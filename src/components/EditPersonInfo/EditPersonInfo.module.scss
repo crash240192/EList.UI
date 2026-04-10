@@ -1,0 +1,31 @@
+.main_wrapper{
+    width: 330px;
+    border: solid rgb(251, 253, 255) 1px;
+    font-size: lage;
+    border-radius: 5px;
+    padding: 5px;
+    position:absolute;
+    left:0;
+    right:0;
+    margin:0 auto;
+    top: 50%;
+    transform: translate(0, -50%);    
+}
+
+.personal_data_wrapper{
+    display: grid;
+    grid-template-columns: 150px 150px;
+    grid-gap: 5px;
+    border: solid rgb(251, 253, 255) 1px;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+.buttons_wrapper{
+    border: solid rgb(251, 253, 255) 1px;
+    border-radius: 5px;
+    margin-top: 5px;
+    padding: 5px;
+    display: flex;
+    justify-content: end;
+}

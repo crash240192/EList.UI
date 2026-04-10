@@ -1,0 +1,43 @@
+.auth_wrapper{
+    font-size: large;
+    border: solid rgb(251, 253, 255) 1px;
+    color: white;
+    border-radius: 5px;
+    padding: 10px;
+    position:absolute;
+    width: 330px;    
+    left:0;
+    right:0;
+    margin:0 auto;
+    top: 50%;
+    transform: translate(0, -50%);    
+}
+
+.auth_data_input_wrapper{
+    border: solid rgb(109, 118, 126) 1px;
+    border-radius: 5px;
+    padding: 7px;
+    display: grid;
+    grid-template-columns: 3fr 5fr;
+    grid-gap: 5px;
+}
+
+.buttons_wrapper{
+    border: solid rgb(109, 118, 126) 1px;
+    border-radius: 5px;
+    padding: 2px;
+    margin-top: 7px;
+    display: flex;
+    justify-content: space-around;
+}
+
+.buttons_wrapper button{
+    width: 50%;
+    margin: 3px;
+}
+
+.change_pass_wrapper{
+    font-size: 14px;
+    float: right;
+    background: radial-gradient();
+}

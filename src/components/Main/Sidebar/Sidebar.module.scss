@@ -1,0 +1,27 @@
+.sidebar{
+    font-size: large;
+    border: solid rgb(251, 253, 255) 1px;
+    color: white;
+    border-radius: 5px;
+    padding: 5px;
+    grid-area: s;
+}
+
+
+
+.sidebar_navigation{
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar_events{
+    border: 1px rgb(255,255,255) solid;
+    border-radius: 5px;
+    padding: 5px;
+}
+/* .personal-data-wrapper{
+    float:left;
+} */
+
+
+

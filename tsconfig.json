@@ -1,0 +1,7 @@
+// tsconfig.json
+{
+    "compilerOptions": {
+      "jsx": "react-jsx",
+      "plugins": [{ "name": "typescript-plugin-css-modules" }]
+    },
+  }

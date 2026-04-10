@@ -1,0 +1,21 @@
+.personal_data_wrapper{
+    border: solid rgb(251, 253, 255) 1px;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+.login_data_wrapper{    
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    grid-gap: 5px;
+}
+
+.main_avatar{
+    width: 70px;
+    border-radius: 35px;
+}
+
+.fio_wrapper{
+    display: flex;
+    flex-direction: column;    
+}
