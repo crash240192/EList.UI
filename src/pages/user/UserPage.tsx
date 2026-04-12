@@ -1,97 +1,92 @@
 // pages/user/UserPage.tsx
+// Единая страница профиля — работает и для текущего пользователя (/user/me)
+// и для чужих (/user/:id)
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/app/store';
-import type { IAccount } from '@/entities/user/types';
+import { getStoredAccountId } from '@/entities/user/api';
+import { fetchFullProfile } from '@/entities/user/profileApi';
+import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
 import styles from './UserPage.module.css';
 
-// Мок-данные пока нет API
-const MOCK_USER: IAccount = {
-  id: 'user-001',
-  login: 'alex_city',
-  avatarUrl: null,
-  organizerRating: 4.6,
-  visitorRating: 4.1,
-  followersCount: 128,
-  followingCount: 74,
-  personInfo: {
-    id: 'pi-001',
-    accountId: 'user-001',
-    firstName: 'Александр',
-    lastName: 'Петров',
-    patronymic: null,
-    gender: 'Male',
-    birthDate: '1992-05-14T00:00:00',
-  },
-};
-
 export default function UserPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { accountId } = useAuthStore();
+  const { id }       = useParams<{ id: string }>();
+  const navigate     = useNavigate();
+  const { isAuthenticated } = useAuthStore();
 
-  const [user, setUser] = useState<IAccount | null>(null);
-  const [loading, setLoading] = useState(true);
+  const myAccountId  = getStoredAccountId();
+  // 'me' или совпадение id — значит это наш профиль
+  const isOwnProfile = !id || id === 'me' || id === myAccountId;
+  const targetId     = isOwnProfile ? null : id;
+
+  const [profile, setProfile]   = useState<IFullProfile | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'participating' | 'created'>('participating');
   const [subscribed, setSubscribed] = useState(false);
 
-  const isOwnProfile = !id || id === 'me' || id === accountId;
-
   useEffect(() => {
     setLoading(true);
-    // TODO: заменить на apiClient.get(`/api/accounts/getData/${id}`)
-    setTimeout(() => {
-      setUser(MOCK_USER);
-      setLoading(false);
-    }, 300);
-  }, [id]);
+    setError(null);
+    fetchFullProfile(targetId)
+      .then(setProfile)
+      .catch(e => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+      .finally(() => setLoading(false));
+  }, [targetId]);
 
   if (loading) return <Skeleton />;
-  if (!user) return (
+
+  if (error || !profile) return (
     <div className={styles.error}>
-      <span>😕</span><p>Пользователь не найден</p>
+      <span>😕</span>
+      <p>{error ?? 'Пользователь не найден'}</p>
       <button onClick={() => navigate(-1)}>← Назад</button>
     </div>
   );
 
-  const fullName = [user.personInfo?.lastName, user.personInfo?.firstName, user.personInfo?.patronymic]
+  const { account, contacts, person } = profile;
+
+  const fullName = [person?.lastName, person?.firstName, person?.patronymic]
     .filter(Boolean).join(' ');
 
-  const age = user.personInfo?.birthDate
-    ? Math.floor((Date.now() - new Date(user.personInfo.birthDate).getTime()) / 31557600000)
+  const age = person?.birthDate
+    ? Math.floor((Date.now() - new Date(person.birthDate).getTime()) / 31_557_600_000)
     : null;
+
+  // Показываем только публичные контакты (или все — для своего профиля)
+  const visibleContacts = contacts.filter(c => isOwnProfile || c.show);
 
   return (
     <div className={styles.page}>
       <button className={styles.backBtn} onClick={() => navigate(-1)}>←</button>
 
-      {/* ---- Header ---- */}
+      {/* ---- Шапка профиля ---- */}
       <div className={styles.header}>
         <div className={styles.avatarWrap}>
-          {user.avatarUrl
-            ? <img src={user.avatarUrl} alt={user.login} className={styles.avatar} />
-            : <div className={styles.avatarPlaceholder}>{user.login[0].toUpperCase()}</div>}
+          <div className={styles.avatarPlaceholder}>
+            {account.login[0].toUpperCase()}
+          </div>
         </div>
 
         <div className={styles.headerInfo}>
-          <h1 className={styles.login}>@{user.login}</h1>
+          <h1 className={styles.login}>@{account.login}</h1>
           {fullName && <p className={styles.fullName}>{fullName}</p>}
 
           <div className={styles.stats}>
-            <button className={styles.statItem}>
-              <span className={styles.statNum}>{user.followersCount ?? 0}</span>
+            <div className={styles.statItem}>
+              <span className={styles.statNum}>—</span>
               <span className={styles.statLabel}>подписчиков</span>
-            </button>
-            <button className={styles.statItem}>
-              <span className={styles.statNum}>{user.followingCount ?? 0}</span>
+            </div>
+            <div className={styles.statItem}>
+              <span className={styles.statNum}>—</span>
               <span className={styles.statLabel}>подписок</span>
-            </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ---- Actions ---- */}
+      {/* ---- Кнопки действий (чужой профиль) ---- */}
       {!isOwnProfile && (
         <div className={styles.actions}>
           <button
@@ -104,23 +99,37 @@ export default function UserPage() {
         </div>
       )}
 
-      {/* ---- Info cards ---- */}
+      {/* ---- Личная информация ---- */}
       <div className={styles.infoGrid}>
         {age !== null && (
           <InfoChip icon="🎂" label="Возраст" value={`${age} лет`} />
         )}
-        {user.personInfo?.gender && (
-          <InfoChip icon="👤" label="Пол" value={user.personInfo.gender === 'Male' ? 'Мужской' : 'Женский'} />
-        )}
-        {user.organizerRating != null && (
-          <InfoChip icon="⭐" label="Рейтинг организатора" value={user.organizerRating.toFixed(1)} />
-        )}
-        {user.visitorRating != null && (
-          <InfoChip icon="🏅" label="Рейтинг посетителя" value={user.visitorRating.toFixed(1)} />
+        {person?.gender && (
+          <InfoChip icon="👤" label="Пол"
+            value={person.gender === 'Male' ? 'Мужской' : 'Женский'} />
         )}
       </div>
 
-      {/* ---- Events tabs ---- */}
+      {/* ---- Контакты ---- */}
+      {visibleContacts.length > 0 && (
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Контакты</h3>
+          <div className={styles.contactsList}>
+            {visibleContacts.map(c => (
+              <ContactRow key={c.id} contact={c} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ---- Редактировать (свой профиль) ---- */}
+      {isOwnProfile && (
+        <button className={styles.editBtn} onClick={() => navigate('/profile/edit')}>
+          ✏️ Редактировать профиль
+        </button>
+      )}
+
+      {/* ---- Мероприятия ---- */}
       <div className={styles.section}>
         <div className={styles.tabs}>
           <button
@@ -136,19 +145,24 @@ export default function UserPage() {
             Организует
           </button>
         </div>
-
         <div className={styles.eventsList}>
           <p className={styles.placeholder}>
             {activeTab === 'participating'
               ? '📅 Мероприятия, в которых участвует пользователь'
-              : '🎯 Мероприятия, созданные пользователем'}
-            <br /><small>Интеграция: GET /api/events/search с participantId / organizatorId</small>
+              : '🎯 Мероприятия, организованные пользователем'}
+            <br />
+            <small>
+              Интеграция: /api/events/search с{' '}
+              {activeTab === 'participating' ? 'participantId' : 'organizatorId'} = {account.id}
+            </small>
           </p>
         </div>
       </div>
     </div>
   );
 }
+
+// ---- Компоненты ----
 
 function InfoChip({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
@@ -162,10 +176,23 @@ function InfoChip({ icon, label, value }: { icon: string; label: string; value: 
   );
 }
 
+function ContactRow({ contact }: { contact: IContactDataItem }) {
+  const typeName = contact.contactType?.localizedName ?? contact.contactType?.namePath ?? 'Контакт';
+  return (
+    <div className={styles.contactRow}>
+      <span className={styles.contactType}>{typeName}</span>
+      <span className={styles.contactValue}>{contact.value}</span>
+      {contact.isAuthorizationContact && (
+        <span className={styles.authTag} title="Авторизационный контакт">★</span>
+      )}
+    </div>
+  );
+}
+
 function Skeleton() {
   return (
-    <div className={styles.page} style={{ gap: 12 }}>
-      <div className={styles.skeletonBlock} style={{ height: 100, borderRadius: 16 }} />
+    <div className={styles.page}>
+      <div className={styles.skeletonBlock} style={{ height: 90, borderRadius: 16 }} />
       <div className={styles.skeletonBlock} style={{ height: 20, width: '40%' }} />
       <div className={styles.skeletonBlock} style={{ height: 20, width: '60%' }} />
     </div>

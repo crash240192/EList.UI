@@ -13,6 +13,7 @@ const MyEventsPage    = lazy(() => import('@/pages/my-events/MyEventsPage'));
 const CreateEventPage = lazy(() => import('@/pages/create-event/CreateEventPage'));
 const LoginPage       = lazy(() => import('@/pages/auth/LoginPage'));
 const ActivationPage  = lazy(() => import('@/pages/auth/ActivationPage'));
+const RegisterPage    = lazy(() => import('@/pages/auth/RegisterPage'));
 
 const Loader = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100dvh', color: '#6366f1', fontSize: 14 }}>
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
   // ---- Публичные маршруты (без AppLayout) ----
   { path: '/login',    element: <AuthGuard>{S(LoginPage)}</AuthGuard> },
   { path: '/activate', element: <AuthGuard>{S(ActivationPage)}</AuthGuard> },
+  { path: '/register', element: <AuthGuard>{S(RegisterPage)}</AuthGuard> },
 
   // ---- Защищённые маршруты (с AppLayout) ----
   {

@@ -1,0 +1,101 @@
+/* pages/auth/RegisterPage.module.css */
+
+/* Чуть шире карточка для формы регистрации */
+.card {
+  max-width: 420px !important;
+}
+
+/* ---- Step indicator ---- */
+
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 160px;
+}
+
+.stepDot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.stepDotActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.stepLine {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  transition: background 0.3s;
+}
+
+.stepLineActive {
+  background: var(--accent);
+}
+
+/* ---- Select ---- */
+
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px !important;
+  cursor: pointer;
+}
+
+/* ---- Loading select placeholder ---- */
+
+.loadingSelect {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ---- Field hint ---- */
+
+.fieldHint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+/* ---- Skip button ---- */
+
+.skipBtn {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.skipBtn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--text-muted);
+}
+
+.skipBtn:disabled { opacity: 0.5; cursor: not-allowed; }
