@@ -1,0 +1,193 @@
+/* pages/my-events/MyEventsPage.module.css */
+
+.page {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Header ---- */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.createBtn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.createBtn:hover { background: var(--accent-hover); }
+
+/* ---- Owner filter ---- */
+
+.ownerFilter {
+  display: flex;
+  gap: 6px;
+  padding: 0 18px 10px;
+  flex-shrink: 0;
+}
+
+.filterChip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filterChip:hover { border-color: var(--accent); color: var(--accent); }
+
+.filterChipActive {
+  background: rgba(99,102,241,0.12) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* ---- Tabs ---- */
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 0 18px;
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px 10px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s;
+  margin-bottom: -1px;
+}
+
+.tab:hover { color: var(--text-primary); }
+
+.tabActive {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent);
+}
+
+.badge {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ---- List ---- */
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---- Card wrap ---- */
+
+.cardWrap {
+  position: relative;
+}
+
+.cardOrganizer {
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+  padding-left: 0;
+}
+
+.organizerTag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  padding-left: 12px;
+}
+
+/* ---- Empty ---- */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 260px;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+
+.empty span { font-size: 48px; }
+.empty p    { font-size: 14px; }
+
+.emptyBtn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sentinel {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loadingMore {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.skeleton {
+  height: 200px;
+  border-radius: 12px;
+  background: var(--surface);
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
