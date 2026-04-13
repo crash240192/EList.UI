@@ -1,10 +1,8 @@
 // entities/user/profileApi.ts
-// Получение полного профиля пользователя из трёх эндпоинтов
 
 import { apiClient } from '@/shared/api/client';
+import { getStoredAccountId } from '@/entities/user/api';
 import type { Gender } from '@/shared/api/types';
-
-// ---- Типы ----
 
 export interface IAccountData {
   id: string;
@@ -40,73 +38,69 @@ export interface IPersonInfo {
 }
 
 export interface IFullProfile {
-  account: IAccountData;
-  contacts: IContactDataItem[];
-  person: IPersonInfo | null;
+  account:       IAccountData;
+  contacts:      IContactDataItem[];
+  contactsError: string | null;   // ошибка загрузки контактов (не роняет страницу)
+  person:        IPersonInfo | null;
 }
 
-// ---- API — текущий пользователь ----
+// ---- Helpers ----
 
-async function fetchMyAccount(): Promise<IAccountData> {
-  const data = await apiClient.get<IAccountData>('/api/accounts/getData');
-  return data.result;
-}
-
-async function fetchMyContacts(): Promise<IContactDataItem[]> {
-  const data = await apiClient.get<IContactDataItem[]>('/api/contacts/getAccountContacts');
-  return data.result ?? [];
-}
-
-async function fetchMyPerson(): Promise<IPersonInfo | null> {
+async function safeContacts(path: string): Promise<{ data: IContactDataItem[]; error: string | null }> {
   try {
-    // Метод без параметров возвращает персональные данные текущего пользователя
-    // Если у пользователя нет PersonInfo — вернёт ошибку, ловим её
-    const accountData = await apiClient.get<IAccountData>('/api/accounts/getData');
-    const accountId   = accountData.result.id;
-    const data = await apiClient.get<IPersonInfo>(`/api/persons/get/${accountId}`);
-    return data.result;
+    const res = await apiClient.get<IContactDataItem[]>(path);
+    return { data: res.result ?? [], error: null };
+  } catch (e) {
+    return { data: [], error: e instanceof Error ? e.message : 'Ошибка загрузки контактов' };
+  }
+}
+
+async function safePerson(path: string): Promise<IPersonInfo | null> {
+  try {
+    const res = await apiClient.get<IPersonInfo>(path);
+    return res.result ?? null;
   } catch {
     return null;
   }
 }
 
-// ---- API — чужой пользователь ----
+// ---- Публичная функция ----
 
-async function fetchAccountById(accountId: string): Promise<IAccountData> {
-  const data = await apiClient.get<IAccountData>(`/api/accounts/getData/${accountId}`);
-  return data.result;
-}
-
-async function fetchContactsByAccountId(accountId: string): Promise<IContactDataItem[]> {
-  const data = await apiClient.get<IContactDataItem[]>(`/api/contacts/getAccountContacts/${accountId}`);
-  return data.result ?? [];
-}
-
-async function fetchPersonByAccountId(accountId: string): Promise<IPersonInfo | null> {
-  try {
-    const data = await apiClient.get<IPersonInfo>(`/api/persons/get/${accountId}`);
-    return data.result;
-  } catch {
-    return null;
-  }
-}
-
-// ---- Публичная функция: загрузить полный профиль ----
-
-/**
- * Загружает аккаунт + контакты + персональные данные одним вызовом.
- * @param accountId — UUID пользователя. Если null/undefined/'me' — загружает текущего.
- */
 export async function fetchFullProfile(
   accountId: string | null | undefined
 ): Promise<IFullProfile> {
   const isMe = !accountId || accountId === 'me';
 
-  const [account, contacts, person] = await Promise.all([
-    isMe ? fetchMyAccount()              : fetchAccountById(accountId!),
-    isMe ? fetchMyContacts()             : fetchContactsByAccountId(accountId!),
-    isMe ? fetchMyPerson()               : fetchPersonByAccountId(accountId!),
+  if (isMe) {
+    // Для текущего пользователя получаем accountId из cookies если нет в хранилище
+    const storedId = getStoredAccountId();
+
+    const [accountRes, contactsRes, person] = await Promise.all([
+      apiClient.get<IAccountData>('/api/accounts/getData'),
+      safeContacts('/api/contacts/getAccountContacts'),
+      // Упрощённый эндпоинт без accountId для текущего пользователя
+      safePerson('/api/persons/get'),
+    ]);
+
+    return {
+      account:       accountRes.result,
+      contacts:      contactsRes.data,
+      contactsError: contactsRes.error,
+      person,
+    };
+  }
+
+  // Для чужого профиля — запросы с accountId
+  const [accountRes, contactsRes, person] = await Promise.all([
+    apiClient.get<IAccountData>(`/api/accounts/getData/${accountId}`),
+    safeContacts(`/api/contacts/getAccountContacts/${accountId}`),
+    safePerson(`/api/persons/get/${accountId}`),
   ]);
 
-  return { account, contacts, person };
+  return {
+    account:       accountRes.result,
+    contacts:      contactsRes.data,
+    contactsError: contactsRes.error,
+    person,
+  };
 }

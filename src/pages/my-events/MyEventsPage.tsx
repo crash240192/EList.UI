@@ -149,7 +149,7 @@ export default function MyEventsPage() {
         <button className={`${styles.tab} ${tab === 'active'  ? styles.tabActive : ''}`}
           onClick={() => setTab('active')}>Активные</button>
         <button className={`${styles.tab} ${tab === 'archive' ? styles.tabActive : ''}`}
-          onClick={() => setTab('archive')}>Архив</button>
+          onClick={() => setTab('archive')}>Прошедшие</button>
       </div>
 
       {/* ---- Content ---- */}
@@ -163,7 +163,7 @@ export default function MyEventsPage() {
         ) : events.length === 0 ? (
           <div className={styles.empty}>
             <span>{tab === 'active' ? '📅' : '📦'}</span>
-            <p>{tab === 'active' ? 'Нет активных событий' : 'Архив пуст'}</p>
+            <p>{tab === 'active' ? 'Нет активных событий' : 'Прошедшие пуст'}</p>
             {tab === 'active' && (
               <button className={styles.emptyBtn} onClick={() => navigate('/')}>
                 Найти события

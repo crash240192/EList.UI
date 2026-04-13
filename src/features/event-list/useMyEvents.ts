@@ -115,11 +115,13 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     try {
       const result = await fetchEvents({
         ...ownerParams(ownerFilter, accountId),
-        ...(tab === 'archive' ? { endTime: new Date().toISOString() } : {}),
+        // Активные: startTime = сейчас (события, которые начнутся или уже идут)
+        // Прошедшие: endTime = сейчас (события, которые уже закончились)
+        ...(tab === 'active'  ? { startTime: new Date().toISOString() } : {}),
+        ...(tab === 'archive' ? { endTime:   new Date().toISOString() } : {}),
         name:       extraParams.name       || undefined,
         categories: extraParams.categories || undefined,
         types:      extraParams.types      || undefined,
-        startTime:  extraParams.startTime  || undefined,
         price:      extraParams.price      || undefined,
         pageIndex:  page,
         pageSize:   PAGE_SIZE,

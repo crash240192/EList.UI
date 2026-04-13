@@ -45,7 +45,7 @@ export default function UserPage() {
     </div>
   );
 
-  const { account, contacts, person } = profile;
+  const { account, contacts, contactsError, person } = profile;
 
   const fullName = [person?.lastName, person?.firstName, person?.patronymic]
     .filter(Boolean).join(' ');
@@ -111,16 +111,18 @@ export default function UserPage() {
       </div>
 
       {/* ---- Контакты ---- */}
-      {visibleContacts.length > 0 && (
-        <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>Контакты</h3>
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Контакты</h3>
+        {contactsError ? (
+          <p className={styles.contactsError}>{contactsError}</p>
+        ) : visibleContacts.length > 0 ? (
           <div className={styles.contactsList}>
-            {visibleContacts.map(c => (
-              <ContactRow key={c.id} contact={c} />
-            ))}
+            {visibleContacts.map(c => <ContactRow key={c.id} contact={c} />)}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className={styles.placeholder}>Контакты не указаны</p>
+        )}
+      </div>
 
       {/* ---- Редактировать (свой профиль) ---- */}
       {isOwnProfile && (
