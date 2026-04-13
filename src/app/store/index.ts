@@ -122,7 +122,11 @@ interface FiltersState {
   resetFilters: () => void;
 }
 
-const DEFAULT_FILTERS: IEventsSearchParams = { pageIndex: 0, pageSize: 20 };
+const DEFAULT_FILTERS: IEventsSearchParams = {
+  pageIndex: 0,
+  pageSize: 20,
+  startTime: new Date().toISOString(),
+};
 
 export const useFiltersStore = create<FiltersState>()((set) => ({
   filters:      DEFAULT_FILTERS,

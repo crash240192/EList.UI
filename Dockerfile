@@ -1,0 +1,60 @@
+# ============================================================
+# Dockerfile — EList UI (React + Vite)
+# Multistage build:
+#   Stage 1 (builder) — устанавливает зависимости и собирает приложение
+#   Stage 2 (runner)  — минимальный nginx образ с готовой сборкой
+# ============================================================
+
+# ---- Stage 1: Build ----
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Копируем манифесты отдельно — используем кеш слоёв Docker
+# если package.json не менялся, npm ci пропускается
+COPY package.json package-lock.json* ./
+
+# Если package-lock.json есть — используем ci для воспроизводимой сборки,
+# иначе обычный install
+RUN if [ -f package-lock.json ]; then \
+      npm ci --prefer-offline; \
+    else \
+      npm install; \
+    fi
+
+# Копируем исходники
+COPY . .
+
+# Переменные окружения для сборки.
+# Переопределяются через --build-arg при docker build
+# или через .env файл (см. ниже)
+ARG VITE_API_BASE_URL=http://92.118.113.6:35028/eList
+ARG VITE_USE_MOCK=false
+
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_USE_MOCK=$VITE_USE_MOCK
+
+# TypeScript проверка + Vite production build
+RUN npm run build
+
+# ---- Stage 2: Serve ----
+FROM nginx:1.27-alpine AS runner
+
+# Удаляем дефолтный nginx config
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Копируем nginx конфиг как шаблон (envsubst подставит BACKEND_URL при старте)
+COPY nginx.conf /etc/nginx/conf.d/default.conf.template
+
+# Копируем собранное приложение из stage 1
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Копируем entrypoint
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh && \
+    chown -R nginx:nginx /usr/share/nginx/html && \
+    chmod -R 755 /usr/share/nginx/html
+
+EXPOSE 80
+
+ENTRYPOINT ["/docker-entrypoint.sh"]

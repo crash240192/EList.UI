@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
-import type { IParticipant } from '@/entities/event';
+import type { IParticipantView } from '@/entities/event';
 import {
   fetchEventById,
   participateEvent,
@@ -15,6 +15,7 @@ import {
 } from '@/entities/event';
 import { useFavoritesStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
+import { UserChip } from '@/entities/user/ui/UserChip';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -26,13 +27,13 @@ export default function EventPage() {
   const { accountId } = useAccountId();
 
   const [event, setEvent]               = useState<IEvent | null>(null);
-  const [participants, setParticipants] = useState<IParticipant[]>([]);
+  const [participants, setParticipants] = useState<IParticipantView[]>([]);
   const [loading, setLoading]           = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['description']));
 
   // Является ли текущий пользователь участником — вычисляется из списка участников
-  const isParticipating = !!accountId && participants.some(p => p.id === accountId);
+  const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
 
   // ---- Загрузка события и участников ----
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function EventPage() {
       : fetchEventById(id);
 
     const loadParticipants = USE_MOCK
-      ? Promise.resolve([] as IParticipant[])
+      ? Promise.resolve([] as IParticipantView[])
       : fetchEventParticipants(id);
 
     Promise.all([loadEvent, loadParticipants])
@@ -62,10 +63,10 @@ export default function EventPage() {
     try {
       if (isParticipating) {
         await leaveEvent(id);
-        setParticipants(prev => prev.filter(p => p.id !== accountId));
+        setParticipants(prev => prev.filter(p => p.accountId !== accountId));
       } else {
         await participateEvent(id);
-        setParticipants(prev => [...prev, { id: accountId }]);
+        setParticipants(prev => [...prev, { accountId, login: '', firstName: null, lastName: null }]);
       }
     } finally {
       setActionLoading(false);
@@ -242,35 +243,32 @@ function ParticipantsList({
   participants,
   currentAccountId,
 }: {
-  participants: IParticipant[];
+  participants: IParticipantView[];
   currentAccountId: string | null;
 }) {
   if (participants.length === 0) {
     return <p className={styles.sectionPlaceholder}>Пока никто не записался</p>;
   }
 
-  // Разделяем: сначала текущий пользователь
-  const me     = participants.filter(p => p.id === currentAccountId);
-  const others = participants.filter(p => p.id !== currentAccountId);
+  // Текущий пользователь — первым
+  const me     = participants.filter(p => p.accountId === currentAccountId);
+  const others = participants.filter(p => p.accountId !== currentAccountId);
+  const sorted = [...me, ...others];
 
   return (
     <div className={styles.participantsList}>
-      {me.length > 0 && (
-        <div className={styles.participantRow} style={{ opacity: 0.9 }}>
-          <div className={styles.participantAvatar} style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
-            Я
-          </div>
-          <span className={styles.participantName}>Вы</span>
-          <span className={styles.participantTag}>участник</span>
-        </div>
-      )}
-      {others.map(p => (
-        <div key={p.id} className={styles.participantRow}>
-          <div className={styles.participantAvatar}>
-            {p.login ? p.login[0].toUpperCase() : '?'}
-          </div>
-          <span className={styles.participantName}>{p.login ?? p.id.slice(0, 8)}</span>
-        </div>
+      {sorted.map(p => (
+        <UserChip
+          key={p.accountId}
+          user={{
+            accountId: p.accountId,
+            login:     p.login,
+            firstName: p.firstName,
+            lastName:  p.lastName,
+            isMe:      p.accountId === currentAccountId,
+          }}
+          size="md"
+        />
       ))}
     </div>
   );

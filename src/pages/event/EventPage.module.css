@@ -396,8 +396,9 @@
 
 .participantsList {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
 }
 
 .participantRow {

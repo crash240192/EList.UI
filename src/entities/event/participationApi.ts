@@ -1,47 +1,63 @@
 // entities/event/participationApi.ts
-// Методы участия в мероприятии
-// Все три — GET-запросы согласно swagger
 
 import { apiClient } from '@/shared/api/client';
 
-export interface IParticipant {
-  id: string;           // accountId участника
-  login?: string;
-  // Дополнительные поля если API возвращает расширенную модель
+// ---- Типы из реального ответа API ----
+
+export interface IParticipantAccount {
+  id: string;
+  login: string;
+  active: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  registrationDate: string;
+  lastSeenDate: string | null;
+  lastActionDate: string | null;
+  walletId: string | null;
 }
 
-/**
- * Записаться на мероприятие.
- * GET /api/participations/participate/{id}
- */
+export interface IParticipantPersonInfo {
+  id: string;
+  accountId: string;
+  firstName: string | null;
+  lastName: string | null;
+  patronymic: string | null;
+  gender: 'Male' | 'Female' | null;
+  birthDate: string | null;
+}
+
+export interface IParticipant {
+  account: IParticipantAccount;
+  personInfo: IParticipantPersonInfo | null;
+}
+
+// Плоская модель для отображения (после нормализации)
+export interface IParticipantView {
+  accountId: string;
+  login: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
 export async function participateEvent(eventId: string): Promise<void> {
   await apiClient.get(`/api/participations/participate/${eventId}`);
 }
 
-/**
- * Покинуть мероприятие.
- * GET /api/participations/leave/{id}
- */
 export async function leaveEvent(eventId: string): Promise<void> {
   await apiClient.get(`/api/participations/leave/${eventId}`);
 }
 
-/**
- * Получить список участников мероприятия.
- * GET /api/participations/eventParticipants/{id}
- * Возвращает массив участников (структура уточняется по реальному ответу API).
- */
-export async function fetchEventParticipants(eventId: string): Promise<IParticipant[]> {
-  // API возвращает CommandResult<unknown> — обрабатываем гибко
-  const data = await apiClient.get<IParticipant[] | string[]>(`/api/participations/eventParticipants/${eventId}`);
-
+export async function fetchEventParticipants(eventId: string): Promise<IParticipantView[]> {
+  const data = await apiClient.get<IParticipant[]>(
+    `/api/participations/eventParticipants/${eventId}`
+  );
   const result = data.result;
   if (!result || !Array.isArray(result)) return [];
 
-  // Если сервер вернул массив строк (UUID) — нормализуем в объекты
-  if (typeof result[0] === 'string') {
-    return (result as string[]).map(id => ({ id }));
-  }
-
-  return result as IParticipant[];
+  return result.map(p => ({
+    accountId: p.account.id,
+    login:     p.account.login,
+    firstName: p.personInfo?.firstName ?? null,
+    lastName:  p.personInfo?.lastName  ?? null,
+  }));
 }

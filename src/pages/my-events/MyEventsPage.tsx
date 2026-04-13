@@ -69,7 +69,7 @@ export default function MyEventsPage() {
           <button key={f}
             className={`${styles.filterChip} ${ownerFilter === f ? styles.filterChipActive : ''}`}
             onClick={() => setOwnerFilter(f)}>
-            {{ all: 'Все', mine: 'Мои', others: 'Подписки' }[f]}
+            {{ all: 'Все', mine: 'Мои', others: 'Участвую' }[f]}
           </button>
         ))}
       </div>

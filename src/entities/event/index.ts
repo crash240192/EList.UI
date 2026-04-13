@@ -37,4 +37,4 @@ export {
   fetchEventParticipants,
 } from './participationApi';
 
-export type { IParticipant } from './participationApi';
+export type { IParticipant, IParticipantView, IParticipantAccount, IParticipantPersonInfo } from './participationApi';

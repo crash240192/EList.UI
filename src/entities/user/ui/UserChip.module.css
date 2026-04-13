@@ -1,0 +1,123 @@
+/* entities/user/ui/UserChip.module.css */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 5px 10px 5px 5px;
+  transition: background 0.15s, border-color 0.15s;
+  min-width: 0;
+  max-width: 220px;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: var(--surface-2);
+  border-color: var(--accent);
+}
+
+.clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.isMe {
+  border-color: rgba(99,102,241,0.4);
+  background: rgba(99,102,241,0.06);
+}
+
+/* ---- Sizes ---- */
+
+.sm { padding: 3px 8px 3px 3px; gap: 6px; }
+.md { padding: 5px 10px 5px 5px; }
+
+/* ---- Avatar ---- */
+
+.avatar {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sm .avatar { width: 24px; height: 24px; }
+.md .avatar { width: 30px; height: 30px; }
+
+.avatarImg,
+.avatarInitials {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarImg { object-fit: cover; }
+
+.avatarInitials {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-weight: 700;
+}
+
+.sm .avatarInitials { font-size: 10px; }
+.md .avatarInitials { font-size: 12px; }
+
+.meDot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  background: var(--success);
+  border-radius: 50%;
+  border: 1.5px solid var(--surface);
+}
+
+/* ---- Info ---- */
+
+.info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.login {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sm .login { font-size: 11px; }
+
+.name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Rating ---- */
+
+.rating {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f59e0b;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.sm .rating { font-size: 10px; }

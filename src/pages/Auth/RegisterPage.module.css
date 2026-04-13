@@ -78,6 +78,31 @@
   line-height: 1.4;
 }
 
+/* ---- City selector ---- */
+
+.cityRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cityRow .select { flex: 1; }
+
+.geoSpinner {
+  font-size: 16px;
+  animation: spin 1.5s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.geoOk {
+  font-size: 14px;
+  color: var(--success);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 /* ---- Skip button ---- */
 
 .skipBtn {

@@ -1,0 +1,18 @@
+services:
+  elist-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # URL бэкенда на этапе сборки (для Vite VITE_API_BASE_URL).
+        # При использовании nginx-прокси можно оставить как есть — 
+        # запросы /eList/* будут проксироваться через nginx.
+        VITE_API_BASE_URL: http://92.118.113.6:35028/eList
+        VITE_USE_MOCK: "false"
+    ports:
+      - "80:80"
+    environment:
+      # URL бэкенда для nginx reverse proxy (подставляется в runtime).
+      # Меняйте здесь, не пересобирая образ.
+      BACKEND_URL: http://92.118.113.6:35028
+    restart: unless-stopped

@@ -18,9 +18,11 @@ export interface ICreateAccountRequest {
   login: string;
   password: string;
   passwordConfirmation: string;
-  authorizationContactValue: string;  // значение контакта (email / телефон)
-  authorizationContactType: string;   // UUID типа контакта
+  authorizationContactValue: string;
+  authorizationContactType: string;
   showContact: boolean;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface IPersonRequest {

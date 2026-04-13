@@ -14,6 +14,7 @@ import {
 } from '@/features/auth/registrationApi';
 import { login } from '@/features/auth/api';
 import { useAuthStore } from '@/app/store';
+import { useGeoCity, POPULAR_CITIES, type ICity } from '@/features/auth/useGeoCity';
 import type { Gender } from '@/shared/api/types';
 import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
@@ -48,6 +49,20 @@ export default function RegisterPage() {
 
   const [contactTypes, setContactTypes]       = useState<IContactType[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
+
+  // Геолокация
+  const { detectedCity, detectedCoords, loading: geoLoading } = useGeoCity();
+  const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
+
+  // Когда геолокация определилась — подставляем найденный город
+  useEffect(() => {
+    if (detectedCity && !selectedCity) setSelectedCity(detectedCity);
+  }, [detectedCity]);
+
+  // Итоговые координаты: сначала точные (GPS/IP), потом из выбранного города
+  const finalCoords = detectedCoords ?? (selectedCity
+    ? { lat: selectedCity.lat, lng: selectedCity.lng }
+    : null);
 
   const [form1, setForm1] = useState<Step1Form>({
     login: '', password: '', passwordConfirmation: '',
@@ -103,8 +118,10 @@ export default function RegisterPage() {
         authorizationContactType:  form1.contactTypeId,
         authorizationContactValue: form1.contactValue.trim(),
         showContact:               true,
+        // Координаты: точные из геолокации или из выбранного города
+        latitude:  finalCoords?.lat ?? undefined,
+        longitude: finalCoords?.lng ?? undefined,
       });
-      // Аккаунт создан — сохраняем credentials, переходим к шагу 2
       setSavedCreds({ login: form1.login.trim(), password: form1.password });
       setStep(2);
     } catch (e) {
@@ -123,13 +140,7 @@ export default function RegisterPage() {
       const authResult = await login(savedCreds);
       setAuth(authResult.token, authResult.activationRequired);
 
-      // 2. Если нужна активация — туда, персданные потом
-      if (authResult.activationRequired) {
-        navigate('/activate', { replace: true });
-        return;
-      }
-
-      // 3. Сохраняем персданные (если не скипнули)
+      // 2. Сохраняем персданные сразу — токен уже есть, эндпоинт POST /api/persons/set
       if (personData) {
         const hasData = personData.firstName || personData.lastName ||
                         personData.patronymic || personData.gender || personData.birthDate;
@@ -142,8 +153,14 @@ export default function RegisterPage() {
             birthDate:  personData.birthDate
               ? new Date(personData.birthDate).toISOString()
               : undefined,
-          }).catch(() => { /* не критично */ });
+          }).catch(() => { /* не критично — профиль можно заполнить позже */ });
         }
+      }
+
+      // 3. Если нужна активация — переходим на страницу кода
+      if (authResult.activationRequired) {
+        navigate('/activate', { replace: true });
+        return;
       }
 
       navigate('/', { replace: true });
@@ -228,6 +245,34 @@ export default function RegisterPage() {
                   onKeyDown={e => e.key === 'Enter' && handleStep1()} />
                 {selectedContactType?.description && (
                   <p className={regStyles.fieldHint}>{selectedContactType.description}</p>
+                )}
+              </Field>
+
+              {/* Город */}
+              <Field label="Ваш город">
+                <div className={regStyles.cityRow}>
+                  <select
+                    className={`${styles.input} ${regStyles.select}`}
+                    value={selectedCity?.name ?? ''}
+                    onChange={e => {
+                      const city = POPULAR_CITIES.find(c => c.name === e.target.value) ?? null;
+                      setSelectedCity(city);
+                    }}
+                  >
+                    <option value="">— Выбрать город —</option>
+                    {POPULAR_CITIES.map(c => (
+                      <option key={c.name} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                  {geoLoading && <span className={regStyles.geoSpinner} title="Определяем местоположение...">📡</span>}
+                  {!geoLoading && detectedCoords && (
+                    <span className={regStyles.geoOk} title="Координаты определены точно">✓</span>
+                  )}
+                </div>
+                {detectedCoords && (
+                  <p className={regStyles.fieldHint}>
+                    📍 Координаты определены ({detectedCoords.lat.toFixed(3)}, {detectedCoords.lng.toFixed(3)})
+                  </p>
                 )}
               </Field>
             </div>
