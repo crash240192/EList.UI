@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useThemeStore, useAuthStore } from '../store';
+import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
 import styles from './AppLayout.module.css';
 
 const NAV_ITEMS = [
@@ -16,9 +17,17 @@ const NAV_ITEMS = [
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
   const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    setLogoutConfirm(false);
+    setSidebarOpen(false);
+    navigate('/login', { replace: true });
+  };
 
   // Синхронизируем класс body при монтировании
   useEffect(() => {
@@ -83,18 +92,20 @@ export function AppLayout() {
         </nav>
 
         {isAuthenticated() && (
-          <button className={styles.logoutBtn} onClick={logout}>
+          <button className={styles.logoutBtn} onClick={() => setLogoutConfirm(true)}>
             Выйти
           </button>
         )}
       </aside>
 
-      {/* Оверлей для закрытия sidebar на мобиле */}
       {sidebarOpen && (
-        <div
-          className={styles.overlay}
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden
+        <div className={styles.overlay} onClick={() => setSidebarOpen(false)} aria-hidden />
+      )}
+
+      {logoutConfirm && (
+        <LogoutConfirmModal
+          onConfirm={handleLogout}
+          onCancel={() => setLogoutConfirm(false)}
         />
       )}
 

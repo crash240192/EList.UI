@@ -338,6 +338,46 @@
   font-size: 14px;
 }
 
+/* ---- Mini-map ---- */
+
+.miniMapWrap {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  height: 180px;
+  flex-shrink: 0;
+}
+
+.miniMapFrame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  filter: var(--map-filter, none);
+}
+
+/* Инвертируем карту в тёмной теме для лучшего вида */
+:global(body:not(.light-theme)) .miniMapFrame {
+  filter: invert(0.9) hue-rotate(180deg) saturate(0.8);
+}
+
+.miniMapLink {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.miniMapLink:hover { background: rgba(0,0,0,0.85); }
+
 /* ---- Spinner ---- */
 
 .spinner {

@@ -138,6 +138,11 @@ export default function EventPage() {
           )}
         </div>
 
+        {/* Mini-map */}
+        {event.latitude && event.longitude && (
+          <MiniMap lat={event.latitude} lng={event.longitude} label={event.name} />
+        )}
+
         {/* ---- Actions ---- */}
         <div className={styles.actions}>
           {!isOrganizer && (
@@ -285,6 +290,32 @@ function Section({
         <span className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`}>›</span>
       </button>
       {open && <div className={styles.sectionBody}>{children}</div>}
+    </div>
+  );
+}
+
+// ---- Mini-map (OpenStreetMap iframe, без зависимостей) ----
+
+function MiniMap({ lat, lng, label }: { lat: number; lng: number; label: string }) {
+  const src = `https://www.openstreetmap.org/export/embed.html`
+    + `?bbox=${lng-0.01},${lat-0.007},${lng+0.01},${lat+0.007}`
+    + `&layer=mapnik&marker=${lat},${lng}`;
+  const fullMapUrl =
+    `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`;
+
+  return (
+    <div className={styles.miniMapWrap}>
+      <iframe
+        className={styles.miniMapFrame}
+        src={src}
+        title={`Карта: ${label}`}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin"
+      />
+      <a className={styles.miniMapLink} href={fullMapUrl} target="_blank" rel="noopener noreferrer">
+        Открыть на карте ↗
+      </a>
     </div>
   );
 }

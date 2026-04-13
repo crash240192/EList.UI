@@ -1,193 +1,162 @@
 /* pages/my-events/MyEventsPage.module.css */
 
-.page {
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
+.page { height: 100%; overflow-y: auto; display: flex; flex-direction: column; }
 
 /* ---- Header ---- */
-
 .header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 18px 12px;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px; flex-shrink: 0;
 }
-
-.title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
+.title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
 .createBtn {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
-
 .createBtn:hover { background: var(--accent-hover); }
 
-/* ---- Owner filter ---- */
-
-.ownerFilter {
-  display: flex;
-  gap: 6px;
-  padding: 0 18px 10px;
-  flex-shrink: 0;
-}
-
+/* ---- Owner filter chips ---- */
+.ownerFilter { display: flex; gap: 6px; padding: 0 16px 10px; flex-shrink: 0; }
 .filterChip {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 5px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+  padding: 5px 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.15s;
 }
-
 .filterChip:hover { border-color: var(--accent); color: var(--accent); }
-
 .filterChipActive {
   background: rgba(99,102,241,0.12) !important;
   border-color: var(--accent) !important;
   color: var(--accent) !important;
 }
 
+/* ---- Search bar ---- */
+.searchBar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 16px 10px; flex-shrink: 0;
+}
+.searchWrap { flex: 1; position: relative; display: flex; align-items: center; }
+.searchIcon { position: absolute; left: 10px; color: var(--text-secondary); pointer-events: none; }
+.searchInput {
+  width: 100%; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 30px 8px 32px; font-size: 13px;
+  color: var(--text-primary); outline: none; font-family: inherit;
+}
+.searchInput:focus { border-color: var(--accent); }
+.searchInput::placeholder { color: var(--text-muted); }
+.clearBtn {
+  position: absolute; right: 8px; background: none; border: none;
+  cursor: pointer; color: var(--text-secondary); font-size: 12px; padding: 2px 4px;
+}
+.filterToggle {
+  position: relative; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 10px; cursor: pointer; color: var(--text-secondary);
+  display: flex; align-items: center; flex-shrink: 0; transition: all 0.15s;
+}
+.filterToggle:hover, .filterActive { border-color: var(--accent); color: var(--accent); }
+.filterDot {
+  position: absolute; top: 4px; right: 4px; width: 6px; height: 6px;
+  background: var(--accent); border-radius: 50%;
+}
+
+/* ---- Expanded filters ---- */
+.expandedFilters {
+  padding: 8px 16px 12px; display: flex; flex-direction: column;
+  gap: 10px; flex-shrink: 0; border-bottom: 1px solid var(--border);
+}
+.filterGroupFull { display: flex; flex-direction: column; gap: 4px; }
+.filterRow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.filterGroup { display: flex; flex-direction: column; gap: 4px; }
+.filterLabel {
+  font-size: 11px; color: var(--text-secondary); text-transform: uppercase;
+  letter-spacing: 0.05em; font-weight: 500;
+}
+.filterInput {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; font-size: 13px; color: var(--text-primary);
+  outline: none; width: 100%; font-family: inherit;
+}
+.filterInput:focus { border-color: var(--accent); }
+.pickerBtn {
+  width: 100%; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; font-size: 13px; color: var(--text-secondary);
+  cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;
+}
+.pickerBtn:hover { border-color: var(--accent); }
+.pickerBtnActive {
+  border-color: var(--accent) !important; color: var(--accent) !important;
+  background: rgba(99,102,241,0.06);
+}
+.resetBtn {
+  background: none; border: 1px solid var(--danger); color: var(--danger);
+  border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+  align-self: flex-start;
+}
+.resetBtn:hover { background: rgba(239,68,68,0.08); }
+
 /* ---- Tabs ---- */
-
 .tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  padding: 0 18px;
+  display: flex; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; padding: 0 16px;
 }
-
 .tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 10px 16px 10px 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: color 0.15s;
-  margin-bottom: -1px;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 10px 16px 10px 0; font-size: 13px; font-weight: 500;
+  color: var(--text-secondary); cursor: pointer; margin-bottom: -1px;
 }
-
 .tab:hover { color: var(--text-primary); }
-
-.tabActive {
-  color: var(--accent) !important;
-  border-bottom-color: var(--accent);
-}
-
-.badge {
-  background: var(--accent);
-  color: #fff;
-  border-radius: 10px;
-  padding: 1px 6px;
-  font-size: 10px;
-  font-weight: 700;
-}
+.tabActive { color: var(--accent) !important; border-bottom-color: var(--accent); }
 
 /* ---- List ---- */
+.list { flex: 1; overflow-y: auto; padding: 14px 16px 40px; }
 
-.list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 14px 18px 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* ---- Grid ---- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
 }
 
-/* ---- Card wrap ---- */
-
+/* ---- Card wrap: единый контейнер для всех карточек ---- */
 .cardWrap {
   position: relative;
+  /* Важно: НЕТ display:contents — div корректно занимает ячейку грида */
 }
 
+/* Организаторская карточка — подсветка слева */
 .cardOrganizer {
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--accent) !important;
   border-radius: 12px;
-  padding-left: 0;
 }
 
+/* Бейдж "Организатор" поверх карточки */
 .organizerTag {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 4px;
-  padding-left: 12px;
-}
-
-/* ---- Empty ---- */
-
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 260px;
-  gap: 12px;
-  color: var(--text-secondary);
-}
-
-.empty span { font-size: 48px; }
-.empty p    { font-size: 14px; }
-
-.emptyBtn {
+  position: absolute;
+  top: 8px; left: 8px;
+  z-index: 2;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #fff;
   background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 9px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
+  border-radius: 20px; padding: 2px 8px;
+  pointer-events: none;
 }
 
-.sentinel {
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ---- States ---- */
+.empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 260px; gap: 12px; color: var(--text-secondary);
 }
-
-.loadingMore {
-  font-size: 13px;
-  color: var(--text-secondary);
+.empty span { font-size: 48px; }
+.empty p    { font-size: 14px; margin: 0; }
+.emptyBtn {
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  padding: 9px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
+.emptyBtn:hover { background: var(--accent-hover); }
 
 .skeleton {
-  height: 200px;
-  border-radius: 12px;
-  background: var(--surface);
-  animation: shimmer 1.4s infinite;
+  height: 240px; border-radius: 12px; background: var(--surface);
+  animation: shimmer 1.4s ease-in-out infinite;
 }
+@keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:0.45} }
 
-@keyframes shimmer {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
-}
+.sentinel { height: 50px; display: flex; align-items: center; justify-content: center; }
+.loadingMore { font-size: 13px; color: var(--text-secondary); }

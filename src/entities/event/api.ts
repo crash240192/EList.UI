@@ -114,7 +114,7 @@ export async function updateEventParameters(
 // ---- Категории мероприятий ----
 
 export async function fetchEventCategories(): Promise<IEventCategory[]> {
-  const data = await apiClient.get<IEventCategory[]>('/api/events/categories/getAll');
+  const data = await apiClient.get<IEventCategory[]>('/api/events/eventCategories/getAll');
   return data.result;
 }
 
@@ -124,7 +124,7 @@ export async function fetchEventTypes(
   categoryId?: string
 ): Promise<IEventType[]> {
   const qs = buildQuery({ categoryId });
-  const data = await apiClient.get<IEventType[]>(`/api/events/types/getAll${qs}`);
+  const data = await apiClient.get<IEventType[]>(`/api/events/eventTypes/getAll${qs}`);
   return data.result;
 }
 
