@@ -1,7 +1,7 @@
 // pages/home/HomePage.tsx
 // Главная страница: карта + список + фильтры
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { IEvent, EventViewMode, IEventsSearchParams } from '@/entities/event';
 import { EventCard } from '@/entities/event';
 import { useEvents } from '@/features/event-list/useEvents';
@@ -9,6 +9,7 @@ import { useFiltersStore, useFavoritesStore } from '@/app/store';
 import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
 import { EventModal } from './EventModal';
 import { FilterBar } from './FilterBar';
+import { EventMap } from '@/features/event-map/EventMap';
 import styles from './HomePage.module.css';
 
 export default function HomePage() {
@@ -46,9 +47,12 @@ export default function HomePage() {
       {/* ---- Content area ---- */}
       <div className={styles.content}>
         {viewMode === 'map' ? (
-          /* MAP VIEW */
+          /* MAP VIEW — реальная Leaflet карта */
           <div className={styles.mapPlaceholder}>
-            <MapPlaceholder events={events} onMarkerClick={handleEventClick} />
+            <EventMap
+              events={events}
+              onMarkerClick={handleEventClick}
+            />
           </div>
         ) : (
           /* LIST VIEW */
@@ -95,42 +99,6 @@ export default function HomePage() {
           onClose={() => setSelectedEvent(null)}
         />
       )}
-    </div>
-  );
-}
-
-/* ---- Map placeholder (замените на реальную карту Leaflet/Яндекс) ---- */
-
-function MapPlaceholder({
-  events,
-  onMarkerClick,
-}: {
-  events: IEvent[];
-  onMarkerClick: (e: IEvent) => void;
-}) {
-  return (
-    <div className={styles.mapMock}>
-      <div className={styles.mapLabel}>
-        🗺️ Здесь будет карта (Leaflet / Яндекс.Карты)
-        <br />
-        <small>Интегрируйте react-leaflet или ymaps3-react</small>
-      </div>
-      {/* Условные маркеры поверх плейсхолдера */}
-      {events.map((event, i) => (
-        <button
-          key={event.id}
-          className={styles.mockMarker}
-          style={{
-            left: `${15 + ((i * 17) % 70)}%`,
-            top:  `${20 + ((i * 23) % 60)}%`,
-          }}
-          onClick={() => onMarkerClick(event)}
-          title={event.name}
-        >
-          {event.eventType?.eventCategory?.namePath?.startsWith('music') ? '🎵' :
-           event.eventType?.eventCategory?.namePath?.startsWith('sport') ? '⚽' : '📍'}
-        </button>
-      ))}
     </div>
   );
 }

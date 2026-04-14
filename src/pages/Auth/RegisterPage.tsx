@@ -15,6 +15,7 @@ import {
 import { login } from '@/features/auth/api';
 import { useAuthStore } from '@/app/store';
 import { useGeoCity, POPULAR_CITIES, type ICity } from '@/features/auth/useGeoCity';
+import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import type { Gender } from '@/shared/api/types';
 import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
@@ -131,7 +132,7 @@ export default function RegisterPage() {
     }
   };
 
-  // ---- Финальный логин после шага 2 (с персданными или без) ----
+  // ---- Финальный логин после шага 2 ----
   const finishRegistration = async (personData?: Step2Form) => {
     setLoading(true);
     setError(null);
@@ -140,12 +141,9 @@ export default function RegisterPage() {
       const authResult = await login(savedCreds);
       setAuth(authResult.token, authResult.activationRequired);
 
-      // 2. Сохраняем персданные сразу — токен уже есть, эндпоинт POST /api/persons/set
-      if (personData) {
-        const hasData = personData.firstName || personData.lastName ||
-                        personData.patronymic || personData.gender || personData.birthDate;
-        if (hasData) {
-          await setPersonInfo({
+      // 2. Готовим объект персональных данных (если есть что отправлять)
+      const personPayload = personData
+        ? {
             firstName:  personData.firstName.trim()  || undefined,
             lastName:   personData.lastName.trim()   || undefined,
             patronymic: personData.patronymic.trim() || undefined,
@@ -153,14 +151,27 @@ export default function RegisterPage() {
             birthDate:  personData.birthDate
               ? new Date(personData.birthDate).toISOString()
               : undefined,
-          }).catch(() => { /* не критично — профиль можно заполнить позже */ });
-        }
-      }
+          }
+        : null;
 
-      // 3. Если нужна активация — переходим на страницу кода
+      const hasPersonData = personPayload &&
+        (personPayload.firstName || personPayload.lastName ||
+         personPayload.patronymic || personPayload.gender || personPayload.birthDate);
+
+      // 3. Если нужна активация — сохраняем персданные в sessionStorage,
+      //    отправим их после активации в ActivationPage
       if (authResult.activationRequired) {
+        if (hasPersonData && personPayload) {
+          savePendingPersonData(personPayload);
+        }
         navigate('/activate', { replace: true });
         return;
+      }
+
+      // 4. Активация не нужна — отправляем сразу
+      if (hasPersonData && personPayload) {
+        await setPersonInfo(personPayload)
+          .catch(() => { /* не критично */ });
       }
 
       navigate('/', { replace: true });

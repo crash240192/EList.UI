@@ -282,21 +282,28 @@
 
 /* ---- Footer ---- */
 
+/* Убираем padding-bottom со страницы — footer теперь sticky */
+.page {
+  padding-bottom: 0 !important;
+}
+
 .footer {
-  position: fixed;
+  position: sticky;
   bottom: 0;
-  left: 0;
-  right: 0;
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding: 12px 18px;
   display: flex;
   gap: 10px;
-  z-index: 50;
+  /* Ширина как у блока формы */
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .cancelBtn {
-  flex: 1;
+  flex: 1;  /* равные доли */
   background: none;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -311,7 +318,7 @@
 .cancelBtn:hover { background: var(--surface-2); }
 
 .submitBtn {
-  flex: 2;
+  flex: 1;  /* равные доли — пополам */
   background: var(--accent);
   color: #fff;
   border: none;

@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { activateAccount } from '@/features/auth/api';
+import { setPersonInfo } from '@/features/auth/registrationApi';
+import { loadPendingPersonData, clearPendingPersonData } from '@/features/auth/pendingPersonData';
 import { useAuthStore } from '@/app/store';
 import styles from './AuthPage.module.css';
 
@@ -21,13 +23,10 @@ export default function ActivationPage() {
   const code = digits.join('');
 
   const handleDigit = (index: number, value: string) => {
-    // Принимаем только цифры или буквы (код может быть не только цифровым)
     const clean = value.replace(/\s/g, '').slice(-1);
     const next  = [...digits];
     next[index] = clean;
     setDigits(next);
-
-    // Авто-фокус на следующий инпут
     if (clean && index < CODE_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -48,7 +47,6 @@ export default function ActivationPage() {
     const next = [...digits];
     pasted.split('').forEach((ch, i) => { if (i < CODE_LENGTH) next[i] = ch; });
     setDigits(next);
-    // Фокус на последний заполненный + 1
     const focusIndex = Math.min(pasted.length, CODE_LENGTH - 1);
     inputRefs.current[focusIndex]?.focus();
   };
@@ -63,6 +61,14 @@ export default function ActivationPage() {
     try {
       await activateAccount(code);
       confirmActivation();
+
+      // После активации — отправляем ранее сохранённые персональные данные
+      const pendingPerson = loadPendingPersonData();
+      if (pendingPerson) {
+        await setPersonInfo(pendingPerson).catch(() => {});
+        clearPendingPersonData();
+      }
+
       setSuccess(true);
       setTimeout(() => navigate('/', { replace: true }), 1200);
     } catch (err) {
@@ -89,13 +95,11 @@ export default function ActivationPage() {
         ) : (
           <>
             <p className={styles.subtitle}>
-              На ваш контакт отправлен код подтверждения.
-              <br />Введите его ниже.
+              На ваш контакт отправлен код подтверждения.<br />Введите его ниже.
             </p>
 
             {error && <div className={styles.error}>{error}</div>}
 
-            {/* Код — раздельные инпуты */}
             <div className={styles.codeRow} onPaste={handlePaste}>
               {digits.map((d, i) => (
                 <input

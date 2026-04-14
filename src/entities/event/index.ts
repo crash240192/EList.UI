@@ -4,7 +4,7 @@ export type {
   IEvent,
   IEventCategory,
   IEventType,
-  IEventParameters,
+  //IEventParameters,
   IEventsSearchParams,
   ICreateEventRequest,
   IEventParametersRequest,
@@ -22,7 +22,7 @@ export {
   deleteEvent,
   startEvent,
   finishEvent,
-  fetchEventParameters,
+  //fetchEventParameters,
   updateEventParameters,
   fetchEventCategories,
   fetchEventTypes,
@@ -38,3 +38,10 @@ export {
 } from './participationApi';
 
 export type { IParticipant, IParticipantView, IParticipantAccount, IParticipantPersonInfo } from './participationApi';
+
+export {
+  fetchEventParameters,
+  fetchEventOrganizators,
+} from './eventExtrasApi';
+
+export type { IEventParameters, IEventOrganizator } from './eventExtrasApi';

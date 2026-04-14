@@ -1,5 +1,4 @@
 // app/providers/AppLayout.tsx
-// Корневой layout — хедер, боковая панель, контент
 
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
@@ -7,17 +6,18 @@ import { useThemeStore, useAuthStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
 import styles from './AppLayout.module.css';
 
+// Профиль убран из сайдбара — доступ через аватар в хедере
 const NAV_ITEMS = [
-  { to: '/',            label: 'Поиск событий',  icon: <SearchIcon /> },
-  { to: '/my-events',   label: 'Мои события',    icon: <CalendarIcon /> },
-  { to: '/create-event',label: 'Создать событие',icon: <PlusIcon /> },
-  { to: '/user/me',     label: 'Мой профиль',    icon: <UserIcon /> },
-  { to: '/wallet',      label: 'Кошелёк',        icon: <WalletIcon /> },
+  { to: '/',             label: 'Поиск событий',  icon: <SearchIcon /> },
+  { to: '/my-events',    label: 'Мои события',    icon: <CalendarIcon /> },
+  { to: '/create-event', label: 'Создать событие',icon: <PlusIcon /> },
+  { to: '/wallet',       label: 'Кошелёк',        icon: <WalletIcon /> },
 ];
 
 export function AppLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [logoutConfirm, setLogoutConfirm] = useState(false);
+  // true = развёрнут, false = свёрнут до иконок
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [logoutConfirm, setLogoutConfirm]     = useState(false);
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -25,11 +25,9 @@ export function AppLayout() {
   const handleLogout = () => {
     logout();
     setLogoutConfirm(false);
-    setSidebarOpen(false);
     navigate('/login', { replace: true });
   };
 
-  // Синхронизируем класс body при монтировании
   useEffect(() => {
     document.body.classList.toggle('light-theme', theme === 'light');
   }, [theme]);
@@ -41,15 +39,16 @@ export function AppLayout() {
         <div className={styles.headerLeft}>
           <button
             className={styles.menuBtn}
-            onClick={() => setSidebarOpen((v) => !v)}
-            aria-label="Меню"
+            onClick={() => setSidebarExpanded(v => !v)}
+            aria-label={sidebarExpanded ? 'Свернуть меню' : 'Развернуть меню'}
           >
             <HamburgerIcon />
           </button>
-          <div className={styles.logo}>
+          {/* Логотип — кликабельный, ведёт на главную */}
+          <button className={styles.logo} onClick={() => navigate('/')} aria-label="На главную">
             <span>📍</span>
             <span>EList</span>
-          </div>
+          </button>
         </div>
 
         <div className={styles.headerRight}>
@@ -72,8 +71,8 @@ export function AppLayout() {
         </div>
       </header>
 
-      {/* ---- Sidebar ---- */}
-      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
+      {/* ---- Sidebar (всегда видим, сворачивается до иконок) ---- */}
+      <aside className={`${styles.sidebar} ${sidebarExpanded ? styles.sidebarExpanded : ''}`}>
         <nav className={styles.nav}>
           {NAV_ITEMS.map(({ to, label, icon }) => (
             <NavLink
@@ -83,7 +82,7 @@ export function AppLayout() {
               className={({ isActive }) =>
                 `${styles.navItem} ${isActive ? styles.navActive : ''}`
               }
-              onClick={() => setSidebarOpen(false)}
+              title={label}
             >
               <span className={styles.navIcon}>{icon}</span>
               <span className={styles.navLabel}>{label}</span>
@@ -92,15 +91,16 @@ export function AppLayout() {
         </nav>
 
         {isAuthenticated() && (
-          <button className={styles.logoutBtn} onClick={() => setLogoutConfirm(true)}>
-            Выйти
+          <button
+            className={styles.logoutBtn}
+            onClick={() => setLogoutConfirm(true)}
+            title="Выйти"
+          >
+            <span className={styles.navIcon}><LogoutIcon /></span>
+            <span className={styles.navLabel}>Выйти</span>
           </button>
         )}
       </aside>
-
-      {sidebarOpen && (
-        <div className={styles.overlay} onClick={() => setSidebarOpen(false)} aria-hidden />
-      )}
 
       {logoutConfirm && (
         <LogoutConfirmModal
@@ -109,23 +109,16 @@ export function AppLayout() {
         />
       )}
 
-      {/* ---- Main content ---- */}
-      <main className={styles.main}>
+      {/* ---- Main content — сдвигается вправо на ширину сайдбара ---- */}
+      <main className={`${styles.main} ${sidebarExpanded ? styles.mainShifted : ''}`}>
         <Outlet />
       </main>
     </div>
   );
 }
 
-// ---- Иконки (инлайн SVG) ----
+// ---- Icons ----
 
-function UserIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-    </svg>
-  );
-}
 function SearchIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -160,6 +153,14 @@ function HamburgerIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+function LogoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   );
 }
