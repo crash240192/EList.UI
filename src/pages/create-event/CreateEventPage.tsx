@@ -1,16 +1,37 @@
 // pages/create-event/CreateEventPage.tsx
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchEventById, fetchEventCategories, fetchEventTypes, MOCK_EVENTS } from '@/entities/event';
+import { fetchEventById, MOCK_EVENTS } from '@/entities/event';
 import { apiClient } from '@/shared/api/client';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
-import type { IEventCategory, IEventType } from '@/entities/event';
 import type { Gender } from '@/shared/api/types';
 import styles from './CreateEventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
+
+// ---- Toast notification ----
+
+interface ToastState {
+  message: string;
+  visible: boolean;
+}
+
+function useToast() {
+  const [toast, setToast] = useState<ToastState>({ message: '', visible: false });
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const show = useCallback((message: string) => {
+    clearTimeout(timerRef.current);
+    setToast({ message, visible: true });
+    timerRef.current = setTimeout(() => setToast(t => ({ ...t, visible: false })), 4000);
+  }, []);
+
+  return { toast, show };
+}
+
+// ---- Form state ----
 
 interface FormState {
   name: string;
@@ -35,6 +56,10 @@ const EMPTY: FormState = {
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
 };
 
+// ---- Validation errors type ----
+
+type FieldError = 'name' | 'type' | 'location' | 'startDate' | 'startTime' | 'endDate' | 'endTime';
+
 export default function CreateEventPage() {
   const navigate  = useNavigate();
   const { id }    = useParams<{ id: string }>();
@@ -43,19 +68,28 @@ export default function CreateEventPage() {
   const [form, setForm]       = useState<FormState>(EMPTY);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Set<FieldError>>(new Set());
 
-  // Координаты из карты
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
 
-  // Выбранные типы мероприятия
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTypes,      setSelectedTypes]      = useState<string[]>([]);
   const [pickerOpen,         setPickerOpen]         = useState(false);
-  const typeFilterCount = selectedCategories.length + selectedTypes.length;
+  const typeCount = selectedCategories.length + selectedTypes.length;
 
-  // Загрузка при редактировании
+  const { toast, show: showToast } = useToast();
+
+  // Refs for scroll-to-field
+  const nameRef      = useRef<HTMLInputElement>(null);
+  const typeRef      = useRef<HTMLDivElement>(null);
+  const locationRef  = useRef<HTMLDivElement>(null);
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const startTimeRef = useRef<HTMLInputElement>(null);
+  const endDateRef   = useRef<HTMLInputElement>(null);
+  const endTimeRef   = useRef<HTMLInputElement>(null);
+
+  // Load for editing
   useEffect(() => {
     if (!isEditing) return;
     setLoading(true);
@@ -66,19 +100,19 @@ export default function CreateEventPage() {
       const toDate = (iso: string) => iso.slice(0, 10);
       const toTime = (iso: string) => iso.slice(11, 16);
       setForm({
-        name:        ev.name ?? '',
-        description: ev.description ?? '',
-        address:     ev.address ?? '',
-        startDate:   ev.startTime ? toDate(ev.startTime) : '',
-        startTime:   ev.startTime ? toTime(ev.startTime) : '',
-        endDate:     ev.endTime   ? toDate(ev.endTime)   : '',
-        endTime:     ev.endTime   ? toTime(ev.endTime)   : '',
-        cost:        String(ev.parameters?.cost ?? 0),
-        ageLimit:    String(ev.parameters?.ageLimit ?? ''),
-        isPrivate:   ev.parameters?.private ?? false,
-        maxPersons:  String(ev.parameters?.maxPersonsCount ?? ''),
-        allowUsersToInvite: ev.parameters?.allowUsersToInvite ?? true,
-        allowedGender: ev.parameters?.allowedGender ?? '',
+        name:              ev.name ?? '',
+        description:       ev.description ?? '',
+        address:           ev.address ?? '',
+        startDate:         ev.startTime ? toDate(ev.startTime) : '',
+        startTime:         ev.startTime ? toTime(ev.startTime) : '',
+        endDate:           ev.endTime   ? toDate(ev.endTime)   : '',
+        endTime:           ev.endTime   ? toTime(ev.endTime)   : '',
+        cost:              String(ev.parameters?.cost ?? 0),
+        ageLimit:          String(ev.parameters?.ageLimit ?? ''),
+        isPrivate:         ev.parameters?.private ?? false,
+        maxPersons:        String(ev.parameters?.maxPersonsCount ?? ''),
+        allowUsersToInvite:ev.parameters?.allowUsersToInvite ?? true,
+        allowedGender:     ev.parameters?.allowedGender ?? '',
       });
       if (ev.latitude)  setLat(ev.latitude);
       if (ev.longitude) setLng(ev.longitude);
@@ -86,31 +120,95 @@ export default function CreateEventPage() {
   }, [id, isEditing]);
 
   const set = (key: keyof FormState) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setForm(f => ({ ...f, [key]: e.target.type === 'checkbox'
-        ? (e.target as HTMLInputElement).checked : e.target.value }));
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      setForm(f => ({
+        ...f,
+        [key]: e.target.type === 'checkbox'
+          ? (e.target as HTMLInputElement).checked
+          : e.target.value,
+      }));
+      // Сбрасываем ошибку поля при вводе
+      setFieldErrors(prev => {
+        const next = new Set(prev);
+        if (key === 'name')      next.delete('name');
+        if (key === 'address')   next.delete('location');
+        if (key === 'startDate') next.delete('startDate');
+        if (key === 'startTime') next.delete('startTime');
+        if (key === 'endDate')   next.delete('endDate');
+        if (key === 'endTime')   next.delete('endTime');
+        return next;
+      });
+    };
 
-  // ---- Submit ----
+  // Scroll + focus helper
+  const focusField = (err: FieldError) => {
+    const map: Record<FieldError, React.RefObject<HTMLElement | null>> = {
+      name:      nameRef,
+      type:      typeRef,
+      location:  locationRef,
+      startDate: startDateRef,
+      startTime: startTimeRef,
+      endDate:   endDateRef,
+      endTime:   endTimeRef,
+    };
+    const el = map[err]?.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if ('focus' in el && typeof (el as HTMLInputElement).focus === 'function') {
+      setTimeout(() => (el as HTMLInputElement).focus(), 300);
+    }
+  };
+
+  // Validate and collect all errors
+  const validate = (): FieldError | null => {
+    const errors = new Set<FieldError>();
+    if (!form.name.trim())              errors.add('name');
+    if (typeCount === 0)                errors.add('type');
+    if (!form.address.trim() || lat === null || lng === null) errors.add('location');
+    if (!form.startDate)                errors.add('startDate');
+    if (!form.startTime)                errors.add('startTime');
+    if (!form.endDate)                  errors.add('endDate');
+    if (!form.endTime)                  errors.add('endTime');
+
+    setFieldErrors(errors);
+
+    if (errors.size === 0) return null;
+
+    // Return first in order
+    const order: FieldError[] = ['name', 'type', 'location', 'startDate', 'startTime', 'endDate', 'endTime'];
+    return order.find(e => errors.has(e)) ?? null;
+  };
+
   const handleSubmit = async () => {
-    if (!form.name.trim())             { setError('Укажите название'); return; }
-    if (!form.startDate || !form.startTime) { setError('Укажите дату и время начала'); return; }
+    const firstError = validate();
+    if (firstError) {
+      const messages: Record<FieldError, string> = {
+        name:      '⚠️ Укажите название мероприятия',
+        type:      '⚠️ Выберите хотя бы один тип мероприятия',
+        location:  '⚠️ Укажите адрес и точку на карте',
+        startDate: '⚠️ Укажите дату начала мероприятия',
+        startTime: '⚠️ Укажите время начала мероприятия',
+        endDate:   '⚠️ Укажите дату окончания мероприятия',
+        endTime:   '⚠️ Укажите время окончания мероприятия',
+      };
+      showToast(messages[firstError]);
+      focusField(firstError);
+      return;
+    }
 
     setSaving(true);
-    setError(null);
     try {
       const accountId = await getOrFetchAccountId();
       const startTime = new Date(`${form.startDate}T${form.startTime}`).toISOString();
-      const endTime   = form.endDate && form.endTime
-        ? new Date(`${form.endDate}T${form.endTime}`).toISOString()
-        : null;
+      const endTime   = new Date(`${form.endDate}T${form.endTime}`).toISOString();
 
       const payload = {
         event: {
           name:        form.name,
           description: form.description || undefined,
-          address:     form.address     || undefined,
-          latitude:    lat  ?? 0,
-          longitude:   lng  ?? 0,
+          address:     form.address,
+          latitude:    lat!,
+          longitude:   lng!,
           startTime,
           endTime,
           active: false,
@@ -123,7 +221,6 @@ export default function CreateEventPage() {
           allowedGender:      form.allowedGender || undefined,
           allowUsersToInvite: form.allowUsersToInvite,
         },
-        // Передаём выбранные типы (и типы из выбранных категорий тоже можно)
         eventTypes: selectedTypes,
         organizatorAccountIds: [accountId],
         organizatorOrganizationIds: null,
@@ -137,11 +234,13 @@ export default function CreateEventPage() {
 
       navigate('/my-events');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+      showToast(`❌ ${err instanceof Error ? err.message : 'Ошибка сохранения'}`);
     } finally {
       setSaving(false);
     }
   };
+
+  const hasErr = (field: FieldError) => fieldErrors.has(field);
 
   if (loading) return (
     <div className={styles.page}>
@@ -152,21 +251,24 @@ export default function CreateEventPage() {
 
   return (
     <div className={styles.page}>
-      {/* Title bar */}
+      {/* Title */}
       <div className={styles.titleBar}>
         <button className={styles.backBtn} onClick={() => navigate(-1)}>←</button>
         <h2 className={styles.title}>{isEditing ? 'Редактировать событие' : 'Создать событие'}</h2>
       </div>
 
-      {error && <div className={styles.errorBanner}>{error}</div>}
-
       <div className={styles.form}>
 
         {/* Основное */}
         <Section title="Основное">
-          <Field label="Название *">
-            <input className={styles.input} placeholder="Название мероприятия"
-              value={form.name} onChange={set('name')} />
+          <Field label="Название *" error={hasErr('name') ? 'Обязательное поле' : undefined}>
+            <input
+              ref={nameRef}
+              className={`${styles.input} ${hasErr('name') ? styles.inputError : ''}`}
+              placeholder="Название мероприятия"
+              value={form.name}
+              onChange={set('name')}
+            />
           </Field>
           <Field label="Описание">
             <textarea className={styles.textarea} rows={4}
@@ -175,64 +277,75 @@ export default function CreateEventPage() {
           </Field>
         </Section>
 
-        {/* Тип мероприятия */}
-        <Section title="Тип мероприятия">
-          <button
-            className={`${styles.pickerBtn} ${typeFilterCount > 0 ? styles.pickerBtnActive : ''}`}
-            onClick={() => setPickerOpen(true)}
-            type="button"
-          >
-            <span>🎭</span>
-            {typeFilterCount > 0
-              ? `Выбрано типов: ${typeFilterCount}`
-              : 'Выбрать категорию и тип...'}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" style={{ marginLeft: 'auto' }}>
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
+        {/* Тип */}
+        <Section title="Тип мероприятия *" error={hasErr('type') ? 'Выберите хотя бы один тип' : undefined}>
+          <div ref={typeRef}>
+            <button
+              className={`${styles.pickerBtn} ${typeCount > 0 ? styles.pickerBtnActive : ''} ${hasErr('type') ? styles.pickerBtnError : ''}`}
+              onClick={() => { setPickerOpen(true); setFieldErrors(p => { const n = new Set(p); n.delete('type'); return n; }); }}
+              type="button"
+            >
+              <span>🎭</span>
+              {typeCount > 0 ? `Выбрано типов: ${typeCount}` : 'Выбрать категорию и тип...'}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" style={{ marginLeft: 'auto' }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          </div>
         </Section>
 
         {/* Место */}
-        <Section title="Место">
-          <Field label="Адрес">
-            <input className={styles.input} placeholder="Введите адрес"
-              value={form.address} onChange={set('address')} />
-          </Field>
-
-          {/* OSM карта с кликом для выбора координат */}
-          <OsmPicker lat={lat} lng={lng} onPick={(la, lo) => { setLat(la); setLng(lo); }} />
-
-          {(lat !== null && lng !== null) && (
-            <p className={styles.coordHint}>
-              📍 Выбрано: {lat.toFixed(5)}, {lng.toFixed(5)}
-              <button className={styles.coordClear}
-                onClick={() => { setLat(null); setLng(null); }}>
-                ✕
-              </button>
-            </p>
-          )}
+        <Section title="Место *" error={hasErr('location') ? 'Укажите адрес и точку на карте' : undefined}>
+          <div ref={locationRef}>
+            <Field label="Адрес">
+              <input
+                className={`${styles.input} ${hasErr('location') ? styles.inputError : ''}`}
+                placeholder="Введите адрес"
+                value={form.address}
+                onChange={set('address')}
+              />
+            </Field>
+            <OsmPicker
+              lat={lat} lng={lng}
+              hasError={hasErr('location')}
+              onPick={(la, lo) => {
+                setLat(la); setLng(lo);
+                setFieldErrors(p => { const n = new Set(p); n.delete('location'); return n; });
+              }}
+            />
+            {lat !== null && lng !== null && (
+              <p className={styles.coordHint}>
+                📍 {lat.toFixed(5)}, {lng.toFixed(5)}
+                <button className={styles.coordClear} onClick={() => { setLat(null); setLng(null); }}>✕</button>
+              </p>
+            )}
+          </div>
         </Section>
 
         {/* Дата и время */}
-        <Section title="Дата и время">
+        <Section title="Дата и время *">
           <div className={styles.row}>
-            <Field label="Дата начала *">
-              <input className={styles.input} type="date"
+            <Field label="Дата начала *" error={hasErr('startDate') ? 'Обязательное' : undefined}>
+              <input ref={startDateRef} type="date"
+                className={`${styles.input} ${hasErr('startDate') ? styles.inputError : ''}`}
                 value={form.startDate} onChange={set('startDate')} />
             </Field>
-            <Field label="Время начала *">
-              <input className={styles.input} type="time"
+            <Field label="Время начала *" error={hasErr('startTime') ? 'Обязательное' : undefined}>
+              <input ref={startTimeRef} type="time"
+                className={`${styles.input} ${hasErr('startTime') ? styles.inputError : ''}`}
                 value={form.startTime} onChange={set('startTime')} />
             </Field>
           </div>
           <div className={styles.row}>
-            <Field label="Дата окончания">
-              <input className={styles.input} type="date"
+            <Field label="Дата окончания *" error={hasErr('endDate') ? 'Обязательное' : undefined}>
+              <input ref={endDateRef} type="date"
+                className={`${styles.input} ${hasErr('endDate') ? styles.inputError : ''}`}
                 value={form.endDate} onChange={set('endDate')} />
             </Field>
-            <Field label="Время окончания">
-              <input className={styles.input} type="time"
+            <Field label="Время окончания *" error={hasErr('endTime') ? 'Обязательное' : undefined}>
+              <input ref={endTimeRef} type="time"
+                className={`${styles.input} ${hasErr('endTime') ? styles.inputError : ''}`}
                 value={form.endTime} onChange={set('endTime')} />
             </Field>
           </div>
@@ -255,8 +368,7 @@ export default function CreateEventPage() {
             </Field>
           </div>
           <Field label="Ограничение по полу">
-            <select className={styles.input} value={form.allowedGender}
-              onChange={set('allowedGender')}>
+            <select className={styles.input} value={form.allowedGender} onChange={set('allowedGender')}>
               <option value="">Без ограничений</option>
               <option value="Male">Мужской</option>
               <option value="Female">Женский</option>
@@ -267,13 +379,11 @@ export default function CreateEventPage() {
             Приватное мероприятие
           </label>
           <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={form.allowUsersToInvite}
-              onChange={set('allowUsersToInvite')} />
+            <input type="checkbox" checked={form.allowUsersToInvite} onChange={set('allowUsersToInvite')} />
             Участники могут приглашать других
           </label>
         </Section>
 
-        {/* Фото — плейсхолдер */}
         <Section title="Фото">
           <div className={styles.uploadPlaceholder}>
             🖼 Загрузка обложки и фотографий
@@ -281,7 +391,6 @@ export default function CreateEventPage() {
           </div>
         </Section>
 
-        {/* Управление (редактирование) */}
         {isEditing && (
           <Section title="Управление">
             <button className={styles.dangerBtn}>❌ Отменить мероприятие</button>
@@ -298,92 +407,92 @@ export default function CreateEventPage() {
         </button>
       </div>
 
-      {/* Category picker modal */}
+      {/* Category picker */}
       {pickerOpen && (
         <CategoryTypePicker
           selectedCategories={selectedCategories}
           selectedTypes={selectedTypes}
-          onChange={(cats, types) => {
-            setSelectedCategories(cats);
-            setSelectedTypes(types);
-          }}
+          onChange={(cats, types) => { setSelectedCategories(cats); setSelectedTypes(types); }}
           onClose={() => setPickerOpen(false)}
         />
       )}
+
+      {/* Toast */}
+      <Toast message={toast.message} visible={toast.visible} />
+    </div>
+  );
+}
+
+// ---- Toast notification ----
+
+function Toast({ message, visible }: { message: string; visible: boolean }) {
+  return (
+    <div className={`${styles.toast} ${visible ? styles.toastVisible : ''}`}>
+      {message}
     </div>
   );
 }
 
 // ---- OSM Picker ----
-// iframe с OpenStreetMap + postMessage для передачи координат по клику.
-// Работает без API-ключей и без react-leaflet.
 
-function OsmPicker({
-  lat, lng, onPick,
-}: { lat: number | null; lng: number | null; onPick: (lat: number, lng: number) => void }) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  // Слушаем сообщения от iframe (если карта поддерживает postMessage)
-  // Для OpenStreetMap embed прямого postMessage нет, поэтому используем
-  // простой fallback: показываем iframe для визуализации и отдельную кнопку
-  // для ручного ввода через prompt. Полноценная интеграция — через leaflet.
-
-  const defaultLat = lat ?? 55.7558;
-  const defaultLng = lng ?? 37.6173;
-
-  const bbox  = `${defaultLng-0.05},${defaultLat-0.03},${defaultLng+0.05},${defaultLat+0.03}`;
+function OsmPicker({ lat, lng, hasError, onPick }: {
+  lat: number | null;
+  lng: number | null;
+  hasError?: boolean;
+  onPick: (lat: number, lng: number) => void;
+}) {
+  const defLat = lat ?? 55.7558;
+  const defLng = lng ?? 37.6173;
+  const bbox   = `${defLng-0.05},${defLat-0.03},${defLng+0.05},${defLat+0.03}`;
   const marker = lat && lng ? `&marker=${lat},${lng}` : '';
-  const src   = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik${marker}`;
+  const src    = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik${marker}`;
 
   const handlePickManual = () => {
-    // Пока leaflet не интегрирован — принимаем координаты через prompt
     const input = window.prompt(
       'Введите координаты через запятую (широта, долгота):\nПример: 55.7558, 37.6173'
     );
     if (!input) return;
-    const parts = input.split(',').map(s => parseFloat(s.trim()));
-    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-      onPick(parts[0], parts[1]);
-    }
+    const [la, lo] = input.split(',').map(s => parseFloat(s.trim()));
+    if (!isNaN(la) && !isNaN(lo)) onPick(la, lo);
   };
 
   return (
-    <div className={styles.mapContainer}>
-      <iframe
-        ref={iframeRef}
-        className={styles.mapFrame}
-        src={src}
-        title="Карта"
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        sandbox="allow-scripts allow-same-origin"
-      />
+    <div className={`${styles.mapContainer} ${hasError ? styles.mapContainerError : ''}`}>
+      <iframe className={styles.mapFrame} src={src} title="Карта"
+        loading="lazy" referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin" />
       <div className={styles.mapOverlay}>
         <button className={styles.mapPickBtn} type="button" onClick={handlePickManual}>
           📍 Указать точку вручную
         </button>
-        <span className={styles.mapHint}>
-          Для интерактивного выбора добавьте react-leaflet
-        </span>
       </div>
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// ---- Section & Field helpers ----
+
+function Section({ title, children, error }: {
+  title: string; children: React.ReactNode; error?: string;
+}) {
   return (
     <div className={styles.section}>
-      <h3 className={styles.sectionTitle}>{title}</h3>
+      <div className={styles.sectionTitleRow}>
+        <h3 className={`${styles.sectionTitle} ${error ? styles.sectionTitleError : ''}`}>{title}</h3>
+        {error && <span className={styles.sectionError}>{error}</span>}
+      </div>
       {children}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, error }: {
+  label: string; children: React.ReactNode; error?: string;
+}) {
   return (
     <div className={styles.field}>
       <label className={styles.label}>{label}</label>
       {children}
+      {error && <span className={styles.fieldError}>{error}</span>}
     </div>
   );
 }

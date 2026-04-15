@@ -84,10 +84,87 @@
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 2px;
+  margin: 0;
 }
 
-/* ---- Type picker button ---- */
+/* ---- Error states ---- */
+
+.inputError {
+  border-color: var(--danger) !important;
+  background: rgba(239,68,68,0.05);
+}
+
+.fieldError {
+  font-size: 11px;
+  color: var(--danger);
+  margin-top: 3px;
+}
+
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sectionTitleError {
+  color: var(--danger) !important;
+}
+
+.sectionError {
+  font-size: 11px;
+  color: var(--danger);
+  background: rgba(239,68,68,0.1);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+
+.mapContainerError {
+  border-color: var(--danger) !important;
+}
+
+.pickerBtnError {
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+  background: rgba(239,68,68,0.05);
+}
+
+/* ---- Toast notification ---- */
+
+.toast {
+  position: fixed;
+  bottom: 80px;   /* выше футера с кнопками */
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1e1e2e;
+  border: 1px solid var(--danger);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.toastVisible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+:global(.light-theme) .toast {
+  background: #fff;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* ---- Section title (override for when no error) ---- */
 
 .pickerBtn {
   width: 100%;

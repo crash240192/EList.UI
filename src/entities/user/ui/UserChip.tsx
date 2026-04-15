@@ -26,13 +26,18 @@ interface UserChipProps {
 export function UserChip({ user, clickable = true, size = 'md' }: UserChipProps) {
   const navigate = useNavigate();
 
-  const initials = user.firstName && user.lastName
-    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
-    : user.login[0].toUpperCase();
+  // Безопасное получение инициалов — login или имя могут быть пустыми
+  const safeLogin    = user.login?.trim() || '?';
+  const safeFirst    = user.firstName?.trim() || '';
+  const safeLast     = user.lastName?.trim()  || '';
 
-  const displayName = user.firstName
-    ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
-    : user.login;
+  const initials = safeFirst && safeLast
+    ? `${safeFirst[0]}${safeLast[0]}`.toUpperCase()
+    : safeLogin[0].toUpperCase();
+
+  const displayName = safeFirst
+    ? `${safeFirst}${safeLast ? ' ' + safeLast : ''}`
+    : safeLogin;
 
   const rating = user.organizerRating ?? user.visitorRating;
 
@@ -60,8 +65,8 @@ export function UserChip({ user, clickable = true, size = 'md' }: UserChipProps)
 
       {/* Info */}
       <div className={styles.info}>
-        <span className={styles.login}>@{user.login}</span>
-        {displayName !== user.login && (
+        <span className={styles.login}>@{safeLogin}</span>
+        {displayName !== safeLogin && (
           <span className={styles.name}>{displayName}</span>
         )}
       </div>

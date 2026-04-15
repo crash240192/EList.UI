@@ -1,0 +1,264 @@
+/* pages/admin/AdminPage.module.css */
+
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ---- Header ---- */
+.header {
+  padding: 16px 20px 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* ---- Top tabs ---- */
+.tabs {
+  display: flex;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab {
+  background: none; border: none;
+  border-bottom: 2px solid transparent;
+  padding: 11px 16px 11px 0;
+  font-size: 13px; font-weight: 500;
+  color: var(--text-secondary); cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s;
+}
+.tab:hover { color: var(--text-primary); }
+.tabActive { color: var(--accent) !important; border-bottom-color: var(--accent); }
+
+/* ---- Content ---- */
+.content {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ---- Split pane ---- */
+.splitPane {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .splitPane {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+}
+
+/* ---- List pane ---- */
+.listPane {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.paneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  flex-shrink: 0;
+}
+.paneTitle {
+  font-size: 15px; font-weight: 600;
+  color: var(--text-primary); margin: 0;
+}
+.addBtn {
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 8px;
+  padding: 7px 12px; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+.addBtn:hover { background: var(--accent-hover); }
+
+.itemList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---- Category row ---- */
+.itemGroup { display: flex; flex-direction: column; gap: 0; }
+
+.categoryRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.categoryRow:hover { background: var(--surface-2); }
+.categoryRowActive { background: rgba(99,102,241,0.08); }
+
+.expandBtn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 13px;
+  width: 18px; flex-shrink: 0;
+  transition: color 0.15s;
+}
+.expandBtn:hover { color: var(--text-primary); }
+
+.itemInfo {
+  flex: 1; min-width: 0; cursor: pointer;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.itemName {
+  font-size: 13px; font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.itemSub {
+  font-size: 11px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.itemMeta { display: flex; align-items: center; gap: 4px; }
+.tag {
+  font-size: 10px; font-weight: 500;
+  color: var(--accent); background: rgba(99,102,241,0.1);
+  border-radius: 10px; padding: 2px 7px;
+}
+
+.itemActions {
+  display: flex; gap: 4px; flex-shrink: 0;
+  opacity: 0; transition: opacity 0.15s;
+}
+.categoryRow:hover .itemActions { opacity: 1; }
+.typeRow:hover .itemActions     { opacity: 1; }
+
+.iconBtn {
+  background: none; border: none; cursor: pointer;
+  font-size: 14px; padding: 3px 4px;
+  border-radius: 6px; transition: background 0.15s; line-height: 1;
+}
+.iconBtn:hover { background: var(--surface-2); }
+.dangerBtn:hover { background: rgba(239,68,68,0.12); }
+
+/* ---- Types list (nested) ---- */
+.typesList {
+  display: flex; flex-direction: column;
+  gap: 1px; padding-left: 26px;
+  border-left: 2px solid var(--border);
+  margin-left: 9px; margin-bottom: 4px;
+}
+
+.typeRow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px; transition: background 0.15s;
+}
+.typeRow:hover { background: var(--surface-2); }
+
+.addTypeBtn {
+  background: none; border: 1px dashed var(--border);
+  border-radius: 8px; padding: 6px 12px;
+  font-size: 12px; color: var(--text-muted);
+  cursor: pointer; margin-top: 4px;
+  text-align: left; transition: all 0.15s;
+}
+.addTypeBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---- Form pane ---- */
+.formPane {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.emptyForm {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  height: 100%; gap: 12px;
+  color: var(--text-muted);
+}
+.emptyForm span { font-size: 40px; }
+.emptyForm p    { font-size: 13px; margin: 0; }
+
+/* ---- Form ---- */
+.form {
+  display: flex; flex-direction: column; gap: 14px;
+  max-width: 480px;
+}
+.formTitle {
+  font-size: 16px; font-weight: 700;
+  color: var(--text-primary); margin: 0 0 4px;
+}
+.formError {
+  padding: 8px 12px; background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 8px; font-size: 13px; color: var(--danger);
+}
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.label {
+  font-size: 12px; font-weight: 500;
+  color: var(--text-secondary);
+}
+.input,
+.textarea {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 12px;
+  font-size: 13px; color: var(--text-primary);
+  outline: none; font-family: inherit; width: 100%;
+  transition: border-color 0.15s;
+}
+.input:focus, .textarea:focus { border-color: var(--accent); }
+.textarea { resize: vertical; min-height: 72px; }
+
+.checkboxLabel {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-secondary);
+  cursor: pointer;
+}
+.checkboxLabel input[type='checkbox'] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent); cursor: pointer;
+}
+
+.formActions {
+  display: flex; gap: 8px;
+  padding-top: 4px; border-top: 1px solid var(--border);
+}
+.cancelBtn {
+  flex: 1; background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px; font-size: 13px; font-weight: 500;
+  color: var(--text-secondary); cursor: pointer; transition: background 0.15s;
+}
+.cancelBtn:hover { background: var(--surface-2); }
+.saveBtn {
+  flex: 1; background: var(--accent); color: #fff;
+  border: none; border-radius: 8px;
+  padding: 9px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s, opacity 0.15s;
+}
+.saveBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- States ---- */
+.loader { padding: 40px; text-align: center; color: var(--text-secondary); font-size: 14px; }
+.errorMsg { padding: 20px; color: var(--danger); font-size: 14px; }
