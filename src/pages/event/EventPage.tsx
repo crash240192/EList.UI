@@ -17,6 +17,7 @@ import {
 import { useFavoritesStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { UserChip } from '@/entities/user/ui/UserChip';
+import { YandexMap } from '@/features/event-map/YandexMap';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -148,7 +149,13 @@ export default function EventPage() {
 
         {/* Mini-map */}
         {event.latitude != null && event.longitude != null && (
-          <MiniMap lat={event.latitude} lng={event.longitude} label={event.name} />
+          <div className={styles.miniMapWrap}>
+            <YandexMap
+              lat={event.latitude}
+              lng={event.longitude}
+              label={event.name}
+            />
+          </div>
         )}
 
         {/* Actions */}
@@ -287,20 +294,6 @@ function Section({ id, title, open, onToggle, children }: {
   );
 }
 
-function MiniMap({ lat, lng, label }: { lat: number; lng: number; label: string }) {
-  const src = `https://www.openstreetmap.org/export/embed.html`
-    + `?bbox=${lng-0.01},${lat-0.007},${lng+0.01},${lat+0.007}&layer=mapnik&marker=${lat},${lng}`;
-  const full = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`;
-  return (
-    <div className={styles.miniMapWrap}>
-      <iframe className={styles.miniMapFrame} src={src} title={`Карта: ${label}`}
-        loading="lazy" referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin" />
-      <a className={styles.miniMapLink} href={full} target="_blank" rel="noopener noreferrer">
-        Открыть на карте ↗
-      </a>
-    </div>
-  );
-}
 
 function PageSkeleton() {
   return (

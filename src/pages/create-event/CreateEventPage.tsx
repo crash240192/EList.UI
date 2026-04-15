@@ -6,6 +6,7 @@ import { fetchEventById, MOCK_EVENTS } from '@/entities/event';
 import { apiClient } from '@/shared/api/client';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
+import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import type { Gender } from '@/shared/api/types';
 import styles from './CreateEventPage.module.css';
 
@@ -298,22 +299,27 @@ export default function CreateEventPage() {
         {/* Место */}
         <Section title="Место *" error={hasErr('location') ? 'Укажите адрес и точку на карте' : undefined}>
           <div ref={locationRef}>
-            <Field label="Адрес">
+            <YandexMapPicker
+              lat={lat}
+              lng={lng}
+              address={form.address}
+              hasError={hasErr('location')}
+              onPick={(la, lo, addr) => {
+                setLat(la); setLng(lo);
+                // Подставляем адрес из геокодера в поле формы
+                setForm(f => ({ ...f, address: addr }));
+                setFieldErrors(p => { const n = new Set(p); n.delete('location'); return n; });
+              }}
+            />
+            {/* Поле адреса под картой (синхронизировано с геокодером) */}
+            <Field label="Адрес" error={hasErr('location') && !form.address ? 'Обязательное поле' : undefined}>
               <input
                 className={`${styles.input} ${hasErr('location') ? styles.inputError : ''}`}
-                placeholder="Введите адрес"
+                placeholder="Адрес (заполняется автоматически или вручную)"
                 value={form.address}
                 onChange={set('address')}
               />
             </Field>
-            <OsmPicker
-              lat={lat} lng={lng}
-              hasError={hasErr('location')}
-              onPick={(la, lo) => {
-                setLat(la); setLng(lo);
-                setFieldErrors(p => { const n = new Set(p); n.delete('location'); return n; });
-              }}
-            />
             {lat !== null && lng !== null && (
               <p className={styles.coordHint}>
                 📍 {lat.toFixed(5)}, {lng.toFixed(5)}
@@ -429,42 +435,6 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
   return (
     <div className={`${styles.toast} ${visible ? styles.toastVisible : ''}`}>
       {message}
-    </div>
-  );
-}
-
-// ---- OSM Picker ----
-
-function OsmPicker({ lat, lng, hasError, onPick }: {
-  lat: number | null;
-  lng: number | null;
-  hasError?: boolean;
-  onPick: (lat: number, lng: number) => void;
-}) {
-  const defLat = lat ?? 55.7558;
-  const defLng = lng ?? 37.6173;
-  const bbox   = `${defLng-0.05},${defLat-0.03},${defLng+0.05},${defLat+0.03}`;
-  const marker = lat && lng ? `&marker=${lat},${lng}` : '';
-  const src    = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik${marker}`;
-
-  const handlePickManual = () => {
-    const input = window.prompt(
-      'Введите координаты через запятую (широта, долгота):\nПример: 55.7558, 37.6173'
-    );
-    if (!input) return;
-    const [la, lo] = input.split(',').map(s => parseFloat(s.trim()));
-    if (!isNaN(la) && !isNaN(lo)) onPick(la, lo);
-  };
-
-  return (
-    <div className={`${styles.mapContainer} ${hasError ? styles.mapContainerError : ''}`}>
-      <iframe className={styles.mapFrame} src={src} title="Карта"
-        loading="lazy" referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin" />
-      <div className={styles.mapOverlay}>
-        <button className={styles.mapPickBtn} type="button" onClick={handlePickManual}>
-          📍 Указать точку вручную
-        </button>
-      </div>
     </div>
   );
 }
