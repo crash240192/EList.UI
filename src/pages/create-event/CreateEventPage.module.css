@@ -63,7 +63,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 640px;
+  max-width: 960px;
   width: 100%;
   margin: 0 auto;
 }
@@ -296,7 +296,7 @@
   display: flex;
   gap: 10px;
   /* Ширина как у блока формы */
-  max-width: 640px;
+  max-width: 960px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;

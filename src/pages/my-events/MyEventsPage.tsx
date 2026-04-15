@@ -24,6 +24,9 @@ export default function MyEventsPage() {
   const [searchName, setSearchName] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [pickerOpen, setPickerOpen]   = useState(false);
+  // «Искать» — форсирует сброс кеша useMyEvents через версию ключа
+  const [searchVersion, setSearchVersion] = useState(0);
+  const handleSearch = () => { setFiltersOpen(false); setSearchVersion(v => v + 1); };
 
   const debouncedName      = useDebounce(searchName, 300);
   const selectedCategories = filters.categories ?? [];
@@ -39,8 +42,12 @@ export default function MyEventsPage() {
     startTime:  filters.startTime,
     endTime:    filters.endTime,
     price:      filters.price,
+    // searchVersion включён чтобы при нажатии «Искать» сбрасывался кеш хука
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // @ts-ignore
+    _v:         searchVersion,
   }), [debouncedName, selectedCategories, selectedTypes,
-       filters.startTime, filters.endTime, filters.price]);
+       filters.startTime, filters.endTime, filters.price, searchVersion]);
 
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useMyEvents({
     accountId,
@@ -97,51 +104,62 @@ export default function MyEventsPage() {
         </button>
       </div>
 
-      {/* ---- Expanded filters ---- */}
+      {/* ---- Expanded filters — overlay ---- */}
       {filtersOpen && (
-        <div className={styles.expandedFilters}>
-          <div className={styles.filterGroupFull}>
-            <label className={styles.filterLabel}>Тип мероприятия</label>
-            <button
-              className={`${styles.pickerBtn} ${typeFilterCount > 0 ? styles.pickerBtnActive : ''}`}
-              onClick={() => setPickerOpen(true)}>
-              {typeFilterCount > 0 ? `Выбрано: ${typeFilterCount}` : 'Все категории и типы'}
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="2" style={{ marginLeft: 'auto' }}>
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-            </button>
-          </div>
-          <div className={styles.filterRow}>
-            <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>Дата от</label>
-              <input type="datetime-local" className={styles.filterInput}
-                value={filters.startTime ? toLocalInput(filters.startTime) : ''}
-                onChange={e => setFilter('startTime', e.target.value
-                  ? new Date(e.target.value).toISOString() : undefined)} />
+        <>
+          <div className={styles.filterBackdrop} onClick={() => setFiltersOpen(false)} aria-hidden />
+          <div className={styles.expandedFilters}>
+            <div className={styles.filterGroupFull}>
+              <label className={styles.filterLabel}>Тип мероприятия</label>
+              <button
+                className={`${styles.pickerBtn} ${typeFilterCount > 0 ? styles.pickerBtnActive : ''}`}
+                onClick={() => setPickerOpen(true)}>
+                {typeFilterCount > 0 ? `Выбрано: ${typeFilterCount}` : 'Все категории и типы'}
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" style={{ marginLeft: 'auto' }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
             </div>
-            <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>Дата до</label>
-              <input type="datetime-local" className={styles.filterInput}
-                value={filters.endTime ? toLocalInput(filters.endTime) : ''}
-                onChange={e => setFilter('endTime', e.target.value
-                  ? new Date(e.target.value).toISOString() : undefined)} />
+            <div className={styles.filterRow}>
+              <div className={styles.filterGroup}>
+                <label className={styles.filterLabel}>Дата от</label>
+                <input type="datetime-local" className={styles.filterInput}
+                  value={filters.startTime ? toLocalInput(filters.startTime) : ''}
+                  onChange={e => setFilter('startTime', e.target.value
+                    ? new Date(e.target.value).toISOString() : undefined)} />
+              </div>
+              <div className={styles.filterGroup}>
+                <label className={styles.filterLabel}>Дата до</label>
+                <input type="datetime-local" className={styles.filterInput}
+                  value={filters.endTime ? toLocalInput(filters.endTime) : ''}
+                  onChange={e => setFilter('endTime', e.target.value
+                    ? new Date(e.target.value).toISOString() : undefined)} />
+              </div>
+            </div>
+            <div className={styles.filterGroup} style={{ width: '50%' }}>
+              <label className={styles.filterLabel}>Макс. цена</label>
+              <input type="number" min={0} step={100} className={styles.filterInput}
+                placeholder="Любая" value={filters.price ?? ''}
+                onChange={e => setFilter('price', e.target.value
+                  ? Number(e.target.value) : undefined)} />
+            </div>
+            <div className={styles.filterActions}>
+              {hasActiveFilters && (
+                <button className={styles.resetBtn}
+                  onClick={() => { resetFilters(); setSearchName(''); }}>
+                  Сбросить
+                </button>
+              )}
+              <button className={styles.searchBtn} onClick={handleSearch}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                Искать
+              </button>
             </div>
           </div>
-          <div className={styles.filterGroup} style={{ width: '50%' }}>
-            <label className={styles.filterLabel}>Макс. цена</label>
-            <input type="number" min={0} step={100} className={styles.filterInput}
-              placeholder="Любая" value={filters.price ?? ''}
-              onChange={e => setFilter('price', e.target.value
-                ? Number(e.target.value) : undefined)} />
-          </div>
-          {hasActiveFilters && (
-            <button className={styles.resetBtn}
-              onClick={() => { resetFilters(); setSearchName(''); }}>
-              Сбросить всё
-            </button>
-          )}
-        </div>
+        </>
       )}
 
       {/* ---- Tabs ---- */}

@@ -34,6 +34,13 @@ export default function HomePage() {
     setSelectedEvent(event);
   }, []);
 
+  // Ручной триггер поиска (по кнопке «Искать» в фильтрах)
+  // useEvents уже реагирует на изменение params автоматически,
+  // поэтому onSearch нужен только для закрытия фильтров и сброса пагинации
+  const handleSearch = useCallback(() => {
+    // params уже обновлены через store — useEvents перезагрузит автоматически
+  }, []);
+
   return (
     <div className={styles.page}>
       {/* ---- Filter bar ---- */}
@@ -42,6 +49,7 @@ export default function HomePage() {
         onSearchChange={setSearchName}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        onSearch={handleSearch}
       />
 
       {/* ---- Content area ---- */}

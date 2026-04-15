@@ -86,11 +86,36 @@
   background: rgba(99,102,241,0.06);
 }
 .resetBtn {
-  background: none; border: 1px solid var(--danger); color: var(--danger);
-  border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer;
-  align-self: flex-start;
+  background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 14px; font-size: 13px; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.15s;
 }
-.resetBtn:hover { background: rgba(239,68,68,0.08); }
+.resetBtn:hover { border-color: var(--danger); color: var(--danger); background: rgba(239,68,68,0.06); }
+
+/* Backdrop и кнопка Искать для оверлея фильтров */
+.filterBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+}
+
+.filterActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.searchBtn {
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 8px;
+  padding: 8px 16px; font-size: 13px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  transition: background 0.15s;
+}
+.searchBtn:hover { background: var(--accent-hover); }
 
 /* ---- Tabs ---- */
 .tabs {

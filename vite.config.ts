@@ -16,7 +16,7 @@ export default defineConfig({
     proxy: {
       // Проксируем API-запросы чтобы избежать CORS в dev
       '/eList': {
-        target: 'http://92.118.113.6:35028',
+        target: 'https://localhost:7020',
         changeOrigin: true,
       },
     },

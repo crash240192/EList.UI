@@ -6,18 +6,16 @@ import { useThemeStore, useAuthStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
 import styles from './AppLayout.module.css';
 
-// Профиль убран из сайдбара — доступ через аватар в хедере
 const NAV_ITEMS = [
-  { to: '/',             label: 'Поиск событий',  icon: <SearchIcon /> },
-  { to: '/my-events',    label: 'Мои события',    icon: <CalendarIcon /> },
-  { to: '/create-event', label: 'Создать событие',icon: <PlusIcon /> },
-  { to: '/wallet',       label: 'Кошелёк',        icon: <WalletIcon /> },
+  { to: '/',             label: 'Поиск событий',   icon: <SearchIcon /> },
+  { to: '/my-events',    label: 'Мои события',     icon: <CalendarIcon /> },
+  { to: '/create-event', label: 'Создать событие', icon: <PlusIcon /> },
+  { to: '/wallet',       label: 'Кошелёк',         icon: <WalletIcon /> },
 ];
 
 export function AppLayout() {
-  // true = развёрнут, false = свёрнут до иконок
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
-  const [logoutConfirm, setLogoutConfirm]     = useState(false);
+  const [logoutConfirm,   setLogoutConfirm]   = useState(false);
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -32,6 +30,13 @@ export function AppLayout() {
     document.body.classList.toggle('light-theme', theme === 'light');
   }, [theme]);
 
+  // Закрытие sidebar по Escape
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setSidebarExpanded(false); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, []);
+
   return (
     <div className={styles.root}>
       {/* ---- Header ---- */}
@@ -41,10 +46,10 @@ export function AppLayout() {
             className={styles.menuBtn}
             onClick={() => setSidebarExpanded(v => !v)}
             aria-label={sidebarExpanded ? 'Свернуть меню' : 'Развернуть меню'}
+            aria-expanded={sidebarExpanded}
           >
             <HamburgerIcon />
           </button>
-          {/* Логотип — кликабельный, ведёт на главную */}
           <button className={styles.logo} onClick={() => navigate('/')} aria-label="На главную">
             <span>📍</span>
             <span>EList</span>
@@ -56,33 +61,24 @@ export function AppLayout() {
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
           {isAuthenticated() ? (
-            <button
-              className={styles.avatarBtn}
-              onClick={() => navigate('/user/me')}
-              aria-label="Профиль"
-            >
+            <button className={styles.avatarBtn} onClick={() => navigate('/user/me')} aria-label="Профиль">
               <span>👤</span>
             </button>
           ) : (
-            <button className={styles.loginBtn} onClick={() => navigate('/login')}>
-              Войти
-            </button>
+            <button className={styles.loginBtn} onClick={() => navigate('/login')}>Войти</button>
           )}
         </div>
       </header>
 
-      {/* ---- Sidebar (всегда видим, сворачивается до иконок) ---- */}
+      {/* ---- Sidebar ---- */}
       <aside className={`${styles.sidebar} ${sidebarExpanded ? styles.sidebarExpanded : ''}`}>
         <nav className={styles.nav}>
           {NAV_ITEMS.map(({ to, label, icon }) => (
             <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) =>
-                `${styles.navItem} ${isActive ? styles.navActive : ''}`
-              }
+              key={to} to={to} end={to === '/'}
+              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
               title={label}
+              onClick={() => setSidebarExpanded(false)}
             >
               <span className={styles.navIcon}>{icon}</span>
               <span className={styles.navLabel}>{label}</span>
@@ -91,76 +87,37 @@ export function AppLayout() {
         </nav>
 
         {isAuthenticated() && (
-          <button
-            className={styles.logoutBtn}
-            onClick={() => setLogoutConfirm(true)}
-            title="Выйти"
-          >
+          <button className={styles.logoutBtn} onClick={() => setLogoutConfirm(true)} title="Выйти">
             <span className={styles.navIcon}><LogoutIcon /></span>
             <span className={styles.navLabel}>Выйти</span>
           </button>
         )}
       </aside>
 
-      {logoutConfirm && (
-        <LogoutConfirmModal
-          onConfirm={handleLogout}
-          onCancel={() => setLogoutConfirm(false)}
+      {/* Backdrop — закрывает sidebar при клике вне */}
+      {sidebarExpanded && (
+        <div
+          className={styles.backdrop}
+          onClick={() => setSidebarExpanded(false)}
+          aria-hidden="true"
         />
       )}
 
-      {/* ---- Main content — сдвигается вправо на ширину сайдбара ---- */}
-      <main className={`${styles.main} ${sidebarExpanded ? styles.mainShifted : ''}`}>
+      {logoutConfirm && (
+        <LogoutConfirmModal onConfirm={handleLogout} onCancel={() => setLogoutConfirm(false)} />
+      )}
+
+      {/* ---- Main ---- */}
+      <main className={styles.main}>
         <Outlet />
       </main>
     </div>
   );
 }
 
-// ---- Icons ----
-
-function SearchIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-    </svg>
-  );
-}
-function CalendarIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-function PlusIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
-    </svg>
-  );
-}
-function WalletIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
-      <path d="M16 3H8l-2 4h12z" /><circle cx="16" cy="14" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-function HamburgerIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-    </svg>
-  );
-}
-function LogoutIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}
+function SearchIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>; }
+function CalendarIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>; }
+function PlusIcon()     { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>; }
+function WalletIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 3H8l-2 4h12z"/><circle cx="16" cy="14" r="1" fill="currentColor"/></svg>; }
+function LogoutIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>; }
+function HamburgerIcon(){ return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>; }

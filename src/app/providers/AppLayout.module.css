@@ -1,31 +1,31 @@
 /* AppLayout.module.css */
 
 :root {
-  --bg:            #0f0f0f;
-  --surface:       #1a1a1a;
-  --surface-2:     #222222;
-  --border:        #2a2a2a;
-  --accent:        #6366f1;
-  --accent-hover:  #4f46e5;
-  --text-primary:  #e0e0e0;
-  --text-secondary:#888888;
-  --text-muted:    #555555;
-  --success:       #22c55e;
-  --danger:        #ef4444;
-  --warning:       #f59e0b;
-  --header-h:      56px;
-  --sidebar-collapsed: 52px;
-  --sidebar-expanded:  220px;
-  --transition:    0.22s ease;
+  --bg:             #0f0f0f;
+  --surface:        #1a1a1a;
+  --surface-2:      #222222;
+  --border:         #2a2a2a;
+  --accent:         #6366f1;
+  --accent-hover:   #4f46e5;
+  --text-primary:   #e0e0e0;
+  --text-secondary: #888888;
+  --text-muted:     #555555;
+  --success:        #22c55e;
+  --danger:         #ef4444;
+  --warning:        #f59e0b;
+  --header-h:       56px;
+  --sidebar-icons:  52px;
+  --sidebar-full:   220px;
+  --transition:     0.22s ease;
 }
 :global(.light-theme) {
-  --bg:            #f0f0f0;
-  --surface:       #ffffff;
-  --surface-2:     #f8f8f8;
-  --border:        #e0e0e0;
-  --text-primary:  #111827;
-  --text-secondary:#6b7280;
-  --text-muted:    #9ca3af;
+  --bg:             #f0f0f0;
+  --surface:        #ffffff;
+  --surface-2:      #f8f8f8;
+  --border:         #e0e0e0;
+  --text-primary:   #111827;
+  --text-secondary: #6b7280;
+  --text-muted:     #9ca3af;
 }
 
 /* ---- Root ---- */
@@ -46,190 +46,178 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* На десктопе отступ слева = ширина иконочного сайдбара */
   padding: 0 16px 0 0;
   flex-shrink: 0;
-  z-index: 200;
+  z-index: 300;
   box-shadow: 0 1px 8px rgba(0,0,0,0.15);
   position: relative;
 }
 
-.headerLeft,
-.headerRight {
+.headerLeft, .headerRight {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-/* Логотип — кнопка без стиля кнопки */
-.logo {
-  background: none;
-  border: none;
-  cursor: pointer;
+/* Кнопка гамбургера занимает ровно столько же, сколько иконочный сайдбар */
+.menuBtn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-primary);
+  width: var(--sidebar-icons);
+  height: var(--header-h);
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--transition);
+  flex-shrink: 0; font-size: 18px;
+}
+.menuBtn:hover { background: var(--surface-2); }
+
+.iconBtn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-primary);
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  transition: background var(--transition);
   font-size: 18px;
-  font-weight: 800;
+}
+.iconBtn:hover { background: var(--surface-2); }
+
+.logo {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; font-weight: 800;
   background-image: linear-gradient(135deg, #6366f1, #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   background-clip: text;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 2px;
-  line-height: 1;
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 2px; line-height: 1;
   transition: opacity var(--transition);
 }
 .logo:hover { opacity: 0.8; }
 
-.menuBtn,
-.iconBtn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-primary);
-  width: var(--sidebar-collapsed);
-  height: var(--header-h);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background var(--transition);
-  flex-shrink: 0;
-  font-size: 18px;
-}
-.menuBtn:hover,
-.iconBtn:hover { background: var(--surface-2); }
-
 .avatarBtn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 32px; height: 32px; border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  transition: transform var(--transition), opacity var(--transition);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; transition: transform var(--transition);
 }
 .avatarBtn:hover { transform: scale(1.07); }
 
 .loginBtn {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; padding: 6px 12px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
   transition: background var(--transition);
 }
 .loginBtn:hover { background: var(--accent-hover); }
 
-/* ---- Body (sidebar + main) ---- */
+/* =============================================
+   SIDEBAR
+   Десктоп: иконки (52px) → оверлей (220px)
+   Мобайл:  скрыт (0px)  → оверлей (220px)
+   ============================================= */
+
 .sidebar {
   position: fixed;
-  top: var(--header-h);
-  left: 0;
-  bottom: 0;
-  width: var(--sidebar-collapsed);
+  top: var(--header-h); left: 0; bottom: 0;
   background: var(--surface);
   border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  z-index: 100;
+  display: flex; flex-direction: column;
+  z-index: 200;
   overflow: hidden;
+  box-shadow: 2px 0 16px rgba(0,0,0,0.15);
+
+  /* Десктоп: начальная ширина = только иконки */
+  width: var(--sidebar-icons);
   transition: width var(--transition);
-  box-shadow: 2px 0 12px rgba(0,0,0,0.1);
 }
 
+/* Расширенный — overlay поверх контента, НЕ двигает main */
 .sidebarExpanded {
-  width: var(--sidebar-expanded);
+  width: var(--sidebar-full);
 }
+
+/* Мобайл: полностью скрыт */
+@media (max-width: 767px) {
+  .sidebar {
+    width: 0;
+    border-right: none;
+  }
+  .sidebarExpanded {
+    width: var(--sidebar-full);
+    border-right: 1px solid var(--border);
+  }
+}
+
+/* ---- Backdrop ---- */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  top: var(--header-h);
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(1px);
+  z-index: 199;
+  animation: fadeIn 0.2s ease;
+  cursor: pointer;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---- Nav ---- */
 .nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 6px;
-  flex: 1;
-  overflow: hidden;
+  display: flex; flex-direction: column;
+  gap: 2px; padding: 8px 6px;
+  flex: 1; overflow: hidden;
 }
 
 .navItem {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: 10px;
-  color: var(--text-secondary);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px; border-radius: 10px;
+  color: var(--text-secondary); text-decoration: none;
+  font-size: 13px; font-weight: 500;
   white-space: nowrap;
   transition: background var(--transition), color var(--transition);
   min-width: 0;
 }
 .navItem:hover { background: var(--surface-2); color: var(--text-primary); }
-.navActive    { background: rgba(99,102,241,0.12) !important; color: var(--accent) !important; }
+.navActive     { background: rgba(99,102,241,0.12) !important; color: var(--accent) !important; }
 
 .navIcon {
-  width: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  width: 20px; display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0;
 }
 
+/* Лейблы: скрыты в свёрнутом, видны в расширенном */
 .navLabel {
-  overflow: hidden;
-  opacity: 0;
-  max-width: 0;
+  opacity: 0; overflow: hidden; max-width: 0;
   transition: opacity var(--transition), max-width var(--transition);
 }
-
 .sidebarExpanded .navLabel {
-  opacity: 1;
-  max-width: 200px;
+  opacity: 1; max-width: 200px;
 }
 
 /* ---- Logout ---- */
 .logoutBtn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 6px;
-  padding: 9px 10px;
-  border: none;
-  border-radius: 10px;
-  background: none;
-  color: var(--danger);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
+  display: flex; align-items: center; gap: 12px;
+  margin: 6px; padding: 9px 10px;
+  border: none; border-radius: 10px; background: none;
+  color: var(--danger); font-size: 13px; font-weight: 500;
+  cursor: pointer; white-space: nowrap; overflow: hidden;
   transition: background var(--transition);
-  text-align: left;
-  overflow: hidden;
 }
 .logoutBtn:hover { background: rgba(239,68,68,0.1); }
-
-.logoutBtn .navLabel {
-  /* same as navItem labels */
-}
 
 /* ---- Main ---- */
 .main {
   position: absolute;
-  top: var(--header-h);
-  left: var(--sidebar-collapsed);
-  right: 0;
-  bottom: 0;
+  top: var(--header-h); right: 0; bottom: 0;
   overflow: hidden;
-  transition: left var(--transition);
+  /* Десктоп: отступ = иконочный сайдбар, не меняется при расширении */
+  left: var(--sidebar-icons);
+  /* Нет transition — main НИКОГДА не двигается */
 }
 
-.mainShifted {
-  left: var(--sidebar-expanded);
+/* Мобайл: main на всю ширину */
+@media (max-width: 767px) {
+  .main { left: 0; }
 }

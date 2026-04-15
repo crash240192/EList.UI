@@ -1,6 +1,4 @@
 // pages/user/UserPage.tsx
-// Единая страница профиля — работает и для текущего пользователя (/user/me)
-// и для чужих (/user/:id)
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -8,22 +6,75 @@ import { useAuthStore } from '@/app/store';
 import { getStoredAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
+import { EventCard } from '@/entities/event';
+import { useEvents } from '@/features/event-list/useEvents';
+import { useFavoritesStore } from '@/app/store';
 import styles from './UserPage.module.css';
 
+type EventTab = 'participating' | 'created';
+
+// ---- Вложенный компонент: список событий пользователя ----
+function UserEventList({
+  accountId,
+  tab,
+}: {
+  accountId: string;
+  tab: EventTab;
+}) {
+  const navigate = useNavigate();
+  const { toggle: toggleFav, isFavorite } = useFavoritesStore();
+
+  const params = tab === 'participating'
+    ? { participantId: accountId }
+    : { organizatorId: accountId };
+
+  const { events, isLoading } = useEvents(params);
+
+  if (isLoading) {
+    return (
+      <div className={styles.eventsGrid}>
+        {[1, 2, 3].map(i => <div key={i} className={styles.eventSkeleton} />)}
+      </div>
+    );
+  }
+
+  if (!events.length) {
+    return (
+      <p className={styles.placeholder}>
+        {tab === 'participating' ? 'Нет мероприятий для участия' : 'Нет организованных мероприятий'}
+      </p>
+    );
+  }
+
+  return (
+    <div className={styles.eventsGrid}>
+      {events.map(ev => (
+        <EventCard.Preset
+          key={ev.id}
+          event={ev}
+          onClick={() => navigate(`/event/${ev.id}`)}
+          isFavorite={isFavorite(ev.id)}
+          onFavorite={toggleFav}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ---- Основной компонент ----
 export default function UserPage() {
   const { id }       = useParams<{ id: string }>();
   const navigate     = useNavigate();
   const { isAuthenticated } = useAuthStore();
 
   const myAccountId  = getStoredAccountId();
-  // 'me' или совпадение id — значит это наш профиль
   const isOwnProfile = !id || id === 'me' || id === myAccountId;
   const targetId     = isOwnProfile ? null : id;
 
-  const [profile, setProfile]   = useState<IFullProfile | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'participating' | 'created'>('participating');
+  const [profile,    setProfile]    = useState<IFullProfile | null>(null);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState<string | null>(null);
+  const [activeTab,  setActiveTab]  = useState<EventTab>('participating');
   const [subscribed, setSubscribed] = useState(false);
 
   useEffect(() => {
@@ -36,7 +87,6 @@ export default function UserPage() {
   }, [targetId]);
 
   if (loading) return <Skeleton />;
-
   if (error || !profile) return (
     <div className={styles.error}>
       <span>😕</span>
@@ -54,25 +104,25 @@ export default function UserPage() {
     ? Math.floor((Date.now() - new Date(person.birthDate).getTime()) / 31_557_600_000)
     : null;
 
-  // Показываем только публичные контакты (или все — для своего профиля)
   const visibleContacts = contacts.filter(c => isOwnProfile || c.show);
+
+  // ID для запросов событий
+  const profileAccountId = isOwnProfile ? (myAccountId ?? account.id) : account.id;
 
   return (
     <div className={styles.page}>
       <button className={styles.backBtn} onClick={() => navigate(-1)}>←</button>
 
-      {/* ---- Шапка профиля ---- */}
+      {/* ---- Шапка ---- */}
       <div className={styles.header}>
         <div className={styles.avatarWrap}>
           <div className={styles.avatarPlaceholder}>
             {account.login[0].toUpperCase()}
           </div>
         </div>
-
         <div className={styles.headerInfo}>
           <h1 className={styles.login}>@{account.login}</h1>
           {fullName && <p className={styles.fullName}>{fullName}</p>}
-
           <div className={styles.stats}>
             <div className={styles.statItem}>
               <span className={styles.statNum}>—</span>
@@ -86,7 +136,7 @@ export default function UserPage() {
         </div>
       </div>
 
-      {/* ---- Кнопки действий (чужой профиль) ---- */}
+      {/* ---- Кнопки (чужой профиль) ---- */}
       {!isOwnProfile && (
         <div className={styles.actions}>
           <button
@@ -99,11 +149,9 @@ export default function UserPage() {
         </div>
       )}
 
-      {/* ---- Личная информация ---- */}
+      {/* ---- Инфо-чипы ---- */}
       <div className={styles.infoGrid}>
-        {age !== null && (
-          <InfoChip icon="🎂" label="Возраст" value={`${age} лет`} />
-        )}
+        {age !== null && <InfoChip icon="🎂" label="Возраст" value={`${age} лет`} />}
         {person?.gender && (
           <InfoChip icon="👤" label="Пол"
             value={person.gender === 'Male' ? 'Мужской' : 'Женский'} />
@@ -124,7 +172,7 @@ export default function UserPage() {
         )}
       </div>
 
-      {/* ---- Редактировать (свой профиль) ---- */}
+      {/* ---- Редактирование ---- */}
       {isOwnProfile && (
         <button className={styles.editBtn} onClick={() => navigate('/profile/edit')}>
           ✏️ Редактировать профиль
@@ -148,23 +196,14 @@ export default function UserPage() {
           </button>
         </div>
         <div className={styles.eventsList}>
-          <p className={styles.placeholder}>
-            {activeTab === 'participating'
-              ? '📅 Мероприятия, в которых участвует пользователь'
-              : '🎯 Мероприятия, организованные пользователем'}
-            <br />
-            <small>
-              Интеграция: /api/events/search с{' '}
-              {activeTab === 'participating' ? 'participantId' : 'organizatorId'} = {account.id}
-            </small>
-          </p>
+          <UserEventList accountId={profileAccountId} tab={activeTab} />
         </div>
       </div>
     </div>
   );
 }
 
-// ---- Компоненты ----
+// ---- Вспомогательные компоненты ----
 
 function InfoChip({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (

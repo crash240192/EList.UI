@@ -15,7 +15,7 @@ import type { CommandResult } from './types';
 export const COOKIE_CLIENT_HASH = 'elist_client_hash';
 export const COOKIE_AUTH_TOKEN  = 'elist_auth_token';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://92.118.113.6:35028/eList';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:7020/eList';
 
 // ---- Ошибки ----
 

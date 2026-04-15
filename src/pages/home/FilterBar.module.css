@@ -1,11 +1,13 @@
-/* pages/home/FilterBar.module.css */
+/* FilterBar.module.css */
 
+/* bar — фиксированная высота, не толкает контент */
 .bar {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 10px 16px;
+  padding: 8px 14px;
   flex-shrink: 0;
-  z-index: 10;
+  position: relative;  /* якорь для dropdown */
+  z-index: 50;
 }
 
 .row {
@@ -15,202 +17,153 @@
 }
 
 /* ---- Search ---- */
-
 .searchWrap {
   flex: 1;
   position: relative;
   display: flex;
   align-items: center;
 }
-
 .searchIcon {
-  position: absolute;
-  left: 10px;
-  color: var(--text-secondary);
-  pointer-events: none;
-  flex-shrink: 0;
+  position: absolute; left: 10px;
+  color: var(--text-secondary); pointer-events: none;
 }
-
 .searchInput {
   width: 100%;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 8px 32px 8px 34px;
-  font-size: 13px;
-  color: var(--text-primary);
-  outline: none;
+  padding: 8px 30px 8px 33px;
+  font-size: 13px; color: var(--text-primary);
+  outline: none; font-family: inherit;
   transition: border-color 0.15s;
 }
-
+.searchInput:focus  { border-color: var(--accent); }
 .searchInput::placeholder { color: var(--text-muted); }
-
-.searchInput:focus {
-  border-color: var(--accent);
-}
-
 .clearBtn {
-  position: absolute;
-  right: 8px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-secondary);
-  font-size: 12px;
-  padding: 2px 4px;
-  border-radius: 4px;
-  line-height: 1;
+  position: absolute; right: 8px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-secondary); font-size: 12px; padding: 2px 4px;
 }
-
-.clearBtn:hover { color: var(--text-primary); }
 
 /* ---- Filter toggle ---- */
-
 .filterToggle {
   position: relative;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
-  cursor: pointer;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  transition: border-color 0.15s, color 0.15s;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 10px;
+  cursor: pointer; color: var(--text-secondary);
+  display: flex; align-items: center;
+  transition: all 0.15s; flex-shrink: 0;
 }
-
-.filterToggle:hover,
-.filterActive {
-  border-color: var(--accent);
-  color: var(--accent);
+.filterToggle:hover, .filterActive {
+  border-color: var(--accent); color: var(--accent);
 }
-
 .filterDot {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 6px;
-  height: 6px;
-  background: var(--accent);
-  border-radius: 50%;
+  position: absolute; top: 4px; right: 4px;
+  width: 6px; height: 6px;
+  background: var(--accent); border-radius: 50%;
 }
 
 /* ---- View toggle ---- */
-
 .viewToggle {
   display: flex;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  flex-shrink: 0;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden; flex-shrink: 0;
 }
-
 .viewBtn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 7px 10px;
-  font-size: 16px;
-  line-height: 1;
-  transition: background 0.15s;
-  color: var(--text-secondary);
+  background: none; border: none; cursor: pointer;
+  padding: 7px 10px; font-size: 15px; line-height: 1;
+  transition: background 0.15s; color: var(--text-secondary);
+}
+.viewBtn:hover  { background: var(--border); }
+.viewActive     { background: rgba(99,102,241,0.15) !important; color: var(--accent) !important; }
+
+/* ---- Filters dropdown — OVERLAY, не толкает контент ---- */
+.filterBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  /* прозрачный — просто перехватывает клики */
 }
 
-.viewBtn:hover { background: var(--border); }
-
-.viewActive {
-  background: rgba(99,102,241,0.15) !important;
-  color: var(--accent) !important;
-}
-
-/* ---- Expanded filters ---- */
-
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-  align-items: flex-end;
-}
-
-.filterGroup {
+.filtersDropdown {
+  position: absolute;
+  top: 100%;       /* прямо под баром */
+  left: 0; right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  padding: 14px 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 160px;
+  gap: 10px;
+  z-index: 51;     /* выше backdrop */
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  animation: dropDown 0.18s ease;
 }
 
+@keyframes dropDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.filterGroupFull { display: flex; flex-direction: column; gap: 4px; }
+.filterRow       { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.filterGroup     { display: flex; flex-direction: column; gap: 4px; }
+
 .filterLabel {
-  font-size: 11px;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 500;
+  font-size: 11px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;
 }
 
 .filterInput {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 13px;
-  color: var(--text-primary);
-  outline: none;
-  transition: border-color 0.15s;
-  width: 100%;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px;
+  font-size: 13px; color: var(--text-primary);
+  outline: none; width: 100%; font-family: inherit;
 }
-
 .filterInput:focus { border-color: var(--accent); }
 
-/* ---- Full-width filter group ---- */
-
-.filterGroupFull {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex-basis: 100%;
-}
-
-/* ---- Picker button ---- */
-
 .pickerBtn {
-  width: 100%;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-align: left;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: border-color 0.15s, color 0.15s;
+  width: 100%; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; color: var(--text-secondary);
+  cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 8px;
 }
-
 .pickerBtn:hover { border-color: var(--accent); }
-
 .pickerBtnActive {
   border-color: var(--accent) !important;
   color: var(--accent) !important;
   background: rgba(99,102,241,0.06);
 }
 
-.resetBtn {
-  background: none;
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  border-radius: 8px;
-  padding: 7px 14px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s;
-  align-self: flex-end;
+/* ---- Filter action buttons ---- */
+.filterActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
 }
 
-.resetBtn:hover { background: rgba(239,68,68,0.1); }
+.resetBtn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 14px;
+  font-size: 13px; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.15s;
+}
+.resetBtn:hover {
+  border-color: var(--danger); color: var(--danger);
+  background: rgba(239,68,68,0.06);
+}
+
+.searchBtn {
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 8px;
+  padding: 8px 18px; font-size: 13px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  transition: background 0.15s;
+}
+.searchBtn:hover { background: var(--accent-hover); }
