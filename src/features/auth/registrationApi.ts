@@ -7,10 +7,11 @@ import type { Gender } from '@/shared/api/types';
 
 export interface IContactType {
   id: string;
+  name: string;             // основное отображаемое название
   namePath: string;
   localizedName: string | null;
   description: string | null;
-  mask: string | null;           // маска для поля ввода (напр. "+7(###)###-##-##")
+  mask: string | null;
   allowNotifications: boolean;
 }
 

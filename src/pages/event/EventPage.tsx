@@ -4,15 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent, IParticipantView, IEventOrganizator } from '@/entities/event';
 import {
-  fetchEventById,
-  participateEvent,
-  leaveEvent,
-  fetchEventParticipants,
-  fetchEventParameters,
-  fetchEventOrganizators,
-  startEvent,
-  finishEvent,
-  MOCK_EVENTS,
+  fetchEventById, participateEvent, leaveEvent,
+  fetchEventParticipants, fetchEventParameters,
+  fetchEventOrganizators, MOCK_EVENTS,
 } from '@/entities/event';
 import { useFavoritesStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
@@ -23,56 +17,33 @@ import styles from './EventPage.module.css';
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
 export default function EventPage() {
-  const { id }    = useParams<{ id: string }>();
-  const navigate  = useNavigate();
+  const { id }   = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const { accountId } = useAccountId();
 
-  const [event,        setEvent]        = useState<IEvent | null>(null);
-  const [participants, setParticipants] = useState<IParticipantView[]>([]);
-  const [organizers,   setOrganizers]   = useState<IEventOrganizator[]>([]);
-  const [loading,      setLoading]      = useState(true);
+  const [event,         setEvent]         = useState<IEvent | null>(null);
+  const [participants,  setParticipants]  = useState<IParticipantView[]>([]);
+  const [organizers,    setOrganizers]    = useState<IEventOrganizator[]>([]);
+  const [loading,       setLoading]       = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [openSections, setOpenSections] = useState<Set<string>>(
-    new Set(['description'])
-  );
+  const [descExpanded,  setDescExpanded]  = useState(false);
 
-  // Является ли текущий пользователь участником
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
-  // Является ли организатором
-  const isOrganizer = !!accountId && organizers.some(o => o.accountId === accountId);
+  const isOrganizer     = !!accountId && organizers.some(o => o.accountId === accountId);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-
-    const loadEvent = USE_MOCK
-      ? Promise.resolve(MOCK_EVENTS.find(e => e.id === id) ?? MOCK_EVENTS[0])
-      : fetchEventById(id);
-
-    const loadParts = USE_MOCK
-      ? Promise.resolve([] as IParticipantView[])
-      : fetchEventParticipants(id);
-
-    const loadParams = USE_MOCK
-      ? Promise.resolve(null)
-      : fetchEventParameters(id);
-
-    const loadOrgs = USE_MOCK
-      ? Promise.resolve([] as IEventOrganizator[])
-      : fetchEventOrganizators(id);
-
-    Promise.all([loadEvent, loadParts, loadParams, loadOrgs])
-      .then(([ev, parts, params, orgs]) => {
-        // Обогащаем событие параметрами из отдельного эндпоинта
-        if (params) {
-          ev = { ...ev, parameters: { ...params } };
-        }
-        setEvent(ev);
-        setParticipants(parts);
-        setOrganizers(orgs);
-      })
-      .finally(() => setLoading(false));
+    Promise.all([
+      USE_MOCK ? Promise.resolve(MOCK_EVENTS.find(e => e.id === id) ?? MOCK_EVENTS[0]) : fetchEventById(id),
+      USE_MOCK ? Promise.resolve([] as IParticipantView[]) : fetchEventParticipants(id),
+      USE_MOCK ? Promise.resolve(null) : fetchEventParameters(id),
+      USE_MOCK ? Promise.resolve([] as IEventOrganizator[]) : fetchEventOrganizators(id),
+    ]).then(([ev, parts, params, orgs]) => {
+      if (params) ev = { ...ev, parameters: { ...params } };
+      setEvent(ev); setParticipants(parts); setOrganizers(orgs);
+    }).finally(() => setLoading(false));
   }, [id]);
 
   const handleParticipate = useCallback(async () => {
@@ -86,231 +57,345 @@ export default function EventPage() {
         await participateEvent(id);
         setParticipants(prev => [...prev, { accountId, login: '', firstName: null, lastName: null }]);
       }
-    } finally {
-      setActionLoading(false);
-    }
+    } finally { setActionLoading(false); }
   }, [id, accountId, isParticipating]);
-
-  const toggleSection = (key: string) =>
-    setOpenSections(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
 
   if (loading) return <PageSkeleton />;
   if (!event) return (
-    <div className={styles.error}>
-      <span>😕</span><p>Мероприятие не найдено</p>
+    <div className={styles.errorState}>
+      <span className={styles.errorIcon}>😕</span>
+      <p>Мероприятие не найдено</p>
       <button onClick={() => navigate(-1)}>← Назад</button>
     </div>
   );
 
   const cost = event.parameters?.cost ?? 0;
+  const maxPersons = event.parameters?.maxPersonsCount ?? null;
+  const fillPct = maxPersons ? Math.round((participants.length / maxPersons) * 100) : null;
+
+  // Участники: текущий пользователь — первым
+  const sortedParticipants = [
+    ...participants.filter(p => p.accountId === accountId),
+    ...participants.filter(p => p.accountId !== accountId),
+  ];
+  const visibleParticipants = sortedParticipants.slice(0, 3);
+  const extraCount = Math.max(0, sortedParticipants.length - 3);
 
   return (
     <div className={styles.page}>
-      {/* Cover */}
-      <div className={styles.cover}>
-        <div
-          className={styles.coverBg}
-          style={{ background: event.coverUrl ? undefined : 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}
-        >
-          {event.coverUrl && <img src={event.coverUrl} alt={event.name} className={styles.coverImg} />}
-        </div>
-        <button className={styles.backBtn} onClick={() => navigate(-1)}>←</button>
-        <button className={styles.photosBtn}>📷 Фото</button>
-        {event.eventType && (
-          <div className={styles.coverBadges}>
-            <span className={styles.categoryBadge}>{event.eventType.eventCategory?.name}</span>
-            <span className={styles.typeBadge}>{event.eventType.name}</span>
+      <div className={styles.card}>
+
+        {/* ── Hero (ограничен шириной карточки) ── */}
+        <div className={styles.hero} style={!event.coverUrl ? {
+          background: 'linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)',
+        } : undefined}>
+        {event.coverUrl && <img src={event.coverUrl} alt={event.name} className={styles.heroImg} />}
+        <div className={styles.heroOverlay} />
+
+        {/* Top controls */}
+        <div className={styles.heroTop}>
+          <button className={styles.heroBtn} onClick={() => navigate(-1)} aria-label="Назад">
+            <ChevronLeft />
+          </button>
+          <div className={styles.heroTopRight}>
+            <button
+              className={`${styles.heroBtn} ${isFavorite(event.id) ? styles.heroBtnFav : ''}`}
+              onClick={() => toggleFav(event.id)} aria-label="В избранное"
+            >
+              <HeartIcon filled={isFavorite(event.id)} />
+            </button>
+            <button className={styles.heroBtn} aria-label="Поделиться"><ShareIcon /></button>
           </div>
-        )}
+        </div>
+
+        {/* Bottom tags */}
+        <div className={styles.heroBottom}>
+          {event.eventType?.eventCategory?.name && (
+            <span className={styles.tagCat}>{event.eventType.eventCategory.name}</span>
+          )}
+          {event.eventType?.name && (
+            <span className={styles.tagType}>{event.eventType.name}</span>
+          )}
+          {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
+        </div>
       </div>
 
-      {/* Content */}
+      {/* ── Content ── */}
       <div className={styles.content}>
+
+        {/* Title + rating */}
         <div className={styles.titleRow}>
           <h1 className={styles.title}>{event.name}</h1>
           {event.anticipationRating != null && (
-            <span className={styles.rating}>⭐ {event.anticipationRating.toFixed(1)}</span>
+            <div className={styles.ratingBadge}>
+              <StarIcon />
+              {event.anticipationRating.toFixed(1)}
+            </div>
           )}
         </div>
 
-        <div className={styles.quickMeta}>
-          <span>📅 {formatDateRange(event.startTime, event.endTime)}</span>
-          {event.address && <span>📍 {event.address}</span>}
-          <span className={cost === 0 ? styles.free : styles.paid}>
-            {cost === 0 ? '🎉 Бесплатно' : `💰 ${cost.toLocaleString('ru-RU')} ₽`}
-          </span>
-          {event.parameters?.ageLimit ? <span className={styles.ageLimit}>{event.parameters.ageLimit}+</span> : null}
-          {participants.length > 0 && <span>👥 {participants.length}</span>}
-        </div>
-
-        {/* Mini-map */}
-        {event.latitude != null && event.longitude != null && (
-          <div className={styles.miniMapWrap}>
-            <YandexMap
-              lat={event.latitude}
-              lng={event.longitude}
-              label={event.name}
-            />
+        {/* Meta pills — без участников, они уже есть в action bar */}
+        <div className={styles.metaStrip}>
+          <div className={`${styles.metaPill} ${styles.metaPillAccent}`}>
+            <CalendarIcon />
+            {formatDateFull(event.startTime, event.endTime)}
           </div>
-        )}
-
-        {/* Actions */}
-        <div className={styles.actions}>
-          {isOrganizer ? (
-            // Организатор — кнопка редактировать вместо участвовать
-            <button
-              className={styles.primaryBtn}
-              onClick={() => navigate(`/edit-event/${event.id}`)}
-            >
-              ✏️ Редактировать
-            </button>
-          ) : (
-            // Обычный участник
-            <button
-              className={`${styles.primaryBtn} ${isParticipating ? styles.leaveBtn : ''}`}
-              onClick={handleParticipate}
-              disabled={actionLoading || !accountId}
-            >
-              {actionLoading
-                ? <span className={styles.spinner} />
-                : isParticipating ? 'Покинуть событие' : 'Участвовать'}
-            </button>
+          {event.address && (
+            <div className={styles.metaPill}>
+              <PinIcon />
+              {event.address}
+            </div>
           )}
-
-          {!isOrganizer && cost > 0 && !isParticipating && (
-            <button className={styles.buyBtn}>Купить билет</button>
-          )}
-
-          <button
-            className={`${styles.iconBtn} ${isFavorite(event.id) ? styles.favActive : ''}`}
-            onClick={() => toggleFav(event.id)}
-            title="Избранное"
-          >❤️</button>
-
-          {isOrganizer && (
-            <button
-              className={styles.iconBtn}
-              onClick={() => event.active ? finishEvent(event.id) : startEvent(event.id)}
-              title={event.active ? 'Завершить' : 'Начать'}
-            >
-              {event.active ? '🏁' : '▶️'}
-            </button>
+          {event.parameters?.ageLimit && (
+            <div className={`${styles.metaPill} ${styles.metaPillAge}`}>
+              {event.parameters.ageLimit}+
+            </div>
           )}
         </div>
 
-        {/* Sections */}
-        <div className={styles.sections}>
-          <Section id="description" title="Описание"
-            open={openSections.has('description')} onToggle={() => toggleSection('description')}>
-            <p className={styles.description}>{event.description ?? 'Описание отсутствует'}</p>
-          </Section>
+        {/* ── Action bar ── */}
+        <div className={styles.actionBar}>
+          {/* Аватары участников — social proof рядом с кнопкой */}
+          {sortedParticipants.length > 0 && (
+            <div className={styles.participantPreview}>
+              <div className={styles.avatarStack}>
+                {visibleParticipants.map((p, i) => (
+                  <div key={p.accountId}
+                    className={`${styles.avatarSm} ${p.accountId === accountId ? styles.avatarSmMe : ''}`}
+                    style={{ zIndex: 3 - i }}
+                  >
+                    {(p.firstName?.[0] ?? p.login?.[0] ?? '?').toUpperCase()}
+                  </div>
+                ))}
+                {extraCount > 0 && (
+                  <div className={`${styles.avatarSm} ${styles.avatarSmExtra}`}>+{extraCount}</div>
+                )}
+              </div>
+              {/* Счётчик только если нет блока вместимости в инфокарточке */}
+              {!maxPersons && (
+                <span className={styles.participantText}>
+                  <strong>{participants.length}</strong> участников
+                </span>
+              )}
+            </div>
+          )}
 
-          <Section id="participants" title={`Участники (${participants.length})`}
-            open={openSections.has('participants')} onToggle={() => toggleSection('participants')}>
-            <ParticipantsList participants={participants} currentAccountId={accountId} />
-          </Section>
+          <div className={styles.actionBtns}>
+            <button className={styles.btnShare} aria-label="Поделиться"><ShareIcon /></button>
+            {isOrganizer ? (
+              <button className={styles.btnJoin} onClick={() => navigate(`/edit-event/${event.id}`)}>
+                ✏️ Редактировать
+              </button>
+            ) : (
+              <button
+                className={`${styles.btnJoin} ${isParticipating ? styles.btnLeave : ''}`}
+                onClick={handleParticipate}
+                disabled={actionLoading || !accountId}
+              >
+                {actionLoading ? '...' : isParticipating ? 'Покинуть' : 'Участвовать'}
+              </button>
+            )}
+          </div>
+        </div>
 
-          {organizers.length > 0 && (
-            <Section id="organizers" title={`Организаторы (${organizers.length})`}
-              open={openSections.has('organizers')} onToggle={() => toggleSection('organizers')}>
-              <div className={styles.participantsList}>
-                {organizers.map(o => (
-                  <UserChip key={o.accountId} user={{
-                    accountId: o.accountId,
-                    login: o.login,
-                    firstName: o.firstName,
-                    lastName: o.lastName,
-                    isMe: o.accountId === accountId,
-                  }} size="md" />
+        {/* ── Two column ── */}
+        <div className={styles.twoCol}>
+
+          {/* Left: description + participants */}
+          <div className={styles.leftCol}>
+
+            <div className={styles.sectionLabel}>О мероприятии</div>
+            <p className={`${styles.description} ${descExpanded ? styles.descriptionFull : ''}`}>
+              {event.description ?? 'Описание отсутствует'}
+            </p>
+            {(event.description?.length ?? 0) > 200 && (
+              <button className={styles.readMore} onClick={() => setDescExpanded(v => !v)}>
+                {descExpanded ? 'Свернуть' : 'Показать полностью'}
+              </button>
+            )}
+
+            {/* Participants */}
+            {sortedParticipants.length > 0 && (
+              <div className={styles.participantsBlock}>
+                <div className={styles.sectionLabel}>Участники</div>
+                <div className={styles.chipsList}>
+                  {sortedParticipants.slice(0, 12).map(p => (
+                    <UserChip key={p.accountId} user={{
+                      accountId: p.accountId, login: p.login,
+                      firstName: p.firstName, lastName: p.lastName,
+                      isMe: p.accountId === accountId,
+                    }} size="sm" />
+                  ))}
+                  {sortedParticipants.length > 12 && (
+                    <span className={styles.moreChip}>ещё {sortedParticipants.length - 12}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Organizer management (only for organizers) */}
+            {isOrganizer && (
+              <div className={styles.managementBlock}>
+                <div className={styles.sectionLabel}>Управление</div>
+                <div className={styles.managementBtns}>
+                  <button className={styles.mgmtBtn}>👥 Добавить организатора</button>
+                  <button className={styles.mgmtBtn}>✅ Белый список</button>
+                  <button className={`${styles.mgmtBtn} ${styles.mgmtBtnDanger}`}>❌ Отменить</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: info card + map + organizers */}
+          <div className={styles.rightCol}>
+
+            {/* Info card */}
+            <div className={styles.infoCard}>
+
+              {/* Дата — рендерим напрямую, не через InfoRow */}
+              <div className={`${styles.infoRow} ${styles.infoRow}`}>
+                <div className={styles.infoIcon}><CalendarIcon /></div>
+                <div className={styles.infoText}>
+                  {isSameDay(event.startTime, event.endTime) ? (
+                    <div className={styles.infoValue}>
+                      <strong>{formatDateStart(event.startTime)}</strong>
+                      <span>
+                        {formatTime(event.startTime)}
+                        {event.endTime ? ` — ${formatTime(event.endTime)}` : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className={styles.infoValue}>
+                      <span className={styles.dateSubLabel}>Начало</span>
+                      <strong>{formatDateStart(event.startTime)}, {formatTime(event.startTime)}</strong>
+                      <span className={`${styles.dateSubLabel} ${styles.dateSubLabelGap}`}>Окончание</span>
+                      <strong>{formatDateStart(event.endTime!)}, {formatTime(event.endTime!)}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {event.address && (
+                <InfoRow icon={<PinIcon />} label="Адрес">
+                  <strong className={styles.accentText}>{event.address}</strong>
+                </InfoRow>
+              )}
+              <InfoRow icon={<MoneyIcon />} label="Стоимость">
+                <strong className={cost === 0 ? styles.freeText : ''}>
+                  {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
+                </strong>
+              </InfoRow>
+              {maxPersons && (
+                <InfoRow icon={<PeopleIcon />} label="Вместимость">
+                  <strong>{participants.length} / {maxPersons}</strong>
+                  <div className={styles.fillBar}>
+                    <div className={styles.fillBarFill} style={{ width: `${fillPct}%` }} />
+                  </div>
+                </InfoRow>
+              )}
+            </div>
+
+            {/* Map */}
+            {event.latitude != null && event.longitude != null && (
+              <div className={styles.mapCard}>
+                <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} />
+              </div>
+            )}
+
+            {/* Organizers */}
+            {organizers.length > 0 && (
+              <div className={styles.infoCard}>
+                <div className={styles.sectionLabel} style={{ marginBottom: 10 }}>Организаторы</div>
+                {organizers.map((o, i) => (
+                  <div key={o.accountId} className={`${styles.orgRow} ${i > 0 ? styles.orgRowBorder : ''}`}>
+                    <div className={styles.orgAvatar}>
+                      {(o.firstName?.[0] ?? o.login[0]).toUpperCase()}
+                    </div>
+                    <div className={styles.orgInfo}>
+                      <span className={styles.orgName}>
+                        {o.firstName ? `${o.firstName} ${o.lastName ?? ''}`.trim() : o.login}
+                      </span>
+                      <span className={styles.orgRole}>
+                        {i === 0 ? 'Главный организатор' : 'Соорганизатор'}
+                      </span>
+                    </div>
+                    <button className={styles.orgLink}
+                      onClick={() => navigate(`/user/${o.accountId}`)}>
+                      Профиль
+                    </button>
+                  </div>
                 ))}
               </div>
-            </Section>
-          )}
+            )}
 
-          <Section id="contacts" title="Контакты"
-            open={openSections.has('contacts')} onToggle={() => toggleSection('contacts')}>
-            <p className={styles.sectionPlaceholder}>Контактная информация организатора</p>
-          </Section>
+          </div>
+        </div>{/* end twoCol */}
+      </div>{/* end content */}
+      </div>{/* end card */}
+    </div>
+  );
+}
 
-          {isOrganizer && (
-            <Section id="management" title="Управление"
-              open={openSections.has('management')} onToggle={() => toggleSection('management')}>
-              <div className={styles.managementLinks}>
-                <button className={styles.managementBtn}>👥 Добавить администратора</button>
-                <button className={styles.managementBtn}>✅ Белый список</button>
-                <button className={styles.managementBtn}>🚫 Чёрный список</button>
-                <button
-                  className={`${styles.managementBtn} ${styles.dangerBtn}`}
-                  onClick={() => navigate(`/edit-event/${event.id}`)}
-                >❌ Отменить мероприятие</button>
-              </div>
-            </Section>
-          )}
-        </div>
+// ── Info row helper ──
+
+function InfoRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  return (
+    <div className={styles.infoRow}>
+      <div className={styles.infoIcon}>{icon}</div>
+      <div className={styles.infoText}>
+        <div className={styles.infoLabel}>{label}</div>
+        <div className={styles.infoValue}>{children}</div>
       </div>
     </div>
   );
 }
 
-// ---- Sub-components ----
-
-function ParticipantsList({ participants, currentAccountId }: {
-  participants: IParticipantView[];
-  currentAccountId: string | null;
-}) {
-  if (!participants.length) return <p className={styles.sectionPlaceholder}>Пока никто не записался</p>;
-  const sorted = [
-    ...participants.filter(p => p.accountId === currentAccountId),
-    ...participants.filter(p => p.accountId !== currentAccountId),
-  ];
-  return (
-    <div className={styles.participantsList}>
-      {sorted.map(p => (
-        <UserChip key={p.accountId} user={{
-          accountId: p.accountId, login: p.login,
-          firstName: p.firstName, lastName: p.lastName,
-          isMe: p.accountId === currentAccountId,
-        }} size="md" />
-      ))}
-    </div>
-  );
-}
-
-function Section({ id, title, open, onToggle, children }: {
-  id: string; title: string; open: boolean; onToggle: () => void; children: React.ReactNode;
-}) {
-  return (
-    <div className={styles.section}>
-      <button className={styles.sectionHeader} onClick={onToggle} aria-expanded={open}>
-        <span>{title}</span>
-        <span className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`}>›</span>
-      </button>
-      {open && <div className={styles.sectionBody}>{children}</div>}
-    </div>
-  );
-}
-
+// ── Skeleton ──
 
 function PageSkeleton() {
   return (
-    <div>
-      <div style={{ height: 220, background: '#1a1a1a', animation: 'shimmer 1.4s infinite' }} />
-      <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ height: 26, width: '70%', borderRadius: 8, background: '#1a1a1a' }} />
-        <div style={{ height: 14, width: '50%', borderRadius: 8, background: '#1a1a1a' }} />
-        <div style={{ height: 44, borderRadius: 10, background: '#1a1a1a' }} />
+    <div className={styles.skeleton}>
+      <div className={styles.skeletonHero} />
+      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className={styles.skeletonLine} style={{ width: '70%', height: 26 }} />
+        <div className={styles.skeletonLine} style={{ width: '40%', height: 14 }} />
+        <div className={styles.skeletonLine} style={{ height: 44 }} />
       </div>
     </div>
   );
 }
 
-function formatDateRange(start: string, end: string | null): string {
-  const fmt = (iso: string) =>
-    new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-      .format(new Date(iso));
-  return end ? `${fmt(start)} — ${fmt(end)}` : fmt(start);
+// ── Date helpers ──
+
+const RU_DATE = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
+const RU_TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const RU_SHORT = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+function formatDateStart(iso: string)   { return RU_DATE.format(new Date(iso)); }
+function formatTime(iso: string)        { return RU_TIME.format(new Date(iso)); }
+function isSameDay(start: string, end: string | null): boolean {
+  if (!end) return true;
+  const a = new Date(start), b = new Date(end);
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
 }
+function formatDateFull(start: string, end: string | null) {
+  if (!end) return RU_SHORT.format(new Date(start));
+  if (isSameDay(start, end)) {
+    // Одна дата: «24 мая, 19:00 — 23:00»
+    return `${RU_SHORT.format(new Date(start))} — ${RU_TIME.format(new Date(end))}`;
+  }
+  // Разные даты: «24 мая, 19:00 — 25 мая, 23:00»
+  return `${RU_SHORT.format(new Date(start))} — ${RU_SHORT.format(new Date(end))}`;
+}
+
+// ── Icons ──
+
+function ChevronLeft() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>; }
+function HeartIcon({ filled }: { filled: boolean }) { return <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>; }
+function ShareIcon()   { return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>; }
+function StarIcon()    { return <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>; }
+function CalendarIcon(){ return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>; }
+function PinIcon()     { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>; }
+function PeopleIcon()  { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>; }
+function MoneyIcon()   { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>; }

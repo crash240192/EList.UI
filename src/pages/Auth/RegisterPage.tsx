@@ -16,6 +16,7 @@ import { login } from '@/features/auth/api';
 import { useAuthStore } from '@/app/store';
 import { useGeoCity, POPULAR_CITIES, type ICity } from '@/features/auth/useGeoCity';
 import { savePendingPersonData } from '@/features/auth/pendingPersonData';
+import { cookies } from '@/shared/lib/cookies';
 import type { Gender } from '@/shared/api/types';
 import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
@@ -53,17 +54,22 @@ export default function RegisterPage() {
 
   // Геолокация
   const { detectedCity, detectedCoords, loading: geoLoading } = useGeoCity();
+  // Флаг — пользователь вручную менял город
+  const [cityManuallySelected, setCityManuallySelected] = useState(false);
   const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
 
-  // Когда геолокация определилась — подставляем найденный город
+  // Когда геолокация определилась — подставляем найденный город,
+  // но только если пользователь ещё не выбрал сам
   useEffect(() => {
-    if (detectedCity && !selectedCity) setSelectedCity(detectedCity);
-  }, [detectedCity]);
+    if (detectedCity && !cityManuallySelected) setSelectedCity(detectedCity);
+  }, [detectedCity, cityManuallySelected]);
 
-  // Итоговые координаты: сначала точные (GPS/IP), потом из выбранного города
-  const finalCoords = detectedCoords ?? (selectedCity
+  // Итоговые координаты:
+  // 1. Если пользователь выбрал город вручную — берём координаты города
+  // 2. Если нет — точные координаты из браузера/IP (они попадают в тот же город)
+  const finalCoords = selectedCity
     ? { lat: selectedCity.lat, lng: selectedCity.lng }
-    : null);
+    : detectedCoords ?? null;
 
   const [form1, setForm1] = useState<Step1Form>({
     login: '', password: '', passwordConfirmation: '',
@@ -119,10 +125,16 @@ export default function RegisterPage() {
         authorizationContactType:  form1.contactTypeId,
         authorizationContactValue: form1.contactValue.trim(),
         showContact:               true,
-        // Координаты: точные из геолокации или из выбранного города
         latitude:  finalCoords?.lat ?? undefined,
         longitude: finalCoords?.lng ?? undefined,
       });
+
+      // Сохраняем координаты города в cookies — чтобы карта сразу открылась
+      // в нужном городе, не дожидаясь загрузки из аккаунта
+      if (finalCoords) {
+        cookies.set('elist_user_lat', finalCoords.lat.toFixed(6), 30);
+        cookies.set('elist_user_lng', finalCoords.lng.toFixed(6), 30);
+      }
       setSavedCreds({ login: form1.login.trim(), password: form1.password });
       setStep(2);
     } catch (e) {
@@ -242,14 +254,14 @@ export default function RegisterPage() {
                       value={form1.contactTypeId} onChange={set1('contactTypeId')}>
                       {contactTypes.map(ct => (
                         <option key={ct.id} value={ct.id}>
-                          {ct.localizedName ?? ct.namePath}
+                          {ct.name || ct.localizedName || ct.namePath}
                         </option>
                       ))}
                     </select>
                   )}
               </Field>
 
-              <Field label={selectedContactType?.localizedName ?? 'Контакт'}>
+              <Field label={selectedContactType?.name || selectedContactType?.localizedName || 'Контакт'}>
                 <input className={styles.input}
                   placeholder={selectedContactType?.mask ?? 'Введите контакт'}
                   value={form1.contactValue} onChange={set1('contactValue')}
@@ -268,6 +280,7 @@ export default function RegisterPage() {
                     onChange={e => {
                       const city = POPULAR_CITIES.find(c => c.name === e.target.value) ?? null;
                       setSelectedCity(city);
+                      setCityManuallySelected(true);
                     }}
                   >
                     <option value="">— Выбрать город —</option>

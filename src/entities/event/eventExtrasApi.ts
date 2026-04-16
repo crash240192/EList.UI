@@ -32,23 +32,54 @@ export async function fetchEventParameters(eventId: string): Promise<IEventParam
 
 // ---- EventOrganizators ----
 
+// Реальная структура ответа API
+interface IOrganizatorAccount {
+  id: string;
+  login: string;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+interface IOrganizatorPersonInfo {
+  id: string;
+  accountId: string;
+  firstName: string | null;
+  lastName: string | null;
+  patronymic: string | null;
+  gender: 'Male' | 'Female' | null;
+  birthDate: string | null;
+}
+
+interface IRawOrganizator {
+  id: string;
+  eventId: string;
+  account: IOrganizatorAccount;
+  personInfo: IOrganizatorPersonInfo | null;
+  organizationId: string | null;
+}
+
+// Плоская модель для отображения
 export interface IEventOrganizator {
   accountId: string;
   login: string;
-  firstName?: string | null;
-  lastName?: string | null;
+  firstName: string | null;
+  lastName: string | null;
 }
 
 /**
  * GET /api/EventOrganizators/getByEventId/{eventId}
- * Не найден в Swagger — реализован по описанию задачи.
  */
 export async function fetchEventOrganizators(eventId: string): Promise<IEventOrganizator[]> {
   try {
-    const data = await apiClient.get<IEventOrganizator[]>(
+    const data = await apiClient.get<IRawOrganizator[]>(
       `/api/EventOrganizators/getByEventId/${eventId}`
     );
-    return data.result ?? [];
+    return (data.result ?? []).map(o => ({
+      accountId: o.account.id,
+      login:     o.account.login,
+      firstName: o.personInfo?.firstName ?? null,
+      lastName:  o.personInfo?.lastName  ?? null,
+    }));
   } catch {
     return [];
   }

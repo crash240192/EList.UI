@@ -73,7 +73,76 @@ export const typesApi = {
   },
 };
 
-// ---- Типы контактов ----
+// ---- Тарифы ----
+
+export interface ITariffValidator {
+  id?: string;
+  costLimit: number;
+  personsLimit: number;
+  allowPrivate: boolean;
+  ageLimit: number;
+  allowGenderSegregation: boolean;
+}
+
+export interface ITariffPeriod {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds?: number;
+}
+
+export interface ITariff {
+  id: string;
+  name: string;
+  cost: number;
+  period: ITariffPeriod;
+  validatorId: string;
+  tariffValidator?: ITariffValidator | null;
+}
+
+export interface ITariffRequest {
+  name: string;
+  cost: number;
+  periodDays: number;
+  validatorId: string;
+}
+
+export const tariffApi = {
+  getAll: async (): Promise<ITariff[]> => {
+    const r = await apiClient.get<ITariff[]>('/api/Wallets/tariff/all');
+    return r.result ?? [];
+  },
+  getById: async (id: string): Promise<ITariff | null> => {
+    try {
+      const r = await apiClient.get<ITariff>(`/api/Wallets/tariff/${id}`);
+      return r.result ?? null;
+    } catch { return null; }
+  },
+  create: async (payload: ITariffRequest): Promise<string> => {
+    const r = await apiClient.post<string>('/api/Wallets/tariff/create', payload);
+    return r.result;
+  },
+  update: async (payload: ITariff): Promise<void> => {
+    await apiClient.put('/api/Wallets/tariff/update', payload);
+  },
+};
+
+export const tariffValidatorApi = {
+  getByTariff: async (tariffId: string): Promise<ITariffValidator | null> => {
+    try {
+      const r = await apiClient.get<ITariffValidator>(`/api/Wallets/tariffValidator/byTariffId/${tariffId}`);
+      return r.result ?? null;
+    } catch { return null; }
+  },
+  create: async (payload: ITariffValidator): Promise<string> => {
+    const r = await apiClient.post<string>('/api/Wallets/tariffValidator/create', payload);
+    return r.result;
+  },
+  update: async (payload: ITariffValidator): Promise<void> => {
+    await apiClient.put('/api/Wallets/tariffValidator/update', payload);
+  },
+};
+
 
 export interface IContactType {
   id: string;

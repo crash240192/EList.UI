@@ -1,0 +1,23 @@
+/* AdSlot — стилизован под карточку событий */
+
+.wrap {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 140px;
+  /* Те же размеры что и EventCard */
+}
+
+.label {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 10px;
+  color: var(--text-muted);
+  z-index: 1;
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}

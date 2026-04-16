@@ -11,6 +11,7 @@ export interface IAccountData {
 
 export interface IContactType {
   id: string;
+  name: string;             // основное отображаемое название
   namePath: string;
   localizedName: string | null;
   mask: string | null;

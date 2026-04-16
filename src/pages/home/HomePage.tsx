@@ -10,7 +10,15 @@ import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
 import { EventModal } from './EventModal';
 import { FilterBar } from './FilterBar';
 import { EventMap } from '@/features/event-map/EventMap';
+import { useUserLocation } from '@/features/auth/useUserLocation';
+import { CityConfirmDialog } from '@/shared/ui/CityConfirmDialog/CityConfirmDialog';
+import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import styles from './HomePage.module.css';
+
+// ID рекламного блока из кабинета РСЯ (partner.yandex.ru)
+// Формат: R-A-XXXXXXX-X
+const AD_BLOCK_ID = import.meta.env.VITE_YANDEX_AD_BLOCK_ID ?? '';
+const AD_EVERY    = 12; // реклама каждые N карточек
 
 export default function HomePage() {
   const [viewMode, setViewMode] = useState<EventViewMode>('map');
@@ -19,6 +27,13 @@ export default function HomePage() {
 
   const { filters, setFilter } = useFiltersStore();
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
+  const {
+    coords: userCoords,
+    showCityConfirm,
+    detectedCity,
+    confirmCity,
+    keepOldCity,
+  } = useUserLocation();
 
   const debouncedName = useDebounce(searchName, 300);
 
@@ -60,6 +75,7 @@ export default function HomePage() {
             <EventMap
               events={events}
               onMarkerClick={handleEventClick}
+              center={[userCoords.lat, userCoords.lng]}
             />
           </div>
         ) : (
@@ -78,14 +94,20 @@ export default function HomePage() {
               </div>
             ) : (
               <div className={styles.grid}>
-                {events.map((event) => (
-                  <EventCard.Preset
-                    key={event.id}
-                    event={event}
-                    onClick={handleEventClick}
-                    isFavorite={isFavorite(event.id)}
-                    onFavorite={toggleFav}
-                  />
+                {events.map((event, idx) => (
+                  <>
+                    <EventCard.Preset
+                      key={event.id}
+                      event={event}
+                      onClick={handleEventClick}
+                      isFavorite={isFavorite(event.id)}
+                      onFavorite={toggleFav}
+                    />
+                    {/* Реклама каждые AD_EVERY карточек */}
+                    {AD_BLOCK_ID && (idx + 1) % AD_EVERY === 0 && (
+                      <AdSlot key={`ad-${idx}`} blockId={AD_BLOCK_ID} />
+                    )}
+                  </>
                 ))}
               </div>
             )}
@@ -102,9 +124,14 @@ export default function HomePage() {
 
       {/* ---- Event popup modal ---- */}
       {selectedEvent && (
-        <EventModal
-          event={selectedEvent}
-          onClose={() => setSelectedEvent(null)}
+        <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      )}
+
+      {showCityConfirm && (
+        <CityConfirmDialog
+          cityName={detectedCity}
+          onConfirm={confirmCity}
+          onKeep={keepOldCity}
         />
       )}
     </div>

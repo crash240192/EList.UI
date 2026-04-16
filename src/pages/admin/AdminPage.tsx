@@ -5,10 +5,12 @@ import {
   categoriesApi, typesApi, contactTypesApi,
   type IEventCategory, type IEventType, type IContactType,
   type IEventCategoryRequest, type IEventTypeRequest, type IContactTypeRequest,
+  tariffApi, tariffValidatorApi,
+  type ITariff, type ITariffValidator, type ITariffPeriod, type ITariffRequest,
 } from '@/entities/admin/adminApi';
 import styles from './AdminPage.module.css';
 
-type AdminTab = 'eventTypes' | 'contactTypes';
+type AdminTab = 'eventTypes' | 'contactTypes' | 'tariffs';
 
 export default function AdminPage() {
   const [tab, setTab] = useState<AdminTab>('eventTypes');
@@ -32,11 +34,18 @@ export default function AdminPage() {
         >
           Типы контактов
         </button>
+        <button
+          className={`${styles.tab} ${tab === 'tariffs' ? styles.tabActive : ''}`}
+          onClick={() => setTab('tariffs')}
+        >
+          Тарифы
+        </button>
       </div>
 
       <div className={styles.content}>
-        {tab === 'eventTypes' && <EventTypesTab />}
+        {tab === 'eventTypes'   && <EventTypesTab />}
         {tab === 'contactTypes' && <ContactTypesTab />}
+        {tab === 'tariffs'      && <TariffsTab />}
       </div>
     </div>
   );
@@ -469,6 +478,217 @@ function ContactTypeForm({
       </div>
     </div>
   );
+}
+
+// =============================================================================
+// ВКЛАДКА: Тарифы
+// =============================================================================
+
+function TariffsTab() {
+  const [tariffs, setTariffs]   = useState<ITariff[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error,   setError]     = useState<string | null>(null);
+  const [editing, setEditing]   = useState<ITariff | null | 'new'>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setTariffs(await tariffApi.getAll()); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Ошибка загрузки'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <div className={styles.loader}>Загрузка...</div>;
+  if (error)   return <div className={styles.errorMsg}>{error}</div>;
+
+  return (
+    <div className={styles.splitPane}>
+      {/* Список */}
+      <div className={styles.listPane}>
+        <div className={styles.paneHeader}>
+          <h2 className={styles.paneTitle}>Тарифы</h2>
+          <button className={styles.addBtn} onClick={() => setEditing('new')}>+ Добавить</button>
+        </div>
+        <div className={styles.itemList}>
+          {tariffs.length === 0 && (
+            <div className={styles.emptyForm} style={{ minHeight: 120 }}>
+              <span style={{ fontSize: 28 }}>📋</span>
+              <p>Нет тарифов. Создайте первый.</p>
+            </div>
+          )}
+          {tariffs.map(t => (
+            <div key={t.id} className={styles.categoryRow}
+              onClick={() => setEditing(t)} style={{ cursor: 'pointer' }}>
+              <div className={styles.itemInfo}>
+                <span className={styles.itemName}>{t.name}</span>
+                <span className={styles.itemSub}>
+                  {t.cost === 0 ? 'Бесплатно' : `${t.cost.toLocaleString('ru-RU')} ₽`}
+                  {' · '}
+                  {formatPeriod(t)}
+                </span>
+              </div>
+              <div className={styles.itemActions}>
+                <button className={styles.iconBtn} onClick={e => { e.stopPropagation(); setEditing(t); }}>✏️</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Форма */}
+      <div className={styles.formPane}>
+        {editing !== null ? (
+          <TariffForm
+            tariff={editing === 'new' ? null : editing}
+            onSave={async (validatorData, tariffData) => {
+              if (editing === 'new') {
+                // 1. Создаём валидатор
+                const validatorId = await tariffValidatorApi.create(validatorData);
+                // 2. Создаём тариф с validatorId
+                await tariffApi.create({ ...tariffData, validatorId });
+              } else {
+                // Обновляем валидатор
+                if (editing.validatorId) {
+                  await tariffValidatorApi.update({ ...validatorData, id: editing.validatorId });
+                }
+                // Обновляем тариф
+                await tariffApi.update({ ...editing, ...tariffData });
+              }
+              setEditing(null);
+              load();
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        ) : (
+          <div className={styles.emptyForm}>
+            <span>👆</span>
+            <p>Выберите тариф для редактирования</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- Форма тарифа ----
+
+const EMPTY_VALIDATOR: ITariffValidator = {
+  costLimit: 0, personsLimit: 0,
+  allowPrivate: false, ageLimit: 0, allowGenderSegregation: false,
+};
+const EMPTY_PERIOD: ITariffPeriod = { days: 30, hours: 0, minutes: 0 };
+
+function TariffForm({ tariff, onSave, onCancel }: {
+  tariff: ITariff | null;
+  onSave: (v: ITariffValidator, t: ITariffRequest) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [name,  setName]  = useState(tariff?.name ?? '');
+  const [cost,  setCost]  = useState(String(tariff?.cost ?? 0));
+  const [days,  setDays]  = useState(String((tariff as any)?.periodDays ?? 30));
+
+  const [validator, setValidator] = useState<ITariffValidator>(EMPTY_VALIDATOR);
+  const [loadingV,  setLoadingV]  = useState(!!tariff?.validatorId);
+
+  // Загружаем валидатор если редактирование
+  useEffect(() => {
+    if (!tariff?.validatorId) return;
+    tariffValidatorApi.getByTariff(tariff.id).then(v => {
+      if (v) setValidator(v);
+    }).finally(() => setLoadingV(false));
+  }, [tariff]);
+
+  const [saving, setSaving] = useState(false);
+  const [err,    setErr]    = useState<string | null>(null);
+
+  const setV = (k: keyof ITariffValidator) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setValidator(v => ({
+        ...v,
+        [k]: e.target.type === 'checkbox' ? e.target.checked : Number(e.target.value),
+      }));
+
+  const handleSave = async () => {
+    if (!name.trim()) { setErr('Укажите название'); return; }
+    setSaving(true); setErr(null);
+    try {
+      await onSave(validator, {
+        name, cost: parseFloat(cost) || 0,
+        periodDays: parseInt(days) || 30,
+        validatorId: '',
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Ошибка');
+    } finally { setSaving(false); }
+  };
+
+  if (loadingV) return <div className={styles.loader}>Загрузка валидатора...</div>;
+
+  return (
+    <div className={styles.form}>
+      <h3 className={styles.formTitle}>{tariff ? 'Редактировать тариф' : 'Новый тариф'}</h3>
+      {err && <div className={styles.formError}>{err}</div>}
+
+      {/* Основное */}
+      <div className={styles.field}>
+        <label className={styles.label}>Название *</label>
+        <input className={styles.input} value={name} onChange={e => setName(e.target.value)} placeholder="Базовый / Pro / Enterprise..." />
+      </div>
+      <div className={styles.field}>
+        <label className={styles.label}>Стоимость (₽/период)</label>
+        <input className={styles.input} type="number" min={0} value={cost} onChange={e => setCost(e.target.value)} />
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label}>Период действия (дней)</label>
+        <input className={styles.input} type="number" min={1} value={days}
+          onChange={e => setDays(e.target.value)} placeholder="30" />
+      </div>
+
+      {/* Валидатор */}
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Ограничения тарифа
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Макс. стоимость события (₽, 0 = без лимита)</label>
+          <input className={styles.input} type="number" min={0} value={validator.costLimit} onChange={setV('costLimit')} />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Макс. участников события (0 = без лимита)</label>
+          <input className={styles.input} type="number" min={0} value={validator.personsLimit} onChange={setV('personsLimit')} />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Возрастное ограничение (0 = без лимита)</label>
+          <input className={styles.input} type="number" min={0} max={99} value={validator.ageLimit} onChange={setV('ageLimit')} />
+        </div>
+        <label className={styles.checkboxLabel}>
+          <input type="checkbox" checked={validator.allowPrivate}
+            onChange={e => setValidator(v => ({ ...v, allowPrivate: e.target.checked }))} />
+          Разрешить приватные события
+        </label>
+        <label className={styles.checkboxLabel}>
+          <input type="checkbox" checked={validator.allowGenderSegregation}
+            onChange={e => setValidator(v => ({ ...v, allowGenderSegregation: e.target.checked }))} />
+          Разрешить фильтр по полу
+        </label>
+      </div>
+
+      <div className={styles.formActions}>
+        <button className={styles.cancelBtn} onClick={onCancel}>Отмена</button>
+        <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Форматирование периода
+function formatPeriod(t: ITariff): string {
+  const days = (t as any).periodDays ?? t.period?.days;
+  return days ? `${days} дн.` : '—';
 }
 
 // ---- Общий компонент поля ----

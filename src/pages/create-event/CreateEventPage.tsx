@@ -304,28 +304,16 @@ export default function CreateEventPage() {
               lng={lng}
               address={form.address}
               hasError={hasErr('location')}
+              onAddressChange={addr => {
+                setForm(f => ({ ...f, address: addr }));
+                if (addr.trim()) setFieldErrors(p => { const n = new Set(p); n.delete('location'); return n; });
+              }}
               onPick={(la, lo, addr) => {
                 setLat(la); setLng(lo);
-                // Подставляем адрес из геокодера в поле формы
                 setForm(f => ({ ...f, address: addr }));
                 setFieldErrors(p => { const n = new Set(p); n.delete('location'); return n; });
               }}
             />
-            {/* Поле адреса под картой (синхронизировано с геокодером) */}
-            <Field label="Адрес" error={hasErr('location') && !form.address ? 'Обязательное поле' : undefined}>
-              <input
-                className={`${styles.input} ${hasErr('location') ? styles.inputError : ''}`}
-                placeholder="Адрес (заполняется автоматически или вручную)"
-                value={form.address}
-                onChange={set('address')}
-              />
-            </Field>
-            {lat !== null && lng !== null && (
-              <p className={styles.coordHint}>
-                📍 {lat.toFixed(5)}, {lng.toFixed(5)}
-                <button className={styles.coordClear} onClick={() => { setLat(null); setLng(null); }}>✕</button>
-              </p>
-            )}
           </div>
         </Section>
 

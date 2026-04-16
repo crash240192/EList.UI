@@ -1,0 +1,64 @@
+/* features/subscriptions/SubscribersListModal.module.css */
+
+.backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(2px);
+  z-index: 500;
+}
+.modal {
+  position: fixed;
+  bottom: 0; left: 50%;
+  transform: translateX(-50%);
+  width: min(480px, 100vw);
+  max-height: 70dvh;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  z-index: 501;
+  display: flex; flex-direction: column;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
+  animation: slideUp 0.22s ease;
+}
+@media (min-width: 600px) {
+  .modal {
+    bottom: auto; top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 16px;
+    max-height: 75dvh;
+    animation: scaleIn 0.2s ease;
+  }
+}
+@keyframes slideUp {
+  from { transform: translateX(-50%) translateY(100%); }
+  to   { transform: translateX(-50%) translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: translate(-50%,-48%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+}
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 18px 12px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.closeBtn {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 50%; width: 28px; height: 28px;
+  font-size: 12px; cursor: pointer; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+}
+.closeBtn:hover { background: var(--border); }
+.body {
+  flex: 1; overflow-y: auto; padding: 8px 0 16px;
+}
+.row {
+  padding: 6px 16px; cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+}
+.row:hover { background: var(--surface-2); }
+.state {
+  padding: 24px 18px; text-align: center;
+  font-size: 13px; color: var(--text-secondary); margin: 0;
+}
+.stateError { color: var(--danger); }
