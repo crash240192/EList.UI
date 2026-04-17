@@ -13,6 +13,7 @@ const MyEventsPage    = lazy(() => import('@/pages/my-events/MyEventsPage'));
 const CreateEventPage = lazy(() => import('@/pages/create-event/CreateEventPage'));
 const AdminPage       = lazy(() => import('@/pages/admin/AdminPage'));
 const SettingsPage    = lazy(() => import('@/pages/settings/SettingsPage'));
+const WalletPage      = lazy(() => import('@/pages/wallet/WalletPage'));
 const LoginPage       = lazy(() => import('@/pages/auth/LoginPage'));
 const ActivationPage  = lazy(() => import('@/pages/auth/ActivationPage'));
 const RegisterPage    = lazy(() => import('@/pages/auth/RegisterPage'));
@@ -46,6 +47,7 @@ const router = createBrowserRouter([
       { path: 'edit-event/:id',   element: S(CreateEventPage) },
       { path: 'admin',            element: S(AdminPage) },
       { path: 'settings',         element: S(SettingsPage) },
+      { path: 'wallet',           element: S(WalletPage) },
       { path: '*',                element: <Navigate to="/" replace /> },
     ],
   },

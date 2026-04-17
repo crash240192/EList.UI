@@ -530,6 +530,23 @@ function TariffsTab() {
               </div>
               <div className={styles.itemActions}>
                 <button className={styles.iconBtn} onClick={e => { e.stopPropagation(); setEditing(t); }}>✏️</button>
+                <button
+                  className={`${styles.iconBtn} ${styles.dangerBtn}`}
+                  title="Удалить тариф"
+                  onClick={async e => {
+                    e.stopPropagation();
+                    if (!confirm(`Удалить тариф «${t.name}»? Это также удалит его валидатор.`)) return;
+                    try {
+                      // Сначала удаляем валидатор, затем тариф
+                      if (t.validatorId) await tariffValidatorApi.delete(t.validatorId);
+                      await tariffApi.delete(t.id);
+                      if (editing !== 'new' && (editing as ITariff)?.id === t.id) setEditing(null);
+                      load();
+                    } catch (e) {
+                      alert(e instanceof Error ? e.message : 'Ошибка удаления');
+                    }
+                  }}
+                >🗑️</button>
               </div>
             </div>
           ))}
@@ -548,12 +565,18 @@ function TariffsTab() {
                 // 2. Создаём тариф с validatorId
                 await tariffApi.create({ ...tariffData, validatorId });
               } else {
-                // Обновляем валидатор
+                // Обновляем валидатор отдельным запросом
                 if (editing.validatorId) {
                   await tariffValidatorApi.update({ ...validatorData, id: editing.validatorId });
                 }
-                // Обновляем тариф
-                await tariffApi.update({ ...editing, ...tariffData });
+                // Обновляем тариф — только нужные поля, без tariffValidator
+                await tariffApi.update({
+                  id:          editing.id,
+                  name:        tariffData.name,
+                  cost:        tariffData.cost,
+                  periodDays:  tariffData.periodDays,
+                  validatorId: editing.validatorId,
+                } as any);
               }
               setEditing(null);
               load();

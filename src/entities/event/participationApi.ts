@@ -61,3 +61,28 @@ export async function fetchEventParticipants(eventId: string): Promise<IParticip
     lastName:  p.personInfo?.lastName  ?? null,
   }));
 }
+
+/**
+ * GET /api/events/eventTypes/byEvent/{eventId}
+ * Возвращает типы мероприятия с полным объектом категории.
+ */
+export async function fetchEventTypesByEvent(eventId: string): Promise<Array<{
+  id: string;
+  eventCategoryId: string;
+  eventCategory?: { id: string } | null;
+}>> {
+  try {
+    const data = await apiClient.get<any[]>(
+      `/api/events/eventTypes/byEvent/${eventId}`
+    );
+    const result = data.result;
+    if (!Array.isArray(result)) return [];
+    return result.map((t: any) => ({
+      id:              t.id,
+      eventCategoryId: t.eventCategoryId ?? t.eventCategory?.id ?? '',
+      eventCategory:   t.eventCategory ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}

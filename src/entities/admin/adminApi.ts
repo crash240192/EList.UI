@@ -125,6 +125,9 @@ export const tariffApi = {
   update: async (payload: ITariff): Promise<void> => {
     await apiClient.put('/api/Wallets/tariff/update', payload);
   },
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/Wallets/tariff/${id}`);
+  },
 };
 
 export const tariffValidatorApi = {
@@ -140,6 +143,9 @@ export const tariffValidatorApi = {
   },
   update: async (payload: ITariffValidator): Promise<void> => {
     await apiClient.put('/api/Wallets/tariffValidator/update', payload);
+  },
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/Wallets/tariffValidator/${id}`);
   },
 };
 

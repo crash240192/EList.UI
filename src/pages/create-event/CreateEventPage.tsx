@@ -3,10 +3,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchEventById, MOCK_EVENTS } from '@/entities/event';
+import { fetchEventTypes as fetchAllEventTypes } from '@/entities/event';
+import { fetchEventTypesByEvent } from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
 import { getOrFetchAccountId } from '@/entities/user/api';
+import { getWalletByAccount } from '@/entities/user/walletApi';
+import { tariffApi, tariffValidatorApi, type ITariffValidator } from '@/entities/admin/adminApi';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
+import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
 import styles from './CreateEventPage.module.css';
 
@@ -74,10 +79,17 @@ export default function CreateEventPage() {
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
 
+  // Для новых событий — начальная точка карты из локации пользователя
+  const userCoords = getStoredUserCoords();
+
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTypes,      setSelectedTypes]      = useState<string[]>([]);
   const [pickerOpen,         setPickerOpen]         = useState(false);
   const typeCount = selectedCategories.length + selectedTypes.length;
+
+  // Тариф пользователя (для ограничений параметров)
+  const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
+  const [hasWallet,       setHasWallet]       = useState<boolean | null>(null); // null = загружается
 
   const { toast, show: showToast } = useToast();
 
@@ -90,33 +102,75 @@ export default function CreateEventPage() {
   const endDateRef   = useRef<HTMLInputElement>(null);
   const endTimeRef   = useRef<HTMLInputElement>(null);
 
+  // Загружаем кошелёк и тариф (для ограничений параметров)
+  useEffect(() => {
+    getOrFetchAccountId().then(async accountId => {
+      try {
+        const wallet = await getWalletByAccount(accountId);
+        setHasWallet(!!wallet);
+        if (wallet?.tariffId) {
+          const tariffs = await tariffApi.getAll().catch(() => []);
+          const t = tariffs.find(x => x.id === wallet.tariffId);
+          if (t?.validatorId) {
+            const v = await tariffValidatorApi.getByTariff(t.id).catch(() => null);
+            setTariffValidator(v);
+          }
+        }
+      } catch {
+        setHasWallet(false);
+      }
+    }).catch(() => setHasWallet(false));
+  }, []);
+
   // Load for editing
   useEffect(() => {
     if (!isEditing) return;
     setLoading(true);
-    const load = USE_MOCK
+
+    const loadEvent = USE_MOCK
       ? Promise.resolve(MOCK_EVENTS.find(e => e.id === id) ?? MOCK_EVENTS[0])
       : fetchEventById(id!);
-    load.then(ev => {
+
+    // Загружаем типы события через отдельный эндпоинт — надёжнее чем из ev.eventType
+    const loadEventTypes = USE_MOCK
+      ? Promise.resolve([])
+      : fetchEventTypesByEvent(id!);
+
+    Promise.all([loadEvent, loadEventTypes]).then(([ev, eventTypes]) => {
       const toDate = (iso: string) => iso.slice(0, 10);
       const toTime = (iso: string) => iso.slice(11, 16);
       setForm({
-        name:              ev.name ?? '',
-        description:       ev.description ?? '',
-        address:           ev.address ?? '',
-        startDate:         ev.startTime ? toDate(ev.startTime) : '',
-        startTime:         ev.startTime ? toTime(ev.startTime) : '',
-        endDate:           ev.endTime   ? toDate(ev.endTime)   : '',
-        endTime:           ev.endTime   ? toTime(ev.endTime)   : '',
-        cost:              String(ev.parameters?.cost ?? 0),
-        ageLimit:          String(ev.parameters?.ageLimit ?? ''),
-        isPrivate:         ev.parameters?.private ?? false,
-        maxPersons:        String(ev.parameters?.maxPersonsCount ?? ''),
-        allowUsersToInvite:ev.parameters?.allowUsersToInvite ?? true,
-        allowedGender:     ev.parameters?.allowedGender ?? '',
+        name:               ev.name ?? '',
+        description:        ev.description ?? '',
+        address:            ev.address ?? '',
+        startDate:          ev.startTime ? toDate(ev.startTime) : '',
+        startTime:          ev.startTime ? toTime(ev.startTime) : '',
+        endDate:            ev.endTime   ? toDate(ev.endTime)   : '',
+        endTime:            ev.endTime   ? toTime(ev.endTime)   : '',
+        cost:               String(ev.parameters?.cost ?? 0),
+        ageLimit:           String(ev.parameters?.ageLimit ?? ''),
+        isPrivate:          ev.parameters?.private ?? false,
+        maxPersons:         String(ev.parameters?.maxPersonsCount ?? ''),
+        allowUsersToInvite: ev.parameters?.allowUsersToInvite ?? true,
+        allowedGender:      ev.parameters?.allowedGender ?? '',
       });
       if (ev.latitude)  setLat(ev.latitude);
       if (ev.longitude) setLng(ev.longitude);
+
+      // Восстанавливаем типы из API byEvent — используем реальные ID из базы
+      if (eventTypes.length > 0) {
+        const typeIds = eventTypes.map(t => t.id);
+        const catIds  = [...new Set(
+          eventTypes.map(t => t.eventCategoryId ?? t.eventCategory?.id).filter(Boolean) as string[]
+        )];
+        setSelectedTypes(typeIds);
+        setSelectedCategories(catIds);
+      } else if (ev.eventType?.id) {
+        // Fallback: хотя бы из самого события если byEvent ничего не вернул
+        setSelectedTypes([ev.eventType.id]);
+        const catId = ev.eventType.eventCategoryId ?? ev.eventType.eventCategory?.id;
+        if (catId) setSelectedCategories([catId]);
+      }
     }).finally(() => setLoading(false));
   }, [id, isEditing]);
 
@@ -199,38 +253,49 @@ export default function CreateEventPage() {
 
     setSaving(true);
     try {
-      const accountId = await getOrFetchAccountId();
       const startTime = new Date(`${form.startDate}T${form.startTime}`).toISOString();
       const endTime   = new Date(`${form.endDate}T${form.endTime}`).toISOString();
 
-      const payload = {
-        event: {
+      if (isEditing) {
+        // Обновление: плоский формат согласно API
+        const updatePayload = {
           name:        form.name,
           description: form.description || undefined,
           address:     form.address,
-          latitude:    lat!,
-          longitude:   lng!,
           startTime,
           endTime,
-          active: false,
-        },
-        eventParameters: {
-          cost:               parseFloat(form.cost) || 0,
-          private:            form.isPrivate,
-          maxPersonsCount:    form.maxPersons ? parseInt(form.maxPersons) : undefined,
-          ageLimit:           form.ageLimit   ? parseInt(form.ageLimit)   : undefined,
-          allowedGender:      form.allowedGender || undefined,
-          allowUsersToInvite: form.allowUsersToInvite,
-        },
-        eventTypes: selectedTypes,
-        organizatorAccountIds: [accountId],
-        organizatorOrganizationIds: null,
-      };
-
-      if (isEditing) {
-        await apiClient.put(`/api/events/update/${id}`, payload);
+          active:      false,
+          // location — строковое поле, координаты передаём отдельно если нужно
+          ...(lat !== null && lng !== null ? { latitude: lat, longitude: lng } : {}),
+        };
+        await apiClient.put(`/api/events/update/${id}`, updatePayload);
       } else {
-        await apiClient.post('/api/events/create', payload);
+        // Создание: вложенный объект
+        const accountId = await getOrFetchAccountId();
+        const createPayload = {
+          event: {
+            name:        form.name,
+            description: form.description || undefined,
+            address:     form.address,
+            latitude:    lat!,
+            longitude:   lng!,
+            startTime,
+            endTime,
+            active: false,
+          },
+          eventParameters: {
+            cost:               parseFloat(form.cost) || 0,
+            private:            form.isPrivate,
+            maxPersonsCount:    form.maxPersons ? parseInt(form.maxPersons) : undefined,
+            ageLimit:           form.ageLimit   ? parseInt(form.ageLimit)   : undefined,
+            allowedGender:      form.allowedGender || undefined,
+            allowUsersToInvite: form.allowUsersToInvite,
+          },
+          eventTypes: selectedTypes,
+          organizatorAccountIds: [accountId],
+          organizatorOrganizationIds: null,
+        };
+        await apiClient.post('/api/events/create', createPayload);
       }
 
       navigate('/my-events');
@@ -302,6 +367,8 @@ export default function CreateEventPage() {
             <YandexMapPicker
               lat={lat}
               lng={lng}
+              // Если нет координат события — показываем карту по локации пользователя
+              initialCenter={lat === null ? [userCoords.lat, userCoords.lng] : undefined}
               address={form.address}
               hasError={hasErr('location')}
               onAddressChange={addr => {
@@ -345,38 +412,58 @@ export default function CreateEventPage() {
           </div>
         </Section>
 
-        {/* Параметры */}
-        <Section title="Параметры">
-          <Field label="Стоимость (₽, 0 = бесплатно)">
-            <input className={styles.input} type="number" min={0} step={50}
-              value={form.cost} onChange={set('cost')} />
-          </Field>
-          <div className={styles.row}>
-            <Field label="Ограничение по возрасту">
-              <input className={styles.input} type="number" min={0} max={99}
-                placeholder="Нет" value={form.ageLimit} onChange={set('ageLimit')} />
+        {/* Параметры — только если есть кошелёк */}
+        {hasWallet && (
+          <Section title={tariffValidator ? 'Параметры' : 'Параметры (базовые)'}>
+            <Field label="Стоимость (₽, 0 = бесплатно)">
+              <input className={styles.input} type="number" min={0} step={50}
+                max={tariffValidator?.costLimit || undefined}
+                value={form.cost} onChange={set('cost')} />
+              {!!tariffValidator?.costLimit && (
+                <span className={styles.fieldHint}>Лимит тарифа: до {tariffValidator.costLimit.toLocaleString()} ₽</span>
+              )}
             </Field>
-            <Field label="Макс. участников">
-              <input className={styles.input} type="number" min={1}
-                placeholder="∞" value={form.maxPersons} onChange={set('maxPersons')} />
+            <div className={styles.row}>
+              <Field label="Ограничение по возрасту">
+                <input className={styles.input} type="number" min={0} max={99}
+                  placeholder="Нет" value={form.ageLimit} onChange={set('ageLimit')} />
+              </Field>
+              <Field label="Макс. участников">
+                <input className={styles.input} type="number" min={1}
+                  placeholder="∞"
+                  max={tariffValidator?.personsLimit || undefined}
+                  value={form.maxPersons} onChange={set('maxPersons')} />
+                {!!tariffValidator?.personsLimit && (
+                  <span className={styles.fieldHint}>Лимит: до {tariffValidator.personsLimit}</span>
+                )}
+              </Field>
+            </div>
+            <Field label="Ограничение по полу">
+              <select className={styles.input} value={form.allowedGender}
+                onChange={set('allowedGender')}
+                disabled={tariffValidator ? !tariffValidator.allowGenderSegregation : false}>
+                <option value="">Без ограничений</option>
+                <option value="Male">Мужской</option>
+                <option value="Female">Женский</option>
+              </select>
+              {tariffValidator && !tariffValidator.allowGenderSegregation && (
+                <span className={styles.fieldHintWarn}>Недоступно в текущем тарифе</span>
+              )}
             </Field>
-          </div>
-          <Field label="Ограничение по полу">
-            <select className={styles.input} value={form.allowedGender} onChange={set('allowedGender')}>
-              <option value="">Без ограничений</option>
-              <option value="Male">Мужской</option>
-              <option value="Female">Женский</option>
-            </select>
-          </Field>
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={form.isPrivate} onChange={set('isPrivate')} />
-            Приватное мероприятие
-          </label>
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={form.allowUsersToInvite} onChange={set('allowUsersToInvite')} />
-            Участники могут приглашать других
-          </label>
-        </Section>
+            <label className={styles.checkboxLabel}>
+              <input type="checkbox" checked={form.isPrivate} onChange={set('isPrivate')}
+                disabled={tariffValidator ? !tariffValidator.allowPrivate : false} />
+              Приватное мероприятие
+              {tariffValidator && !tariffValidator.allowPrivate && (
+                <span className={styles.fieldHintWarn}> (недоступно в тарифе)</span>
+              )}
+            </label>
+            <label className={styles.checkboxLabel}>
+              <input type="checkbox" checked={form.allowUsersToInvite} onChange={set('allowUsersToInvite')} />
+              Участники могут приглашать других
+            </label>
+          </Section>
+        )}
 
         <Section title="Фото">
           <div className={styles.uploadPlaceholder}>
