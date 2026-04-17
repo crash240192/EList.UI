@@ -119,3 +119,81 @@
   font-size: 13px;
   text-align: center;
 }
+
+/* ---- Point group modal ---- */
+
+.groupBackdrop {
+  position: absolute; inset: 0; z-index: 10;
+}
+
+.groupModal {
+  position: absolute;
+  bottom: 24px; left: 50%; transform: translateX(-50%);
+  width: min(320px, calc(100% - 32px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  z-index: 11;
+  overflow: hidden;
+  animation: slideUp 0.18s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.groupHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.groupTitle {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+}
+
+.groupClose {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 14px; padding: 2px 4px;
+  border-radius: 4px; line-height: 1;
+}
+.groupClose:hover { background: var(--surface-2); }
+
+.groupList {
+  max-height: 240px; overflow-y: auto;
+}
+
+.groupItem {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
+  padding: 10px 14px;
+  background: none; border: none; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+.groupItem:last-child { border-bottom: none; }
+.groupItem:hover { background: var(--surface-2); }
+
+.groupDot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+
+.groupItemInfo {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+
+.groupItemName {
+  font-size: 13px; font-weight: 500; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.groupItemMeta {
+  display: flex; gap: 8px; font-size: 11px; color: var(--text-secondary);
+}
+
+.groupArrow {
+  font-size: 18px; color: var(--text-muted); flex-shrink: 0;
+}

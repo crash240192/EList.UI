@@ -10,13 +10,11 @@ interface Props {
   lng: number | null;
   address: string;
   hasError?: boolean;
-  /** Начальный центр если lat/lng ещё не выбраны */
-  initialCenter?: [number, number];
   onPick: (lat: number, lng: number, address: string) => void;
   onAddressChange: (address: string) => void;
 }
 
-export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, onPick, onAddressChange }: Props) {
+export function YandexMapPicker({ lat, lng, address, hasError, onPick, onAddressChange }: Props) {
   const ref       = useRef<HTMLDivElement>(null);
   const mapRef    = useRef<any>(null);
   const markerRef = useRef<any>(null);
@@ -30,9 +28,7 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
     loadYandexMaps().then(() => {
       if (destroyed || !ref.current) return;
       const ymaps = (window as any).ymaps;
-      const center: [number, number] = lat !== null && lng !== null
-        ? [lat, lng]
-        : initialCenter ?? [55.7558, 37.6173];
+      const center: [number, number] = lat !== null && lng !== null ? [lat, lng] : [55.7558, 37.6173];
 
       const map = new ymaps.Map(ref.current, {
         center, zoom: lat !== null ? 15 : 10,
