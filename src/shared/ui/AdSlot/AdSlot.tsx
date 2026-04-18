@@ -40,7 +40,22 @@ export function AdSlot({ blockId }: AdSlotProps) {
     return () => clearTimeout(timer);
   }, [blockId]);
 
-  if (!blockId) return null;
+  if (!blockId) {
+    // Заглушка — показываем как выглядит рекламное место
+    return (
+      <div className={styles.wrap}>
+        <span className={styles.label}>Реклама</span>
+        <div className={styles.placeholder}>
+          <div className={styles.placeholderImg} />
+          <div className={styles.placeholderBody}>
+            <div className={styles.placeholderLine} style={{ width: '70%' }} />
+            <div className={styles.placeholderLine} style={{ width: '50%' }} />
+            <div className={styles.placeholderLine} style={{ width: '40%', height: 10 }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.wrap}>

@@ -12,6 +12,9 @@ import {
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { POPULAR_CITIES, type ICity } from '@/features/auth/useGeoCity';
 import { cookies } from '@/shared/lib/cookies';
+import { AvatarUpload } from '@/shared/ui/AvatarUpload/AvatarUpload';
+import { getStoredAccountId } from '@/entities/user/api';
+import { useMyAvatar } from '@/features/auth/useAvatar';
 import styles from './SettingsPage.module.css';
 
 type Tab = 'profile' | 'security';
@@ -66,6 +69,10 @@ function PersonSection() {
   const [saving,  setSaving]  = useState(false);
   const [msg,     setMsg]     = useState<{ text: string; ok: boolean } | null>(null);
 
+  const initials  = (form.firstName?.[0] ?? '') + (form.lastName?.[0] ?? '');
+  const accountId = getStoredAccountId() ?? '';
+  const myAvatarFileId = useMyAvatar();
+
   useEffect(() => {
     getMyPersonInfo().then(p => {
       if (p) setForm({
@@ -100,6 +107,14 @@ function PersonSection() {
 
   return (
     <SectionCard title="Личная информация" loading={loading}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+        <AvatarUpload
+          initials={initials || accountId.slice(0, 2).toUpperCase() || '?'}
+          accountId={accountId}
+          fileId={myAvatarFileId}
+          size={80}
+        />
+      </div>
       <Row label="Имя">
         <input className={styles.input} value={form.firstName}
           onChange={set('firstName')} placeholder="Имя" />

@@ -4,7 +4,7 @@
 // Схема авторизации — два заголовка:
 //   authorization-jwt : рандомный клиентский хеш, генерируется при первом визите,
 //                       хранится в cookies, передаётся в КАЖДОМ запросе
-//   Authorization     : "{token}" — GUID-токен после логина,
+//   Authorization     : "N3 {token}" — GUID-токен после логина,
 //                       хранится в cookies, передаётся в запросах требующих аутентификации
 
 import { cookies } from '@/shared/lib/cookies';
@@ -15,7 +15,9 @@ import type { CommandResult } from './types';
 export const COOKIE_CLIENT_HASH = 'elist_client_hash';
 export const COOKIE_AUTH_TOKEN  = 'elist_auth_token';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:7020/eList';
+// В dev-режиме используем относительный путь → Vite проксирует → нет CORS OPTIONS
+// В production VITE_API_BASE_URL должна быть полным URL
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/eList';
 
 // ---- Ошибки ----
 
@@ -90,7 +92,7 @@ async function request<T>(
   };
 
   if (authToken) {
-    headers['Authorization'] = `${authToken}`;
+    headers['Authorization'] = authToken;
   }
 
   const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });

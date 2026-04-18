@@ -45,15 +45,15 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
   const [ready, setReady] = useState(false);
   const { theme } = useThemeStore();
 
-  // Состояние списка мероприятий на одной точке
-  const [groupList, setGroupList] = useState<IEvent[] | null>(null);
+  // Состояние списка мероприятий на одной точке + позиция
+  const [groupState, setGroupState] = useState<{ events: IEvent[]; x: number; y: number } | null>(null);
 
-  const handleGroupClick = useCallback((group: IEvent[]) => {
+  const showGroup = useCallback((group: IEvent[], x: number, y: number) => {
     if (group.length === 1) {
       onMarkerClick(group[0]);
-    } else {
-      setGroupList(group);
+      return;
     }
+    setGroupState({ events: group, x, y });
   }, [onMarkerClick]);
 
   useEffect(() => {
@@ -118,13 +118,22 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
       );
       // Сохраняем группу на объекте для доступа из обработчика кластера
       (pm as any)._elistGroup = group;
-      pm.events.add('click', () => handleGroupClick(group));
+      pm.events.add('click', (e: any) => {
+        // Берём пиксельные координаты из события клика
+        const pageX = e.get('pageX') as number;
+        const pageY = e.get('pageY') as number;
+        if (containerRef.current && pageX != null && pageY != null) {
+          const rect = containerRef.current.getBoundingClientRect();
+          showGroup(group, pageX - rect.left, pageY - rect.top);
+        } else {
+          showGroup(group, -1, -1);
+        }
+      });
       marks.push(pm);
     }
 
     clusterer.add(marks);
 
-    // Клик по кластеру — показываем список всех мероприятий внутри
     clusterer.events.add('click', (e: any) => {
       const target = e.get('target');
       const placemarks: any[] = target.getGeoObjects?.() ?? [];
@@ -132,12 +141,21 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
       placemarks.forEach((pm: any) => {
         (pm._elistGroup ?? []).forEach((ev: IEvent) => clusterEvents.push(ev));
       });
-      if (clusterEvents.length > 0) handleGroupClick(clusterEvents);
+      if (clusterEvents.length > 0) {
+        const pageX = e.get('pageX') as number;
+        const pageY = e.get('pageY') as number;
+        if (containerRef.current && pageX != null && pageY != null) {
+          const rect = containerRef.current.getBoundingClientRect();
+          showGroup(clusterEvents, pageX - rect.left, pageY - rect.top);
+        } else {
+          showGroup(clusterEvents, -1, -1);
+        }
+      }
     });
 
     mapRef.current.geoObjects.add(clusterer);
     clusterRef.current = clusterer;
-  }, [events, handleGroupClick, ready]);
+  }, [events, showGroup, ready]);
 
   if (error) return (
     <div className={styles.errorBox} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -154,11 +172,13 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
       />
 
       {/* Список мероприятий на одной точке */}
-      {groupList && (
+      {groupState && (
         <PointGroupModal
-          events={groupList}
-          onSelect={ev => { setGroupList(null); onMarkerClick(ev); }}
-          onClose={() => setGroupList(null)}
+          events={groupState.events}
+          anchorX={groupState.x}
+          anchorY={groupState.y}
+          onSelect={ev => { setGroupState(null); onMarkerClick(ev); }}
+          onClose={() => setGroupState(null)}
         />
       )}
     </div>
@@ -167,15 +187,39 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
 
 // ---- Модальный список мероприятий в одной точке ----
 
-function PointGroupModal({ events, onSelect, onClose }: {
+function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
   events: IEvent[];
+  anchorX: number;
+  anchorY: number;
   onSelect: (ev: IEvent) => void;
   onClose: () => void;
 }) {
+  const MODAL_W = 300;
+  const MODAL_ESTIMATED_H = Math.min(events.length * 52 + 48, 288);
+  const GAP = 12; // отступ от маркера
+
+  const positioned = anchorX >= 0 && anchorY >= 0;
+
+  // Вычисляем left/top так чтобы модал не уходил за края
+  // left: центрируем по X, но не выходим за [0, containerW - MODAL_W]
+  const rawLeft = anchorX - MODAL_W / 2;
+  const left    = Math.max(8, rawLeft);                         // не за левый край
+  // top: показываем над точкой, но не за верхний край
+  const rawTop  = anchorY - MODAL_ESTIMATED_H - GAP;
+  const top     = rawTop < 8
+    ? anchorY + GAP + 14   // если не влезает сверху — показываем снизу
+    : rawTop;
+
+  const style: React.CSSProperties = positioned
+    ? { position: 'absolute', left, top, width: MODAL_W }
+    : { position: 'absolute', bottom: 24, left: '50%', marginLeft: -MODAL_W / 2, width: MODAL_W };
+
+  const tailAbove = positioned && rawTop >= 8; // хвостик снизу модала (когда модал над точкой)
+
   return (
     <>
       <div className={styles.groupBackdrop} onClick={onClose} />
-      <div className={styles.groupModal}>
+      <div className={styles.groupModal} style={style}>
         <div className={styles.groupHeader}>
           <span className={styles.groupTitle}>
             {events.length} мероприятия в этой точке
@@ -184,7 +228,7 @@ function PointGroupModal({ events, onSelect, onClose }: {
         </div>
         <div className={styles.groupList}>
           {events.map(ev => {
-            const cost = ev.parameters?.cost ?? 0;
+            const cost  = ev.parameters?.cost ?? 0;
             const color = getColor(ev.eventType?.eventCategory?.namePath);
             return (
               <button key={ev.id} className={styles.groupItem} onClick={() => onSelect(ev)}>
@@ -201,6 +245,16 @@ function PointGroupModal({ events, onSelect, onClose }: {
             );
           })}
         </div>
+        {/* Хвостик — снизу если модал над точкой, сверху если под */}
+        {positioned && (
+          <div
+            className={styles.groupTail}
+            style={tailAbove
+              ? { bottom: -7, top: 'auto', left: Math.max(12, Math.min(MODAL_W - 26, anchorX - left - 7)) }
+              : { top: -7, bottom: 'auto', left: Math.max(12, Math.min(MODAL_W - 26, anchorX - left - 7)), transform: 'rotate(180deg)' }
+            }
+          />
+        )}
       </div>
     </>
   );

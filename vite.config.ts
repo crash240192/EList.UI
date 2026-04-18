@@ -14,9 +14,14 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      // Проксируем API-запросы чтобы избежать CORS в dev
+      // Основной API
       '/eList': {
-        target: 'https://localhost:7020',
+        target: 'http://92.118.113.6:35028',
+        changeOrigin: true,
+      },
+      // Файлохранилище
+      '/elist/filestorage': {
+        target: 'http://92.118.113.6:35029',
         changeOrigin: true,
       },
     },

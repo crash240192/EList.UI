@@ -1,0 +1,84 @@
+/* AvatarLightbox.module.css */
+
+.backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+  z-index: 600;
+}
+
+.lightbox {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 601;
+  display: flex; flex-direction: column;
+  align-items: center;
+  width: min(90vmin, 1080px);
+}
+
+.closeBtn {
+  position: absolute; top: -44px; right: 0;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.15); border: none;
+  color: #fff; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.closeBtn:hover { background: rgba(255,255,255,0.25); }
+
+.counter {
+  position: absolute; top: -44px; left: 0;
+  font-size: 13px; color: rgba(255,255,255,0.7);
+  line-height: 36px;
+}
+
+.imageWrap {
+  width: 100%; max-height: 80vh;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 16px; overflow: hidden;
+  background: rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.image {
+  width: 100%; height: auto; max-height: 80vh;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.fallbackAvatar {
+  width: 100%; height: 100%;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 96px; font-weight: 600; color: #fff;
+}
+
+/* Стрелки */
+.arrow {
+  position: absolute; top: 50%;
+  transform: translateY(-50%);
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,0.15); backdrop-filter: blur(4px);
+  border: none; color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.arrow:hover { background: rgba(255,255,255,0.28); }
+.arrowLeft  { left: -56px; }
+.arrowRight { right: -56px; }
+
+@media (max-width: 600px) {
+  .arrowLeft  { left: 8px; }
+  .arrowRight { right: 8px; }
+}
+
+/* Точки */
+.dots {
+  display: flex; gap: 6px; margin-top: 16px;
+}
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(255,255,255,0.35); border: none; cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+  padding: 0;
+}
+.dotActive { background: #fff; transform: scale(1.3); }

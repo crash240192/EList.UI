@@ -104,7 +104,7 @@ export default function HomePage() {
                       onFavorite={toggleFav}
                     />
                     {/* Реклама каждые AD_EVERY карточек */}
-                    {AD_BLOCK_ID && (idx + 1) % AD_EVERY === 0 && (
+                    {(idx + 1) % AD_EVERY === 0 && (
                       <AdSlot key={`ad-${idx}`} blockId={AD_BLOCK_ID} />
                     )}
                   </>

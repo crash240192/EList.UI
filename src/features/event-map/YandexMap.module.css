@@ -127,21 +127,37 @@
 }
 
 .groupModal {
-  position: absolute;
-  bottom: 24px; left: 50%; transform: translateX(-50%);
-  width: min(320px, calc(100% - 32px));
+  /* Позиция задаётся инлайн-стилями из JS — без transform здесь */
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25);
   z-index: 11;
-  overflow: hidden;
-  animation: slideUp 0.18s ease;
+  overflow: visible;
+  animation: groupFadeIn 0.15s ease;
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+@keyframes groupFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Хвостик-стрелка */
+.groupTail {
+  position: absolute;
+  width: 14px; height: 8px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.groupTail::before {
+  content: '';
+  display: block;
+  width: 10px; height: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transform: rotate(45deg);
+  position: absolute;
+  top: -5px; left: 2px;
 }
 
 .groupHeader {

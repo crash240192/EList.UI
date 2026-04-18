@@ -2,40 +2,21 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchEventById, MOCK_EVENTS } from '@/entities/event';
-import { fetchEventTypes as fetchAllEventTypes } from '@/entities/event';
+import { fetchEventById, fetchEventTypes as fetchAllEventTypes, MOCK_EVENTS } from '@/entities/event';
+import type { IEventType } from '@/entities/event';
 import { fetchEventTypesByEvent } from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { getWalletByAccount } from '@/entities/user/walletApi';
-import { tariffApi, tariffValidatorApi, type ITariffValidator } from '@/entities/admin/adminApi';
+import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } from '@/entities/admin/adminApi';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
+import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
 import styles from './CreateEventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
-
-// ---- Toast notification ----
-
-interface ToastState {
-  message: string;
-  visible: boolean;
-}
-
-function useToast() {
-  const [toast, setToast] = useState<ToastState>({ message: '', visible: false });
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-
-  const show = useCallback((message: string) => {
-    clearTimeout(timerRef.current);
-    setToast({ message, visible: true });
-    timerRef.current = setTimeout(() => setToast(t => ({ ...t, visible: false })), 4000);
-  }, []);
-
-  return { toast, show };
-}
 
 // ---- Form state ----
 
@@ -62,38 +43,58 @@ const EMPTY: FormState = {
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
 };
 
-// ---- Validation errors type ----
-
 type FieldError = 'name' | 'type' | 'location' | 'startDate' | 'startTime' | 'endDate' | 'endTime';
+
+// ---- Helpers ----
+
+function useToast() {
+  const [toast, setToast] = useState({ message: '', visible: false });
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const show = useCallback((message: string) => {
+    clearTimeout(timer.current);
+    setToast({ message, visible: true });
+    timer.current = setTimeout(() => setToast(t => ({ ...t, visible: false })), 4000);
+  }, []);
+  return { toast, show };
+}
+
+// ---- Основной компонент ----
 
 export default function CreateEventPage() {
   const navigate  = useNavigate();
   const { id }    = useParams<{ id: string }>();
   const isEditing = !!id;
 
-  const [form, setForm]       = useState<FormState>(EMPTY);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving]   = useState(false);
+  const [form,        setForm]        = useState<FormState>(EMPTY);
+  const [loading,     setLoading]     = useState(isEditing);
+  const [saving,      setSaving]      = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Set<FieldError>>(new Set());
 
-  const [lat, setLat] = useState<number | null>(null);
-  const [lng, setLng] = useState<number | null>(null);
+  const [lat,      setLat]      = useState<number | null>(null);
+  const [lng,      setLng]      = useState<number | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
 
-  // Для новых событий — начальная точка карты из локации пользователя
   const userCoords = getStoredUserCoords();
 
+  // Выбранные типы + полные объекты для отображения чипов
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTypes,      setSelectedTypes]      = useState<string[]>([]);
+  const [allTypes,           setAllTypes]           = useState<IEventType[]>([]);
   const [pickerOpen,         setPickerOpen]         = useState(false);
-  const typeCount = selectedCategories.length + selectedTypes.length;
 
-  // Тариф пользователя (для ограничений параметров)
+  // Режим окончания
+  const [endMode,   setEndMode]   = useState<'duration' | 'multiday'>('duration');
+  const [durationH, setDurationH] = useState('2');
+  const [durationM, setDurationM] = useState('0');
+
+  // Кошелёк / тариф
   const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
-  const [hasWallet,       setHasWallet]       = useState<boolean | null>(null); // null = загружается
+  const [tariff,          setTariff]          = useState<ITariff | null>(null);
+  const [hasWallet,       setHasWallet]       = useState<boolean | null>(null);
 
   const { toast, show: showToast } = useToast();
 
-  // Refs for scroll-to-field
+  // Refs
   const nameRef      = useRef<HTMLInputElement>(null);
   const typeRef      = useRef<HTMLDivElement>(null);
   const locationRef  = useRef<HTMLDivElement>(null);
@@ -102,7 +103,7 @@ export default function CreateEventPage() {
   const endDateRef   = useRef<HTMLInputElement>(null);
   const endTimeRef   = useRef<HTMLInputElement>(null);
 
-  // Загружаем кошелёк и тариф (для ограничений параметров)
+  // Загрузка кошелька и тарифа
   useEffect(() => {
     getOrFetchAccountId().then(async accountId => {
       try {
@@ -110,35 +111,35 @@ export default function CreateEventPage() {
         setHasWallet(!!wallet);
         if (wallet?.tariffId) {
           const tariffs = await tariffApi.getAll().catch(() => []);
-          const t = tariffs.find(x => x.id === wallet.tariffId);
+          const t = tariffs.find(x => x.id === wallet.tariffId) ?? null;
+          setTariff(t);
           if (t?.validatorId) {
             const v = await tariffValidatorApi.getByTariff(t.id).catch(() => null);
             setTariffValidator(v);
           }
         }
-      } catch {
-        setHasWallet(false);
-      }
+      } catch { setHasWallet(false); }
     }).catch(() => setHasWallet(false));
   }, []);
 
-  // Load for editing
+  // Загрузка всех типов для чипов
+  useEffect(() => {
+    if (USE_MOCK) return;
+    fetchAllEventTypes().then(setAllTypes).catch(() => {});
+  }, []);
+
+  // Загрузка события для редактирования
   useEffect(() => {
     if (!isEditing) return;
     setLoading(true);
-
     const loadEvent = USE_MOCK
       ? Promise.resolve(MOCK_EVENTS.find(e => e.id === id) ?? MOCK_EVENTS[0])
       : fetchEventById(id!);
+    const loadTypes = USE_MOCK ? Promise.resolve([]) : fetchEventTypesByEvent(id!);
 
-    // Загружаем типы события через отдельный эндпоинт — надёжнее чем из ev.eventType
-    const loadEventTypes = USE_MOCK
-      ? Promise.resolve([])
-      : fetchEventTypesByEvent(id!);
-
-    Promise.all([loadEvent, loadEventTypes]).then(([ev, eventTypes]) => {
-      const toDate = (iso: string) => iso.slice(0, 10);
-      const toTime = (iso: string) => iso.slice(11, 16);
+    Promise.all([loadEvent, loadTypes]).then(([ev, evTypes]) => {
+      const toDate = (s: string) => s.slice(0, 10);
+      const toTime = (s: string) => s.slice(11, 16);
       setForm({
         name:               ev.name ?? '',
         description:        ev.description ?? '',
@@ -156,17 +157,23 @@ export default function CreateEventPage() {
       });
       if (ev.latitude)  setLat(ev.latitude);
       if (ev.longitude) setLng(ev.longitude);
+      if (ev.coverUrl)  setCoverUrl(ev.coverUrl);
 
-      // Восстанавливаем типы из API byEvent — используем реальные ID из базы
-      if (eventTypes.length > 0) {
-        const typeIds = eventTypes.map(t => t.id);
-        const catIds  = [...new Set(
-          eventTypes.map(t => t.eventCategoryId ?? t.eventCategory?.id).filter(Boolean) as string[]
-        )];
-        setSelectedTypes(typeIds);
-        setSelectedCategories(catIds);
+      if (ev.startTime && ev.endTime) {
+        const diff = new Date(ev.endTime).getTime() - new Date(ev.startTime).getTime();
+        const sameDay = new Date(ev.startTime).toDateString() === new Date(ev.endTime).toDateString();
+        if (sameDay) {
+          setEndMode('duration');
+          setDurationH(String(Math.floor(diff / 3600000)));
+          setDurationM(String(Math.round((diff % 3600000) / 60000)));
+        } else { setEndMode('multiday'); }
+      }
+
+      if (evTypes.length > 0) {
+        setSelectedTypes(evTypes.map(t => t.id));
+        setSelectedCategories([...new Set(evTypes.map(t =>
+          t.eventCategoryId ?? (t as any).eventCategory?.id).filter(Boolean) as string[])]);
       } else if (ev.eventType?.id) {
-        // Fallback: хотя бы из самого события если byEvent ничего не вернул
         setSelectedTypes([ev.eventType.id]);
         const catId = ev.eventType.eventCategoryId ?? ev.eventType.eventCategory?.id;
         if (catId) setSelectedCategories([catId]);
@@ -174,114 +181,94 @@ export default function CreateEventPage() {
     }).finally(() => setLoading(false));
   }, [id, isEditing]);
 
+  // Вспомогательные
   const set = (key: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      setForm(f => ({
-        ...f,
-        [key]: e.target.type === 'checkbox'
-          ? (e.target as HTMLInputElement).checked
-          : e.target.value,
-      }));
-      // Сбрасываем ошибку поля при вводе
-      setFieldErrors(prev => {
-        const next = new Set(prev);
-        if (key === 'name')      next.delete('name');
-        if (key === 'address')   next.delete('location');
-        if (key === 'startDate') next.delete('startDate');
-        if (key === 'startTime') next.delete('startTime');
-        if (key === 'endDate')   next.delete('endDate');
-        if (key === 'endTime')   next.delete('endTime');
-        return next;
-      });
+      const val = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
+      setForm(f => ({ ...f, [key]: val }));
+      const errMap: Partial<Record<keyof FormState, FieldError>> = {
+        name: 'name', address: 'location', startDate: 'startDate',
+        startTime: 'startTime', endDate: 'endDate', endTime: 'endTime',
+      };
+      if (errMap[key]) setFieldErrors(p => { const n = new Set(p); n.delete(errMap[key]!); return n; });
     };
 
-  // Scroll + focus helper
-  const focusField = (err: FieldError) => {
-    const map: Record<FieldError, React.RefObject<HTMLElement | null>> = {
-      name:      nameRef,
-      type:      typeRef,
-      location:  locationRef,
-      startDate: startDateRef,
-      startTime: startTimeRef,
-      endDate:   endDateRef,
-      endTime:   endTimeRef,
-    };
-    const el = map[err]?.current;
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if ('focus' in el && typeof (el as HTMLInputElement).focus === 'function') {
-      setTimeout(() => (el as HTMLInputElement).focus(), 300);
+  const hasErr = (f: FieldError) => fieldErrors.has(f);
+  const typeCount = selectedCategories.length + selectedTypes.length;
+
+  // Чипы выбранных типов
+  const selectedTypeObjects = allTypes.filter(t => selectedTypes.includes(t.id));
+
+  // Проверки тарифа
+  const canSetCost         = tariffValidator ? (tariffValidator.costLimit == null || tariffValidator.costLimit > 0) : true;
+  const canSetMaxPersons   = tariffValidator ? (tariffValidator.personsLimit == null || tariffValidator.personsLimit > 0) : true;
+  const canSetPrivate      = tariffValidator ? !!tariffValidator.allowPrivate : true;
+  const canSetGender       = tariffValidator ? !!tariffValidator.allowGenderSegregation : true;
+  const canSetAge          = tariffValidator ? (tariffValidator.ageLimit == null || tariffValidator.ageLimit > 0) : true;
+  const hasTariffWarning   = hasWallet && tariff && (!canSetCost || !canSetMaxPersons || !canSetPrivate || !canSetGender || !canSetAge);
+  const tariffName         = tariff?.name ?? 'текущем';
+
+  // Validation
+  const validate = (): FieldError | null => {
+    const errs = new Set<FieldError>();
+    if (!form.name.trim()) errs.add('name');
+    if (typeCount === 0)   errs.add('type');
+    if (!form.address.trim() || lat === null || lng === null) errs.add('location');
+    if (!form.startDate)   errs.add('startDate');
+    if (!form.startTime)   errs.add('startTime');
+    if (endMode === 'multiday') {
+      if (!form.endDate) errs.add('endDate');
+      if (!form.endTime) errs.add('endTime');
     }
+    setFieldErrors(errs);
+    if (!errs.size) return null;
+    return (['name','type','location','startDate','startTime','endDate','endTime'] as FieldError[])
+      .find(f => errs.has(f)) ?? null;
   };
 
-  // Validate and collect all errors
-  const validate = (): FieldError | null => {
-    const errors = new Set<FieldError>();
-    if (!form.name.trim())              errors.add('name');
-    if (typeCount === 0)                errors.add('type');
-    if (!form.address.trim() || lat === null || lng === null) errors.add('location');
-    if (!form.startDate)                errors.add('startDate');
-    if (!form.startTime)                errors.add('startTime');
-    if (!form.endDate)                  errors.add('endDate');
-    if (!form.endTime)                  errors.add('endTime');
-
-    setFieldErrors(errors);
-
-    if (errors.size === 0) return null;
-
-    // Return first in order
-    const order: FieldError[] = ['name', 'type', 'location', 'startDate', 'startTime', 'endDate', 'endTime'];
-    return order.find(e => errors.has(e)) ?? null;
+  const scrollTo = (err: FieldError) => {
+    const map: Record<FieldError, React.RefObject<HTMLElement | null>> = {
+      name: nameRef, type: typeRef, location: locationRef,
+      startDate: startDateRef, startTime: startTimeRef,
+      endDate: endDateRef, endTime: endTimeRef,
+    };
+    const el = map[err]?.current;
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   };
 
   const handleSubmit = async () => {
-    const firstError = validate();
-    if (firstError) {
-      const messages: Record<FieldError, string> = {
-        name:      '⚠️ Укажите название мероприятия',
-        type:      '⚠️ Выберите хотя бы один тип мероприятия',
-        location:  '⚠️ Укажите адрес и точку на карте',
-        startDate: '⚠️ Укажите дату начала мероприятия',
-        startTime: '⚠️ Укажите время начала мероприятия',
-        endDate:   '⚠️ Укажите дату окончания мероприятия',
-        endTime:   '⚠️ Укажите время окончания мероприятия',
-      };
-      showToast(messages[firstError]);
-      focusField(firstError);
-      return;
+    const firstErr = validate();
+    if (firstErr) {
+      showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
+        location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
+        startTime:'⚠️ Укажите время начала', endDate:'⚠️ Укажите дату окончания',
+        endTime:'⚠️ Укажите время окончания' }[firstErr]);
+      scrollTo(firstErr); return;
     }
-
     setSaving(true);
     try {
-      const startTime = new Date(`${form.startDate}T${form.startTime}`).toISOString();
-      const endTime   = new Date(`${form.endDate}T${form.endTime}`).toISOString();
+      const startDt = new Date(`${form.startDate}T${form.startTime}`);
+      const endDt = endMode === 'duration'
+        ? new Date(startDt.getTime() + (parseInt(durationH)||0)*3600000 + (parseInt(durationM)||0)*60000)
+        : new Date(`${form.endDate}T${form.endTime}`);
+      const startTime = startDt.toISOString();
+      const endTime   = endDt.toISOString();
 
       if (isEditing) {
-        // Обновление: плоский формат согласно API
-        const updatePayload = {
-          name:        form.name,
-          description: form.description || undefined,
-          address:     form.address,
-          startTime,
-          endTime,
-          active:      false,
-          // location — строковое поле, координаты передаём отдельно если нужно
+        await apiClient.put(`/api/events/update/${id}`, {
+          name: form.name, description: form.description || undefined,
+          address: form.address, startTime, endTime, active: true,
           ...(lat !== null && lng !== null ? { latitude: lat, longitude: lng } : {}),
-        };
-        await apiClient.put(`/api/events/update/${id}`, updatePayload);
+          ...(coverUrl ? { coverUrl } : {}),
+        });
       } else {
-        // Создание: вложенный объект
         const accountId = await getOrFetchAccountId();
-        const createPayload = {
+        await apiClient.post('/api/events/create', {
           event: {
-            name:        form.name,
-            description: form.description || undefined,
-            address:     form.address,
-            latitude:    lat!,
-            longitude:   lng!,
-            startTime,
-            endTime,
-            active: false,
+            name: form.name, description: form.description || undefined,
+            address: form.address, latitude: lat!, longitude: lng!,
+            startTime, endTime, active: true,
+            ...(coverUrl ? { coverUrl } : {}),
           },
           eventParameters: {
             cost:               parseFloat(form.cost) || 0,
@@ -294,52 +281,71 @@ export default function CreateEventPage() {
           eventTypes: selectedTypes,
           organizatorAccountIds: [accountId],
           organizatorOrganizationIds: null,
-        };
-        await apiClient.post('/api/events/create', createPayload);
+        });
       }
-
       navigate('/my-events');
     } catch (err) {
       showToast(`❌ ${err instanceof Error ? err.message : 'Ошибка сохранения'}`);
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
-  const hasErr = (field: FieldError) => fieldErrors.has(field);
+  // Чеклист готовности
+  const checks = [
+    { label: 'Название',          done: !!form.name.trim() },
+    { label: 'Тип мероприятия',   done: typeCount > 0 },
+    { label: 'Место на карте',    done: !!form.address && lat !== null },
+    { label: 'Дата и время',      done: !!form.startDate && !!form.startTime },
+    { label: 'Обложка',           done: !!coverUrl, optional: true },
+  ];
+
+  // Предпросмотр времени
+  const previewTime = (() => {
+    if (!form.startDate || !form.startTime) return null;
+    const start = new Date(`${form.startDate}T${form.startTime}`);
+    const end = endMode === 'duration'
+      ? new Date(start.getTime() + (parseInt(durationH)||0)*3600000 + (parseInt(durationM)||0)*60000)
+      : form.endDate && form.endTime ? new Date(`${form.endDate}T${form.endTime}`) : null;
+    const fmt = (d: Date) => d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const fmtDate = (d: Date) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    return end ? `${fmtDate(start)} · ${fmt(start)} — ${fmt(end)}` : `${fmtDate(start)} · ${fmt(start)}`;
+  })();
 
   if (loading) return (
     <div className={styles.page}>
-      <div className={styles.skeletonBlock} style={{ height: 40, width: '50%' }} />
-      <div className={styles.skeletonBlock} style={{ height: 200 }} />
+      <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
+        <div className={styles.header}><div className={styles.backBtn} /><div style={{width:180,height:20,borderRadius:8,background:'rgba(255,255,255,0.2)'}} /></div>
+      </div>
     </div>
   );
 
   return (
     <div className={styles.page}>
-      {/* Title */}
-      <div className={styles.titleBar}>
-        <button className={styles.backBtn} onClick={() => navigate(-1)}>←</button>
-        <h2 className={styles.title}>{isEditing ? 'Редактировать событие' : 'Создать событие'}</h2>
-      </div>
+      {/* ── Левая колонка: форма ── */}
+      <div className={styles.card}>
 
-      <div className={styles.form}>
+        {/* Хедер */}
+        <div className={styles.header}>
+          <button className={styles.backBtn} onClick={() => navigate(-1)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h1 className={styles.title}>{isEditing ? 'Редактировать мероприятие' : 'Новое мероприятие'}</h1>
+        </div>
+
+        {/* Обложка */}
+        <Section title="Обложка">
+          <CoverUpload currentUrl={coverUrl} onUploaded={url => setCoverUrl(url)} />
+        </Section>
 
         {/* Основное */}
         <Section title="Основное">
           <Field label="Название *" error={hasErr('name') ? 'Обязательное поле' : undefined}>
-            <input
-              ref={nameRef}
+            <input ref={nameRef}
               className={`${styles.input} ${hasErr('name') ? styles.inputError : ''}`}
-              placeholder="Название мероприятия"
-              value={form.name}
-              onChange={set('name')}
-            />
+              placeholder="Название мероприятия" value={form.name} onChange={set('name')} />
           </Field>
           <Field label="Описание">
-            <textarea className={styles.textarea} rows={4}
-              placeholder="Расскажите о мероприятии..." value={form.description}
-              onChange={set('description')} />
+            <textarea className={`${styles.input} ${styles.textarea}`} rows={3}
+              placeholder="Расскажите о мероприятии..." value={form.description} onChange={set('description')} />
           </Field>
         </Section>
 
@@ -349,15 +355,24 @@ export default function CreateEventPage() {
             <button
               className={`${styles.pickerBtn} ${typeCount > 0 ? styles.pickerBtnActive : ''} ${hasErr('type') ? styles.pickerBtnError : ''}`}
               onClick={() => { setPickerOpen(true); setFieldErrors(p => { const n = new Set(p); n.delete('type'); return n; }); }}
-              type="button"
             >
-              <span>🎭</span>
-              {typeCount > 0 ? `Выбрано типов: ${typeCount}` : 'Выбрать категорию и тип...'}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" style={{ marginLeft: 'auto' }}>
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              {typeCount > 0 ? 'Изменить типы' : 'Выбрать категорию и тип...'}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginLeft:'auto'}}><polyline points="6 9 12 15 18 9"/></svg>
             </button>
+            {selectedTypeObjects.length > 0 && (
+              <div className={styles.typeChips}>
+                {selectedTypeObjects.map(t => (
+                  <div key={t.id} className={styles.typeChip}>
+                    {t.ico && <img src={t.ico} alt="" width={14} height={14} style={{borderRadius:2}} />}
+                    {t.name}
+                    <button className={styles.typeChipRemove} onClick={() => {
+                      setSelectedTypes(p => p.filter(x => x !== t.id));
+                    }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </Section>
 
@@ -365,12 +380,9 @@ export default function CreateEventPage() {
         <Section title="Место *" error={hasErr('location') ? 'Укажите адрес и точку на карте' : undefined}>
           <div ref={locationRef}>
             <YandexMapPicker
-              lat={lat}
-              lng={lng}
-              // Если нет координат события — показываем карту по локации пользователя
+              lat={lat} lng={lng}
               initialCenter={lat === null ? [userCoords.lat, userCoords.lng] : undefined}
-              address={form.address}
-              hasError={hasErr('location')}
+              address={form.address} hasError={hasErr('location')}
               onAddressChange={addr => {
                 setForm(f => ({ ...f, address: addr }));
                 if (addr.trim()) setFieldErrors(p => { const n = new Set(p); n.delete('location'); return n; });
@@ -398,131 +410,217 @@ export default function CreateEventPage() {
                 value={form.startTime} onChange={set('startTime')} />
             </Field>
           </div>
-          <div className={styles.row}>
-            <Field label="Дата окончания *" error={hasErr('endDate') ? 'Обязательное' : undefined}>
-              <input ref={endDateRef} type="date"
-                className={`${styles.input} ${hasErr('endDate') ? styles.inputError : ''}`}
-                value={form.endDate} onChange={set('endDate')} />
-            </Field>
-            <Field label="Время окончания *" error={hasErr('endTime') ? 'Обязательное' : undefined}>
-              <input ref={endTimeRef} type="time"
-                className={`${styles.input} ${hasErr('endTime') ? styles.inputError : ''}`}
-                value={form.endTime} onChange={set('endTime')} />
-            </Field>
-          </div>
-        </Section>
 
-        {/* Параметры — только если есть кошелёк */}
-        {hasWallet && (
-          <Section title={tariffValidator ? 'Параметры' : 'Параметры (базовые)'}>
-            <Field label="Стоимость (₽, 0 = бесплатно)">
-              <input className={styles.input} type="number" min={0} step={50}
-                max={tariffValidator?.costLimit || undefined}
-                value={form.cost} onChange={set('cost')} />
-              {!!tariffValidator?.costLimit && (
-                <span className={styles.fieldHint}>Лимит тарифа: до {tariffValidator.costLimit.toLocaleString()} ₽</span>
-              )}
-            </Field>
+          <div className={styles.endModeToggle}>
+            <button className={`${styles.modeBtn} ${endMode === 'duration' ? styles.modeBtnActive : ''}`}
+              onClick={() => setEndMode('duration')}>По длительности</button>
+            <button className={`${styles.modeBtn} ${endMode === 'multiday' ? styles.modeBtnActive : ''}`}
+              onClick={() => setEndMode('multiday')}>Многодневное</button>
+          </div>
+
+          {endMode === 'duration' ? (
             <div className={styles.row}>
-              <Field label="Ограничение по возрасту">
-                <input className={styles.input} type="number" min={0} max={99}
-                  placeholder="Нет" value={form.ageLimit} onChange={set('ageLimit')} />
+              <Field label="Часов">
+                <input className={styles.input} type="number" min={0} max={99} value={durationH} onChange={e => setDurationH(e.target.value)} />
               </Field>
-              <Field label="Макс. участников">
-                <input className={styles.input} type="number" min={1}
-                  placeholder="∞"
-                  max={tariffValidator?.personsLimit || undefined}
-                  value={form.maxPersons} onChange={set('maxPersons')} />
-                {!!tariffValidator?.personsLimit && (
-                  <span className={styles.fieldHint}>Лимит: до {tariffValidator.personsLimit}</span>
-                )}
+              <Field label="Минут">
+                <select className={styles.input} value={durationM} onChange={e => setDurationM(e.target.value)}>
+                  {['0','15','30','45'].map(m => <option key={m} value={m}>{m.padStart(2,'0')}</option>)}
+                </select>
               </Field>
             </div>
-            <Field label="Ограничение по полу">
-              <select className={styles.input} value={form.allowedGender}
-                onChange={set('allowedGender')}
-                disabled={tariffValidator ? !tariffValidator.allowGenderSegregation : false}>
-                <option value="">Без ограничений</option>
-                <option value="Male">Мужской</option>
-                <option value="Female">Женский</option>
-              </select>
-              {tariffValidator && !tariffValidator.allowGenderSegregation && (
-                <span className={styles.fieldHintWarn}>Недоступно в текущем тарифе</span>
-              )}
+          ) : (
+            <div className={styles.row}>
+              <Field label="Дата окончания *" error={hasErr('endDate') ? 'Обязательное' : undefined}>
+                <input ref={endDateRef} type="date"
+                  className={`${styles.input} ${hasErr('endDate') ? styles.inputError : ''}`}
+                  value={form.endDate} onChange={set('endDate')} />
+              </Field>
+              <Field label="Время окончания *" error={hasErr('endTime') ? 'Обязательное' : undefined}>
+                <input ref={endTimeRef} type="time"
+                  className={`${styles.input} ${hasErr('endTime') ? styles.inputError : ''}`}
+                  value={form.endTime} onChange={set('endTime')} />
+              </Field>
+            </div>
+          )}
+        </Section>
+
+        {/* Параметры (только если есть кошелёк) */}
+        {hasWallet && (
+          <Section title="Параметры">
+            {hasTariffWarning && (
+              <div className={styles.tariffBanner}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="#b45309" stroke="none"/></svg>
+                <span>Некоторые параметры ограничены тарифом «{tariffName}»</span>
+                <button className={styles.tariffLink} onClick={() => navigate('/wallet')}>Сменить тариф</button>
+              </div>
+            )}
+
+            <div className={styles.paramGrid}>
+              <Field label="Стоимость, ₽">
+                <LockedInput
+                  locked={!canSetCost}
+                  value={form.cost}
+                  onChange={e => setForm(f => ({ ...f, cost: e.target.value }))}
+                  type="number" min={0} step={50}
+                  max={tariffValidator?.costLimit ? String(tariffValidator.costLimit) : undefined}
+                  hint={canSetCost && tariffValidator?.costLimit
+                    ? `до ${tariffValidator.costLimit.toLocaleString()} ₽`
+                    : !canSetCost ? 'Недоступно в тарифе' : undefined}
+                />
+              </Field>
+              <Field label="Макс. участников">
+                <LockedInput
+                  locked={!canSetMaxPersons}
+                  value={form.maxPersons} placeholder="∞"
+                  onChange={e => setForm(f => ({ ...f, maxPersons: e.target.value }))}
+                  type="number" min={1}
+                  hint={!canSetMaxPersons ? 'Недоступно в тарифе' : undefined}
+                />
+              </Field>
+            </div>
+
+            <Field label="Возрастное ограничение">
+              <LockedInput
+                locked={!canSetAge}
+                value={form.ageLimit} placeholder="Нет"
+                onChange={e => setForm(f => ({ ...f, ageLimit: e.target.value }))}
+                type="number" min={0} max={99}
+                suffix="лет и старше"
+                hint={!canSetAge ? 'Недоступно в тарифе' : undefined}
+              />
             </Field>
-            <label className={styles.checkboxLabel}>
-              <input type="checkbox" checked={form.isPrivate} onChange={set('isPrivate')}
-                disabled={tariffValidator ? !tariffValidator.allowPrivate : false} />
-              Приватное мероприятие
-              {tariffValidator && !tariffValidator.allowPrivate && (
-                <span className={styles.fieldHintWarn}> (недоступно в тарифе)</span>
-              )}
-            </label>
-            <label className={styles.checkboxLabel}>
-              <input type="checkbox" checked={form.allowUsersToInvite} onChange={set('allowUsersToInvite')} />
-              Участники могут приглашать других
-            </label>
+
+            <div className={styles.toggles}>
+              <Toggle
+                label="Приватное мероприятие"
+                checked={form.isPrivate}
+                locked={!canSetPrivate}
+                onChange={v => setForm(f => ({ ...f, isPrivate: v }))}
+                lockedHint="Недоступно в тарифе"
+              />
+              <Toggle
+                label="Фильтр участников по полу"
+                checked={form.allowedGender !== ''}
+                locked={!canSetGender}
+                onChange={v => setForm(f => ({ ...f, allowedGender: v ? 'Male' : '' }))}
+                lockedHint="Недоступно в тарифе"
+              />
+              <Toggle
+                label="Участники могут приглашать"
+                checked={form.allowUsersToInvite}
+                onChange={v => setForm(f => ({ ...f, allowUsersToInvite: v }))}
+              />
+            </div>
+
+            {/* Белый список — только для приватных */}
+            {form.isPrivate && canSetPrivate && (
+              <div className={styles.whitelist}>
+                <div className={styles.whitelistTitle}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  Белый список участников
+                </div>
+                <p className={styles.whitelistHint}>Только эти пользователи смогут записаться на мероприятие</p>
+                <div className={styles.whitelistInput}>
+                  <input className={styles.input} placeholder="Логин или ID пользователя..." />
+                  <button className={styles.whitelistAdd}>Добавить</button>
+                </div>
+              </div>
+            )}
           </Section>
         )}
 
-        <Section title="Фото">
-          <div className={styles.uploadPlaceholder}>
-            🖼 Загрузка обложки и фотографий
-            <small>Интеграция: POST /api/media/...</small>
+        {/* Фотоальбом — заглушка */}
+        <Section title="Фотоальбом">
+          <div className={styles.albumPlaceholder}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><circle cx="9" cy="15" r="2"/><path d="M14 13l3 3"/></svg>
+            <span className={styles.albumHint}>Загрузка фотографий с мероприятия</span>
+            <span className={styles.albumSub}>Будет доступно после публикации</span>
           </div>
         </Section>
 
-        {isEditing && (
-          <Section title="Управление">
-            <button className={styles.dangerBtn}>❌ Отменить мероприятие</button>
-            <button className={styles.dangerBtn}>🏁 Завершить мероприятие</button>
-          </Section>
-        )}
       </div>
 
-      {/* Footer */}
-      <div className={styles.footer}>
-        <button className={styles.cancelBtn} onClick={() => navigate(-1)}>Отмена</button>
-        <button className={styles.submitBtn} onClick={handleSubmit} disabled={saving}>
-          {saving ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Создать'}
-        </button>
+      {/* ── Правая колонка: предпросмотр + кнопки ── */}
+      <div className={styles.sidePanel}>
+
+        {/* Карточка предпросмотра */}
+        <div className={styles.previewCard}>
+          <div className={styles.previewCover}>
+            {coverUrl
+              ? <img src={coverUrl} alt="Обложка" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+              : <span className={styles.previewCoverEmpty}>нет обложки</span>}
+          </div>
+          <div className={styles.previewBody}>
+            <div className={styles.previewName}>{form.name || <span style={{color:'var(--text-muted)'}}>Название мероприятия</span>}</div>
+            {(form.isPrivate || form.ageLimit) && (
+              <div className={styles.previewBadges}>
+                {form.isPrivate && <span className={styles.badgePrivate}>🔒 Приватное</span>}
+                {form.ageLimit  && <span className={styles.badgeAge}>{form.ageLimit}+</span>}
+              </div>
+            )}
+            {previewTime && (
+              <div className={styles.previewRow}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {previewTime}
+              </div>
+            )}
+            {form.address && (
+              <div className={styles.previewRow}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                {form.address}
+              </div>
+            )}
+            {parseFloat(form.cost) === 0
+              ? <div className={styles.previewFree}>Бесплатно</div>
+              : <div className={styles.previewCost}>{parseFloat(form.cost).toLocaleString('ru-RU')} ₽</div>}
+          </div>
+        </div>
+
+        {/* Чеклист */}
+        <div className={styles.checklist}>
+          <div className={styles.checklistTitle}>Готовность к публикации</div>
+          {checks.map(c => (
+            <div key={c.label} className={`${styles.checkRow} ${c.done ? styles.checkDone : c.optional ? styles.checkOptional : ''}`}>
+              <div className={`${styles.checkDot} ${c.done ? styles.checkDotOk : c.optional ? styles.checkDotOpt : styles.checkDotNo}`}>
+                {c.done ? '✓' : c.optional ? '·' : '·'}
+              </div>
+              {c.label}{c.optional ? ' (необяз.)' : ''}
+            </div>
+          ))}
+        </div>
+
+        {/* Кнопки */}
+        <div className={styles.actions}>
+          <button className={styles.cancelBtn} onClick={() => navigate(-1)}>Отмена</button>
+          <button className={styles.saveBtn} onClick={handleSubmit} disabled={saving}>
+            {saving ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Опубликовать'}
+          </button>
+        </div>
       </div>
 
-      {/* Category picker */}
+      {/* Picker */}
       {pickerOpen && (
         <CategoryTypePicker
-          selectedCategories={selectedCategories}
-          selectedTypes={selectedTypes}
+          selectedCategories={selectedCategories} selectedTypes={selectedTypes}
           onChange={(cats, types) => { setSelectedCategories(cats); setSelectedTypes(types); }}
           onClose={() => setPickerOpen(false)}
         />
       )}
 
       {/* Toast */}
-      <Toast message={toast.message} visible={toast.visible} />
+      <div className={`${styles.toast} ${toast.visible ? styles.toastVisible : ''}`}>{toast.message}</div>
     </div>
   );
 }
 
-// ---- Toast notification ----
+// ---- Вспомогательные компоненты ----
 
-function Toast({ message, visible }: { message: string; visible: boolean }) {
-  return (
-    <div className={`${styles.toast} ${visible ? styles.toastVisible : ''}`}>
-      {message}
-    </div>
-  );
-}
-
-// ---- Section & Field helpers ----
-
-function Section({ title, children, error }: {
-  title: string; children: React.ReactNode; error?: string;
-}) {
+function Section({ title, children, error }: { title: string; children: React.ReactNode; error?: string }) {
   return (
     <div className={styles.section}>
-      <div className={styles.sectionTitleRow}>
-        <h3 className={`${styles.sectionTitle} ${error ? styles.sectionTitleError : ''}`}>{title}</h3>
+      <div className={styles.sectionHeader}>
+        <span className={`${styles.sectionLabel} ${error ? styles.sectionLabelError : ''}`}>{title}</span>
         {error && <span className={styles.sectionError}>{error}</span>}
       </div>
       {children}
@@ -530,14 +628,48 @@ function Section({ title, children, error }: {
   );
 }
 
-function Field({ label, children, error }: {
-  label: string; children: React.ReactNode; error?: string;
-}) {
+function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
   return (
     <div className={styles.field}>
       <label className={styles.label}>{label}</label>
       {children}
       {error && <span className={styles.fieldError}>{error}</span>}
+    </div>
+  );
+}
+
+function LockedInput({ locked, hint, suffix, ...props }: {
+  locked?: boolean; hint?: string; suffix?: string;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
+        <input
+          className={`${styles.input} ${locked ? styles.inputLocked : ''}`}
+          disabled={locked} {...props}
+          style={suffix ? { flex: 1 } : undefined}
+        />
+        {suffix && <span className={styles.inputSuffix}>{suffix}</span>}
+        {locked && <span className={styles.lockBadge}>🔒 тариф</span>}
+      </div>
+      {hint && <div className={`${styles.fieldHint} ${locked ? styles.fieldHintWarn : ''}`}>{hint}</div>}
+    </div>
+  );
+}
+
+function Toggle({ label, checked, locked, onChange, lockedHint }: {
+  label: string; checked: boolean; locked?: boolean;
+  onChange: (v: boolean) => void; lockedHint?: string;
+}) {
+  return (
+    <div className={`${styles.toggle} ${locked ? styles.toggleLocked : ''}`}
+      onClick={() => !locked && onChange(!checked)}>
+      <span className={styles.toggleLabel}>{label}</span>
+      {locked && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
+      <div className={`${styles.switch} ${(checked && !locked) ? styles.switchOn : ''}`}>
+        <div className={styles.switchDot} />
+      </div>
+      {locked && lockedHint && <span className={styles.toggleHint}>{lockedHint}</span>}
     </div>
   );
 }

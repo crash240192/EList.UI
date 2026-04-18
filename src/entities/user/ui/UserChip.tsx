@@ -2,6 +2,7 @@
 // Мини-карточка пользователя: аватар + логин + рейтинг (опционально)
 
 import { useNavigate } from 'react-router-dom';
+import { UserAvatar } from './UserAvatar/UserAvatar';
 import styles from './UserChip.module.css';
 
 export interface IUserChipData {
@@ -56,10 +57,13 @@ export function UserChip({ user, clickable = true, size = 'md' }: UserChipProps)
       aria-label={displayName}
     >
       {/* Avatar */}
-      <div className={styles.avatar}>
-        {user.avatarUrl
-          ? <img src={user.avatarUrl} alt={user.login} className={styles.avatarImg} />
-          : <span className={styles.avatarInitials}>{initials}</span>}
+      <div className={styles.avatarWrap}>
+        <UserAvatar
+          accountId={user.accountId}
+          initials={initials}
+          size={size === 'sm' ? 24 : 32}
+          className={styles.avatar}
+        />
         {user.isMe && <span className={styles.meDot} title="Это вы" />}
       </div>
 

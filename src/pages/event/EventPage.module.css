@@ -16,17 +16,16 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
-  overflow: hidden;
   box-shadow: 0 2px 20px rgba(0,0,0,0.15);
-  /* Не фиксируем высоту — карточка растёт по контенту */
 }
 
-/* ── Hero (ограничен шириной карточки, с border-radius сверху) ── */
+/* ── Hero ── */
 .hero {
   position: relative;
   height: 220px;
   flex-shrink: 0;
-  /* border-radius унаследован от .card overflow:hidden */
+  border-radius: 15px 15px 0 0;
+  overflow: hidden;
 }
 .heroImg {
   width: 100%; height: 100%; object-fit: cover; display: block;
@@ -172,10 +171,11 @@
   letter-spacing: 0.07em; color: var(--text-secondary); margin-bottom: 8px;
 }
 .description {
+  white-space: pre-line;
   font-size: 14px; color: var(--text-secondary); line-height: 1.7;
   display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
 }
-.descriptionFull { display: block; -webkit-line-clamp: unset; }
+.descriptionFull { display: block; -webkit-line-clamp: unset; white-space: pre-line; }
 .readMore {
   background: none; border: none; cursor: pointer;
   font-size: 13px; color: var(--accent); padding: 6px 0 0; display: block;

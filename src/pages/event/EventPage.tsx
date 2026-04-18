@@ -28,6 +28,7 @@ export default function EventPage() {
   const [loading,       setLoading]       = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
   const isOrganizer     = !!accountId && organizers.some(o => o.accountId === accountId);
@@ -55,10 +56,32 @@ export default function EventPage() {
         setParticipants(prev => prev.filter(p => p.accountId !== accountId));
       } else {
         await participateEvent(id);
-        setParticipants(prev => [...prev, { accountId, login: '', firstName: null, lastName: null }]);
+        // Загружаем профиль текущего пользователя для корректного отображения чипа
+        try {
+          const { fetchFullProfile } = await import('@/entities/user/profileApi');
+          const profile = await fetchFullProfile(null);
+          setParticipants(prev => [...prev, {
+            accountId,
+            login:     profile.account.login,
+            firstName: profile.person?.firstName ?? null,
+            lastName:  profile.person?.lastName  ?? null,
+          }]);
+        } catch {
+          setParticipants(prev => [...prev, { accountId, login: accountId.slice(0, 8), firstName: null, lastName: null }]);
+        }
       }
     } finally { setActionLoading(false); }
   }, [id, accountId, isParticipating]);
+
+  const handleCancelEvent = useCallback(async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await apiClient.put(`/api/events/update/${id}`, { active: false });
+      setEvent(ev => ev ? { ...ev, active: false } : ev);
+      setCancelConfirm(false);
+    } finally { setActionLoading(false); }
+  }, [id]);
 
   if (loading) return <PageSkeleton />;
   if (!event) return (
@@ -239,8 +262,17 @@ export default function EventPage() {
                 <div className={styles.sectionLabel}>Управление</div>
                 <div className={styles.managementBtns}>
                   <button className={styles.mgmtBtn}>👥 Добавить организатора</button>
-                  <button className={styles.mgmtBtn}>✅ Белый список</button>
-                  <button className={`${styles.mgmtBtn} ${styles.mgmtBtnDanger}`}>❌ Отменить</button>
+                  {event.parameters?.private && (
+                    <button className={styles.mgmtBtn}>✅ Белый список</button>
+                  )}
+                  {event.active && (
+                    <button
+                      className={`${styles.mgmtBtn} ${styles.mgmtBtnDanger}`}
+                      onClick={() => setCancelConfirm(true)}
+                    >
+                      ❌ Отменить мероприятие
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -305,25 +337,17 @@ export default function EventPage() {
             {organizers.length > 0 && (
               <div className={styles.infoCard}>
                 <div className={styles.sectionLabel} style={{ marginBottom: 10 }}>Организаторы</div>
-                {organizers.map((o, i) => (
-                  <div key={o.accountId} className={`${styles.orgRow} ${i > 0 ? styles.orgRowBorder : ''}`}>
-                    <div className={styles.orgAvatar}>
-                      {(o.firstName?.[0] ?? o.login[0]).toUpperCase()}
-                    </div>
-                    <div className={styles.orgInfo}>
-                      <span className={styles.orgName}>
-                        {o.firstName ? `${o.firstName} ${o.lastName ?? ''}`.trim() : o.login}
-                      </span>
-                      <span className={styles.orgRole}>
-                        {i === 0 ? 'Главный организатор' : 'Соорганизатор'}
-                      </span>
-                    </div>
-                    <button className={styles.orgLink}
-                      onClick={() => navigate(`/user/${o.accountId}`)}>
-                      Профиль
-                    </button>
-                  </div>
-                ))}
+                <div className={styles.chipsList}>
+                  {organizers.map(o => (
+                    <UserChip key={o.accountId} user={{
+                      accountId: o.accountId,
+                      login:     o.login,
+                      firstName: o.firstName,
+                      lastName:  o.lastName,
+                      isMe:      o.accountId === accountId,
+                    }} size="sm" />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -331,11 +355,49 @@ export default function EventPage() {
         </div>{/* end twoCol */}
       </div>{/* end content */}
       </div>{/* end card */}
+
+      {/* Диалог подтверждения отмены мероприятия */}
+      {cancelConfirm && (
+        <CancelConfirmDialog
+          eventName={event.name}
+          loading={actionLoading}
+          onConfirm={handleCancelEvent}
+          onClose={() => setCancelConfirm(false)}
+        />
+      )}
     </div>
   );
 }
 
 // ── Info row helper ──
+
+function CancelConfirmDialog({ eventName, loading, onConfirm, onClose }: {
+  eventName: string; loading: boolean; onConfirm: () => void; onClose: () => void;
+}) {
+  return (
+    <>
+      <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',backdropFilter:'blur(2px)',zIndex:500 }} onClick={onClose} />
+      <div style={{ position:'fixed',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'min(360px,90vw)',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:16,padding:'24px 20px',zIndex:501,textAlign:'center' }}>
+        <div style={{ fontSize:36,marginBottom:8 }}>❌</div>
+        <h3 style={{ fontSize:16,fontWeight:700,color:'var(--text-primary)',margin:'0 0 8px' }}>Отменить мероприятие?</h3>
+        <p style={{ fontSize:13,color:'var(--text-secondary)',margin:'0 0 20px',lineHeight:1.5 }}>
+          «{eventName}» будет помечено как неактуальное. Участники увидят что мероприятие отменено.
+        </p>
+        <div style={{ display:'flex',gap:10 }}>
+          <button style={{ flex:1,background:'none',border:'1px solid var(--border)',borderRadius:10,padding:'10px',fontSize:13,fontWeight:500,color:'var(--text-secondary)',cursor:'pointer' }} onClick={onClose}>
+            Нет, назад
+          </button>
+          <button
+            style={{ flex:1,background:'var(--danger)',color:'#fff',border:'none',borderRadius:10,padding:'10px',fontSize:13,fontWeight:600,cursor:'pointer',opacity: loading ? 0.6 : 1 }}
+            onClick={onConfirm} disabled={loading}
+          >
+            {loading ? 'Отмена...' : 'Да, отменить'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
 
 function InfoRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (

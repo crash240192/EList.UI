@@ -4,7 +4,7 @@
 //   Шаг 2 — ФИО, пол, дата рождения (необязательно, можно скипнуть)
 //   Финал — автоматический логин → setPersonInfo (если не скипнули) → /activate или /
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   fetchContactTypes,
@@ -14,9 +14,10 @@ import {
 } from '@/features/auth/registrationApi';
 import { login } from '@/features/auth/api';
 import { useAuthStore } from '@/app/store';
-import { useGeoCity, POPULAR_CITIES, type ICity } from '@/features/auth/useGeoCity';
+import { useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
+import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import type { Gender } from '@/shared/api/types';
 import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
@@ -273,31 +274,12 @@ export default function RegisterPage() {
 
               {/* Город */}
               <Field label="Ваш город">
-                <div className={regStyles.cityRow}>
-                  <select
-                    className={`${styles.input} ${regStyles.select}`}
-                    value={selectedCity?.name ?? ''}
-                    onChange={e => {
-                      const city = POPULAR_CITIES.find(c => c.name === e.target.value) ?? null;
-                      setSelectedCity(city);
-                      setCityManuallySelected(true);
-                    }}
-                  >
-                    <option value="">— Выбрать город —</option>
-                    {POPULAR_CITIES.map(c => (
-                      <option key={c.name} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                  {geoLoading && <span className={regStyles.geoSpinner} title="Определяем местоположение...">📡</span>}
-                  {!geoLoading && detectedCoords && (
-                    <span className={regStyles.geoOk} title="Координаты определены точно">✓</span>
-                  )}
-                </div>
-                {detectedCoords && (
-                  <p className={regStyles.fieldHint}>
-                    📍 Координаты определены ({detectedCoords.lat.toFixed(3)}, {detectedCoords.lng.toFixed(3)})
-                  </p>
-                )}
+                <CitySearch
+                  value={selectedCity?.name ?? ''}
+                  onSelect={city => { setSelectedCity(city); setCityManuallySelected(true); }}
+                  geoLoading={geoLoading}
+                  detectedCoords={detectedCoords}
+                />
               </Field>
             </div>
 
@@ -363,6 +345,104 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className={styles.field}>
       <label className={styles.label}>{label}</label>
       {children}
+    </div>
+  );
+}
+
+// ---- Поиск города через геокодер Яндекса ----
+function CitySearch({ value, onSelect, geoLoading, detectedCoords }: {
+  value: string;
+  onSelect: (city: ICity) => void;
+  geoLoading: boolean;
+  detectedCoords: { lat: number; lng: number } | null;
+}) {
+  const [query,       setQuery]       = useState(value);
+  const [suggestions, setSuggestions] = useState<ICity[]>([]);
+  const [open,        setOpen]        = useState(false);
+  const [searching,   setSearching]   = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const wrapRef     = useRef<HTMLDivElement>(null);
+
+  // Синхронизируем поле если город выбран снаружи (геолокация)
+  useEffect(() => { setQuery(value); }, [value]);
+
+  // Закрываем дропдаун при клике вне
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, []);
+
+  const search = useCallback(async (q: string) => {
+    if (q.length < 2) { setSuggestions([]); return; }
+    setSearching(true);
+    try {
+      await loadYandexMaps();
+      const ymaps = (window as any).ymaps;
+      const res = await ymaps.geocode(q, { results: 8, kind: 'locality', lang: 'ru_RU' });
+      const items: ICity[] = [];
+      res.geoObjects.each((obj: any) => {
+        const coords = obj.geometry.getCoordinates();
+        const name   = obj.getLocalities().join(', ') || obj.getPremiseNumber() || q;
+        if (coords && name) items.push({ name, lat: coords[0], lng: coords[1] });
+      });
+      setSuggestions(items);
+      setOpen(items.length > 0);
+    } catch { setSuggestions([]); }
+    finally { setSearching(false); }
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const q = e.target.value;
+    setQuery(q);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => search(q), 350);
+  };
+
+  const handleSelect = (city: ICity) => {
+    setQuery(city.name);
+    setSuggestions([]);
+    setOpen(false);
+    onSelect(city);
+  };
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <div className={regStyles.cityRow}>
+        <input
+          className={styles.input}
+          placeholder="Начните вводить название города..."
+          value={query}
+          onChange={handleChange}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          autoComplete="off"
+        />
+        {(geoLoading || searching) && (
+          <span className={regStyles.geoSpinner} title="Поиск...">📡</span>
+        )}
+        {!geoLoading && !searching && detectedCoords && query && (
+          <span className={regStyles.geoOk} title="Координаты определены">✓</span>
+        )}
+      </div>
+
+      {open && suggestions.length > 0 && (
+        <div className={regStyles.citySuggestions}>
+          {suggestions.map((c, i) => (
+            <button key={i} className={regStyles.citySuggestionItem}
+              onMouseDown={() => handleSelect(c)}>
+              📍 {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {detectedCoords && query && (
+        <p className={regStyles.fieldHint}>
+          📍 Координаты определены ({detectedCoords.lat.toFixed(3)}, {detectedCoords.lng.toFixed(3)})
+        </p>
+      )}
     </div>
   );
 }

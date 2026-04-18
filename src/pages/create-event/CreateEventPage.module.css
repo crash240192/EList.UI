@@ -1,425 +1,287 @@
-/* pages/create-event/CreateEventPage.module.css */
+/* CreateEventPage.module.css — двухколонный layout */
 
 .page {
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 80px; /* место под footer */
-}
-
-/* ---- Title bar ---- */
-
-.titleBar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 18px 12px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  background: var(--bg);
-  z-index: 10;
-  border-bottom: 1px solid var(--border);
-}
-
-.backBtn {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  width: 34px;
-  height: 34px;
-  font-size: 18px;
-  cursor: pointer;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-/* ---- Error banner ---- */
-
-.errorBanner {
-  margin: 8px 18px 0;
-  padding: 10px 14px;
-  background: rgba(239,68,68,0.1);
-  border: 1px solid rgba(239,68,68,0.3);
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--danger);
-}
-
-/* ---- Form ---- */
-
-.form {
-  padding: 14px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 960px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-.section {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.sectionTitle {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0;
-}
-
-/* ---- Error states ---- */
-
-.inputError {
-  border-color: var(--danger) !important;
-  background: rgba(239,68,68,0.05);
-}
-
-.fieldError {
-  font-size: 11px;
-  color: var(--danger);
-  margin-top: 3px;
-}
-
-.sectionTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.sectionTitleError {
-  color: var(--danger) !important;
-}
-
-.sectionError {
-  font-size: 11px;
-  color: var(--danger);
-  background: rgba(239,68,68,0.1);
-  border-radius: 20px;
-  padding: 2px 8px;
-}
-
-.mapContainerError {
-  border-color: var(--danger) !important;
-}
-
-.pickerBtnError {
-  border-color: var(--danger) !important;
-  color: var(--danger) !important;
-  background: rgba(239,68,68,0.05);
-}
-
-/* ---- Toast notification ---- */
-
-.toast {
-  position: fixed;
-  bottom: 80px;   /* выше футера с кнопками */
-  left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  background: #1e1e2e;
-  border: 1px solid var(--danger);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 12px 20px;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  z-index: 1000;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  white-space: nowrap;
-  max-width: 90vw;
-  text-align: center;
-}
-
-.toastVisible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-:global(.light-theme) .toast {
-  background: #fff;
-  color: var(--danger);
-  border-color: var(--danger);
-}
-
-/* ---- Section title (override for when no error) ---- */
-
-.pickerBtn {
-  width: 100%;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-align: left;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: border-color 0.15s;
-}
-.pickerBtn:hover { border-color: var(--accent); }
-.pickerBtnActive {
-  border-color: var(--accent) !important;
-  color: var(--accent) !important;
-  background: rgba(99,102,241,0.06);
-}
-
-/* ---- Map ---- */
-
-.mapContainer {
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  height: 200px;
-}
-
-.mapFrame {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-}
-
-:global(body:not(.light-theme)) .mapFrame {
-  filter: invert(0.9) hue-rotate(180deg) saturate(0.8);
-}
-
-.mapOverlay {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.mapPickBtn {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s;
-}
-.mapPickBtn:hover { background: var(--accent-hover); }
-
-.mapHint {
-  font-size: 11px;
-  color: rgba(255,255,255,0.75);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
-}
-
-.coordHint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 0;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 10px;
-}
-
-.coordClear {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: 11px;
-  padding: 0;
-  line-height: 1;
-  margin-left: auto;
-}
-.coordClear:hover { color: var(--danger); }
-
-/* ---- Fields ---- */
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.input,
-.textarea {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 13px;
-  color: var(--text-primary);
-  outline: none;
-  width: 100%;
-  font-family: inherit;
-  transition: border-color 0.15s;
-}
-
-.input:focus,
-.textarea:focus { border-color: var(--accent); }
-
-.textarea { resize: vertical; min-height: 90px; }
-
-.row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.checkboxLabel {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.checkboxLabel input[type='checkbox'] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-/* ---- Placeholders ---- */
-
-.mapPlaceholder,
-.uploadPlaceholder {
-  background: var(--surface-2);
-  border: 1px dashed var(--border);
-  border-radius: 10px;
+  height: 100%; overflow-y: auto; background: var(--bg);
   padding: 20px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--text-muted);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  line-height: 1.6;
-}
-
-.mapPlaceholder { min-height: 120px; justify-content: center; }
-.uploadPlaceholder small { font-size: 11px; opacity: 0.7; }
-
-/* ---- Danger buttons ---- */
-
-.dangerBtn {
-  background: none;
-  border: 1px solid rgba(239,68,68,0.4);
-  border-radius: 8px;
-  padding: 9px 14px;
-  font-size: 13px;
-  color: var(--danger);
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.15s;
-  width: 100%;
-}
-
-.dangerBtn:hover { background: rgba(239,68,68,0.08); }
-
-/* ---- Footer ---- */
-
-/* Убираем padding-bottom со страницы — footer теперь sticky */
-.page {
-  padding-bottom: 0 !important;
-}
-
-.footer {
-  position: sticky;
-  bottom: 0;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  padding: 12px 18px;
-  display: flex;
-  gap: 10px;
-  /* Ширина как у блока формы */
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 20px;
+  align-items: start;
   max-width: 960px;
-  width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
 }
+@media (max-width: 720px) {
+  .page { grid-template-columns: 1fr; padding: 12px; }
+}
 
+/* ── Карточка формы ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.12);
+}
+
+/* ── Хедер ── */
+.header {
+  height: 80px;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 60%, #a855f7 100%);
+  border-radius: 15px 15px 0 0;
+  display: flex; align-items: center; gap: 14px; padding: 0 20px;
+}
+.backBtn {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(255,255,255,0.18); backdrop-filter: blur(6px);
+  border: 0.5px solid rgba(255,255,255,0.25); color: #fff;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background 0.15s;
+}
+.backBtn:hover { background: rgba(255,255,255,0.3); }
+.title { font-size: 18px; font-weight: 600; color: #fff; margin: 0; }
+
+/* ── Секции ── */
+.section {
+  padding: 18px 22px; border-bottom: 1px solid var(--border);
+}
+.section:last-child { border-bottom: none; }
+.sectionHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.sectionLabel {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--text-secondary);
+}
+.sectionLabelError { color: var(--danger); }
+.sectionError { font-size: 11px; color: var(--danger); font-weight: 500; }
+
+/* ── Поля ── */
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.field:last-child { margin-bottom: 0; }
+.label { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+
+.input, .textarea {
+  width: 100%; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 12px; font-size: 13px; color: var(--text-primary);
+  outline: none; font-family: inherit;
+  transition: border-color 0.15s;
+}
+.input:focus, .textarea:focus { border-color: var(--accent); }
+.textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
+.inputError { border-color: var(--danger) !important; }
+.inputLocked {
+  opacity: 0.45; cursor: not-allowed; pointer-events: none;
+}
+.inputSuffix { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+
+.lockBadge {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  font-size: 10px; padding: 2px 7px; border-radius: 12px;
+  background: rgba(245,158,11,0.12); color: #b45309;
+  border: 0.5px solid rgba(245,158,11,0.3); white-space: nowrap;
+}
+
+.fieldError { font-size: 11px; color: var(--danger); }
+.fieldHint  { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.fieldHintWarn { font-size: 11px; color: #b45309; margin-top: 3px; }
+
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
+
+/* ── Тип — picker + чипы ── */
+.pickerBtn {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 12px;
+  font-size: 13px; color: var(--text-secondary);
+  cursor: pointer; transition: border-color 0.15s; margin-bottom: 8px;
+}
+.pickerBtn:hover { border-color: var(--accent); }
+.pickerBtnActive { border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,0.04); }
+.pickerBtnError  { border-color: var(--danger) !important; }
+.typeChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.typeChip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  background: rgba(99,102,241,0.1); color: var(--accent);
+  border: 0.5px solid rgba(99,102,241,0.25);
+}
+.typeChipRemove {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 0 0 0 2px; opacity: 0.7;
+}
+.typeChipRemove:hover { opacity: 1; }
+
+/* ── Переключатель режима ── */
+.endModeToggle {
+  display: flex; border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden; margin: 10px 0;
+}
+.modeBtn {
+  flex: 1; padding: 7px; font-size: 12px; font-weight: 500;
+  text-align: center; background: none; border: none;
+  color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
+}
+.modeBtn:first-child { border-right: 1px solid var(--border); }
+.modeBtnActive { background: var(--accent); color: #fff; }
+
+/* ── Тарифный баннер ── */
+.tariffBanner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 11px; border-radius: 8px; margin-bottom: 12px;
+  background: rgba(245,158,11,0.08); border: 0.5px solid rgba(245,158,11,0.25);
+  font-size: 11px; color: #92400e;
+}
+.tariffBanner span { flex: 1; }
+.tariffLink {
+  font-size: 11px; font-weight: 600; color: #b45309;
+  background: none; border: none; cursor: pointer;
+  text-decoration: underline; white-space: nowrap; padding: 0;
+}
+
+/* ── Параметры grid ── */
+.paramGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+@media (max-width: 480px) { .paramGrid { grid-template-columns: 1fr; } }
+
+/* ── Тогглы ── */
+.toggles { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.toggle {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border);
+  transition: border-color 0.15s;
+}
+.toggle:hover:not(.toggleLocked) { border-color: var(--accent); }
+.toggleLocked { opacity: 0.55; cursor: not-allowed; }
+.toggleLabel { flex: 1; font-size: 12px; color: var(--text-primary); }
+.toggleHint  { font-size: 10px; color: #b45309; }
+.switch {
+  width: 32px; height: 18px; border-radius: 9px;
+  background: var(--border); position: relative; flex-shrink: 0;
+  transition: background 0.2s;
+}
+.switchOn { background: var(--accent); }
+.switchDot {
+  position: absolute; top: 2px; left: 2px;
+  width: 14px; height: 14px; border-radius: 50%; background: #fff;
+  transition: left 0.2s;
+}
+.switchOn .switchDot { left: 16px; }
+
+/* ── Белый список ── */
+.whitelist {
+  margin-top: 12px; padding: 12px;
+  background: rgba(99,102,241,0.04);
+  border: 0.5px solid rgba(99,102,241,0.2); border-radius: 10px;
+}
+.whitelistTitle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 4px;
+}
+.whitelistHint { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+.whitelistInput { display: flex; gap: 8px; }
+.whitelistAdd {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 7px; padding: 0 14px; font-size: 12px; font-weight: 500;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+
+/* ── Фотоальбом заглушка ── */
+.albumPlaceholder {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 20px; border: 1.5px dashed var(--border); border-radius: 10px;
+  background: var(--surface-2); color: var(--text-muted);
+}
+.albumHint { font-size: 12px; }
+.albumSub  { font-size: 11px; color: var(--text-muted); }
+
+/* ── Правая панель ── */
+.sidePanel {
+  display: flex; flex-direction: column; gap: 12px;
+  position: sticky; top: 20px;
+}
+
+.previewCard {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden;
+}
+.previewCover {
+  height: 110px; background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.previewCoverEmpty { font-size: 11px; color: var(--text-muted); }
+.previewBody { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.previewName { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.previewBadges { display: flex; gap: 5px; flex-wrap: wrap; }
+.badgePrivate {
+  font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 12px;
+  background: rgba(99,102,241,0.1); color: var(--accent);
+}
+.badgeAge {
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 12px;
+  background: rgba(239,68,68,0.08); color: #dc2626;
+}
+.previewRow {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-secondary);
+}
+.previewRow svg { flex-shrink: 0; opacity: 0.6; }
+.previewFree { font-size: 12px; font-weight: 600; color: var(--success); }
+.previewCost { font-size: 12px; font-weight: 600; color: var(--warning); }
+
+/* ── Чеклист ── */
+.checklist {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.checklistTitle {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text-secondary); margin-bottom: 4px;
+}
+.checkRow {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-muted);
+}
+.checkDone    { color: var(--text-primary); }
+.checkOptional{ color: var(--text-muted); }
+.checkDot {
+  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; font-weight: 700;
+  border: 1px solid var(--border); background: var(--surface-2);
+}
+.checkDotOk  { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.3); color: var(--success); }
+.checkDotNo  { }
+.checkDotOpt { opacity: 0.5; }
+
+/* ── Кнопки действий ── */
+.actions {
+  display: flex; gap: 8px;
+}
 .cancelBtn {
-  flex: 1;  /* равные доли */
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 11px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.15s;
+  background: none; border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; font-weight: 500;
+  color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
 }
-
-.cancelBtn:hover { background: var(--surface-2); }
-
-.submitBtn {
-  flex: 1;  /* равные доли — пополам */
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: 11px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+.cancelBtn:hover { border-color: var(--accent); color: var(--accent); }
+.saveBtn {
+  flex: 1; background: var(--accent); color: #fff; border: none;
+  border-radius: 10px; padding: 10px; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
 }
+.saveBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.submitBtn:hover:not(:disabled) { background: var(--accent-hover); }
-.submitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* ---- Skeleton ---- */
-
-.skeletonBlock {
-  background: var(--surface);
-  border-radius: 8px;
-  margin: 18px;
-  animation: shimmer 1.4s infinite;
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 18px; font-size: 13px;
+  color: var(--text-primary); box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 200;
+  white-space: nowrap;
 }
-
-@keyframes shimmer {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
-}
+.toastVisible { opacity: 1; transform: translateX(-50%) translateY(0); }

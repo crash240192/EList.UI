@@ -134,18 +134,18 @@ export default function WalletPage() {
                     />
                     <ValidatorRow
                       label="Макс. стоимость события"
-                      value={validator.costLimit === 0 ? 'Без ограничений' : `до ${validator.costLimit.toLocaleString()} ₽`}
-                      type={validator.costLimit === 0 ? 'ok' : 'warn'}
+                      value={validator.costLimit == null ? 'Без ограничений' : validator.costLimit === 0 ? 'Только бесплатные события' : `до ${validator.costLimit.toLocaleString()} ₽`}
+                      type={validator.costLimit == null ? 'ok' : validator.costLimit === 0 ? 'no' : 'warn'}
                     />
                     <ValidatorRow
                       label="Макс. участников события"
-                      value={validator.personsLimit === 0 ? 'Без ограничений' : `до ${validator.personsLimit} чел.`}
-                      type={validator.personsLimit === 0 ? 'ok' : 'warn'}
+                      value={validator.personsLimit == null ? 'Без ограничений' : validator.personsLimit === 0 ? 'Нельзя ограничивать участников' : `до ${validator.personsLimit} чел.`}
+                      type={validator.personsLimit == null ? 'ok' : validator.personsLimit === 0 ? 'no' : 'warn'}
                     />
                     <ValidatorRow
-                      label="Возрастной ценз"
-                      value={validator.ageLimit === 0 ? 'Без ограничений' : `до ${validator.ageLimit}+`}
-                      type={validator.ageLimit === 0 ? 'ok' : 'warn'}
+                      label="Возрастные ограничения"
+                      value={validator.ageLimit == null ? 'Без ограничений' : validator.ageLimit === 0 ? 'Нельзя ставить возрастной ценз' : `до ${validator.ageLimit}+ включительно`}
+                      type={validator.ageLimit == null ? 'ok' : validator.ageLimit === 0 ? 'no' : 'warn'}
                     />
                   </div>
                 )}
@@ -261,18 +261,18 @@ function TariffOption({ tariff, selected, onSelect }: {
               />
               <DetailRow
                 label="Макс. стоимость события"
-                value={validator.costLimit === 0 ? 'Без ограничений' : `до ${validator.costLimit.toLocaleString()} ₽`}
-                type={validator.costLimit === 0 ? 'ok' : 'warn'}
+                value={validator.costLimit == null ? 'Без ограничений' : validator.costLimit === 0 ? 'Только бесплатные' : `до ${validator.costLimit.toLocaleString()} ₽`}
+                type={validator.costLimit == null ? 'ok' : validator.costLimit === 0 ? 'no' : 'warn'}
               />
               <DetailRow
                 label="Макс. участников"
-                value={validator.personsLimit === 0 ? 'Без ограничений' : `до ${validator.personsLimit} чел.`}
-                type={validator.personsLimit === 0 ? 'ok' : 'warn'}
+                value={validator.personsLimit == null ? 'Без ограничений' : validator.personsLimit === 0 ? 'Нельзя ограничивать' : `до ${validator.personsLimit} чел.`}
+                type={validator.personsLimit == null ? 'ok' : validator.personsLimit === 0 ? 'no' : 'warn'}
               />
               <DetailRow
-                label="Возрастной ценз"
-                value={validator.ageLimit === 0 ? 'Без ограничений' : `до ${validator.ageLimit}+`}
-                type={validator.ageLimit === 0 ? 'ok' : 'warn'}
+                label="Макс. возраст ограничения"
+                value={validator.ageLimit == null ? 'Без ограничений' : validator.ageLimit === 0 ? 'Нельзя ставить ценз' : `до ${validator.ageLimit}+`}
+                type={validator.ageLimit == null ? 'ok' : validator.ageLimit === 0 ? 'no' : 'warn'}
               />
             </div>
           )}

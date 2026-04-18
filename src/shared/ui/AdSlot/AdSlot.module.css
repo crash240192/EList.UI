@@ -21,3 +21,27 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+/* Заглушка рекламного блока */
+.placeholder {
+  display: flex; gap: 12px; padding: 12px; align-items: flex-start;
+}
+.placeholderImg {
+  width: 80px; height: 80px; border-radius: 8px; flex-shrink: 0;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease infinite;
+}
+.placeholderBody {
+  flex: 1; display: flex; flex-direction: column; gap: 8px; padding-top: 4px;
+}
+.placeholderLine {
+  height: 13px; border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

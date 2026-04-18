@@ -39,11 +39,14 @@
 
 /* ---- Avatar ---- */
 
-.avatar {
+.avatarWrap {
   position: relative;
   flex-shrink: 0;
 }
 
+.avatar { border-radius: 50%; }
+.sm .avatarWrap { width: 24px; height: 24px; }
+.md .avatarWrap { width: 30px; height: 30px; }
 .sm .avatar { width: 24px; height: 24px; }
 .md .avatar { width: 30px; height: 30px; }
 

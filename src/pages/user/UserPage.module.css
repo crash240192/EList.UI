@@ -1,387 +1,246 @@
 /* pages/user/UserPage.module.css */
 
 .page {
-  height: 100%;
-  overflow-y: auto;
-  padding: 20px 18px 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 960px;
-  margin: 0 auto;
-  position: relative;
+  height: 100%; overflow-y: auto;
+  background: var(--bg);
+  padding: 20px;
+  box-sizing: border-box;
 }
 
-.backBtn {
-  position: sticky;
-  top: 0;
-  align-self: flex-start;
+/* ── Карточка (как на EventPage) ── */
+.card {
+  width: 100%; max-width: 960px; margin: 0 auto;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  font-size: 18px;
-  cursor: pointer;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  z-index: 10;
+  border-radius: 16px;
+  /* overflow: hidden убран — аватар должен вылезать за баннер */
+  box-shadow: 0 2px 20px rgba(0,0,0,0.2);
 }
 
-/* ---- Header ---- */
-
-.header {
-  display: flex;
-  gap: 18px;
-  align-items: flex-start;
+/* ── Баннер ── */
+.banner {
+  height: 140px;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 60%, #a855f7 100%);
+  position: relative; flex-shrink: 0;
+  /* Скругление только сверху */
+  border-radius: 15px 15px 0 0;
+  overflow: hidden; /* клипаем только содержимое баннера */
 }
-
-.avatarWrap { flex-shrink: 0; }
-
-.avatar,
-.avatarPlaceholder {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-}
-
-.avatar { object-fit: cover; }
-
-.avatarPlaceholder {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  font-weight: 700;
-  color: #fff;
-}
-
-.headerInfo {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.login {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.fullName {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.stats {
-  display: flex;
-  gap: 20px;
-  margin-top: 8px;
-}
-
-.statItem {
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 4px 8px;
-  border-radius: 8px;
+.bannerBack {
+  position: absolute; top: 14px; left: 14px;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(255,255,255,0.18); backdrop-filter: blur(6px);
+  border: 0.5px solid rgba(255,255,255,0.25); color: #fff;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: background 0.15s;
 }
-.statItem:hover { background: var(--surface-2); }
-
-.statNum {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
+.bannerBack:hover { background: rgba(255,255,255,0.3); }
+.bannerActions {
+  position: absolute; top: 14px; right: 14px; display: flex; gap: 8px;
 }
-
-.statLabel {
-  font-size: 11px;
-  color: var(--text-secondary);
+.bannerBtn {
+  height: 32px; padding: 0 16px; border-radius: 20px;
+  border: 0.5px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.18); backdrop-filter: blur(6px);
+  color: #fff; font-size: 12px; font-weight: 500; cursor: pointer;
 }
+.bannerBtnSub { background: rgba(255,255,255,0.08); }
 
-/* ---- Actions ---- */
-
-.actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+/* ── Шапка профиля ── */
+.profileHeader {
+  padding: 0 24px 16px;
+  border-bottom: 1px solid var(--border);
+  position: relative; /* создаёт контекст стекинга выше баннера */
+  z-index: 1;
 }
-
-.subscribeBtn {
-  flex: 1;
+.avatarWrap {
+  width: 80px; height: 80px;
+  margin-top: -40px; margin-bottom: 12px;
+  position: relative; /* гарантируем что аватар выше баннера */
+  z-index: 2;
+}
+.avatar {
+  width: 80px; height: 80px; border-radius: 50%;
   background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.subscribeBtn:hover { background: var(--accent-hover); }
-
-.subscribedBtn {
-  background: transparent !important;
-  border: 1px solid var(--border);
-  color: var(--text-primary) !important;
-}
-
-.reportBtn {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: none;
-  color: var(--text-muted);
-  font-size: 16px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-  flex-shrink: 0;
-}
-
-.reportBtn:hover {
-  color: var(--danger);
-  border-color: rgba(239,68,68,0.4);
-}
-
-/* ---- Info grid ---- */
-
-.infoGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.infoChip {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 18px;
-}
-
-.chipLabel {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.chipValue {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* ---- Contacts ---- */
-
-.contactsError {
-  font-size: 12px;
-  color: var(--danger);
-  padding: 6px 0;
-  margin: 0;
-}
-
-.contactsGroups {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.contactGroup {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--surface-2);
-  border-radius: 8px;
-}
-
-.contactGroupLabel {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  min-width: 80px;
-  flex-shrink: 0;
-  padding-top: 1px;
-}
-
-.contactGroupValues {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-
-.contactsList {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.contactRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--surface-2);
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.contactType {
-  color: var(--text-secondary);
-  min-width: 80px;
-  flex-shrink: 0;
-}
-
-.contactValue {
-  color: var(--text-primary);
-  flex: 1;
-  word-break: break-all;
-}
-
-.authTag {
-  color: var(--warning);
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-/* ---- Edit button ---- */
-
-.editBtn {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: background 0.15s;
-  text-align: left;
-  width: 100%;
-}
-
-.editBtn:hover { background: var(--surface-2); }
-
-/* ---- Section ---- */
-
-.sectionTitle {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 8px;
-}
-
-.section {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 3px solid var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 600; color: #fff;
   overflow: hidden;
 }
-
-.tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
+.avatarImg { width: 100%; height: 100%; object-fit: cover; }
+.nameRow {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 12px; margin-bottom: 12px;
 }
+.fullName { font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.loginLine { font-size: 13px; color: var(--text-secondary); }
+.editBtn {
+  height: 34px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--border); background: transparent;
+  font-size: 13px; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  transition: all 0.15s;
+}
+.editBtn:hover { border-color: var(--accent); color: var(--accent); }
 
-.tab {
-  flex: 1;
-  background: none;
-  border: none;
-  padding: 12px;
-  font-size: 13px;
-  font-weight: 500;
+/* ── Счётчики ── */
+.statsRow {
+  display: flex; align-items: center; gap: 0; flex-wrap: wrap; gap: 4px;
+}
+.statBtn {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 6px 14px; border-radius: 8px;
+  background: none; border: none; cursor: pointer;
+  transition: background 0.12s;
+}
+.statBtn:first-child { padding-left: 0; }
+.statBtn:hover { background: var(--surface-2); }
+.statNum { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+.statLabel { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+.statDivider { width: 1px; height: 28px; background: var(--border); margin: 0 4px; }
+
+/* Рейтинг организатора */
+.ratingBadge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 20px;
+  background: rgba(245,158,11,0.09);
+  border: 0.5px solid rgba(245,158,11,0.25);
+  margin-left: auto;
+}
+.stars { display: flex; gap: 2px; }
+.star  { width: 13px; height: 13px; }
+.ratingNum { font-size: 15px; font-weight: 600; color: #b45309; }
+
+/* ── Мета-чипы ── */
+.metaRow {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 12px 24px; border-bottom: 1px solid var(--border);
+}
+.metaChip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 20px; font-size: 12px;
+  background: var(--surface-2); border: 1px solid var(--border);
   color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
 }
+.metaChip svg { opacity: .7; flex-shrink: 0; }
 
-.tab:hover { background: var(--surface-2); }
-
-.tabActive {
-  color: var(--accent) !important;
-  border-bottom: 2px solid var(--accent);
-}
-
-.eventsList {
-  padding: 16px;
-}
-
-.placeholder {
-  font-size: 13px;
-  color: var(--text-muted);
-  text-align: center;
-  line-height: 1.7;
-}
-
-.placeholder small { font-size: 11px; }
-
-/* ---- Error / skeleton ---- */
-
-.error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 12px;
-  color: var(--text-secondary);
-}
-
-.error span { font-size: 48px; }
-
-.error button {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 9px 18px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.skeletonBlock {
-  background: var(--surface);
-  border-radius: 8px;
-  animation: shimmer 1.4s infinite;
-}
-
-@keyframes shimmer {
-  0%   { opacity: 1; }
-  50%  { opacity: 0.5; }
-  100% { opacity: 1; }
-}
-
-/* ---- User events grid ---- */
-
-.eventsGrid {
+/* ── Двухколонная часть ── */
+.twoCol {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
-  padding: 4px 0;
+  grid-template-columns: minmax(0,1fr) 260px;
+  gap: 0;
+}
+@media (max-width: 680px) {
+  .twoCol { grid-template-columns: 1fr; }
+  .rightCol { border-top: 1px solid var(--border); border-left: none !important; }
+  .page { padding: 12px; }
 }
 
+/* ── Левая колонка ── */
+.leftCol {
+  padding: 20px 24px; min-width: 0;
+  display: flex; flex-direction: column; gap: 24px;
+}
+
+/* Контакты */
+.contactsList { display: flex; flex-direction: column; }
+.contactGroup {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.contactGroup:last-child { border-bottom: none; }
+.contactTypeName {
+  font-size: 11px; font-weight: 500; color: var(--text-secondary);
+  min-width: 72px; flex-shrink: 0; padding-top: 2px;
+}
+.contactVals { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.contactVal { font-size: 13px; color: var(--text-primary); }
+
+/* Секция событий */
+.secLabel {
+  font-size: 10px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text-secondary); margin-bottom: 10px;
+}
+.tabsRow {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border); margin-bottom: 12px;
+}
+.tab {
+  background: none; border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 16px 8px 0; font-size: 13px; font-weight: 500;
+  color: var(--text-secondary); cursor: pointer; margin-bottom: -1px;
+}
+.tabActive { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Мини-карточка мероприятия */
+.eventMini {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 10px;
+  border: 1px solid var(--border);
+  cursor: pointer; margin-bottom: 7px;
+  transition: background 0.12s;
+}
+.eventMini:hover { background: var(--surface-2); }
+.eventDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.eventMiniInfo { flex: 1; min-width: 0; }
+.eventMiniName {
+  font-size: 13px; font-weight: 500; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.eventMiniMeta { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.eventMiniDate { font-size: 11px; color: var(--text-secondary); }
+.eventMiniCost { font-size: 12px; font-weight: 500; flex-shrink: 0; }
+
+/* Плашка возрастного ограничения */
+.ageBadge {
+  font-size: 10px; font-weight: 600;
+  padding: 1px 6px; border-radius: 20px;
+  line-height: 1.5;
+}
+.ageBadgeRed   { background: rgba(239,68,68,0.1);   color: #dc2626; border: 0.5px solid rgba(239,68,68,0.2); }
+.ageBadgeAmber { background: rgba(245,158,11,0.1);  color: #b45309; border: 0.5px solid rgba(245,158,11,0.25); }
+.ageBadgeGreen { background: rgba(34,197,94,0.08);  color: #15803d; border: 0.5px solid rgba(34,197,94,0.2); }
+
+.eventSkeletons { display: flex; flex-direction: column; gap: 7px; }
 .eventSkeleton {
-  height: 200px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  animation: shimmer 1.4s ease-in-out infinite;
+  height: 52px; border-radius: 10px;
+  background: var(--surface-2); animation: shimmer 1.4s ease infinite;
 }
+.placeholder { font-size: 13px; color: var(--text-muted); padding: 12px 0; }
 
-@keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:0.5} }
+/* ── Правая колонка ── */
+.rightCol {
+  padding: 20px; min-width: 0;
+  border-left: 1px solid var(--border);
+}
+.infoCard {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px;
+}
+.infoRow {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.infoRow:first-child { padding-top: 0; }
+.infoRow:last-child  { border-bottom: none; padding-bottom: 0; }
+.infoIcon {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: var(--surface); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.infoKey { font-size: 10px; color: var(--text-secondary); margin-bottom: 1px; }
+.infoVal { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+
+/* ── Состояния ── */
+@keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:0.45} }
+
+.errorState {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 100%; gap: 12px;
+  color: var(--text-secondary); text-align: center;
+}
+.errorState button {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; padding: 8px 18px; cursor: pointer; font-size: 13px;
+}
