@@ -98,8 +98,13 @@ async function request<T>(
   const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
   if (response.status === 401) {
-    clearAuthToken();
-    onUnauthorized?.();
+    // Не сбрасываем сессию для эндпоинтов активации — они могут вернуть 401
+    // потому что аккаунт ещё не активирован, а не потому что токен протух
+    const isActivationEndpoint = path.includes('activation') || path.includes('activate');
+    if (!isActivationEndpoint) {
+      clearAuthToken();
+      onUnauthorized?.();
+    }
     throw new ApiError(401, 'Необходима авторизация');
   }
 

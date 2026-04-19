@@ -52,7 +52,11 @@ export function AppLayout() {
           >
             <HamburgerIcon />
           </button>
-          <button className={styles.logo} onClick={() => navigate('/')} aria-label="На главную">
+          <button className={styles.logo} onClick={() => {
+            navigate('/');
+            // Отправляем событие — карта слушает и центрируется
+            window.dispatchEvent(new CustomEvent('elist:centerMap'));
+          }} aria-label="На главную">
             <span>📍</span>
             <span>EList</span>
           </button>

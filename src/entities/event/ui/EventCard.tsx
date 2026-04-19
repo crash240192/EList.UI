@@ -1,67 +1,35 @@
-// ============================================================
 // entities/event/ui/EventCard.tsx
-// Compound Component — карточка мероприятия
-//
-// Использование (гибкое — Compound Pattern):
-//
-//   <EventCard event={event} onClick={handleClick}>
-//     <EventCard.Cover />
-//     <EventCard.Body>
-//       <EventCard.Title />
-//       <EventCard.Meta />
-//       <EventCard.Footer>
-//         <EventCard.Price />
-//         <EventCard.FavoriteButton onToggle={handleFav} isFavorite={fav} />
-//       </EventCard.Footer>
-//     </EventCard.Body>
-//   </EventCard>
-//
-// Или предустановленный пресет:
-//   <EventCard.Preset event={event} onClick={...} onFavorite={...} isFavorite={...} />
-// ============================================================
 
 import React, { createContext, useContext } from 'react';
 import type { IEvent } from '../types';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './EventCard.module.css';
 
-// ---- Context ----
-
-interface EventCardContextValue {
-  event: IEvent;
-}
-
+interface EventCardContextValue { event: IEvent; }
 const EventCardContext = createContext<EventCardContextValue | null>(null);
-
-function useEventCard(): EventCardContextValue {
+function useEventCard() {
   const ctx = useContext(EventCardContext);
-  if (!ctx) throw new Error('EventCard subcomponent must be used inside <EventCard>');
+  if (!ctx) throw new Error('EventCard subcomponent must be inside <EventCard>');
   return ctx;
 }
 
-// ---- Helpers ----
-
-function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(iso));
+function formatDate(iso: string) {
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
-
-function formatPrice(cost: number): string {
+function formatPrice(cost: number) {
   return cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`;
+}
+function categoryGradient(p?: string | null) {
+  if (!p) return 'linear-gradient(135deg,#6366f1,#8b5cf6)';
+  if (p.startsWith('music'))  return 'linear-gradient(135deg,#6366f1,#8b5cf6)';
+  if (p.startsWith('sport'))  return 'linear-gradient(135deg,#10b981,#3b82f6)';
+  if (p.startsWith('art'))    return 'linear-gradient(135deg,#f59e0b,#ef4444)';
+  if (p.startsWith('food'))   return 'linear-gradient(135deg,#f97316,#fbbf24)';
+  return 'linear-gradient(135deg,#6366f1,#8b5cf6)';
 }
 
 // ---- Root ----
-
-interface EventCardProps {
-  event: IEvent;
-  onClick?: (event: IEvent) => void;
-  className?: string;
-  children: React.ReactNode;
-}
-
+interface EventCardProps { event: IEvent; onClick?: (e: IEvent) => void; className?: string; children: React.ReactNode; }
 function EventCard({ event, onClick, className = '', children }: EventCardProps) {
   return (
     <EventCardContext.Provider value={{ event }}>
@@ -72,78 +40,53 @@ function EventCard({ event, onClick, className = '', children }: EventCardProps)
         tabIndex={onClick ? 0 : undefined}
         onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick(event) : undefined}
         aria-label={event.name}
-      >
-        {children}
-      </article>
+      >{children}</article>
     </EventCardContext.Provider>
   );
 }
 
-// ---- Cover (обложка) ----
-
-interface CoverProps {
-  fallbackGradient?: string;
-}
-
-function Cover({ fallbackGradient }: CoverProps) {
+// ---- Cover ----
+function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
   const { event } = useEventCard();
-
   const gradient = fallbackGradient ?? categoryGradient(event.eventType?.eventCategory?.namePath);
+  const hasCover = !!(event.coverImageId || event.coverUrl);
 
   return (
-    <div className={styles.cover} style={{ background: event.coverUrl ? undefined : gradient }}>
-      {event.coverUrl && (
+    <div className={styles.cover} style={{ background: hasCover ? '#111' : gradient }}>
+      {event.coverImageId ? (
+        <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg}
+          fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} /> : undefined} />
+      ) : event.coverUrl ? (
         <img src={event.coverUrl} alt={event.name} className={styles.coverImg} loading="lazy" />
+      ) : null}
+
+      <div className={styles.coverOverlay} />
+
+      {event.eventType && <span className={styles.typeBadge}>{event.eventType.name}</span>}
+      {(event.parameters?.ageLimit ?? 0) > 0 && (
+        <span className={styles.ageBadge}>{event.parameters!.ageLimit}+</span>
       )}
-      {event.eventType && (
-        <span className={styles.typeBadge}>{event.eventType.name}</span>
-      )}
-      {event.active && <span className={styles.activeDot} title="Идёт сейчас" />}
+      {event.parameters?.private && <span className={styles.privateBadge}>🔒</span>}
     </div>
   );
 }
 
-/** Градиент по умолчанию в зависимости от категории */
-function categoryGradient(namePath?: string | null): string {
-  if (!namePath) return 'linear-gradient(135deg, #6366f1, #8b5cf6)';
-  if (namePath.startsWith('music')) return 'linear-gradient(135deg, #6366f1, #8b5cf6)';
-  if (namePath.startsWith('sport')) return 'linear-gradient(135deg, #10b981, #3b82f6)';
-  if (namePath.startsWith('art')) return 'linear-gradient(135deg, #f59e0b, #ef4444)';
-  if (namePath.startsWith('food')) return 'linear-gradient(135deg, #f97316, #fbbf24)';
-  return 'linear-gradient(135deg, #6366f1, #8b5cf6)';
-}
+// ---- Body / Title / Meta / Footer / Price / Participants / FavoriteButton / Rating ----
 
-// ---- Body ----
-
-function Body({ children }: { children: React.ReactNode }) {
-  return <div className={styles.body}>{children}</div>;
-}
-
-// ---- Title ----
-
-function Title() {
-  const { event } = useEventCard();
-  return <h3 className={styles.title}>{event.name}</h3>;
-}
-
-// ---- Meta (дата + адрес) ----
+function Body({ children }: { children: React.ReactNode }) { return <div className={styles.body}>{children}</div>; }
+function Title() { const { event } = useEventCard(); return <h3 className={styles.title}>{event.name}</h3>; }
 
 function Meta() {
   const { event } = useEventCard();
   return (
     <div className={styles.meta}>
       <span className={styles.metaItem}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-          <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         {formatDate(event.startTime)}
       </span>
       {event.address && (
         <span className={styles.metaItem}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
-          </svg>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
           {event.address}
         </span>
       )}
@@ -151,13 +94,7 @@ function Meta() {
   );
 }
 
-// ---- Footer ----
-
-function Footer({ children }: { children: React.ReactNode }) {
-  return <div className={styles.footer}>{children}</div>;
-}
-
-// ---- Price ----
+function Footer({ children }: { children: React.ReactNode }) { return <div className={styles.footer}>{children}</div>; }
 
 function Price() {
   const { event } = useEventCard();
@@ -169,74 +106,46 @@ function Price() {
   );
 }
 
-// ---- Participants ----
-
 function Participants() {
   const { event } = useEventCard();
   if (!event.participantsCount) return null;
   return (
     <span className={styles.participants}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
       {event.participantsCount}
     </span>
   );
 }
 
-// ---- FavoriteButton ----
-
-interface FavoriteButtonProps {
-  isFavorite: boolean;
-  onToggle: (eventId: string, current: boolean) => void;
-}
-
+interface FavoriteButtonProps { isFavorite: boolean; onToggle: (id: string, cur: boolean) => void; }
 function FavoriteButton({ isFavorite, onToggle }: FavoriteButtonProps) {
   const { event } = useEventCard();
-
   return (
     <button
       className={`${styles.favBtn} ${isFavorite ? styles.favActive : ''}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle(event.id, isFavorite);
-      }}
-      aria-label={isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
-      title={isFavorite ? 'В избранном' : 'В избранное'}
+      onClick={(e) => { e.stopPropagation(); onToggle(event.id, isFavorite); }}
+      aria-label={isFavorite ? 'Убрать из избранного' : 'В избранное'}
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+      <svg width="15" height="15" viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
       </svg>
     </button>
   );
 }
-
-// ---- Rating ----
 
 function Rating() {
   const { event } = useEventCard();
   if (!event.anticipationRating) return null;
   return (
     <span className={styles.rating}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-      </svg>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       {event.anticipationRating.toFixed(1)}
     </span>
   );
 }
 
-// ---- Preset (удобный пресет для быстрого использования) ----
-
-interface PresetProps {
-  event: IEvent;
-  onClick?: (event: IEvent) => void;
-  onFavorite?: (eventId: string, current: boolean) => void;
-  isFavorite?: boolean;
-  className?: string;
-}
-
+// ---- Preset ----
+interface PresetProps { event: IEvent; onClick?: (e: IEvent) => void; onFavorite?: (id: string, cur: boolean) => void; isFavorite?: boolean; className?: string; }
 function Preset({ event, onClick, onFavorite, isFavorite = false, className }: PresetProps) {
   return (
     <EventCard event={event} onClick={onClick} className={className}>
@@ -245,19 +154,13 @@ function Preset({ event, onClick, onFavorite, isFavorite = false, className }: P
         <Title />
         <Meta />
         <Footer>
-          <div className={styles.footerLeft}>
-            <Price />
-            <Rating />
-            <Participants />
-          </div>
+          <div className={styles.footerLeft}><Price /><Rating /><Participants /></div>
           {onFavorite && <FavoriteButton isFavorite={isFavorite} onToggle={onFavorite} />}
         </Footer>
       </Body>
     </EventCard>
   );
 }
-
-// ---- Экспорт в стиле Compound Component ----
 
 EventCard.Cover = Cover;
 EventCard.Body = Body;

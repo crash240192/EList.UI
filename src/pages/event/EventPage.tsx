@@ -10,6 +10,8 @@ import {
 } from '@/entities/event';
 import { useFavoritesStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
+import { apiClient } from '@/shared/api/client';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserChip } from '@/entities/user/ui/UserChip';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import styles from './EventPage.module.css';
@@ -108,11 +110,16 @@ export default function EventPage() {
     <div className={styles.page}>
       <div className={styles.card}>
 
-        {/* ── Hero (ограничен шириной карточки) ── */}
-        <div className={styles.hero} style={!event.coverUrl ? {
+        {/* ── Hero ── */}
+        <div className={styles.hero} style={!(event.coverImageId || event.coverUrl) ? {
           background: 'linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)',
         } : undefined}>
-        {event.coverUrl && <img src={event.coverUrl} alt={event.name} className={styles.heroImg} />}
+        {event.coverImageId ? (
+          <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.heroImg}
+            fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.heroImg} /> : undefined} />
+        ) : event.coverUrl ? (
+          <img src={event.coverUrl} alt={event.name} className={styles.heroImg} />
+        ) : null}
         <div className={styles.heroOverlay} />
 
         {/* Top controls */}

@@ -1,224 +1,184 @@
-/* pages/auth/AuthPage.module.css */
+/* pages/auth/AuthPage.module.css
+   Единый layout для login / register / activation
+   iOS: overflow-y: auto + padding-bottom для safe area */
 
 .page {
-  min-height: 100dvh;
+  /* position: fixed + inset: 0 — создаёт независимый scroll-контейнер,
+     не зависящий от body overflow: hidden */
+  position: fixed;
+  inset: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: var(--bg);
-  padding: 20px;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(99,102,241,0.12) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(139,92,246,0.10) 0%, transparent 50%);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: max(32px, 5vh) 16px max(32px, 5vh);
+  box-sizing: border-box;
 }
 
+/* Карточка центрируется через margin: auto по вертикали когда места хватает */
 .card {
   width: 100%;
-  max-width: 380px;
+  max-width: 400px;
+  margin: auto 0;  /* auto сверху и снизу = вертикальное центрирование внутри flex */
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 20px;
-  padding: 36px 32px 28px;
+  padding: 28px 28px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-shadow: 0 8px 48px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+@media (max-width: 440px) {
+  .card { padding: 22px 16px 18px; border-radius: 16px; }
+  .page { padding: 16px; }
+}
+
+/* ── Лого ── */
+.logoWrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+  gap: 4px;
+  margin-bottom: 18px;
 }
-
-/* ---- Logo ---- */
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.logoIcon { font-size: 36px; }
-
-.logoText {
-  font-size: 28px;
-  font-weight: 800;
+.logoMark {
+  width: 46px; height: 46px; border-radius: 14px;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; margin-bottom: 2px;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.35);
+}
+.logoText {
+  font-size: 22px; font-weight: 800;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; line-height: 1;
+}
+.logoSub {
+  font-size: 11px; color: var(--text-muted);
 }
 
-.subtitle {
-  font-size: 13px;
-  color: var(--text-secondary);
-  text-align: center;
-  line-height: 1.6;
-  margin-top: -8px;
+/* ── Заголовок ── */
+.heading {
+  font-size: 18px; font-weight: 700;
+  color: var(--text-primary); text-align: center;
+  margin-bottom: 3px;
+}
+.subheading {
+  font-size: 12px; color: var(--text-secondary);
+  text-align: center; margin-bottom: 18px; line-height: 1.5;
 }
 
-/* ---- Error ---- */
+/* ── Форма ── */
+.fields { display: flex; flex-direction: column; gap: 10px; }
 
-.error {
-  width: 100%;
-  padding: 10px 14px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--danger);
-  text-align: center;
-}
-
-/* ---- Fields ---- */
-
-.fields {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  width: 100%;
-}
+.field { display: flex; flex-direction: column; gap: 4px; }
 
 .label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
+  font-size: 11px; font-weight: 500; color: var(--text-secondary);
 }
+
+.inputWrap { position: relative; }
 
 .input {
   width: 100%;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 14px;
-  color: var(--text-primary);
-  outline: none;
-  transition: border-color 0.15s;
-  font-family: inherit;
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13px; color: var(--text-primary);
+  outline: none; font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-appearance: none;
 }
-
-.input:focus { border-color: var(--accent); }
-
-.passWrap {
-  position: relative;
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
 }
-
-.passWrap .input {
-  padding-right: 40px;
-}
+.inputError { border-color: var(--danger) !important; }
+.inputWithBtn { padding-right: 40px; }
 
 .eyeBtn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
+  position: absolute; right: 10px; top: 50%;
   transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: 2px;
-  opacity: 0.6;
-  transition: opacity 0.15s;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 15px; padding: 2px;
 }
 
-.eyeBtn:hover { opacity: 1; }
+/* ── Ошибка ── */
+.error {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 8px 11px; border-radius: 8px;
+  background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+  font-size: 12px; color: var(--danger); line-height: 1.5;
+  margin-top: 2px;
+}
+.error svg { flex-shrink: 0; margin-top: 1px; }
 
-/* ---- Submit ---- */
-
+/* ── Основная кнопка ── */
 .submitBtn {
   width: 100%;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  padding: 12px;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 46px;
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 9px; padding: 11px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: background 0.15s, transform 0.1s;
+  margin-top: 4px;
+  -webkit-appearance: none;
 }
-
 .submitBtn:hover:not(:disabled) { background: var(--accent-hover); }
-.submitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.submitBtn:active:not(:disabled) { transform: scale(0.98); }
+.submitBtn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-/* ---- Spinner ---- */
-
+/* ── Спиннер ── */
 .spinner {
-  width: 18px;
-  height: 18px;
+  width: 16px; height: 16px; border-radius: 50%;
   border: 2px solid rgba(255,255,255,0.3);
   border-top-color: #fff;
-  border-radius: 50%;
   animation: spin 0.7s linear infinite;
   display: inline-block;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* ── Ссылка-переключатель ── */
+.switchRow {
+  display: flex; align-items: center; justify-content: center;
+  gap: 5px; margin-top: 16px;
+  font-size: 12px; color: var(--text-secondary);
 }
-
-/* ---- Hint / links ---- */
-
-.hint {
-  font-size: 13px;
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-.linkBtn {
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 13px;
-  cursor: pointer;
+.switchLink {
+  background: none; border: none; cursor: pointer;
+  color: var(--accent); font-size: 12px; font-weight: 600;
   padding: 0;
-  font-family: inherit;
-  transition: opacity 0.15s;
+}
+.switchLink:hover { text-decoration: underline; }
+
+/* ── Разделитель ── */
+.divider {
+  display: flex; align-items: center; gap: 10px;
+  margin: 14px 0; color: var(--text-muted); font-size: 11px;
+}
+.divider::before, .divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
 }
 
-.linkBtn:hover { opacity: 0.75; }
-
-/* ---- Code inputs (activation) ---- */
-
-.codeRow {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-}
-
-.codeInput {
-  width: 44px;
-  height: 52px;
+/* ── select ── */
+.select {
+  width: 100%;
   background: var(--surface-2);
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  font-size: 22px;
-  font-weight: 700;
-  text-align: center;
-  color: var(--text-primary);
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  caret-color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13px; color: var(--text-primary);
+  outline: none; font-family: inherit;
+  -webkit-appearance: none;
+  cursor: pointer;
 }
-
-.codeInput:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-}
-
-.codeError {
-  border-color: var(--danger) !important;
-  animation: shake 0.35s ease;
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%       { transform: translateX(-5px); }
-  60%       { transform: translateX(5px); }
-}
+.select:focus { border-color: var(--accent); }

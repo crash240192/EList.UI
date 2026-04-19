@@ -18,6 +18,8 @@ import { useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
+import { validateContactValue, getMaskInputMode } from '@/shared/lib/contactMask';
+import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import type { Gender } from '@/shared/api/types';
 import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
@@ -36,6 +38,28 @@ interface Step2Form {
   patronymic: string;
   gender: Gender | '';
   birthDate: string;
+}
+
+/** Возвращает понятный пример вместо regex-маски */
+function getContactPlaceholder(ct: import('@/features/auth/registrationApi').IContactType | undefined): string {
+  if (!ct) return 'Введите контакт';
+  const name = (ct.name || ct.localizedName || ct.namePath || '').toLowerCase();
+  // Определяем по имени типа
+  if (name.includes('email') || name.includes('почт') || name.includes('mail'))
+    return 'example@mail.ru';
+  if (name.includes('telegram') || name.includes('tg'))
+    return '@username';
+  if (name.includes('телефон') || name.includes('phone') || name.includes('мобил'))
+    return '+7 (999) 123-45-67';
+  if (name.includes('vk') || name.includes('вконтакте'))
+    return 'vk.com/id или @username';
+  if (name.includes('whatsapp'))
+    return '+7 (999) 123-45-67';
+  // Если маска выглядит как regex — скрываем её, показываем generic
+  if (ct.mask && (ct.mask.startsWith('^') || ct.mask.includes('\\d') || ct.mask.includes('?')))
+    return `Введите ${ct.name ?? 'контакт'}`;
+  // Если маска — человекочитаемый пример, показываем её
+  return ct.mask ?? `Введите ${ct.name ?? 'контакт'}`;
 }
 
 export default function RegisterPage() {
@@ -76,6 +100,20 @@ export default function RegisterPage() {
     login: '', password: '', passwordConfirmation: '',
     contactTypeId: '', contactValue: '',
   });
+  const [contactError, setContactError] = useState<string | null>(null);
+
+  // Умный обработчик поля контакта — форматирует телефон по маске
+  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setForm1(f => ({ ...f, contactValue: raw }));
+    if (contactError) setContactError(null);
+  };
+
+  const handleContactBlur = () => {
+    const mask = selectedContactType?.mask ?? null;
+    const err = validateContactValue(form1.contactValue, mask);
+    if (err && form1.contactValue.trim()) setContactError(err);
+  };
 
   const [form2, setForm2] = useState<Step2Form>({
     firstName: '', lastName: '', patronymic: '', gender: '', birthDate: '',
@@ -108,7 +146,8 @@ export default function RegisterPage() {
     if (form1.password.length < 6) return 'Пароль — не менее 6 символов';
     if (form1.password !== form1.passwordConfirmation) return 'Пароли не совпадают';
     if (!form1.contactTypeId)      return 'Выберите тип контакта';
-    if (!form1.contactValue.trim()) return 'Введите контактные данные';
+    const maskErr = validateContactValue(form1.contactValue, selectedContactType?.mask ?? null);
+    if (maskErr) return maskErr;
     return null;
   }
 
@@ -197,11 +236,12 @@ export default function RegisterPage() {
 
   return (
     <div className={styles.page}>
-      <div className={`${styles.card} ${regStyles.card}`}>
+      <div className={styles.card}>
         {/* Logo */}
-        <div className={styles.logo}>
-          <span className={styles.logoIcon}>📍</span>
-          <span className={styles.logoText}>EList</span>
+        <div className={styles.logoWrap}>
+          <div className={styles.logoMark}>📍</div>
+          <div className={styles.logoText}>EList</div>
+          <div className={styles.logoSub}>Агрегатор городских мероприятий</div>
         </div>
 
         {/* Step indicator */}
@@ -211,11 +251,19 @@ export default function RegisterPage() {
           <div className={`${regStyles.stepDot} ${step >= 2 ? regStyles.stepDotActive : ''}`}>2</div>
         </div>
 
-        <p className={styles.subtitle}>
+        <h1 className={styles.heading}>
           {step === 1 ? 'Создайте аккаунт' : 'Расскажите о себе'}
+        </h1>
+        <p className={styles.subheading}>
+          {step === 1 ? 'Шаг 1 из 2 — основные данные' : 'Шаг 2 из 2 — личная информация (необязательно)'}
         </p>
 
-        {error && <div className={styles.error}>{error}</div>}
+        {error && (
+          <div className={styles.error}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
+            {error}
+          </div>
+        )}
 
         {/* ===== STEP 1 ===== */}
         {step === 1 && (
@@ -224,12 +272,14 @@ export default function RegisterPage() {
               <Field label="Логин">
                 <input className={styles.input} placeholder="Придумайте логин"
                   value={form1.login} autoFocus autoComplete="username"
+                  autoCapitalize="none"
                   onChange={set1('login')} onKeyDown={e => e.key === 'Enter' && handleStep1()} />
               </Field>
 
               <Field label="Пароль">
-                <div className={styles.passWrap}>
-                  <input className={styles.input} type={showPass ? 'text' : 'password'}
+                <div className={styles.inputWrap}>
+                  <input className={`${styles.input} ${styles.inputWithBtn}`}
+                    type={showPass ? 'text' : 'password'}
                     placeholder="Не менее 6 символов" value={form1.password}
                     autoComplete="new-password" onChange={set1('password')}
                     onKeyDown={e => e.key === 'Enter' && handleStep1()} />
@@ -251,7 +301,7 @@ export default function RegisterPage() {
                 {contactsLoading
                   ? <div className={regStyles.loadingSelect}>Загрузка...</div>
                   : (
-                    <select className={`${styles.input} ${regStyles.select}`}
+                    <select className={styles.select}
                       value={form1.contactTypeId} onChange={set1('contactTypeId')}>
                       {contactTypes.map(ct => (
                         <option key={ct.id} value={ct.id}>
@@ -263,22 +313,28 @@ export default function RegisterPage() {
               </Field>
 
               <Field label={selectedContactType?.name || selectedContactType?.localizedName || 'Контакт'}>
-                <input className={styles.input}
-                  placeholder={selectedContactType?.mask ?? 'Введите контакт'}
-                  value={form1.contactValue} onChange={set1('contactValue')}
-                  onKeyDown={e => e.key === 'Enter' && handleStep1()} />
-                {selectedContactType?.description && (
-                  <p className={regStyles.fieldHint}>{selectedContactType.description}</p>
+                <input
+                  className={`${styles.input} ${contactError ? styles.inputError : ''}`}
+                  placeholder={getContactPlaceholder(selectedContactType)}
+                  value={form1.contactValue}
+                  onChange={handleContactChange}
+                  onBlur={handleContactBlur}
+                  onKeyDown={e => e.key === 'Enter' && handleStep1()}
+                  inputMode={getMaskInputMode(selectedContactType?.mask ?? null)}
+                  autoComplete="off"
+                />
+                {contactError && (
+                  <p style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3 }}>{contactError}</p>
                 )}
               </Field>
 
-              {/* Город */}
               <Field label="Ваш город">
                 <CitySearch
                   value={selectedCity?.name ?? ''}
                   onSelect={city => { setSelectedCity(city); setCityManuallySelected(true); }}
                   geoLoading={geoLoading}
                   detectedCoords={detectedCoords}
+                  onAutoDetect={detectedCity ? () => { setSelectedCity(detectedCity); setCityManuallySelected(false); } : undefined}
                 />
               </Field>
             </div>
@@ -287,10 +343,10 @@ export default function RegisterPage() {
               {loading ? <span className={styles.spinner} /> : 'Далее →'}
             </button>
 
-            <p className={styles.hint}>
-              Уже есть аккаунт?{' '}
-              <button className={styles.linkBtn} onClick={() => navigate('/login')}>Войти</button>
-            </p>
+            <div className={styles.switchRow}>
+              Уже есть аккаунт?
+              <button className={styles.switchLink} onClick={() => navigate('/login')}>Войти</button>
+            </div>
           </>
         )}
 
@@ -311,7 +367,7 @@ export default function RegisterPage() {
                   value={form2.patronymic} onChange={set2('patronymic')} />
               </Field>
               <Field label="Пол">
-                <select className={`${styles.input} ${regStyles.select}`}
+                <select className={styles.select}
                   value={form2.gender} onChange={set2('gender')}>
                   <option value="">Не указывать</option>
                   <option value="Male">Мужской</option>
@@ -320,7 +376,17 @@ export default function RegisterPage() {
               </Field>
               <Field label="Дата рождения">
                 <input className={styles.input} type="date"
-                  value={form2.birthDate} onChange={set2('birthDate')} />
+                  value={form2.birthDate}
+                  onChange={set2('birthDate')}
+                  min="1900-01-01"
+                  max={(() => {
+                    // Максимум — 18 лет назад (по умолчанию), но принимаем и младше
+                    const d = new Date();
+                    d.setFullYear(d.getFullYear() - 6);
+                    return d.toISOString().slice(0, 10);
+                  })()}
+                />
+                <p className={regStyles.fieldHint}>Если вам меньше 18 лет, некоторые мероприятия могут быть недоступны</p>
               </Field>
             </div>
 
@@ -345,104 +411,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className={styles.field}>
       <label className={styles.label}>{label}</label>
       {children}
-    </div>
-  );
-}
-
-// ---- Поиск города через геокодер Яндекса ----
-function CitySearch({ value, onSelect, geoLoading, detectedCoords }: {
-  value: string;
-  onSelect: (city: ICity) => void;
-  geoLoading: boolean;
-  detectedCoords: { lat: number; lng: number } | null;
-}) {
-  const [query,       setQuery]       = useState(value);
-  const [suggestions, setSuggestions] = useState<ICity[]>([]);
-  const [open,        setOpen]        = useState(false);
-  const [searching,   setSearching]   = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const wrapRef     = useRef<HTMLDivElement>(null);
-
-  // Синхронизируем поле если город выбран снаружи (геолокация)
-  useEffect(() => { setQuery(value); }, [value]);
-
-  // Закрываем дропдаун при клике вне
-  useEffect(() => {
-    const fn = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', fn);
-    return () => document.removeEventListener('mousedown', fn);
-  }, []);
-
-  const search = useCallback(async (q: string) => {
-    if (q.length < 2) { setSuggestions([]); return; }
-    setSearching(true);
-    try {
-      await loadYandexMaps();
-      const ymaps = (window as any).ymaps;
-      const res = await ymaps.geocode(q, { results: 8, kind: 'locality', lang: 'ru_RU' });
-      const items: ICity[] = [];
-      res.geoObjects.each((obj: any) => {
-        const coords = obj.geometry.getCoordinates();
-        const name   = obj.getLocalities().join(', ') || obj.getPremiseNumber() || q;
-        if (coords && name) items.push({ name, lat: coords[0], lng: coords[1] });
-      });
-      setSuggestions(items);
-      setOpen(items.length > 0);
-    } catch { setSuggestions([]); }
-    finally { setSearching(false); }
-  }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const q = e.target.value;
-    setQuery(q);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(q), 350);
-  };
-
-  const handleSelect = (city: ICity) => {
-    setQuery(city.name);
-    setSuggestions([]);
-    setOpen(false);
-    onSelect(city);
-  };
-
-  return (
-    <div ref={wrapRef} style={{ position: 'relative' }}>
-      <div className={regStyles.cityRow}>
-        <input
-          className={styles.input}
-          placeholder="Начните вводить название города..."
-          value={query}
-          onChange={handleChange}
-          onFocus={() => suggestions.length > 0 && setOpen(true)}
-          autoComplete="off"
-        />
-        {(geoLoading || searching) && (
-          <span className={regStyles.geoSpinner} title="Поиск...">📡</span>
-        )}
-        {!geoLoading && !searching && detectedCoords && query && (
-          <span className={regStyles.geoOk} title="Координаты определены">✓</span>
-        )}
-      </div>
-
-      {open && suggestions.length > 0 && (
-        <div className={regStyles.citySuggestions}>
-          {suggestions.map((c, i) => (
-            <button key={i} className={regStyles.citySuggestionItem}
-              onMouseDown={() => handleSelect(c)}>
-              📍 {c.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {detectedCoords && query && (
-        <p className={regStyles.fieldHint}>
-          📍 Координаты определены ({detectedCoords.lat.toFixed(3)}, {detectedCoords.lng.toFixed(3)})
-        </p>
-      )}
     </div>
   );
 }

@@ -10,9 +10,10 @@ import {
   createContact, updateContact, getMyContacts,
 } from '@/entities/user/settingsApi';
 import { useUserLocation } from '@/features/auth/useUserLocation';
-import { POPULAR_CITIES, type ICity } from '@/features/auth/useGeoCity';
+import { POPULAR_CITIES, useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { cookies } from '@/shared/lib/cookies';
 import { AvatarUpload } from '@/shared/ui/AvatarUpload/AvatarUpload';
+import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import styles from './SettingsPage.module.css';
@@ -147,11 +148,12 @@ function PersonSection() {
 
 function CitySection() {
   const { coords, confirmCity: applyNewCity } = useUserLocation();
+  const { detectedCity, loading: geoLoading } = useGeoCity();
   const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
   const [saving,       setSaving]       = useState(false);
   const [msg,          setMsg]          = useState<{ text: string; ok: boolean } | null>(null);
 
-  // Определяем текущий город по coords
+  // Определяем текущий город по coords из POPULAR_CITIES или геокодером
   useEffect(() => {
     let nearest: ICity | null = null;
     let minDist = Infinity;
@@ -162,12 +164,15 @@ function CitySection() {
     if (nearest && minDist < 3) setSelectedCity(nearest);
   }, [coords]);
 
+  const handleAutoDetect = () => {
+    if (detectedCity) setSelectedCity(detectedCity);
+  };
+
   const handleSave = async () => {
     if (!selectedCity) return;
     setSaving(true); setMsg(null);
     try {
       await updateLocation(selectedCity.lat, selectedCity.lng);
-      // Обновляем cookies сразу
       cookies.set('elist_user_lat', String(selectedCity.lat), 30);
       cookies.set('elist_user_lng', String(selectedCity.lng), 30);
       cookies.set('elist_acct_lat', String(selectedCity.lat), 30);
@@ -181,27 +186,17 @@ function CitySection() {
 
   return (
     <SectionCard title="Местоположение">
-      <Row label="Текущий город">
-        <div className={styles.cityDisplay}>
-          <span className={styles.cityPin}>📍</span>
-          <span>{selectedCity?.name ?? `${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}`}</span>
-        </div>
-      </Row>
       <Row label="Сменить город">
-        <select className={styles.input}
+        <CitySearch
           value={selectedCity?.name ?? ''}
-          onChange={e => {
-            const city = POPULAR_CITIES.find(c => c.name === e.target.value) ?? null;
-            setSelectedCity(city);
-          }}>
-          <option value="">— Выбрать —</option>
-          {POPULAR_CITIES.map(c => (
-            <option key={c.name} value={c.name}>{c.name}</option>
-          ))}
-        </select>
+          onSelect={setSelectedCity}
+          geoLoading={geoLoading}
+          detectedCoords={coords}
+          onAutoDetect={handleAutoDetect}
+        />
       </Row>
       <SaveRow msg={msg} saving={saving} onSave={handleSave}
-        label="Сменить город" disabled={!selectedCity} />
+        label="Сохранить город" disabled={!selectedCity} />
     </SectionCard>
   );
 }

@@ -1,0 +1,54 @@
+/* ActivationPage.module.css */
+
+.codeRow {
+  display: flex; gap: 10px; justify-content: center;
+  margin: 8px 0 16px;
+}
+
+.codeInput {
+  width: 46px; height: 56px;
+  text-align: center; font-size: 22px; font-weight: 700;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: 12px; color: var(--text-primary);
+  outline: none; font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  -webkit-appearance: none;
+}
+.codeInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  transform: scale(1.05);
+}
+.codeFilled { border-color: var(--accent); }
+.codeError  { border-color: var(--danger) !important; animation: shake 0.3s ease; }
+
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+
+@media (max-width: 380px) {
+  .codeInput { width: 40px; height: 50px; font-size: 20px; }
+  .codeRow   { gap: 7px; }
+}
+
+/* Повторная отправка кода */
+.resendRow {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  margin-top: 4px;
+}
+.resendHint {
+  font-size: 12px; color: var(--text-muted);
+}
+.resendBtn {
+  background: none; border: none; cursor: pointer;
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  padding: 0;
+}
+.resendBtn:hover { text-decoration: underline; }
+.resendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.resendOk {
+  font-size: 11px; color: var(--success);
+}

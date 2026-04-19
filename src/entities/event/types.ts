@@ -57,7 +57,8 @@ export interface IEvent {
   parameters?: IEventParameters | null;
   eventType?: IEventType | null;
   /** URL обложки (из MediaAlbum) */
-  coverUrl?: string | null;
+  coverUrl?:      string | null;
+  coverImageId?:  string | null;
   /** Кол-во участников */
   participantsCount?: number;
   /** Текущий пользователь участвует */

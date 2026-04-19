@@ -43,6 +43,18 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
   const clusterRef   = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+
+  // Центрирование по событию от кнопки лого
+  useEffect(() => {
+    const handler = () => {
+      if (mapRef.current) {
+        mapRef.current.panTo(center, { flying: true });
+        mapRef.current.setZoom(zoom, { smooth: true });
+      }
+    };
+    window.addEventListener('elist:centerMap', handler);
+    return () => window.removeEventListener('elist:centerMap', handler);
+  }, [center, zoom]);
   const { theme } = useThemeStore();
 
   // Состояние списка мероприятий на одной точке + позиция

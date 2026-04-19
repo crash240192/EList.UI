@@ -4,6 +4,10 @@ import { useState, useRef, useEffect } from 'react';
 import type { EventViewMode } from '@/entities/event';
 import { useFiltersStore } from '@/app/store';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
+import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
+import type { ICity } from '@/features/auth/useGeoCity';
+import { getStoredUserCoords } from '@/features/auth/useUserLocation';
+import { cookies } from '@/shared/lib/cookies';
 import styles from './FilterBar.module.css';
 
 interface FilterBarProps {
@@ -11,7 +15,6 @@ interface FilterBarProps {
   onSearchChange: (v: string) => void;
   viewMode: EventViewMode;
   onViewModeChange: (v: EventViewMode) => void;
-  /** Вызывается по кнопке «Искать» */
   onSearch: () => void;
 }
 
@@ -23,32 +26,49 @@ export function FilterBar({
   const { filters, setFilter, resetFilters } = useFiltersStore();
   const barRef = useRef<HTMLDivElement>(null);
 
+  // Город — инициализируем из cookies/профиля
+  const storedCoords = getStoredUserCoords();
+  const [cityName, setCityName] = useState<string>(() => {
+    return cookies.get('elist_city_name') ?? '';
+  });
+
+  // При первом монтировании — подставить координаты из аккаунта в фильтры
+  useEffect(() => {
+    if (!filters.latitude && storedCoords.lat !== 0) {
+      setFilter('latitude',  storedCoords.lat);
+      setFilter('longitude', storedCoords.lng);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCitySelect = (city: ICity) => {
+    setCityName(city.name);
+    cookies.set('elist_city_name', city.name, 30);
+    setFilter('latitude',  city.lat);
+    setFilter('longitude', city.lng);
+  };
+
   const selectedCategories = filters.categories ?? [];
   const selectedTypes      = filters.types      ?? [];
   const typeFilterCount    = selectedCategories.length + selectedTypes.length;
   const hasActiveFilters   = !!(filters.startTime || filters.endTime || typeFilterCount || filters.price);
 
-  // Закрытие по Escape
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false); };
     document.addEventListener('keydown', fn);
     return () => document.removeEventListener('keydown', fn);
   }, []);
 
-  const handleSearch = () => {
-    setExpanded(false);
-    onSearch();
-  };
+  const handleSearch = () => { setExpanded(false); onSearch(); };
 
   return (
     <>
-      {/* Backdrop фильтров — закрывает по клику вне */}
       {expanded && (
         <div className={styles.filterBackdrop} onClick={() => setExpanded(false)} aria-hidden />
       )}
 
       <div className={styles.bar} ref={barRef}>
-        {/* ---- Главная строка: поиск + кнопки ---- */}
+        {/* ---- Главная строка ---- */}
         <div className={styles.row}>
           <div className={styles.searchWrap}>
             <svg className={styles.searchIcon} width="15" height="15" viewBox="0 0 24 24"
@@ -67,12 +87,10 @@ export function FilterBar({
             )}
           </div>
 
-          {/* Кнопка фильтров */}
           <button
             className={`${styles.filterToggle} ${expanded || hasActiveFilters ? styles.filterActive : ''}`}
             onClick={() => setExpanded(v => !v)}
-            aria-label="Фильтры"
-            aria-expanded={expanded}
+            aria-label="Фильтры" aria-expanded={expanded}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
@@ -80,22 +98,27 @@ export function FilterBar({
             {hasActiveFilters && <span className={styles.filterDot}/>}
           </button>
 
-          {/* Переключатель вид */}
           <div className={styles.viewToggle}>
-            <button
-              className={`${styles.viewBtn} ${viewMode === 'map'  ? styles.viewActive : ''}`}
-              onClick={() => onViewModeChange('map')} title="Карта"
-            >🗺️</button>
-            <button
-              className={`${styles.viewBtn} ${viewMode === 'list' ? styles.viewActive : ''}`}
-              onClick={() => onViewModeChange('list')} title="Список"
-            >☰</button>
+            <button className={`${styles.viewBtn} ${viewMode === 'map'  ? styles.viewActive : ''}`}
+              onClick={() => onViewModeChange('map')} title="Карта">🗺️</button>
+            <button className={`${styles.viewBtn} ${viewMode === 'list' ? styles.viewActive : ''}`}
+              onClick={() => onViewModeChange('list')} title="Список">☰</button>
           </div>
         </div>
 
-        {/* ---- Dropdown фильтров — overlay, не сдвигает контент ---- */}
+        {/* ---- Dropdown фильтров ---- */}
         {expanded && (
           <div className={styles.filtersDropdown}>
+            {/* Город */}
+            <div className={styles.filterGroupFull}>
+              <label className={styles.filterLabel}>Город</label>
+              <CitySearch
+                value={cityName}
+                onSelect={handleCitySelect}
+                placeholder="Поиск города..."
+              />
+            </div>
+
             {/* Тип мероприятия */}
             <div className={styles.filterGroupFull}>
               <label className={styles.filterLabel}>Тип мероприятия</label>
@@ -149,7 +172,7 @@ export function FilterBar({
             <div className={styles.filterActions}>
               {hasActiveFilters && (
                 <button className={styles.resetBtn}
-                  onClick={() => { resetFilters(); onSearchChange(''); }}>
+                  onClick={() => { resetFilters(); onSearchChange(''); setCityName(''); }}>
                   Сбросить
                 </button>
               )}
@@ -184,3 +207,4 @@ function toLocalInput(iso: string): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+

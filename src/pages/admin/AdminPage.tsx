@@ -1,6 +1,6 @@
 // pages/admin/AdminPage.tsx
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   categoriesApi, typesApi, contactTypesApi,
   type IEventCategory, type IEventType, type IContactType,
@@ -90,10 +90,12 @@ function EventTypesTab() {
   if (loading) return <div className={styles.loader}>Загрузка...</div>;
   if (error)   return <div className={styles.errorMsg}>{error}</div>;
 
+  const isEditing = editingCat !== null || editingType !== null;
+
   return (
     <div className={styles.splitPane}>
       {/* ---- Левая панель: категории ---- */}
-      <div className={styles.listPane}>
+      <div className={`${styles.listPane} ${isEditing ? styles.mobileHidden : ''}`}>
         <div className={styles.paneHeader}>
           <h2 className={styles.paneTitle}>Категории</h2>
           <button className={styles.addBtn} onClick={() => setEditingCat('new')}>+ Добавить</button>
@@ -136,6 +138,11 @@ function EventTypesTab() {
                   {typesForCat(cat.id).map(tp => (
                     <div key={tp.id} className={styles.typeRow}>
                       <div className={styles.itemInfo} onClick={() => setEditingType(tp)}>
+                        {tp.ico && (
+                          tp.ico.startsWith('data:') || tp.ico.startsWith('http')
+                            ? <img src={tp.ico} alt="" style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />
+                            : <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{tp.ico}</span>
+                        )}
                         <span className={styles.itemName}>{tp.name}</span>
                         <span className={styles.itemSub}>{tp.localizationPath}</span>
                       </div>
@@ -167,7 +174,12 @@ function EventTypesTab() {
       </div>
 
       {/* ---- Правая панель: форма редактирования ---- */}
-      <div className={styles.formPane}>
+      <div className={`${styles.formPane} ${!isEditing ? styles.mobileHidden : ''}`}>
+        {/* Кнопка «Назад» только на мобиле */}
+        <button className={styles.mobileBackBtn}
+          onClick={() => { setEditingCat(null); setEditingType(null); setNewTypeCatId(null); }}>
+          ← Назад к списку
+        </button>
         {editingCat !== null && (
           <CategoryForm
             category={editingCat === 'new' ? null : editingCat}
@@ -290,19 +302,37 @@ function TypeForm({
   });
   const [saving, setSaving] = useState(false);
   const [err,    setErr]    = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof IEventTypeRequest) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm(f => ({ ...f, [key]: e.target.value }));
 
+  // Конвертируем файл в base64 data URL
+  const handleIconFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 100 * 1024) { setErr('Иконка слишком большая (макс. 100 КБ)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setForm(f => ({ ...f, ico: reader.result as string }));
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = async () => {
-    if (!form.name.trim())             { setErr('Укажите название'); return; }
-    if (!form.eventCategoryId)         { setErr('Выберите категорию'); return; }
+    if (!form.name.trim())     { setErr('Укажите название'); return; }
+    if (!form.eventCategoryId) { setErr('Выберите категорию'); return; }
     setSaving(true); setErr(null);
     try { await onSave(form); }
     catch (e) { setErr(e instanceof Error ? e.message : 'Ошибка'); }
     finally { setSaving(false); }
   };
+
+  // Проверяем как отображать ico: data URL, обычный URL, или эмодзи
+  const icoPreview = form.ico
+    ? (form.ico.startsWith('data:') || form.ico.startsWith('http') || form.ico.startsWith('/'))
+      ? <img src={form.ico} alt="icon" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }} />
+      : <span style={{ fontSize: 28, lineHeight: 1 }}>{form.ico}</span>
+    : null;
 
   return (
     <div className={styles.form}>
@@ -322,8 +352,55 @@ function TypeForm({
       <FormField label="Описание">
         <textarea className={styles.textarea} rows={3} value={form.description ?? ''} onChange={set('description')} placeholder="Описание типа..." />
       </FormField>
-      <FormField label="Иконка (URL или emoji)">
-        <input className={styles.input} value={form.ico ?? ''} onChange={set('ico')} placeholder="🎤" />
+      <FormField label="Иконка">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Превью / заглушка */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              width: 56, height: 56, borderRadius: 10, flexShrink: 0,
+              background: 'var(--surface-2)', border: '1px dashed var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', transition: 'border-color 0.15s',
+            }}
+            title="Нажмите чтобы загрузить изображение"
+          >
+            {icoPreview ?? <span style={{ fontSize: 22, opacity: 0.4 }}>🖼</span>}
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              style={{ fontSize: 12, padding: '6px 12px' }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {form.ico ? 'Заменить файл' : 'Загрузить файл'}
+            </button>
+            <input
+              className={styles.input}
+              style={{ fontSize: 12, padding: '5px 10px' }}
+              value={form.ico?.startsWith('data:') ? '' : (form.ico ?? '')}
+              onChange={set('ico')}
+              placeholder="или вставьте URL / эмодзи"
+            />
+          </div>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleIconFile}
+        />
+        {form.ico && (
+          <button
+            type="button"
+            style={{ marginTop: 4, fontSize: 11, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            onClick={() => setForm(f => ({ ...f, ico: '' }))}
+          >
+            Удалить иконку
+          </button>
+        )}
       </FormField>
       <div className={styles.formActions}>
         <button className={styles.cancelBtn} onClick={onCancel}>Отмена</button>
@@ -364,7 +441,7 @@ function ContactTypesTab() {
   return (
     <div className={styles.splitPane}>
       {/* ---- Список ---- */}
-      <div className={styles.listPane}>
+      <div className={`${styles.listPane} ${editing !== null ? styles.mobileHidden : ''}`}>
         <div className={styles.paneHeader}>
           <h2 className={styles.paneTitle}>Типы контактов</h2>
           <button className={styles.addBtn} onClick={() => setEditing('new')}>+ Добавить</button>
@@ -388,7 +465,10 @@ function ContactTypesTab() {
       </div>
 
       {/* ---- Форма ---- */}
-      <div className={styles.formPane}>
+      <div className={`${styles.formPane} ${editing === null ? styles.mobileHidden : ''}`}>
+        <button className={styles.mobileBackBtn} onClick={() => setEditing(null)}>
+          ← Назад к списку
+        </button>
         {editing !== null ? (
           <ContactTypeForm
             item={editing === 'new' ? null : editing}
@@ -505,7 +585,7 @@ function TariffsTab() {
   return (
     <div className={styles.splitPane}>
       {/* Список */}
-      <div className={styles.listPane}>
+      <div className={`${styles.listPane} ${editing !== null ? styles.mobileHidden : ''}`}>
         <div className={styles.paneHeader}>
           <h2 className={styles.paneTitle}>Тарифы</h2>
           <button className={styles.addBtn} onClick={() => setEditing('new')}>+ Добавить</button>
@@ -554,7 +634,10 @@ function TariffsTab() {
       </div>
 
       {/* Форма */}
-      <div className={styles.formPane}>
+      <div className={`${styles.formPane} ${editing === null ? styles.mobileHidden : ''}`}>
+        <button className={styles.mobileBackBtn} onClick={() => setEditing(null)}>
+          ← Назад к списку
+        </button>
         {editing !== null ? (
           <TariffForm
             tariff={editing === 'new' ? null : editing}

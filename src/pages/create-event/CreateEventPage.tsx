@@ -70,9 +70,10 @@ export default function CreateEventPage() {
   const [saving,      setSaving]      = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Set<FieldError>>(new Set());
 
-  const [lat,      setLat]      = useState<number | null>(null);
-  const [lng,      setLng]      = useState<number | null>(null);
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [lat,          setLat]          = useState<number | null>(null);
+  const [lng,          setLng]          = useState<number | null>(null);
+  const [coverUrl,     setCoverUrl]     = useState<string | null>(null);
+  const [coverImageId, setCoverImageId] = useState<string | null>(null);
 
   const userCoords = getStoredUserCoords();
 
@@ -155,9 +156,10 @@ export default function CreateEventPage() {
         allowUsersToInvite: ev.parameters?.allowUsersToInvite ?? true,
         allowedGender:      ev.parameters?.allowedGender ?? '',
       });
-      if (ev.latitude)  setLat(ev.latitude);
-      if (ev.longitude) setLng(ev.longitude);
-      if (ev.coverUrl)  setCoverUrl(ev.coverUrl);
+      if (ev.latitude)      setLat(ev.latitude);
+      if (ev.longitude)     setLng(ev.longitude);
+      if (ev.coverUrl)      setCoverUrl(ev.coverUrl);
+      if (ev.coverImageId)  setCoverImageId(ev.coverImageId);
 
       if (ev.startTime && ev.endTime) {
         const diff = new Date(ev.endTime).getTime() - new Date(ev.startTime).getTime();
@@ -260,6 +262,7 @@ export default function CreateEventPage() {
           address: form.address, startTime, endTime, active: true,
           ...(lat !== null && lng !== null ? { latitude: lat, longitude: lng } : {}),
           ...(coverUrl ? { coverUrl } : {}),
+          ...(coverImageId ? { coverImageId } : {}),
         });
       } else {
         const accountId = await getOrFetchAccountId();
@@ -269,6 +272,7 @@ export default function CreateEventPage() {
             address: form.address, latitude: lat!, longitude: lng!,
             startTime, endTime, active: true,
             ...(coverUrl ? { coverUrl } : {}),
+            ...(coverImageId ? { coverImageId } : {}),
           },
           eventParameters: {
             cost:               parseFloat(form.cost) || 0,
@@ -289,7 +293,20 @@ export default function CreateEventPage() {
     } finally { setSaving(false); }
   };
 
-  // Чеклист готовности
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const handlePublishClick = () => {
+    if (isEditing) { handleSubmit(); return; }
+    const firstErr = validate();
+    if (firstErr) {
+      showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
+        location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
+        startTime:'⚠️ Укажите время начала', endDate:'⚠️ Укажите дату окончания',
+        endTime:'⚠️ Укажите время окончания' }[firstErr]);
+      scrollTo(firstErr); return;
+    }
+    setConfirmOpen(true);
+  };
   const checks = [
     { label: 'Название',          done: !!form.name.trim() },
     { label: 'Тип мероприятия',   done: typeCount > 0 },
@@ -320,6 +337,7 @@ export default function CreateEventPage() {
 
   return (
     <div className={styles.page}>
+      <div className={styles.pageInner}>
       {/* ── Левая колонка: форма ── */}
       <div className={styles.card}>
 
@@ -333,7 +351,10 @@ export default function CreateEventPage() {
 
         {/* Обложка */}
         <Section title="Обложка">
-          <CoverUpload currentUrl={coverUrl} onUploaded={url => setCoverUrl(url)} />
+          <CoverUpload currentUrl={coverUrl} onUploaded={(url, fileId) => {
+            setCoverUrl(url);
+            setCoverImageId(fileId);
+          }} />
         </Section>
 
         {/* Основное */}
@@ -593,11 +614,34 @@ export default function CreateEventPage() {
         {/* Кнопки */}
         <div className={styles.actions}>
           <button className={styles.cancelBtn} onClick={() => navigate(-1)}>Отмена</button>
-          <button className={styles.saveBtn} onClick={handleSubmit} disabled={saving}>
+          <button className={styles.saveBtn} onClick={handlePublishClick} disabled={saving}>
             {saving ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Опубликовать'}
           </button>
         </div>
-      </div>
+      </div>{/* end sidePanel */}
+      </div>{/* end pageInner */}
+
+      {/* Диалог подтверждения публикации */}
+      {confirmOpen && (
+        <div className={styles.confirmBackdrop} onClick={() => setConfirmOpen(false)}>
+          <div className={styles.confirmDialog} onClick={e => e.stopPropagation()}>
+            <div className={styles.confirmIcon}>🚀</div>
+            <h3 className={styles.confirmTitle}>Опубликовать мероприятие?</h3>
+            <p className={styles.confirmText}>
+              «{form.name}» станет видно всем пользователям.
+              После публикации вы сможете отредактировать его в любой момент.
+            </p>
+            <div className={styles.confirmActions}>
+              <button className={styles.confirmCancel} onClick={() => setConfirmOpen(false)}>
+                Отмена
+              </button>
+              <button className={styles.confirmOk} onClick={() => { setConfirmOpen(false); handleSubmit(); }} disabled={saving}>
+                {saving ? 'Публикуем...' : 'Опубликовать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Picker */}
       {pickerOpen && (
@@ -608,7 +652,6 @@ export default function CreateEventPage() {
         />
       )}
 
-      {/* Toast */}
       <div className={`${styles.toast} ${toast.visible ? styles.toastVisible : ''}`}>{toast.message}</div>
     </div>
   );

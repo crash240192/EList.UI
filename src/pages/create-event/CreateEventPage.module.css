@@ -1,18 +1,24 @@
 /* CreateEventPage.module.css — двухколонный layout */
 
+/* Внешний скроллируемый контейнер */
 .page {
-  height: 100%; overflow-y: auto; background: var(--bg);
-  padding: 20px;
+  height: 100%; overflow-y: auto; overflow-x: hidden;
+  background: var(--bg);
+}
+
+/* Внутренняя сетка — центрируется и ограничивается по ширине */
+.pageInner {
   display: grid;
   grid-template-columns: 1fr 280px;
   gap: 20px;
   align-items: start;
   max-width: 960px;
   margin: 0 auto;
+  padding: 20px;
   box-sizing: border-box;
 }
 @media (max-width: 720px) {
-  .page { grid-template-columns: 1fr; padding: 12px; }
+  .pageInner { grid-template-columns: 1fr; padding: 12px; }
 }
 
 /* ── Карточка формы ── */
@@ -285,3 +291,52 @@
   white-space: nowrap;
 }
 .toastVisible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+
+/* ── Диалог подтверждения публикации ── */
+.confirmBackdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  z-index: 500;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.confirmDialog {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 18px; padding: 28px 24px 24px;
+  max-width: 360px; width: 100%;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+  animation: dialogIn 0.2s ease;
+}
+@keyframes dialogIn {
+  from { opacity: 0; transform: scale(0.93); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.confirmIcon { font-size: 36px; line-height: 1; margin-bottom: 2px; }
+.confirmTitle {
+  font-size: 17px; font-weight: 700; color: var(--text-primary);
+  text-align: center; margin: 0;
+}
+.confirmText {
+  font-size: 13px; color: var(--text-secondary); text-align: center;
+  line-height: 1.6; margin: 0;
+}
+.confirmActions {
+  display: flex; gap: 10px; width: 100%; margin-top: 8px;
+}
+.confirmCancel {
+  flex: 1; background: none; border: 1px solid var(--border);
+  border-radius: 10px; padding: 11px;
+  font-size: 14px; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.15s;
+}
+.confirmCancel:hover { border-color: var(--accent); color: var(--accent); }
+.confirmOk {
+  flex: 1; background: var(--accent); color: #fff; border: none;
+  border-radius: 10px; padding: 11px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s;
+}
+.confirmOk:hover:not(:disabled) { background: var(--accent-hover); }
+.confirmOk:disabled { opacity: 0.55; cursor: not-allowed; }

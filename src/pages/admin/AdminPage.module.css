@@ -59,7 +59,12 @@
 @media (max-width: 767px) {
   .splitPane {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
+    grid-template-rows: auto;
+  }
+  /* На мобиле показываем только одну панель */
+  .listPane.mobileHidden,
+  .formPane.mobileHidden {
+    display: none;
   }
 }
 
@@ -262,3 +267,19 @@
 /* ---- States ---- */
 .loader { padding: 40px; text-align: center; color: var(--text-secondary); font-size: 14px; }
 .errorMsg { padding: 20px; color: var(--danger); font-size: 14px; }
+
+/* Мобильная кнопка «Назад» — видна только на мобиле */
+.mobileBackBtn {
+  display: none;
+}
+@media (max-width: 767px) {
+  .mobileBackBtn {
+    display: flex; align-items: center; gap: 6px;
+    background: none; border: none;
+    color: var(--accent); font-size: 13px; font-weight: 600;
+    padding: 12px 16px; cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    width: 100%;
+  }
+  .formPane { overflow-y: auto; }
+}

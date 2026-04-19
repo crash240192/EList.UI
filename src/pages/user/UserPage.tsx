@@ -266,8 +266,8 @@ export default function UserPage() {
               <>
                 <div className={styles.statDivider} />
                 <div className={styles.ratingBadge}>
-                  <StarRating rating={rating} />
-                  <span className={styles.ratingNum}>{rating.toFixed(1)}</span>
+                  <StarRating rating={rating as number} />
+                  <span className={styles.ratingNum}>{(rating as number).toFixed(1)}</span>
                 </div>
               </>
             )}

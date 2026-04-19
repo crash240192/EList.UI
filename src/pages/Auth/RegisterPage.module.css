@@ -1,151 +1,56 @@
-/* pages/auth/RegisterPage.module.css */
+/* RegisterPage.module.css — специфичные стили поверх AuthPage.module.css */
 
-/* Чуть шире карточка для формы регистрации */
-.card {
-  max-width: 420px !important;
-}
-
-/* ---- Step indicator ---- */
-
+/* Индикатор шагов */
 .stepRow {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  width: 160px;
+  display: flex; align-items: center; gap: 0;
+  margin-bottom: 20px; width: 100%;
 }
-
 .stepDot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  border: 2px solid var(--border);
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.2s;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  background: var(--surface-2); border: 2px solid var(--border);
+  color: var(--text-muted); flex-shrink: 0; transition: all 0.2s;
 }
-
 .stepDotActive {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--accent); border-color: var(--accent);
+  color: #fff; box-shadow: 0 0 0 4px rgba(99,102,241,0.15);
 }
-
 .stepLine {
-  flex: 1;
-  height: 2px;
-  background: var(--border);
-  transition: background 0.3s;
+  flex: 1; height: 2px; background: var(--border); transition: background 0.3s;
 }
+.stepLineActive { background: var(--accent); }
 
-.stepLineActive {
-  background: var(--accent);
-}
-
-/* ---- Select ---- */
-
-.select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 32px !important;
-  cursor: pointer;
-}
-
-/* ---- Loading select placeholder ---- */
-
-.loadingSelect {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-/* ---- Field hint ---- */
-
-.fieldHint {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 3px;
-  line-height: 1.4;
-}
-
-/* ---- City selector ---- */
-
-.cityRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cityRow .select { flex: 1; }
-
-.geoSpinner {
-  font-size: 16px;
-  animation: spin 1.5s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.geoOk {
-  font-size: 14px;
-  color: var(--success);
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-/* ---- Skip button ---- */
-
+/* Пропустить */
 .skipBtn {
-  width: 100%;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 11px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  width: 100%; background: none;
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 11px; font-size: 14px; font-weight: 500;
+  color: var(--text-secondary); cursor: pointer; margin-top: 8px;
+  transition: all 0.15s;
 }
+.skipBtn:hover { border-color: var(--accent); color: var(--accent); }
 
-.skipBtn:hover:not(:disabled) {
-  background: var(--surface-2);
-  border-color: var(--text-muted);
-}
+/* Хинты */
+.fieldHint { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+.loadingSelect { font-size: 13px; color: var(--text-muted); padding: 8px 0; }
 
-.skipBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* ---- City search dropdown ---- */
+/* City search dropdown */
+.cityRow { position: relative; }
 .citySuggestions {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0; right: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-  z-index: 50;
-  overflow: hidden;
-  max-height: 240px;
-  overflow-y: auto;
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  z-index: 50; overflow: hidden; max-height: 220px; overflow-y: auto;
 }
 .citySuggestionItem {
-  display: block; width: 100%;
-  text-align: left; padding: 9px 14px;
-  background: none; border: none;
+  display: block; width: 100%; text-align: left;
+  padding: 9px 14px; background: none; border: none;
   border-bottom: 1px solid var(--border);
   font-size: 13px; color: var(--text-primary);
   cursor: pointer; transition: background 0.1s;
 }
 .citySuggestionItem:last-child { border-bottom: none; }
 .citySuggestionItem:hover { background: var(--surface-2); }
+.geoSpinner { font-size: 16px; }
+.geoOk { color: var(--success); font-size: 16px; }
