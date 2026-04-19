@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useThemeStore, useAuthStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
+import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import styles from './AppLayout.module.css';
 
 const NAV_ITEMS = [
@@ -54,8 +55,11 @@ export function AppLayout() {
           </button>
           <button className={styles.logo} onClick={() => {
             navigate('/');
-            // Отправляем событие — карта слушает и центрируется
-            window.dispatchEvent(new CustomEvent('elist:centerMap'));
+            // Передаём актуальные координаты пользователя
+            const { lat, lng } = getStoredUserCoords();
+            window.dispatchEvent(new CustomEvent('elist:centerMap', {
+              detail: { lat, lng },
+            }));
           }} aria-label="На главную">
             <span>📍</span>
             <span>EList</span>

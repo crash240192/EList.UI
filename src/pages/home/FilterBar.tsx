@@ -46,6 +46,10 @@ export function FilterBar({
     cookies.set('elist_city_name', city.name, 30);
     setFilter('latitude',  city.lat);
     setFilter('longitude', city.lng);
+    // Центрируем карту на выбранном городе
+    window.dispatchEvent(new CustomEvent('elist:centerMap', {
+      detail: { lat: city.lat, lng: city.lng },
+    }));
   };
 
   const selectedCategories = filters.categories ?? [];

@@ -44,17 +44,26 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
-  // Центрирование по событию от кнопки лого
+  // Храним актуальный center в ref чтобы closure в обработчике всегда видела свежие координаты
+  const centerRef = useRef(center);
+  useEffect(() => { centerRef.current = center; }, [center]);
+
+  // Центрирование по событию от кнопки лого или смены города в фильтрах
   useEffect(() => {
-    const handler = () => {
-      if (mapRef.current) {
-        mapRef.current.panTo(center, { flying: true });
-        mapRef.current.setZoom(zoom, { smooth: true });
-      }
+    const handler = (e: Event) => {
+      if (!mapRef.current) return;
+      const detail = (e as CustomEvent<{ lat?: number; lng?: number }>).detail;
+      // Используем координаты из события (смена города) или актуальный center (лого)
+      const target: [number, number] = (detail?.lat && detail?.lng)
+        ? [detail.lat, detail.lng]
+        : centerRef.current;
+      mapRef.current.panTo(target, { flying: true });
+      mapRef.current.setZoom(12, { smooth: true });
     };
     window.addEventListener('elist:centerMap', handler);
     return () => window.removeEventListener('elist:centerMap', handler);
-  }, [center, zoom]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { theme } = useThemeStore();
 
   // Состояние списка мероприятий на одной точке + позиция
