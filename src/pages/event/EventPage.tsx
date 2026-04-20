@@ -13,6 +13,7 @@ import { useAccountId } from '@/features/auth/useAccountId';
 import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserChip } from '@/entities/user/ui/UserChip';
+import { ParticipantsModal } from '@/features/event/ParticipantsModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import styles from './EventPage.module.css';
 
@@ -29,6 +30,7 @@ export default function EventPage() {
   const [organizers,    setOrganizers]    = useState<IEventOrganizator[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
 
@@ -203,9 +205,13 @@ export default function EventPage() {
               </div>
               {/* Счётчик только если нет блока вместимости в инфокарточке */}
               {!maxPersons && (
-                <span className={styles.participantText}>
+                <button
+                  className={styles.participantText}
+                  onClick={() => setParticipantsModalOpen(true)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
                   <strong>{participants.length}</strong> участников
-                </span>
+                </button>
               )}
             </div>
           )}
@@ -247,8 +253,13 @@ export default function EventPage() {
             {/* Participants */}
             {sortedParticipants.length > 0 && (
               <div className={styles.participantsBlock}>
-                <div className={styles.sectionLabel}>Участники</div>
-                <div className={styles.chipsList}>
+                <div className={styles.sectionLabel}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setParticipantsModalOpen(true)}
+                >
+                  Участники ({sortedParticipants.length})
+                </div>
+                <div className={styles.chipsList} onClick={() => setParticipantsModalOpen(true)} style={{ cursor: 'pointer' }}>
                   {sortedParticipants.slice(0, 12).map(p => (
                     <UserChip key={p.accountId} user={{
                       accountId: p.accountId, login: p.login,
@@ -257,7 +268,7 @@ export default function EventPage() {
                     }} size="sm" />
                   ))}
                   {sortedParticipants.length > 12 && (
-                    <span className={styles.moreChip}>ещё {sortedParticipants.length - 12}</span>
+                    <span className={styles.moreChip}>ещё {sortedParticipants.length - 12} →</span>
                   )}
                 </div>
               </div>
@@ -370,6 +381,15 @@ export default function EventPage() {
           loading={actionLoading}
           onConfirm={handleCancelEvent}
           onClose={() => setCancelConfirm(false)}
+        />
+      )}
+
+      {participantsModalOpen && (
+        <ParticipantsModal
+          participants={sortedParticipants}
+          organizerIds={new Set(organizers.map(o => o.accountId))}
+          currentAccountId={accountId}
+          onClose={() => setParticipantsModalOpen(false)}
         />
       )}
     </div>

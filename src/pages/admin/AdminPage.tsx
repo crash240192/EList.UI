@@ -12,6 +12,15 @@ import styles from './AdminPage.module.css';
 
 type AdminTab = 'eventTypes' | 'contactTypes' | 'tariffs';
 
+// Восстанавливаем data URL из чистого base64 для отображения иконки
+function icoToDisplayUrl(ico: string): string {
+  if (!ico) return '';
+  if (ico.startsWith('data:') || ico.startsWith('http') || ico.startsWith('/') || ico.length < 10) return ico;
+  const mime = (ico.startsWith('PHN') || ico.startsWith('PD9') || ico.startsWith('PD94'))
+    ? 'image/svg+xml' : 'image/png';
+  return `data:${mime};base64,${ico}`;
+}
+
 export default function AdminPage() {
   const [tab, setTab] = useState<AdminTab>('eventTypes');
 
@@ -139,8 +148,8 @@ function EventTypesTab() {
                     <div key={tp.id} className={styles.typeRow}>
                       <div className={styles.itemInfo} onClick={() => setEditingType(tp)}>
                         {tp.ico && (
-                          tp.ico.startsWith('data:') || tp.ico.startsWith('http')
-                            ? <img src={tp.ico} alt="" style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />
+                          icoToDisplayUrl(tp.ico).startsWith('data:') || icoToDisplayUrl(tp.ico).startsWith('http')
+                            ? <img src={icoToDisplayUrl(tp.ico)} alt="" style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />
                             : <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{tp.ico}</span>
                         )}
                         <span className={styles.itemName}>{tp.name}</span>
@@ -308,13 +317,20 @@ function TypeForm({
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm(f => ({ ...f, [key]: e.target.value }));
 
-  // Конвертируем файл в base64 data URL
+  // Конвертируем файл — сохраняем только чистый base64 без data: префикса
+  const icoMimeRef = useRef<string>('image/png');
   const handleIconFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 100 * 1024) { setErr('Иконка слишком большая (макс. 100 КБ)'); return; }
     const reader = new FileReader();
-    reader.onload = () => setForm(f => ({ ...f, ico: reader.result as string }));
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      icoMimeRef.current = dataUrl.split(';')[0].replace('data:', '') || 'image/png';
+      // Бэкенд ожидает только чистый base64 без "data:image/...;base64," префикса
+      const base64 = dataUrl.split(',')[1] ?? dataUrl;
+      setForm(f => ({ ...f, ico: base64 }));
+    };
     reader.readAsDataURL(file);
   };
 
@@ -327,11 +343,22 @@ function TypeForm({
     finally { setSaving(false); }
   };
 
-  // Проверяем как отображать ico: data URL, обычный URL, или эмодзи
+  // Для превью восстанавливаем data URL из чистого base64
+  const toDisplayUrl = (ico: string): string => {
+    if (ico.startsWith('data:') || ico.startsWith('http') || ico.startsWith('/')) return ico;
+    // PHN = SVG в base64, /9j = JPEG, iVB = PNG
+    const mime = icoMimeRef.current ||
+      (ico.startsWith('PHN') || ico.startsWith('PD9') ? 'image/svg+xml' : 'image/png');
+    return `data:${mime};base64,${ico}`;
+  };
+
   const icoPreview = form.ico
-    ? (form.ico.startsWith('data:') || form.ico.startsWith('http') || form.ico.startsWith('/'))
-      ? <img src={form.ico} alt="icon" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }} />
-      : <span style={{ fontSize: 28, lineHeight: 1 }}>{form.ico}</span>
+    ? (() => {
+        const url = toDisplayUrl(form.ico);
+        return (url.startsWith('data:') || url.startsWith('http'))
+          ? <img src={url} alt="icon" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }} />
+          : <span style={{ fontSize: 28, lineHeight: 1 }}>{form.ico}</span>;
+      })()
     : null;
 
   return (

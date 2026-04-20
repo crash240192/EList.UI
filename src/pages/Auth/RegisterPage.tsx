@@ -19,6 +19,7 @@ import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import { validateContactValue, getMaskInputMode } from '@/shared/lib/contactMask';
+import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import type { Gender } from '@/shared/api/types';
 import styles from './AuthPage.module.css';
@@ -339,7 +340,7 @@ export default function RegisterPage() {
               </Field>
             </div>
 
-            <button className={styles.submitBtn} onClick={handleStep1} disabled={loading}>
+            <button className={styles.submitBtn} style={{ marginTop: 4 }} onClick={handleStep1} disabled={loading}>
               {loading ? <span className={styles.spinner} /> : 'Далее →'}
             </button>
 
@@ -375,18 +376,13 @@ export default function RegisterPage() {
                 </select>
               </Field>
               <Field label="Дата рождения">
-                <input className={styles.input} type="date"
+                <DatePicker
                   value={form2.birthDate}
-                  onChange={set2('birthDate')}
+                  onChange={iso => setForm2(f => ({ ...f, birthDate: iso }))}
+                  placeholder="Выберите дату рождения"
                   min="1900-01-01"
-                  max={(() => {
-                    // Максимум — 18 лет назад (по умолчанию), но принимаем и младше
-                    const d = new Date();
-                    d.setFullYear(d.getFullYear() - 6);
-                    return d.toISOString().slice(0, 10);
-                  })()}
+                  max={(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 6); return d.toISOString().slice(0,10); })()}
                 />
-                <p className={regStyles.fieldHint}>Если вам меньше 18 лет, некоторые мероприятия могут быть недоступны</p>
               </Field>
             </div>
 

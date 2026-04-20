@@ -78,3 +78,24 @@ input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; }
 /* Но не для анимаций */
 *[class*='skeleton'],
 *[class*='Skeleton'] { transition: none; }
+
+/* Иконка календаря в полях ввода даты/времени — светлая для тёмной темы */
+input[type='date']::-webkit-calendar-picker-indicator,
+input[type='datetime-local']::-webkit-calendar-picker-indicator,
+input[type='time']::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+input[type='date']::-webkit-calendar-picker-indicator:hover,
+input[type='datetime-local']::-webkit-calendar-picker-indicator:hover,
+input[type='time']::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+.light-theme input[type='date']::-webkit-calendar-picker-indicator,
+.light-theme input[type='datetime-local']::-webkit-calendar-picker-indicator,
+.light-theme input[type='time']::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.5;
+}

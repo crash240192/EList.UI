@@ -5,6 +5,7 @@ import type { EventViewMode } from '@/entities/event';
 import { useFiltersStore } from '@/app/store';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
+import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import type { ICity } from '@/features/auth/useGeoCity';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { cookies } from '@/shared/lib/cookies';
@@ -24,6 +25,10 @@ export function FilterBar({
   const [expanded, setExpanded]     = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const { filters, setFilter, resetFilters } = useFiltersStore();
+
+  // Черновик типов — применяется в стор только при нажатии «Искать»
+  const [draftCategories, setDraftCategories] = useState<string[]>(filters.categories ?? []);
+  const [draftTypes,      setDraftTypes]      = useState<string[]>(filters.types ?? []);
   const barRef = useRef<HTMLDivElement>(null);
 
   // Город — инициализируем из cookies/профиля
@@ -52,10 +57,10 @@ export function FilterBar({
     }));
   };
 
-  const selectedCategories = filters.categories ?? [];
-  const selectedTypes      = filters.types      ?? [];
+  const selectedCategories = draftCategories;
+  const selectedTypes      = draftTypes;
   const typeFilterCount    = selectedCategories.length + selectedTypes.length;
-  const hasActiveFilters   = !!(filters.startTime || filters.endTime || typeFilterCount || filters.price);
+  const hasActiveFilters   = !!(filters.startTime || filters.endTime || (filters.categories?.length || filters.types?.length) || filters.price);
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false); };
@@ -63,7 +68,13 @@ export function FilterBar({
     return () => document.removeEventListener('keydown', fn);
   }, []);
 
-  const handleSearch = () => { setExpanded(false); onSearch(); };
+  const handleSearch = () => {
+    // Применяем черновик типов в стор перед поиском
+    setFilter('categories', draftCategories.length ? draftCategories : undefined);
+    setFilter('types',      draftTypes.length      ? draftTypes      : undefined);
+    setExpanded(false);
+    onSearch();
+  };
 
   return (
     <>
@@ -142,17 +153,19 @@ export function FilterBar({
             <div className={styles.filterRow}>
               <div className={styles.filterGroup}>
                 <label className={styles.filterLabel}>Дата от</label>
-                <input type="datetime-local" className={styles.filterInput}
-                  value={filters.startTime ? toLocalInput(filters.startTime) : ''}
-                  onChange={e => setFilter('startTime', e.target.value
-                    ? new Date(e.target.value).toISOString() : undefined)}/>
+                <DatePicker withTime
+                  value={filters.startTime ?? ''}
+                  onChange={iso => setFilter('startTime', iso || undefined)}
+                  placeholder="Дата и время"
+                />
               </div>
               <div className={styles.filterGroup}>
                 <label className={styles.filterLabel}>Дата до</label>
-                <input type="datetime-local" className={styles.filterInput}
-                  value={filters.endTime ? toLocalInput(filters.endTime) : ''}
-                  onChange={e => setFilter('endTime', e.target.value
-                    ? new Date(e.target.value).toISOString() : undefined)}/>
+                <DatePicker withTime
+                  value={filters.endTime ?? ''}
+                  onChange={iso => setFilter('endTime', iso || undefined)}
+                  placeholder="Дата и время"
+                />
               </div>
             </div>
 
@@ -176,7 +189,13 @@ export function FilterBar({
             <div className={styles.filterActions}>
               {hasActiveFilters && (
                 <button className={styles.resetBtn}
-                  onClick={() => { resetFilters(); onSearchChange(''); setCityName(''); }}>
+                  onClick={() => {
+                    resetFilters();
+                    onSearchChange('');
+                    setCityName('');
+                    setDraftCategories([]);
+                    setDraftTypes([]);
+                  }}>
                   Сбросить
                 </button>
               )}
@@ -196,8 +215,8 @@ export function FilterBar({
           selectedCategories={selectedCategories}
           selectedTypes={selectedTypes}
           onChange={(cats, types) => {
-            setFilter('categories', cats.length ? cats : undefined);
-            setFilter('types',      types.length ? types : undefined);
+            setDraftCategories(cats);
+            setDraftTypes(types);
           }}
           onClose={() => setPickerOpen(false)}
         />

@@ -1,9 +1,10 @@
 /* CitySearch.module.css */
 
-.wrap { position: relative; width: 100%; }
+.wrap { position: relative; width: 100%; overflow: visible; }
 
 .inputRow {
   display: flex; align-items: center; gap: 6px;
+  min-width: 0; /* не даём flex-строке вылезать за родителя */
 }
 
 .input {
@@ -15,7 +16,8 @@
   font-size: 13px; color: var(--text-primary);
   outline: none; font-family: inherit;
   transition: border-color 0.15s;
-  min-width: 0;
+  min-width: 0; /* позволяем инпуту сжиматься */
+  width: 0;    /* flex забирает только свободное место */
 }
 .input:focus { border-color: var(--accent); }
 
@@ -33,6 +35,12 @@
 }
 .autoBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .autoBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* На узких экранах — скрываем текст, оставляем только иконку */
+@media (max-width: 380px) {
+  .autoBtnText { display: none; }
+  .autoBtn { padding: 7px 8px; }
+}
 
 .dropdown {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0;

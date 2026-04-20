@@ -1,0 +1,139 @@
+/* DatePicker.module.css */
+
+.wrap { position: relative; width: 100%; }
+
+/* ── Поле ── */
+.field {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 9px 12px;
+  cursor: pointer; font-family: inherit; text-align: left;
+  transition: border-color 0.15s;
+}
+.field:hover, .fieldOpen { border-color: var(--accent); }
+.fieldError { border-color: var(--danger) !important; }
+
+.icon { flex-shrink: 0; color: var(--text-secondary); opacity: 0.7; }
+.fieldOpen .icon { opacity: 1; color: var(--accent); }
+
+.fieldValue { flex: 1; font-size: 13px; color: var(--text-primary); }
+.fieldPlaceholder { flex: 1; font-size: 13px; color: var(--text-muted); }
+
+.clearBtn {
+  flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--border); color: var(--text-secondary);
+  font-size: 14px; line-height: 18px; text-align: center;
+  cursor: pointer; transition: background 0.15s;
+}
+.clearBtn:hover { background: var(--danger); color: #fff; }
+
+/* ── Popup ── */
+.popup {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden;
+  width: 280px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  animation: popIn 0.15s ease;
+}
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Если не хватает места справа */
+@media (max-width: 400px) { .popup { left: auto; right: 0; } }
+
+/* ── Хедер ── */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+}
+.navBtn {
+  width: 28px; height: 28px; border-radius: 8px;
+  border: 1px solid var(--border); background: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-secondary); transition: background 0.15s;
+}
+.navBtn:hover { background: var(--surface-2); }
+.monthYear {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+}
+
+/* ── Год ── */
+.yearBar {
+  display: flex; gap: 5px; padding: 8px 14px;
+  overflow-x: auto; border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+.yearBar::-webkit-scrollbar { display: none; }
+.yearBtn {
+  flex-shrink: 0; padding: 3px 9px; border-radius: 20px;
+  font-size: 11px; font-weight: 500;
+  border: 1px solid var(--border); background: none;
+  cursor: pointer; color: var(--text-secondary); transition: all 0.15s;
+}
+.yearBtn:hover { border-color: var(--accent); color: var(--accent); }
+.yearBtnActive { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
+
+/* ── Дни недели ── */
+.weekRow {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  padding: 8px 10px 2px;
+}
+.weekCell {
+  text-align: center; font-size: 10px; font-weight: 600;
+  color: var(--text-muted); text-transform: uppercase;
+}
+
+/* ── Сетка ── */
+.grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 1px; padding: 4px 10px 10px;
+}
+.day {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; font-size: 12px; background: none; border: none;
+  cursor: pointer; color: var(--text-primary); transition: background 0.1s;
+}
+.day:hover:not(.daySelected):not(.dayDisabled) { background: var(--surface-2); }
+.dayOther    { color: var(--text-muted); cursor: default; }
+.dayToday    { color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px rgba(99,102,241,0.4); }
+.daySelected { background: var(--accent) !important; color: #fff !important; font-weight: 600; }
+.dayDisabled { color: var(--text-muted); opacity: 0.35; cursor: not-allowed; }
+
+/* ── Время ── */
+.timePicker {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-top: 1px solid var(--border);
+}
+.timeLabel { font-size: 12px; color: var(--text-secondary); flex: 1; }
+.timeInputs { display: flex; align-items: center; gap: 4px; }
+.timeInput {
+  width: 40px; text-align: center;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 7px; padding: 5px 0;
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  font-family: inherit;
+}
+.timeInput:focus { outline: none; border-color: var(--accent); }
+.timeSep { font-size: 16px; font-weight: 600; color: var(--text-secondary); }
+
+/* ── Кнопки ── */
+.footer {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 10px 14px; border-top: 1px solid var(--border);
+}
+.cancelBtn {
+  font-size: 12px; color: var(--text-secondary);
+  background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  transition: all 0.15s;
+}
+.cancelBtn:hover { border-color: var(--accent); color: var(--accent); }
+.okBtn {
+  font-size: 12px; color: #fff; background: var(--accent);
+  border: none; border-radius: 8px; padding: 6px 14px;
+  font-weight: 600; cursor: pointer; transition: background 0.15s;
+}
+.okBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.okBtn:disabled { opacity: 0.45; cursor: not-allowed; }

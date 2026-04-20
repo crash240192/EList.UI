@@ -12,6 +12,7 @@ import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } fr
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
+import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
 import styles from './CreateEventPage.module.css';
@@ -419,18 +420,25 @@ export default function CreateEventPage() {
 
         {/* Дата и время */}
         <Section title="Дата и время *">
-          <div className={styles.row}>
-            <Field label="Дата начала *" error={hasErr('startDate') ? 'Обязательное' : undefined}>
-              <input ref={startDateRef} type="date"
-                className={`${styles.input} ${hasErr('startDate') ? styles.inputError : ''}`}
-                value={form.startDate} onChange={set('startDate')} />
-            </Field>
-            <Field label="Время начала *" error={hasErr('startTime') ? 'Обязательное' : undefined}>
-              <input ref={startTimeRef} type="time"
-                className={`${styles.input} ${hasErr('startTime') ? styles.inputError : ''}`}
-                value={form.startTime} onChange={set('startTime')} />
-            </Field>
-          </div>
+          <Field label="Начало *" error={hasErr('startDate') || hasErr('startTime') ? 'Укажите дату и время начала' : undefined}>
+            <div ref={startDateRef as any}>
+              <DatePicker
+                withTime
+                value={form.startDate && form.startTime ? `${form.startDate}T${form.startTime}` : form.startDate}
+                onChange={iso => {
+                  const d = new Date(iso);
+                  setForm(f => ({
+                    ...f,
+                    startDate: iso.slice(0, 10),
+                    startTime: `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+                  }));
+                  setFieldErrors(p => { const n = new Set(p); n.delete('startDate'); n.delete('startTime'); return n; });
+                }}
+                placeholder="Выберите дату и время начала"
+                hasError={hasErr('startDate') || hasErr('startTime')}
+              />
+            </div>
+          </Field>
 
           <div className={styles.endModeToggle}>
             <button className={`${styles.modeBtn} ${endMode === 'duration' ? styles.modeBtnActive : ''}`}
@@ -451,18 +459,25 @@ export default function CreateEventPage() {
               </Field>
             </div>
           ) : (
-            <div className={styles.row}>
-              <Field label="Дата окончания *" error={hasErr('endDate') ? 'Обязательное' : undefined}>
-                <input ref={endDateRef} type="date"
-                  className={`${styles.input} ${hasErr('endDate') ? styles.inputError : ''}`}
-                  value={form.endDate} onChange={set('endDate')} />
-              </Field>
-              <Field label="Время окончания *" error={hasErr('endTime') ? 'Обязательное' : undefined}>
-                <input ref={endTimeRef} type="time"
-                  className={`${styles.input} ${hasErr('endTime') ? styles.inputError : ''}`}
-                  value={form.endTime} onChange={set('endTime')} />
-              </Field>
-            </div>
+            <Field label="Окончание *" error={hasErr('endDate') || hasErr('endTime') ? 'Укажите дату и время окончания' : undefined}>
+              <div ref={endDateRef as any}>
+                <DatePicker
+                  withTime
+                  value={form.endDate && form.endTime ? `${form.endDate}T${form.endTime}` : form.endDate}
+                  onChange={iso => {
+                    const d = new Date(iso);
+                    setForm(f => ({
+                      ...f,
+                      endDate: iso.slice(0, 10),
+                      endTime: `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+                    }));
+                    setFieldErrors(p => { const n = new Set(p); n.delete('endDate'); n.delete('endTime'); return n; });
+                  }}
+                  placeholder="Выберите дату и время окончания"
+                  hasError={hasErr('endDate') || hasErr('endTime')}
+                />
+              </div>
+            </Field>
           )}
         </Section>
 
