@@ -52,13 +52,12 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
   useEffect(() => {
     const handler = (e: Event) => {
       if (!mapRef.current) return;
-      const detail = (e as CustomEvent<{ lat?: number; lng?: number }>).detail;
-      // Используем координаты из события (смена города) или актуальный center (лого)
+      const detail = (e as CustomEvent<{ lat?: number; lng?: number } | null>).detail;
       const target: [number, number] = (detail?.lat && detail?.lng)
         ? [detail.lat, detail.lng]
         : centerRef.current;
-      mapRef.current.panTo(target, { flying: true });
-      mapRef.current.setZoom(12, { smooth: true });
+      // setCenter — правильный метод в Яндекс.Картах API 2.1
+      mapRef.current.setCenter(target, 12, { checkZoomRange: true, duration: 500 });
     };
     window.addEventListener('elist:centerMap', handler);
     return () => window.removeEventListener('elist:centerMap', handler);

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useThemeStore, useAuthStore } from '../store';
+import { useThemeStore, useAuthStore, useFiltersStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import styles from './AppLayout.module.css';
@@ -21,6 +21,7 @@ export function AppLayout() {
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
+  const { filters } = useFiltersStore();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -55,8 +56,10 @@ export function AppLayout() {
           </button>
           <button className={styles.logo} onClick={() => {
             navigate('/');
-            // Передаём актуальные координаты пользователя
-            const { lat, lng } = getStoredUserCoords();
+            // Приоритет: выбранный город в фильтрах → координаты пользователя
+            const userCoords = getStoredUserCoords();
+            const lat = filters.latitude  ?? userCoords.lat;
+            const lng = filters.longitude ?? userCoords.lng;
             window.dispatchEvent(new CustomEvent('elist:centerMap', {
               detail: { lat, lng },
             }));
