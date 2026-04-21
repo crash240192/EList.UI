@@ -29,19 +29,15 @@
 
 /* ── Popup ── */
 .popup {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 14px; overflow: hidden;
-  width: 280px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.25);
   animation: popIn 0.15s ease;
 }
 @keyframes popIn {
-  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-/* Если не хватает места справа */
-@media (max-width: 400px) { .popup { left: auto; right: 0; } }
 
 /* ── Хедер ── */
 .header {

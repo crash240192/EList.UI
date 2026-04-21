@@ -2,6 +2,7 @@
 // Кастомный выбор даты (и опционально времени) в стилистике EList
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './DatePicker.module.css';
 
 interface DatePickerProps {
@@ -47,6 +48,8 @@ function toISO(date: Date, withTime: boolean): string {
 export function DatePicker({ value, onChange, withTime = false, placeholder, min, max, className, hasError }: DatePickerProps) {
   const [open, setOpen]     = useState(false);
   const wrapRef             = useRef<HTMLDivElement>(null);
+  const fieldRef            = useRef<HTMLButtonElement>(null);
+  const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
 
   const parsed = parseValue(value);
   const [viewYear,  setViewYear]  = useState(() => parsed?.getFullYear() ?? new Date().getFullYear());
@@ -65,13 +68,36 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   // Закрытие по клику вне
   useEffect(() => {
     const fn = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (wrapRef.current && !wrapRef.current.contains(target)) {
+        // Также проверяем portal-popup через data-атрибут
+        const popup = document.querySelector('[data-datepicker-popup]');
+        if (!popup || !popup.contains(target)) setOpen(false);
+      }
     };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', fn);
     document.addEventListener('keydown', esc);
     return () => { document.removeEventListener('mousedown', fn); document.removeEventListener('keydown', esc); };
   }, []);
+
+  // Вычисляем позицию popup при открытии
+  useEffect(() => {
+    if (!open || !fieldRef.current) return;
+    const rect = fieldRef.current.getBoundingClientRect();
+    const popupH = withTime ? 420 : 360; // приблизительная высота
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const showAbove = spaceBelow < popupH && spaceAbove > spaceBelow;
+
+    setPopupStyle({
+      position: 'fixed',
+      left: Math.min(rect.left, window.innerWidth - 288 - 8),
+      top:  showAbove ? rect.top - popupH - 6 : rect.bottom + 6,
+      width: 280,
+      zIndex: 9999,
+    });
+  }, [open, withTime]);
 
   const handleSelect = useCallback((day: number) => {
     const d = new Date(viewYear, viewMonth, day, timeH, timeM, 0, 0);
@@ -128,6 +154,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     <div ref={wrapRef} className={`${styles.wrap} ${className ?? ''}`}>
       {/* Поле ввода */}
       <button
+        ref={fieldRef}
         type="button"
         className={`${styles.field} ${open ? styles.fieldOpen : ''} ${hasError ? styles.fieldError : ''}`}
         onClick={() => setOpen(v => !v)}
@@ -145,9 +172,9 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
         )}
       </button>
 
-      {/* Календарь */}
-      {open && (
-        <div className={styles.popup}>
+      {/* Календарь — рендерим через portal чтобы не обрезался overflow:hidden родителей */}
+      {open && createPortal(
+        <div data-datepicker-popup className={styles.popup} style={popupStyle}>
           {/* Хедер */}
           <div className={styles.header}>
             <button type="button" className={styles.navBtn} onClick={prevMonth}>
@@ -214,7 +241,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
             </div>
           )}
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }
