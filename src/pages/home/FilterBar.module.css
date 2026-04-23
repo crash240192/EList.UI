@@ -1,169 +1,208 @@
-/* FilterBar.module.css */
+/* FilterBar.module.css — новый дизайн */
 
-/* bar — фиксированная высота, не толкает контент */
 .bar {
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 8px 14px;
-  flex-shrink: 0;
-  position: relative;  /* якорь для dropdown */
-  z-index: 50;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* ---- Search ---- */
-.searchWrap {
-  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: visible;
   position: relative;
-  display: flex;
-  align-items: center;
+  z-index: 10;
+}
+
+/* ── Строка поиска ── */
+.searchRow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.searchWrap {
+  flex: 1; position: relative; display: flex; align-items: center;
 }
 .searchIcon {
   position: absolute; left: 10px;
-  color: var(--text-secondary); pointer-events: none;
+  color: var(--text-muted); pointer-events: none;
 }
 .searchInput {
-  width: 100%;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 30px 8px 33px;
-  font-size: 13px; color: var(--text-primary);
-  outline: none; font-family: inherit;
-  transition: border-color 0.15s;
+  width: 100%; padding: 7px 32px 7px 30px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; color: var(--text-primary);
+  outline: none; font-family: inherit; transition: border-color .15s;
 }
-.searchInput:focus  { border-color: var(--accent); }
-.searchInput::placeholder { color: var(--text-muted); }
+.searchInput:focus { border-color: var(--accent); }
 .clearBtn {
   position: absolute; right: 8px;
-  background: none; border: none; cursor: pointer;
-  color: var(--text-secondary); font-size: 12px; padding: 2px 4px;
+  background: var(--border); border: none; border-radius: 50%;
+  width: 16px; height: 16px; font-size: 11px; cursor: pointer;
+  color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
 }
 
-/* ---- Filter toggle ---- */
-.filterToggle {
-  position: relative;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 8px 10px;
-  cursor: pointer; color: var(--text-secondary);
-  display: flex; align-items: center;
-  transition: all 0.15s; flex-shrink: 0;
-}
-.filterToggle:hover, .filterActive {
-  border-color: var(--accent); color: var(--accent);
-}
-.filterDot {
-  position: absolute; top: 4px; right: 4px;
-  width: 6px; height: 6px;
-  background: var(--accent); border-radius: 50%;
-}
-
-/* ---- View toggle ---- */
 .viewToggle {
-  display: flex;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 10px; overflow: hidden; flex-shrink: 0;
+  display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0;
 }
 .viewBtn {
-  background: none; border: none; cursor: pointer;
-  padding: 7px 10px; font-size: 15px; line-height: 1;
-  transition: background 0.15s; color: var(--text-secondary);
+  width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer; color: var(--text-secondary);
+  transition: background .1s;
 }
-.viewBtn:hover  { background: var(--border); }
-.viewActive     { background: rgba(99,102,241,0.15) !important; color: var(--accent) !important; }
+.viewActive { background: var(--surface-2); color: var(--text-primary); }
 
-/* ---- Filters dropdown — OVERLAY, не толкает контент ---- */
-.filterBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 49;
-  /* прозрачный — просто перехватывает клики */
+/* ── Чипы ── */
+.chipsRow {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 12px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  background: rgba(99,102,241,.1); color: var(--accent);
+  border: 1px solid rgba(99,102,241,.25);
+}
+.chipClose {
+  cursor: pointer; opacity: .7; font-size: 13px; line-height: 1;
+}
+.chipClose:hover { opacity: 1; }
+.clearAll {
+  margin-left: auto; font-size: 11px; color: var(--text-muted);
+  background: none; border: none; cursor: pointer; padding: 2px 4px;
+  border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+}
+.clearAll:hover { color: var(--danger); }
+
+/* ── Быстрые фильтры ── */
+.quickRow {
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 12px; overflow-x: auto; scrollbar-width: none;
+}
+.quickRow::-webkit-scrollbar { display: none; }
+
+.sep {
+  width: 1px; height: 16px; background: var(--border); flex-shrink: 0; margin: 0 2px;
 }
 
-.filtersDropdown {
-  position: absolute;
-  top: 100%;       /* прямо под баром */
-  left: 0; right: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 14px 14px;
-  padding: 14px 14px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 51;     /* выше backdrop */
+/* Город */
+.cityWrap { position: relative; flex-shrink: 0; }
+.cityBtn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 20px; font-size: 12px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  cursor: pointer; color: var(--text-primary); font-weight: 500;
+  white-space: nowrap; transition: border-color .15s;
+}
+.cityBtn:hover { border-color: var(--accent); }
+.cityDropdown {
+  position: absolute; top: calc(100% + 6px); left: 0;
+  width: 280px; z-index: 200;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-  animation: dropDown 0.18s ease;
 }
 
-@keyframes dropDown {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* Быстрые кнопки */
+.quickBtn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 20px; font-size: 12px;
+  border: 1px solid var(--border); background: none;
+  cursor: pointer; color: var(--text-secondary); white-space: nowrap;
+  flex-shrink: 0; transition: all .15s;
+}
+.quickBtn:hover { border-color: var(--accent); color: var(--accent); }
+.quickBtnOn { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
+.quickBtnIcon { padding: 4px 7px; }
+
+/* Ещё фильтры */
+.moreBtn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 20px; font-size: 12px;
+  border: 1px dashed var(--border); background: none;
+  cursor: pointer; color: var(--text-secondary); white-space: nowrap;
+  flex-shrink: 0; transition: all .15s;
+}
+.moreBtn:hover   { border-color: var(--accent); color: var(--accent); border-style: solid; }
+.moreBtnOpen     { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.moreBtnActive   { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.moreDot {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0;
 }
 
-.filterGroupFull { display: flex; flex-direction: column; gap: 4px; }
-.filterRow       { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.filterGroup     { display: flex; flex-direction: column; gap: 4px; }
-
-.filterLabel {
-  font-size: 11px; color: var(--text-secondary);
-  text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;
+/* ── Расширенная панель ── */
+.expandPanel {
+  border-top: 1px solid var(--border);
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
 }
-
-.filterInput {
+.epRow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.epGroup { display: flex; flex-direction: column; gap: 3px; }
+.epLabel {
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-muted);
+}
+.epInput {
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 8px; padding: 7px 10px;
   font-size: 13px; color: var(--text-primary);
-  outline: none; width: 100%; font-family: inherit;
+  width: 100%; outline: none; font-family: inherit;
+  transition: border-color .15s;
 }
-.filterInput:focus { border-color: var(--accent); }
-
-.pickerBtn {
-  width: 100%; background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 8px;
-  padding: 8px 12px; font-size: 13px; color: var(--text-secondary);
-  cursor: pointer; text-align: left;
-  display: flex; align-items: center; gap: 8px;
-}
-.pickerBtn:hover { border-color: var(--accent); }
-.pickerBtnActive {
-  border-color: var(--accent) !important;
-  color: var(--accent) !important;
-  background: rgba(99,102,241,0.06);
-}
-
-/* ---- Filter action buttons ---- */
-.filterActions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  align-items: center;
-  padding-top: 4px;
-  border-top: 1px solid var(--border);
-}
-
-.resetBtn {
+.epInput:focus { border-color: var(--accent); }
+.epFooter { display: flex; gap: 8px; }
+.epReset {
   background: none; border: 1px solid var(--border);
-  border-radius: 8px; padding: 7px 14px;
-  font-size: 13px; color: var(--text-secondary);
-  cursor: pointer; transition: all 0.15s;
+  border-radius: 8px; padding: 8px 14px;
+  font-size: 13px; color: var(--text-secondary); cursor: pointer;
+  transition: all .15s;
 }
-.resetBtn:hover {
-  border-color: var(--danger); color: var(--danger);
-  background: rgba(239,68,68,0.06);
+.epReset:hover { border-color: var(--accent); color: var(--accent); }
+.epApply {
+  flex: 1; background: var(--accent); color: #fff;
+  border: none; border-radius: 8px; padding: 8px;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: background .15s;
+}
+.epApply:hover { background: var(--accent-hover, #4f46e5); }
+
+/* ── Мобильная адаптация ── */
+@media (max-width: 480px) {
+  .epRow { grid-template-columns: 1fr; }
+  .cityDropdown { width: calc(100vw - 40px); left: 50%; transform: translateX(-50%); }
 }
 
-.searchBtn {
-  background: var(--accent); color: #fff;
-  border: none; border-radius: 8px;
-  padding: 8px 18px; font-size: 13px; font-weight: 600;
-  cursor: pointer; display: flex; align-items: center; gap: 6px;
-  transition: background 0.15s;
+/* ── Компактная расширенная панель ── */
+.expandPanel {
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap;
 }
-.searchBtn:hover { background: var(--accent-hover); }
+.epBlock {
+  display: flex; flex-direction: column; gap: 3px;
+}
+.epLabel {
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-muted); white-space: nowrap;
+}
+.epInput {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 9px;
+  font-size: 13px; color: var(--text-primary);
+  width: 90px; outline: none; font-family: inherit;
+  transition: border-color .15s;
+}
+.epInput:focus { border-color: var(--accent); }
+.epFooter { display: flex; gap: 6px; align-items: flex-end; margin-left: auto; }
+.epReset {
+  background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 12px;
+  font-size: 12px; color: var(--text-secondary); cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+.epReset:hover { border-color: var(--accent); color: var(--accent); }
+.epApply {
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 8px; padding: 6px 14px;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: background .15s; white-space: nowrap;
+}
+.epApply:hover { background: var(--accent-hover, #4f46e5); }

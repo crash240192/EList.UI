@@ -1,7 +1,9 @@
 // pages/home/FilterBar.tsx
 
-import { useState, useRef, useEffect } from 'react';
-import type { EventViewMode } from '@/entities/event';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import type { EventViewMode, IEventType } from '@/entities/event';
+import { fetchEventTypes } from '@/entities/event';
 import { useFiltersStore } from '@/app/store';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
@@ -11,6 +13,8 @@ import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { cookies } from '@/shared/lib/cookies';
 import styles from './FilterBar.module.css';
 
+const DEFAULT_RADIUS_M = 25000; // 25 км по умолчанию
+
 interface FilterBarProps {
   searchName: string;
   onSearchChange: (v: string) => void;
@@ -19,215 +23,252 @@ interface FilterBarProps {
   onSearch: () => void;
 }
 
-export function FilterBar({
-  searchName, onSearchChange, viewMode, onViewModeChange, onSearch,
-}: FilterBarProps) {
-  const [expanded, setExpanded]     = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+function todayRange()    { const d = new Date(); d.setHours(0,0,0,0); const e = new Date(d); e.setHours(23,59,59); return { s: d.toISOString(), e: e.toISOString() }; }
+function tomorrowRange() { const d = new Date(); d.setDate(d.getDate()+1); d.setHours(0,0,0,0); const e = new Date(d); e.setHours(23,59,59); return { s: d.toISOString(), e: e.toISOString() }; }
+function weekendRange()  {
+  const d = new Date(); const day = d.getDay();
+  const sat = new Date(d); sat.setDate(d.getDate() + ((6 - day + 7) % 7 || 7)); sat.setHours(0,0,0,0);
+  const sun = new Date(sat); sun.setDate(sat.getDate()+1); sun.setHours(23,59,59);
+  return { s: sat.toISOString(), e: sun.toISOString() };
+}
+
+function icoSrc(ico: string) {
+  return (ico.startsWith('data:') || ico.startsWith('http') || ico.startsWith('/'))
+    ? ico : `data:image/png;base64,${ico}`;
+}
+
+export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChange, onSearch }: FilterBarProps) {
   const { filters, setFilter, resetFilters } = useFiltersStore();
+  const [allTypes,       setAllTypes]       = useState<IEventType[]>([]);
+  const [expanded,       setExpanded]       = useState(false);
+  const [pickerOpen,     setPickerOpen]     = useState(false);
+  const [showCity,       setShowCity]       = useState(false);
+  const [cityName,       setCityName]       = useState(() => cookies.get('elist_city_name') ?? '');
+  const [draftTypes,     setDraftTypes]     = useState<string[]>(filters.types ?? []);
+  const [draftCats,      setDraftCats]      = useState<string[]>(filters.categories ?? []);
+  type QuickDate = 'today'|'tomorrow'|'weekend'|null;
+  const [quickDate,      setQuickDate]      = useState<QuickDate>(null);
 
-  // Черновик типов — применяется в стор только при нажатии «Искать»
-  const [draftCategories, setDraftCategories] = useState<string[]>(filters.categories ?? []);
-  const [draftTypes,      setDraftTypes]      = useState<string[]>(filters.types ?? []);
-  const barRef = useRef<HTMLDivElement>(null);
+  // Для portal-позиции дропдауна города
+  const cityBtnRef = useRef<HTMLButtonElement>(null);
+  const [cityDropStyle, setCityDropStyle] = useState<React.CSSProperties>({});
 
-  // Город — инициализируем из cookies/профиля
+  useEffect(() => { fetchEventTypes().then(setAllTypes).catch(() => {}); }, []);
+
+  // Подставляем координаты и радиус по умолчанию
   const storedCoords = getStoredUserCoords();
-  const [cityName, setCityName] = useState<string>(() => {
-    return cookies.get('elist_city_name') ?? '';
-  });
-
-  // При первом монтировании — подставить координаты из аккаунта в фильтры
   useEffect(() => {
     if (!filters.latitude && storedCoords.lat !== 0) {
       setFilter('latitude',  storedCoords.lat);
       setFilter('longitude', storedCoords.lng);
     }
+    if (!filters.locationRange) {
+      setFilter('locationRange', DEFAULT_RADIUS_M);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Вычисляем позицию дропдауна города через portal
+  useEffect(() => {
+    if (!showCity || !cityBtnRef.current) return;
+    const r = cityBtnRef.current.getBoundingClientRect();
+    setCityDropStyle({
+      position: 'fixed',
+      top: r.bottom + 6,
+      left: Math.min(r.left, window.innerWidth - 296),
+      width: 280,
+      zIndex: 9999,
+    });
+    // Закрытие по клику вне
+    const fn = (e: MouseEvent) => {
+      if (cityBtnRef.current?.contains(e.target as Node)) return;
+      const drop = document.querySelector('[data-city-drop]');
+      if (!drop?.contains(e.target as Node)) setShowCity(false);
+    };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, [showCity]);
+
   const handleCitySelect = (city: ICity) => {
-    setCityName(city.name);
-    cookies.set('elist_city_name', city.name, 30);
+    const name = city.shortName ?? city.name;
+    setCityName(name);
+    cookies.set('elist_city_name', name, 30);
     setFilter('latitude',  city.lat);
     setFilter('longitude', city.lng);
-    // Центрируем карту на выбранном городе
-    window.dispatchEvent(new CustomEvent('elist:centerMap', {
-      detail: { lat: city.lat, lng: city.lng },
-    }));
+    setShowCity(false);
+    window.dispatchEvent(new CustomEvent('elist:centerMap', { detail: { lat: city.lat, lng: city.lng } }));
   };
 
-  const selectedCategories = draftCategories;
-  const selectedTypes      = draftTypes;
-  const typeFilterCount    = selectedCategories.length + selectedTypes.length;
-  const hasActiveFilters   = !!(filters.startTime || filters.endTime || (filters.categories?.length || filters.types?.length) || filters.price);
+  const handleQuickDate = (key: QuickDate) => {
+    if (quickDate === key) { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); return; }
+    setQuickDate(key);
+    const r = key === 'today' ? todayRange() : key === 'tomorrow' ? tomorrowRange() : weekendRange();
+    setFilter('startTime', r.s); setFilter('endTime', r.e);
+  };
 
-  useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false); };
-    document.addEventListener('keydown', fn);
-    return () => document.removeEventListener('keydown', fn);
-  }, []);
+  const toggleType = (id: string) =>
+    setDraftTypes(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
-  const handleSearch = () => {
-    // Применяем черновик типов в стор перед поиском
-    setFilter('categories', draftCategories.length ? draftCategories : undefined);
-    setFilter('types',      draftTypes.length      ? draftTypes      : undefined);
+  const handleApply = () => {
+    setFilter('categories', draftCats.length  ? draftCats  : undefined);
+    setFilter('types',      draftTypes.length ? draftTypes : undefined);
     setExpanded(false);
     onSearch();
   };
 
+  const handleReset = () => {
+    resetFilters();
+    onSearchChange('');
+    setCityName('');
+    setDraftCats([]);
+    setDraftTypes([]);
+    setQuickDate(null);
+    setExpanded(false);
+    // Восстанавливаем дефолтный радиус и координаты
+    if (storedCoords.lat !== 0) {
+      setFilter('latitude',  storedCoords.lat);
+      setFilter('longitude', storedCoords.lng);
+    }
+    setFilter('locationRange', DEFAULT_RADIUS_M);
+  };
+
+  // Чипы
+  const chips: { label: string; onRemove: () => void }[] = [];
+  if (cityName) chips.push({ label: `📍 ${cityName}`, onRemove: () => { setCityName(''); setFilter('latitude', undefined); setFilter('longitude', undefined); } });
+  if (quickDate === 'today')    chips.push({ label: 'Сегодня',  onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
+  if (quickDate === 'tomorrow') chips.push({ label: 'Завтра',   onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
+  if (quickDate === 'weekend')  chips.push({ label: 'Выходные', onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
+  if (filters.price === 0)      chips.push({ label: 'Бесплатно', onRemove: () => setFilter('price', undefined) });
+  (filters.types ?? []).forEach(tid => {
+    const t = allTypes.find(x => x.id === tid);
+    if (t) chips.push({ label: t.name, onRemove: () => { const n = (filters.types ?? []).filter(x => x !== tid); setFilter('types', n.length ? n : undefined); setDraftTypes(n); } });
+  });
+
+  const QUICK_TYPES = allTypes.slice(0, 5);
+  const hasExpandedActive = (!quickDate && !!(filters.startTime || filters.endTime)) || (!!filters.price && filters.price > 0) || (!!filters.locationRange && filters.locationRange !== DEFAULT_RADIUS_M);
+  const radiusKm = filters.locationRange ? Math.round(filters.locationRange / 1000) : '';
+
   return (
     <>
-      {expanded && (
-        <div className={styles.filterBackdrop} onClick={() => setExpanded(false)} aria-hidden />
-      )}
-
-      <div className={styles.bar} ref={barRef}>
-        {/* ---- Главная строка ---- */}
-        <div className={styles.row}>
-          <div className={styles.searchWrap}>
-            <svg className={styles.searchIcon} width="15" height="15" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            <input
-              className={styles.searchInput}
-              placeholder="Поиск мероприятий..."
-              value={searchName}
-              onChange={e => onSearchChange(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            />
-            {searchName && (
-              <button className={styles.clearBtn} onClick={() => onSearchChange('')}>✕</button>
-            )}
-          </div>
-
-          <button
-            className={`${styles.filterToggle} ${expanded || hasActiveFilters ? styles.filterActive : ''}`}
-            onClick={() => setExpanded(v => !v)}
-            aria-label="Фильтры" aria-expanded={expanded}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-            </svg>
-            {hasActiveFilters && <span className={styles.filterDot}/>}
-          </button>
-
-          <div className={styles.viewToggle}>
-            <button className={`${styles.viewBtn} ${viewMode === 'map'  ? styles.viewActive : ''}`}
-              onClick={() => onViewModeChange('map')} title="Карта">🗺️</button>
-            <button className={`${styles.viewBtn} ${viewMode === 'list' ? styles.viewActive : ''}`}
-              onClick={() => onViewModeChange('list')} title="Список">☰</button>
-          </div>
+    <div className={styles.bar}>
+      {/* ── Строка поиска ── */}
+      <div className={styles.searchRow}>
+        <div className={styles.searchWrap}>
+          <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input className={styles.searchInput} placeholder="Название мероприятия..."
+            value={searchName} onChange={e => onSearchChange(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleApply()} />
+          {searchName && <button className={styles.clearBtn} onClick={() => onSearchChange('')}>✕</button>}
         </div>
-
-        {/* ---- Dropdown фильтров ---- */}
-        {expanded && (
-          <div className={styles.filtersDropdown}>
-            {/* Город */}
-            <div className={styles.filterGroupFull}>
-              <label className={styles.filterLabel}>Город</label>
-              <CitySearch
-                value={cityName}
-                onSelect={handleCitySelect}
-                placeholder="Поиск города..."
-              />
-            </div>
-
-            {/* Тип мероприятия */}
-            <div className={styles.filterGroupFull}>
-              <label className={styles.filterLabel}>Тип мероприятия</label>
-              <button
-                className={`${styles.pickerBtn} ${typeFilterCount > 0 ? styles.pickerBtnActive : ''}`}
-                onClick={() => setPickerOpen(true)}
-              >
-                {typeFilterCount > 0 ? `Выбрано: ${typeFilterCount}` : 'Все категории и типы'}
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="2" style={{ marginLeft: 'auto' }}>
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </button>
-            </div>
-
-            {/* Дата */}
-            <div className={styles.filterRow}>
-              <div className={styles.filterGroup}>
-                <label className={styles.filterLabel}>Дата от</label>
-                <DatePicker withTime
-                  value={filters.startTime ?? ''}
-                  onChange={iso => setFilter('startTime', iso || undefined)}
-                  placeholder="Дата и время"
-                />
-              </div>
-              <div className={styles.filterGroup}>
-                <label className={styles.filterLabel}>Дата до</label>
-                <DatePicker withTime
-                  value={filters.endTime ?? ''}
-                  onChange={iso => setFilter('endTime', iso || undefined)}
-                  placeholder="Дата и время"
-                />
-              </div>
-            </div>
-
-            {/* Цена и радиус */}
-            <div className={styles.filterRow}>
-              <div className={styles.filterGroup}>
-                <label className={styles.filterLabel}>Макс. цена, ₽</label>
-                <input type="number" min={0} step={100} className={styles.filterInput}
-                  placeholder="Любая" value={filters.price ?? ''}
-                  onChange={e => setFilter('price', e.target.value ? Number(e.target.value) : undefined)}/>
-              </div>
-              <div className={styles.filterGroup}>
-                <label className={styles.filterLabel}>Радиус, м</label>
-                <input type="number" min={500} step={500} className={styles.filterInput}
-                  placeholder="Весь город" value={filters.locationRange ?? ''}
-                  onChange={e => setFilter('locationRange', e.target.value ? Number(e.target.value) : undefined)}/>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className={styles.filterActions}>
-              {hasActiveFilters && (
-                <button className={styles.resetBtn}
-                  onClick={() => {
-                    resetFilters();
-                    onSearchChange('');
-                    setCityName('');
-                    setDraftCategories([]);
-                    setDraftTypes([]);
-                  }}>
-                  Сбросить
-                </button>
-              )}
-              <button className={styles.searchBtn} onClick={handleSearch}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                </svg>
-                Искать
-              </button>
-            </div>
-          </div>
-        )}
+        <div className={styles.viewToggle}>
+          <button className={`${styles.viewBtn} ${viewMode === 'list' ? styles.viewActive : ''}`} onClick={() => onViewModeChange('list')} title="Список">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          </button>
+          <button className={`${styles.viewBtn} ${viewMode === 'map' ? styles.viewActive : ''}`} onClick={() => onViewModeChange('map')} title="Карта">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </button>
+        </div>
       </div>
 
-      {pickerOpen && (
-        <CategoryTypePicker
-          selectedCategories={selectedCategories}
-          selectedTypes={selectedTypes}
-          onChange={(cats, types) => {
-            setDraftCategories(cats);
-            setDraftTypes(types);
-          }}
-          onClose={() => setPickerOpen(false)}
-        />
+      {/* ── Чипы ── */}
+      {chips.length > 0 && (
+        <div className={styles.chipsRow}>
+          {chips.map((c, i) => (
+            <div key={i} className={styles.chip}>{c.label}<span className={styles.chipClose} onClick={c.onRemove}>×</span></div>
+          ))}
+          <button className={styles.clearAll} onClick={handleReset}>Сбросить всё</button>
+        </div>
       )}
+
+      {/* ── Быстрые фильтры ── */}
+      <div className={styles.quickRow}>
+        <button ref={cityBtnRef} className={styles.cityBtn} onClick={() => setShowCity(v => !v)}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          {cityName || 'Город'}
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points={showCity ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/></svg>
+        </button>
+
+        <div className={styles.sep}/>
+        <button className={`${styles.quickBtn} ${quickDate === 'today'    ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('today')}>Сегодня</button>
+        <button className={`${styles.quickBtn} ${quickDate === 'tomorrow' ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('tomorrow')}>Завтра</button>
+        <button className={`${styles.quickBtn} ${quickDate === 'weekend'  ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('weekend')}>Выходные</button>
+        <button className={`${styles.quickBtn} ${filters.price === 0      ? styles.quickBtnOn : ''}`} onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>Бесплатно</button>
+
+        <div className={styles.sep}/>
+        {QUICK_TYPES.map(t => (
+          <button key={t.id} title={t.name}
+            className={`${styles.quickBtn} ${styles.quickBtnIcon} ${draftTypes.includes(t.id) ? styles.quickBtnOn : ''}`}
+            onClick={() => toggleType(t.id)}>
+            {t.ico
+              ? <img src={icoSrc(t.ico)} alt={t.name} width={14} height={14} style={{ objectFit: 'contain' }} />
+              : <span style={{ fontSize: 12 }}>{t.name[0]}</span>}
+          </button>
+        ))}
+        {/* Кнопка «Ещё типы» — открывает CategoryTypePicker */}
+        <button className={`${styles.quickBtn} ${(draftTypes.length > 0 || draftCats.length > 0) ? styles.quickBtnOn : ''}`}
+          onClick={() => setPickerOpen(true)}>
+          Ещё&nbsp;
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <div className={styles.sep}/>
+        <button className={`${styles.moreBtn} ${expanded ? styles.moreBtnOpen : ''} ${hasExpandedActive ? styles.moreBtnActive : ''}`}
+          onClick={() => setExpanded(v => !v)}>
+          {hasExpandedActive && <span className={styles.moreDot}/>}
+          {expanded ? 'Закрыть' : 'Ещё'}
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points={expanded ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/></svg>
+        </button>
+      </div>
+
+      {/* ── Расширенная панель ── */}
+      {expanded && (
+        <div className={styles.expandPanel}>
+          <div className={styles.epBlock}>
+            <span className={styles.epLabel}>Дата от</span>
+            <DatePicker withTime value={filters.startTime ?? ''} placeholder="Любая"
+              onChange={iso => { setFilter('startTime', iso || undefined); setQuickDate(null); }} />
+          </div>
+          <div className={styles.epBlock}>
+            <span className={styles.epLabel}>Дата до</span>
+            <DatePicker withTime value={filters.endTime ?? ''} placeholder="Любая"
+              onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
+          </div>
+          <div className={styles.epBlock}>
+            <span className={styles.epLabel}>Цена, ₽</span>
+            <input type="number" min={0} step={100} className={styles.epInput}
+              placeholder="Любая" value={filters.price ?? ''}
+              onChange={e => setFilter('price', e.target.value ? Number(e.target.value) : undefined)} />
+          </div>
+          <div className={styles.epBlock}>
+            <span className={styles.epLabel}>Радиус, км</span>
+            <input type="number" min={1} max={500} step={5} className={styles.epInput}
+              placeholder="25" value={radiusKm}
+              onChange={e => setFilter('locationRange', e.target.value ? Number(e.target.value) * 1000 : DEFAULT_RADIUS_M)} />
+          </div>
+          <div className={styles.epFooter}>
+            <button className={styles.epReset} onClick={handleReset}>Сбросить</button>
+            <button className={styles.epApply} onClick={handleApply}>Применить</button>
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* City dropdown через portal — не обрезается overflow родителей */}
+    {showCity && createPortal(
+      <div data-city-drop style={{ ...cityDropStyle, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
+        <CitySearch value={cityName} onSelect={handleCitySelect} placeholder="Поиск города..." />
+      </div>,
+      document.body
+    )}
+
+    {pickerOpen && (
+      <CategoryTypePicker
+        selectedCategories={draftCats}
+        selectedTypes={draftTypes}
+        onChange={(cats, types) => { setDraftCats(cats); setDraftTypes(types); }}
+        onClose={() => { setPickerOpen(false); handleApply(); }}
+      />
+    )}
     </>
   );
 }
-
-function toLocalInput(iso: string): string {
-  const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-

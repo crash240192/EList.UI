@@ -89,8 +89,11 @@ export default function HomePage() {
               </div>
             ) : events.length === 0 ? (
               <div className={styles.empty}>
-                <span>🔍</span>
-                <p>Ничего не найдено. Попробуйте изменить фильтры.</p>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4 }}>
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <p>Ничего не найдено</p>
+                <p style={{ fontSize: 12 }}>Попробуйте другой город, изменить радиус или убрать некоторые фильтры</p>
               </div>
             ) : (
               <div className={styles.grid}>

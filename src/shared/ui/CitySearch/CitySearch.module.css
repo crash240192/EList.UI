@@ -4,7 +4,8 @@
 
 .inputRow {
   display: flex; align-items: center; gap: 6px;
-  min-width: 0; /* не даём flex-строке вылезать за родителя */
+  min-width: 0;
+  flex-wrap: wrap; /* на узких экранах кнопка переходит на следующую строку */
 }
 
 .input {
@@ -16,8 +17,7 @@
   font-size: 13px; color: var(--text-primary);
   outline: none; font-family: inherit;
   transition: border-color 0.15s;
-  min-width: 0; /* позволяем инпуту сжиматься */
-  width: 0;    /* flex забирает только свободное место */
+  min-width: 120px; /* минимальная ширина чтобы не схлопнулся */
 }
 .input:focus { border-color: var(--accent); }
 
@@ -36,7 +36,6 @@
 .autoBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .autoBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* На узких экранах — скрываем текст, оставляем только иконку */
 @media (max-width: 380px) {
   .autoBtnText { display: none; }
   .autoBtn { padding: 7px 8px; }

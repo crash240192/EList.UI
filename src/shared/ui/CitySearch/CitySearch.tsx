@@ -81,7 +81,11 @@ export function CitySearch({
         const suffix = country && country !== 'Россия' ? `, ${country}` : region ? `, ${region}` : '';
         const displayName = name + suffix;
 
-        if (displayName) items.push({ name: displayName, lat: coords[0], lng: coords[1] });
+        if (displayName) items.push({
+          name: displayName,
+          shortName: name, // только название города без региона/страны
+          lat: coords[0], lng: coords[1]
+        });
       });
 
       setSuggestions(items);
@@ -98,7 +102,7 @@ export function CitySearch({
   };
 
   const handleSelect = (city: ICity) => {
-    setQuery(city.name);
+    setQuery(city.shortName ?? city.name); // короткое в поле
     setSuggestions([]);
     setOpen(false);
     onSelect(city);

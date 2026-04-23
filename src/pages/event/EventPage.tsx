@@ -189,7 +189,12 @@ export default function EventPage() {
         <div className={styles.actionBar}>
           {/* Аватары участников — social proof рядом с кнопкой */}
           {sortedParticipants.length > 0 && (
-            <div className={styles.participantPreview}>
+            <div
+              className={styles.participantPreview}
+              onClick={() => setParticipantsModalOpen(true)}
+              style={{ cursor: 'pointer' }}
+              title="Посмотреть всех участников"
+            >
               <div className={styles.avatarStack}>
                 {visibleParticipants.map((p, i) => (
                   <div key={p.accountId}
@@ -203,16 +208,9 @@ export default function EventPage() {
                   <div className={`${styles.avatarSm} ${styles.avatarSmExtra}`}>+{extraCount}</div>
                 )}
               </div>
-              {/* Счётчик только если нет блока вместимости в инфокарточке */}
-              {!maxPersons && (
-                <button
-                  className={styles.participantText}
-                  onClick={() => setParticipantsModalOpen(true)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                >
-                  <strong>{participants.length}</strong> участников
-                </button>
-              )}
+              <span className={styles.participantText}>
+                <strong>{participants.length}</strong> участников
+              </span>
             </div>
           )}
 
