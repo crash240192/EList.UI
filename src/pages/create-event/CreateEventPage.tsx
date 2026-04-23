@@ -13,6 +13,7 @@ import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker'
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
+import { InviteModal } from '@/features/event/InviteModal';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
 import styles from './CreateEventPage.module.css';
@@ -239,6 +240,10 @@ export default function CreateEventPage() {
     if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   };
 
+  const [createdEventId,  setCreatedEventId]  = useState<string | null>(null);
+  const [createdAccountId, setCreatedAccountId] = useState<string>('');
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+
   const handleSubmit = async () => {
     const firstErr = validate();
     if (firstErr) {
@@ -265,9 +270,10 @@ export default function CreateEventPage() {
           ...(coverUrl ? { coverUrl } : {}),
           ...(coverImageId ? { coverImageId } : {}),
         });
+        navigate('/my-events');
       } else {
         const accountId = await getOrFetchAccountId();
-        await apiClient.post('/api/events/create', {
+        const createResult = await apiClient.post<string>('/api/events/create', {
           event: {
             name: form.name, description: form.description || undefined,
             address: form.address, latitude: lat!, longitude: lng!,
@@ -287,8 +293,16 @@ export default function CreateEventPage() {
           organizatorAccountIds: [accountId],
           organizatorOrganizationIds: null,
         });
+        // Предлагаем пригласить подписчиков
+        const newEventId = createResult?.result ?? createResult as unknown as string;
+        if (newEventId && accountId) {
+          setCreatedEventId(newEventId);
+          setCreatedAccountId(accountId);
+          setInviteModalOpen(true);
+        } else {
+          navigate('/my-events');
+        }
       }
-      navigate('/my-events');
     } catch (err) {
       showToast(`❌ ${err instanceof Error ? err.message : 'Ошибка сохранения'}`);
     } finally { setSaving(false); }
@@ -664,6 +678,16 @@ export default function CreateEventPage() {
           selectedCategories={selectedCategories} selectedTypes={selectedTypes}
           onChange={(cats, types) => { setSelectedCategories(cats); setSelectedTypes(types); }}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {/* Приглашения после создания события */}
+      {inviteModalOpen && createdEventId && (
+        <InviteModal
+          eventId={createdEventId}
+          currentAccountId={createdAccountId}
+          onClose={() => { setInviteModalOpen(false); navigate('/my-events'); }}
+          onSent={() => { setInviteModalOpen(false); navigate('/my-events'); }}
         />
       )}
 

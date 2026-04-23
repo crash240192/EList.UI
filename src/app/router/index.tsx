@@ -42,6 +42,7 @@ const router = createBrowserRouter([
       { index: true,              element: S(HomePage) },
       { path: 'event/:id',        element: S(EventPage) },
       { path: 'user/:id',         element: S(UserPage) },
+      { path: 'invitations',       element: S(lazy(() => import('@/pages/invitations/InvitationsPage'))) },
       { path: 'my-events',        element: S(MyEventsPage) },
       { path: 'create-event',     element: S(CreateEventPage) },
       { path: 'edit-event/:id',   element: S(CreateEventPage) },

@@ -14,6 +14,7 @@ import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserChip } from '@/entities/user/ui/UserChip';
 import { ParticipantsModal } from '@/features/event/ParticipantsModal';
+import { InviteModal } from '@/features/event/InviteModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import styles from './EventPage.module.css';
 
@@ -31,6 +32,7 @@ export default function EventPage() {
   const [loading,       setLoading]       = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
+  const [inviteModalOpen,       setInviteModalOpen]       = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
 
@@ -216,6 +218,18 @@ export default function EventPage() {
 
           <div className={styles.actionBtns}>
             <button className={styles.btnShare} aria-label="Поделиться"><ShareIcon /></button>
+            {/* Кнопка «Пригласить» — только для организаторов */}
+            {isOrganizer && accountId && event?.id && (
+              <button
+                className={styles.btnShare}
+                title="Пригласить подписчиков"
+                onClick={() => setInviteModalOpen(true)}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.8 19.8 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+                </svg>
+              </button>
+            )}
             {isOrganizer ? (
               <button className={styles.btnJoin} onClick={() => navigate(`/edit-event/${event.id}`)}>
                 ✏️ Редактировать
@@ -388,6 +402,14 @@ export default function EventPage() {
           organizerIds={new Set(organizers.map(o => o.accountId))}
           currentAccountId={accountId}
           onClose={() => setParticipantsModalOpen(false)}
+        />
+      )}
+
+      {inviteModalOpen && accountId && event?.id && (
+        <InviteModal
+          eventId={event.id}
+          currentAccountId={accountId}
+          onClose={() => setInviteModalOpen(false)}
         />
       )}
     </div>

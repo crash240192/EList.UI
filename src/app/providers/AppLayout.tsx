@@ -10,6 +10,7 @@ import styles from './AppLayout.module.css';
 const NAV_ITEMS = [
   { to: '/',             label: 'Поиск событий',    icon: <SearchIcon /> },
   { to: '/my-events',    label: 'Мои события',      icon: <CalendarIcon /> },
+  { to: '/invitations',  label: 'Приглашения',      icon: <InviteIcon /> },
   { to: '/create-event', label: 'Создать событие',  icon: <PlusIcon /> },
   { to: '/settings',     label: 'Настройки',        icon: <SettingsIcon /> },
   { to: '/wallet',       label: 'Кошелёк',          icon: <WalletIcon /> },
@@ -136,3 +137,4 @@ function PlusIcon()     { return <svg width="18" height="18" viewBox="0 0 24 24"
 function WalletIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 3H8l-2 4h12z"/><circle cx="16" cy="14" r="1" fill="currentColor"/></svg>; }
 function LogoutIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>; }
 function HamburgerIcon(){ return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>; }
+function InviteIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.8 19.8 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>; }
