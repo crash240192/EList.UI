@@ -4,20 +4,15 @@
 
 .inputRow {
   display: flex; align-items: center; gap: 6px;
-  min-width: 0;
-  flex-wrap: wrap; /* на узких экранах кнопка переходит на следующую строку */
+  min-width: 0; flex-wrap: wrap;
 }
 
 .input {
-  flex: 1;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 9px 12px;
+  flex: 1; min-width: 120px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 9px 12px;
   font-size: 13px; color: var(--text-primary);
-  outline: none; font-family: inherit;
-  transition: border-color 0.15s;
-  min-width: 120px; /* минимальная ширина чтобы не схлопнулся */
+  outline: none; font-family: inherit; transition: border-color 0.15s;
 }
 .input:focus { border-color: var(--accent); }
 
@@ -25,39 +20,49 @@
 .ok { color: var(--success); font-size: 14px; flex-shrink: 0; font-weight: 600; }
 
 .autoBtn {
-  display: flex; align-items: center; gap: 5px;
-  flex-shrink: 0;
+  display: flex; align-items: center; gap: 5px; flex-shrink: 0;
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 8px; padding: 7px 10px;
   font-size: 12px; font-weight: 500; color: var(--text-secondary);
-  cursor: pointer; white-space: nowrap;
-  transition: all 0.15s;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s;
 }
 .autoBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .autoBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-
 @media (max-width: 380px) {
   .autoBtnText { display: none; }
   .autoBtn { padding: 7px 8px; }
 }
 
+/* ── Дропдаун — десктоп ── */
 .dropdown {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-  z-index: 100; overflow: hidden;
-  max-height: 220px; overflow-y: auto;
+  border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  z-index: 1000; overflow: hidden; max-height: 260px; overflow-y: auto;
+}
+
+/* ── На мобиле — фиксированная панель снизу ── */
+@media (max-width: 767px) {
+  .dropdown {
+    position: fixed;
+    left: 0; right: 0; bottom: 0; top: auto;
+    border-radius: 16px 16px 0 0;
+    max-height: 50vh;
+    z-index: 9999;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
+  }
 }
 
 .item {
   display: flex; align-items: center; gap: 8px;
   width: 100%; text-align: left;
-  padding: 9px 14px;
+  padding: 11px 14px;
   background: none; border: none;
   border-bottom: 1px solid var(--border);
   font-size: 13px; color: var(--text-primary);
   cursor: pointer; transition: background 0.1s;
+  -webkit-tap-highlight-color: transparent;
 }
 .item:last-child { border-bottom: none; }
-.item:hover { background: var(--surface-2); }
+.item:hover, .item:active { background: var(--surface-2); }
 .item svg { flex-shrink: 0; opacity: 0.5; }

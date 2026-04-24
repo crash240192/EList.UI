@@ -24,6 +24,13 @@ export default defineConfig({
         target: 'http://92.118.113.6:35029',
         changeOrigin: true,
       },
+      // Яндекс.Карты — проксируем чтобы не было CORS/401
+      '/yandex-maps-api': {
+        target: 'https://api-maps.yandex.ru',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/yandex-maps-api/, ''),
+        secure: false,
+      },
     },
   },
 });
