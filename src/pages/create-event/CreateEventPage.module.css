@@ -18,7 +18,14 @@
   box-sizing: border-box;
 }
 @media (max-width: 720px) {
-  .pageInner { grid-template-columns: 1fr; padding: 12px; }
+  .pageInner { grid-template-columns: 1fr; padding: 0; gap: 0; }
+  .card { border-radius: 0; border-left: none; border-right: none; }
+  /* Отступ между основной формой и боковой панелью */
+  .sidePanel { margin-top: 12px; gap: 0; }
+  /* Скрываем обложку в чеклисте — на мобиле она уже есть в форме */
+  .checklistCoverRow { display: none; }
+  /* Убираем предпросмотр обложки в карточке предпросмотра */
+  .previewCover { display: none; }
 }
 
 /* ── Карточка формы ── */
@@ -93,7 +100,7 @@
 .fieldHintWarn { font-size: 11px; color: #b45309; margin-top: 3px; }
 
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-@media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
 
 /* ── Тип — picker + чипы ── */
 .pickerBtn {
@@ -148,7 +155,7 @@
 
 /* ── Параметры grid ── */
 .paramGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-@media (max-width: 480px) { .paramGrid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .paramGrid { grid-template-columns: 1fr; } }
 
 /* ── Тогглы ── */
 .toggles { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }

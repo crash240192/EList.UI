@@ -731,11 +731,10 @@ function TariffsTab() {
 
 // ---- Форма тарифа ----
 
-const EMPTY_VALIDATOR: ITariffValidator = {
-  costLimit: 0, personsLimit: 0,
-  allowPrivate: false, ageLimit: 0, allowGenderSegregation: false,
+const EMPTY_VALIDATOR_STR = {
+  costLimit: '', personsLimit: '', ageLimit: '',
+  allowPrivate: false, allowGenderSegregation: false,
 };
-const EMPTY_PERIOD: ITariffPeriod = { days: 30, hours: 0, minutes: 0 };
 
 function TariffForm({ tariff, onSave, onCancel }: {
   tariff: ITariff | null;
@@ -746,30 +745,48 @@ function TariffForm({ tariff, onSave, onCancel }: {
   const [cost,  setCost]  = useState(String(tariff?.cost ?? 0));
   const [days,  setDays]  = useState(String((tariff as any)?.periodDays ?? 30));
 
-  const [validator, setValidator] = useState<ITariffValidator>(EMPTY_VALIDATOR);
+  const [validatorStr, setValidatorStr] = useState(EMPTY_VALIDATOR_STR);
+  const [validatorBool, setValidatorBool] = useState({ allowPrivate: false, allowGenderSegregation: false });
   const [loadingV,  setLoadingV]  = useState(!!tariff?.validatorId);
 
-  // Загружаем валидатор если редактирование
+  // Сбрасываем и перезагружаем при смене тарифа
   useEffect(() => {
-    if (!tariff?.validatorId) return;
+    setName(tariff?.name ?? '');
+    setCost(String(tariff?.cost ?? 0));
+    setDays(String((tariff as any)?.periodDays ?? 30));
+    setValidatorStr(EMPTY_VALIDATOR_STR);
+    setValidatorBool({ allowPrivate: false, allowGenderSegregation: false });
+    setErr(null);
+
+    if (!tariff?.validatorId) { setLoadingV(false); return; }
+    setLoadingV(true);
     tariffValidatorApi.getByTariff(tariff.id).then(v => {
-      if (v) setValidator(v);
+      if (v) {
+        setValidatorStr({
+          costLimit:    v.costLimit    ? String(v.costLimit)    : '',
+          personsLimit: v.personsLimit ? String(v.personsLimit) : '',
+          ageLimit:     v.ageLimit     ? String(v.ageLimit)     : '',
+          allowPrivate: false, allowGenderSegregation: false,
+        });
+        setValidatorBool({ allowPrivate: !!v.allowPrivate, allowGenderSegregation: !!v.allowGenderSegregation });
+      }
     }).finally(() => setLoadingV(false));
-  }, [tariff]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tariff?.id]);
 
   const [saving, setSaving] = useState(false);
   const [err,    setErr]    = useState<string | null>(null);
 
-  const setV = (k: keyof ITariffValidator) =>
-    (e: React.ChangeEvent<HTMLInputElement>) =>
-      setValidator(v => ({
-        ...v,
-        [k]: e.target.type === 'checkbox' ? e.target.checked : Number(e.target.value),
-      }));
-
   const handleSave = async () => {
     if (!name.trim()) { setErr('Укажите название'); return; }
     setSaving(true); setErr(null);
+    const validator: ITariffValidator = {
+      costLimit:             parseFloat(validatorStr.costLimit)    || 0,
+      personsLimit:          parseInt(validatorStr.personsLimit)    || 0,
+      ageLimit:              parseInt(validatorStr.ageLimit)        || 0,
+      allowPrivate:          validatorBool.allowPrivate,
+      allowGenderSegregation: validatorBool.allowGenderSegregation,
+    };
     try {
       await onSave(validator, {
         name, cost: parseFloat(cost) || 0,
@@ -788,7 +805,6 @@ function TariffForm({ tariff, onSave, onCancel }: {
       <h3 className={styles.formTitle}>{tariff ? 'Редактировать тариф' : 'Новый тариф'}</h3>
       {err && <div className={styles.formError}>{err}</div>}
 
-      {/* Основное */}
       <div className={styles.field}>
         <label className={styles.label}>Название *</label>
         <input className={styles.input} value={name} onChange={e => setName(e.target.value)} placeholder="Базовый / Pro / Enterprise..." />
@@ -797,39 +813,43 @@ function TariffForm({ tariff, onSave, onCancel }: {
         <label className={styles.label}>Стоимость (₽/период)</label>
         <input className={styles.input} type="number" min={0} value={cost} onChange={e => setCost(e.target.value)} />
       </div>
-
       <div className={styles.field}>
         <label className={styles.label}>Период действия (дней)</label>
         <input className={styles.input} type="number" min={1} value={days}
           onChange={e => setDays(e.target.value)} placeholder="30" />
       </div>
 
-      {/* Валидатор */}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Ограничения тарифа
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>Макс. стоимость события (₽, 0 = без лимита)</label>
-          <input className={styles.input} type="number" min={0} value={validator.costLimit} onChange={setV('costLimit')} />
+          <label className={styles.label}>Макс. стоимость события (₽, пусто = только бесплатные)</label>
+          <input className={styles.input} type="number" min={0}
+            value={validatorStr.costLimit} placeholder="не задано"
+            onChange={e => setValidatorStr(v => ({ ...v, costLimit: e.target.value }))} />
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>Макс. участников события (0 = без лимита)</label>
-          <input className={styles.input} type="number" min={0} value={validator.personsLimit} onChange={setV('personsLimit')} />
+          <label className={styles.label}>Макс. участников события (пусто = только без лимита)</label>
+          <input className={styles.input} type="number" min={0}
+            value={validatorStr.personsLimit} placeholder="не задано"
+            onChange={e => setValidatorStr(v => ({ ...v, personsLimit: e.target.value }))} />
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>Возрастное ограничение (0 = без лимита)</label>
-          <input className={styles.input} type="number" min={0} max={99} value={validator.ageLimit} onChange={setV('ageLimit')} />
+          <label className={styles.label}>Макс. возрастное ограничение (пусто = только 0+)</label>
+          <input className={styles.input} type="number" min={0} max={99}
+            value={validatorStr.ageLimit} placeholder="не задано"
+            onChange={e => setValidatorStr(v => ({ ...v, ageLimit: e.target.value }))} />
         </div>
         <label className={styles.checkboxLabel}>
-          <input type="checkbox" checked={validator.allowPrivate}
-            onChange={e => setValidator(v => ({ ...v, allowPrivate: e.target.checked }))} />
+          <input type="checkbox" checked={validatorBool.allowPrivate}
+            onChange={e => setValidatorBool(v => ({ ...v, allowPrivate: e.target.checked }))} />
           Разрешить приватные события
         </label>
         <label className={styles.checkboxLabel}>
-          <input type="checkbox" checked={validator.allowGenderSegregation}
-            onChange={e => setValidator(v => ({ ...v, allowGenderSegregation: e.target.checked }))} />
-          Разрешить фильтр по полу
+          <input type="checkbox" checked={validatorBool.allowGenderSegregation}
+            onChange={e => setValidatorBool(v => ({ ...v, allowGenderSegregation: e.target.checked }))} />
+          Разрешить ограничение по полу
         </label>
       </div>
 

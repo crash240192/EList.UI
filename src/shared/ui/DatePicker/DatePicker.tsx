@@ -87,21 +87,58 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   }, []);
 
   // Вычисляем позицию popup при открытии
+  // На мобиле используем visualViewport — он учитывает открытую клавиатуру
   useEffect(() => {
     if (!open || !fieldRef.current) return;
-    const rect = fieldRef.current.getBoundingClientRect();
-    const popupH = withTime ? 420 : 360; // приблизительная высота
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const showAbove = spaceBelow < popupH && spaceAbove > spaceBelow;
 
-    setPopupStyle({
-      position: 'fixed',
-      left: Math.min(rect.left, window.innerWidth - 288 - 8),
-      top:  showAbove ? rect.top - popupH - 6 : rect.bottom + 6,
-      width: 280,
-      zIndex: 9999,
-    });
+    const compute = () => {
+      if (!fieldRef.current) return;
+      const rect = fieldRef.current.getBoundingClientRect();
+      const popupH = withTime ? 420 : 360;
+
+      // visualViewport даёт реальную видимую высоту (за вычетом клавиатуры)
+      const vvp = window.visualViewport;
+      const viewH  = vvp ? vvp.height  : window.innerHeight;
+      const viewW  = vvp ? vvp.width   : window.innerWidth;
+      const offsetY = vvp ? vvp.offsetTop : 0;
+
+      // Позиция кнопки относительно видимого viewport
+      const rectTopInView  = rect.top  - offsetY;
+      const rectBotInView  = rect.bottom - offsetY;
+
+      const spaceBelow = viewH - rectBotInView;
+      const spaceAbove = rectTopInView;
+      const showAbove  = spaceBelow < popupH && spaceAbove > spaceBelow;
+
+      // На мобиле (узкий экран) — растягиваем на всю ширину с отступами
+      const isMobile = viewW < 480;
+      const popupWidth = isMobile ? viewW - 16 : 280;
+      const left = isMobile
+        ? 8
+        : Math.min(rect.left, viewW - popupWidth - 8);
+
+      const top = showAbove
+        ? rect.top + offsetY - popupH - 6
+        : rect.bottom + offsetY + 6;
+
+      setPopupStyle({
+        position: 'fixed',
+        left,
+        top: Math.max(offsetY + 4, Math.min(top, offsetY + viewH - popupH - 4)),
+        width: popupWidth,
+        zIndex: 9999,
+      });
+    };
+
+    compute();
+
+    // Пересчитываем при изменении размера (открытие/закрытие клавиатуры)
+    window.visualViewport?.addEventListener('resize', compute);
+    window.visualViewport?.addEventListener('scroll', compute);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', compute);
+      window.visualViewport?.removeEventListener('scroll', compute);
+    };
   }, [open, withTime]);
 
   const handleSelect = useCallback((day: number) => {

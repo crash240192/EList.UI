@@ -204,13 +204,19 @@ export default function CreateEventPage() {
   const selectedTypeObjects = allTypes.filter(t => selectedTypes.includes(t.id));
 
   // Проверки тарифа
-  const canSetCost         = tariffValidator ? (tariffValidator.costLimit == null || tariffValidator.costLimit > 0) : true;
-  const canSetMaxPersons   = tariffValidator ? (tariffValidator.personsLimit == null || tariffValidator.personsLimit > 0) : true;
-  const canSetPrivate      = tariffValidator ? !!tariffValidator.allowPrivate : true;
-  const canSetGender       = tariffValidator ? !!tariffValidator.allowGenderSegregation : true;
-  const canSetAge          = tariffValidator ? (tariffValidator.ageLimit == null || tariffValidator.ageLimit > 0) : true;
-  const hasTariffWarning   = hasWallet && tariff && (!canSetCost || !canSetMaxPersons || !canSetPrivate || !canSetGender || !canSetAge);
-  const tariffName         = tariff?.name ?? 'текущем';
+  // Нет тарифа → только бесплатные, без лимита по людям, только 0+
+  const tv = tariffValidator;
+  const hasTariff        = !!tariff && !!tv;
+  const canSetCost       = hasTariff && (tv!.costLimit != null && tv!.costLimit > 0);
+  const maxCost          = tv?.costLimit ?? null;
+  const canSetMaxPersons = hasTariff && (tv!.personsLimit != null && tv!.personsLimit > 0);
+  const maxPersons       = tv?.personsLimit ?? null;
+  const canSetPrivate    = hasTariff ? !!tv!.allowPrivate : false;
+  const canSetGender     = hasTariff ? !!tv!.allowGenderSegregation : false;
+  const canSetAge        = hasTariff && (tv!.ageLimit != null && tv!.ageLimit > 0);
+  const maxAge           = tv?.ageLimit ?? null;
+  const hasTariffWarning = hasWallet && (!canSetCost || !canSetMaxPersons || !canSetPrivate || !canSetGender || !canSetAge);
+  const tariffName       = tariff?.name ?? 'текущем';
 
   // Validation
   const validate = (): FieldError | null => {
@@ -462,15 +468,14 @@ export default function CreateEventPage() {
           </div>
 
           {endMode === 'duration' ? (
-            <div className={styles.row}>
-              <Field label="Часов">
-                <input className={styles.input} type="number" value={durationH} onChange={e => setDurationH(e.target.value)} />
-              </Field>
-              <Field label="Минут">
-                <select className={styles.input} value={durationM} onChange={e => setDurationM(e.target.value)}>
-                  {['0','15','30','45'].map(m => <option key={m} value={m}>{m.padStart(2,'0')}</option>)}
-                </select>
-              </Field>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className={styles.label} style={{ whiteSpace: 'nowrap', margin: 0 }}>Длительность</span>
+              <DurationPicker
+                hours={parseInt(durationH) || 0}
+                minutes={parseInt(durationM) || 0}
+                onChangeHours={h => setDurationH(String(h))}
+                onChangeMinutes={m => setDurationM(String(m))}
+              />
             </div>
           ) : (
             <Field label="Окончание *" error={hasErr('endDate') || hasErr('endTime') ? 'Укажите дату и время окончания' : undefined}>
@@ -501,8 +506,13 @@ export default function CreateEventPage() {
             {hasTariffWarning && (
               <div className={styles.tariffBanner}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="#b45309" stroke="none"/></svg>
-                <span>Некоторые параметры ограничены тарифом «{tariffName}»</span>
-                <button className={styles.tariffLink} onClick={() => navigate('/wallet')}>Сменить тариф</button>
+                <span>{hasTariff
+                  ? `Некоторые параметры ограничены тарифом «${tariffName}»`
+                  : 'Без тарифа: только бесплатные мероприятия, 0+, без лимита участников'
+                }</span>
+                <button className={styles.tariffLink} onClick={() => navigate('/wallet')}>
+                  {hasTariff ? 'Сменить тариф' : 'Подключить тариф'}
+                </button>
               </div>
             )}
 
@@ -513,7 +523,7 @@ export default function CreateEventPage() {
                   value={form.cost}
                   onChange={e => setForm(f => ({ ...f, cost: e.target.value }))}
                   type="number" 
-                  max={tariffValidator?.costLimit ? String(tariffValidator.costLimit) : undefined}
+                  max={maxCost ? String(maxCost) : undefined}
                   hint={canSetCost && tariffValidator?.costLimit
                     ? `до ${tariffValidator.costLimit.toLocaleString()} ₽`
                     : !canSetCost ? 'Недоступно в тарифе' : undefined}
@@ -524,8 +534,11 @@ export default function CreateEventPage() {
                   locked={!canSetMaxPersons}
                   value={form.maxPersons} placeholder="∞"
                   onChange={e => setForm(f => ({ ...f, maxPersons: e.target.value }))}
-                  type="number" 
-                  hint={!canSetMaxPersons ? 'Недоступно в тарифе' : undefined}
+                  type="number"
+                  max={maxPersons ? String(maxPersons) : undefined}
+                  hint={!canSetMaxPersons
+                    ? 'Недоступно в тарифе — только без лимита'
+                    : maxPersons ? `до ${maxPersons} человек` : undefined}
                 />
               </Field>
             </div>
@@ -533,11 +546,19 @@ export default function CreateEventPage() {
             <Field label="Возрастное ограничение">
               <LockedInput
                 locked={!canSetAge}
-                value={form.ageLimit} placeholder="Нет"
-                onChange={e => setForm(f => ({ ...f, ageLimit: e.target.value }))}
+                value={form.ageLimit} placeholder="0+"
+                onChange={e => {
+                  const val = e.target.value;
+                  // Если в тарифе есть ограничение — не даём ставить выше
+                  if (maxAge != null && parseInt(val) > maxAge) return;
+                  setForm(f => ({ ...f, ageLimit: val }));
+                }}
                 type="number"
-                suffix="лет и старше"
-                hint={!canSetAge ? 'Недоступно в тарифе' : undefined}
+                max={maxAge ? String(maxAge) : undefined}
+                suffix="+"
+                hint={!canSetAge
+                  ? 'Недоступно в тарифе — только 0+'
+                  : maxAge ? `до ${maxAge}+` : undefined}
               />
             </Field>
 
@@ -631,7 +652,8 @@ export default function CreateEventPage() {
         <div className={styles.checklist}>
           <div className={styles.checklistTitle}>Готовность к публикации</div>
           {checks.map(c => (
-            <div key={c.label} className={`${styles.checkRow} ${c.done ? styles.checkDone : c.optional ? styles.checkOptional : ''}`}>
+            <div key={c.label}
+              className={`${styles.checkRow} ${c.done ? styles.checkDone : c.optional ? styles.checkOptional : ''} ${c.label === 'Обложка' ? styles.checklistCoverRow : ''}`}>
               <div className={`${styles.checkDot} ${c.done ? styles.checkDotOk : c.optional ? styles.checkDotOpt : styles.checkDotNo}`}>
                 {c.done ? '✓' : c.optional ? '·' : '·'}
               </div>
@@ -752,6 +774,69 @@ function Toggle({ label, checked, locked, onChange, lockedHint }: {
         <div className={styles.switchDot} />
       </div>
       {locked && lockedHint && <span className={styles.toggleHint}>{lockedHint}</span>}
+    </div>
+  );
+}
+
+// ── Кастомный пикер длительности ──────────────────────────────────────────
+function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes }: {
+  hours: number; minutes: number;
+  onChangeHours: (h: number) => void;
+  onChangeMinutes: (m: number) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <SpinnerUnit value={hours}   min={0} max={99} onChange={onChangeHours}   pad={2} />
+      <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-secondary)', lineHeight: 1 }}>:</span>
+      <SpinnerUnit value={minutes} min={0} max={59} step={5} onChange={onChangeMinutes} pad={2} />
+    </div>
+  );
+}
+
+function SpinnerUnit({ value, min, max, step = 1, onChange, pad }: {
+  value: number; min: number; max: number; step?: number;
+  onChange: (v: number) => void; pad: number;
+}) {
+  const inc = () => onChange(Math.min(max, value + step));
+  const dec = () => onChange(Math.max(min, value - step));
+
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowUp')   { e.preventDefault(); inc(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); dec(); }
+  };
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const n = parseInt(e.target.value.replace(/\D/g, ''), 10);
+    if (!isNaN(n)) onChange(Math.min(max, Math.max(min, n)));
+  };
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      background: 'var(--surface-2)', border: '1px solid var(--border)',
+      borderRadius: 8, overflow: 'hidden', width: 52,
+    }}>
+      <button type="button" onClick={inc}
+        style={{ width: '100%', background: 'none', border: 'none', padding: '3px 0',
+          cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1, fontSize: 10 }}>
+        ▲
+      </button>
+      <input
+        type="text" inputMode="numeric"
+        value={String(value).padStart(pad, '0')}
+        onChange={handleInput}
+        onKeyDown={handleKey}
+        onFocus={e => e.target.select()}
+        style={{ width: '100%', textAlign: 'center', background: 'none', border: 'none',
+          borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)',
+          padding: '4px 0', fontSize: 16, fontWeight: 600, color: 'var(--text-primary)',
+          outline: 'none', fontFamily: 'inherit' }}
+      />
+      <button type="button" onClick={dec}
+        style={{ width: '100%', background: 'none', border: 'none', padding: '3px 0',
+          cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1, fontSize: 10 }}>
+        ▼
+      </button>
     </div>
   );
 }
