@@ -147,3 +147,23 @@
   transition: background .15s; white-space: nowrap;
 }
 .epApply:hover { background: var(--accent-hover, #4f46e5); }
+
+/* ── Вкладки над строкой поиска ── */
+.tabsRow {
+  display: flex; gap: 2px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tabBtn {
+  padding: 6px 14px; border-radius: 8px 8px 0 0;
+  font-size: 13px; font-weight: 500;
+  border: none; background: none; cursor: pointer;
+  color: var(--text-secondary); transition: all 0.15s;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tabBtn:hover { color: var(--text-primary); }
+.tabBtnActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: rgba(99,102,241,0.06);
+}

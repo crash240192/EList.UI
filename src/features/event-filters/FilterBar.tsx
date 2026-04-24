@@ -21,6 +21,12 @@ interface FilterBarProps {
   viewMode: EventViewMode;
   onViewModeChange: (v: EventViewMode) => void;
   onSearch: () => void;
+  /** Скрыть фильтр города (напр. на странице «Мои мероприятия») */
+  hideCity?: boolean;
+  /** Дополнительные вкладки над строкой поиска */
+  tabs?: { key: string; label: string }[];
+  activeTab?: string;
+  onTabChange?: (key: string) => void;
 }
 
 function todayRange()    { const d = new Date(); d.setHours(0,0,0,0); const e = new Date(d); e.setHours(23,59,59); return { s: d.toISOString(), e: e.toISOString() }; }
@@ -37,7 +43,10 @@ function icoSrc(ico: string) {
     ? ico : `data:image/png;base64,${ico}`;
 }
 
-export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChange, onSearch }: FilterBarProps) {
+export function FilterBar({
+  searchName, onSearchChange, viewMode, onViewModeChange, onSearch,
+  hideCity = false, tabs, activeTab, onTabChange,
+}: FilterBarProps) {
   const { filters, setFilter, resetFilters } = useFiltersStore();
   const [allTypes,       setAllTypes]       = useState<IEventType[]>([]);
   const [expanded,       setExpanded]       = useState(false);
@@ -57,16 +66,37 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
 
   // Подставляем координаты и радиус по умолчанию
   const storedCoords = getStoredUserCoords();
+  const savedLocation = useRef<{ lat?: number; lng?: number; range?: number } | null>(null);
+
   useEffect(() => {
-    if (!filters.latitude && storedCoords.lat !== 0) {
-      setFilter('latitude',  storedCoords.lat);
-      setFilter('longitude', storedCoords.lng);
-    }
-    if (!filters.locationRange) {
-      setFilter('locationRange', DEFAULT_RADIUS_M);
+    if (hideCity) {
+      // Сохраняем текущие координаты чтобы восстановить при возвращении на главную
+      savedLocation.current = {
+        lat:   filters.latitude,
+        lng:   filters.longitude,
+        range: filters.locationRange,
+      };
+      setFilter('latitude',      undefined);
+      setFilter('longitude',     undefined);
+      setFilter('locationRange', undefined);
+
+      return () => {
+        // При размонтировании (уход со страницы) — восстанавливаем координаты
+        const saved = savedLocation.current;
+        if (saved?.lat !== undefined) setFilter('latitude',  saved.lat);
+        if (saved?.lng !== undefined) setFilter('longitude', saved.lng);
+        if (saved?.range !== undefined) setFilter('locationRange', saved.range);
+        else setFilter('locationRange', DEFAULT_RADIUS_M);
+      };
+    } else {
+      if (!filters.latitude && storedCoords.lat !== 0) {
+        setFilter('latitude',  storedCoords.lat);
+        setFilter('longitude', storedCoords.lng);
+      }
+      if (!filters.locationRange) setFilter('locationRange', DEFAULT_RADIUS_M);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hideCity]);
 
   // Вычисляем позицию дропдауна города через portal
   useEffect(() => {
@@ -156,6 +186,19 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
   return (
     <>
     <div className={styles.bar}>
+      {/* ── Вкладки (опционально) ── */}
+      {tabs && tabs.length > 0 && (
+        <div className={styles.tabsRow}>
+          {tabs.map(t => (
+            <button key={t.key}
+              className={`${styles.tabBtn} ${activeTab === t.key ? styles.tabBtnActive : ''}`}
+              onClick={() => onTabChange?.(t.key)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── Строка поиска ── */}
       <div className={styles.searchRow}>
         <div className={styles.searchWrap}>
@@ -187,13 +230,15 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
 
       {/* ── Быстрые фильтры ── */}
       <div className={styles.quickRow}>
-        <button ref={cityBtnRef} className={styles.cityBtn} onClick={() => setShowCity(v => !v)}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          {cityName || 'Город'}
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points={showCity ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/></svg>
-        </button>
+        {!hideCity && (
+          <button ref={cityBtnRef} className={styles.cityBtn} onClick={() => setShowCity(v => !v)}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            {cityName || 'Город'}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points={showCity ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/></svg>
+          </button>
+        )}
 
-        <div className={styles.sep}/>
+        {!hideCity && <div className={styles.sep}/>}
         <button className={`${styles.quickBtn} ${quickDate === 'today'    ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('today')}>Сегодня</button>
         <button className={`${styles.quickBtn} ${quickDate === 'tomorrow' ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('tomorrow')}>Завтра</button>
         <button className={`${styles.quickBtn} ${quickDate === 'weekend'  ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('weekend')}>Выходные</button>

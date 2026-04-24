@@ -15,23 +15,64 @@ interface EventMapProps {
   zoom?: number;
 }
 
-const CAT_COLORS: Record<string, string> = {
-  music: '#8b5cf6', sport: '#10b981', art: '#f59e0b', food: '#f97316',
-};
-const getColor = (p?: string | null) => {
-  for (const [k, c] of Object.entries(CAT_COLORS)) if (p?.startsWith(k)) return c;
-  return '#6366f1';
-};
-const svgIcon = (color: string, count = 1) => {
-  const label = count > 1 ? `<text x="12" y="16" text-anchor="middle" font-size="10" font-weight="bold" fill="white">${count}</text>` : '';
-  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">` +
-    `<circle cx="14" cy="14" r="12" fill="${color}" opacity=".95"/>` +
-    `<circle cx="14" cy="14" r="6" fill="white" opacity=".9"/>` +
-    label +
-    `</svg>`
-  );
-};
+const DEFAULT_COLOR = '#6366f1';
+
+/** Цвет по типам мероприятия: берём из category.color или дефолт */
+function getEventColors(event: IEvent): string[] {
+  const types = event.eventTypes ?? (event.eventType ? [event.eventType] : []);
+  const colors = types
+    .map(t => t.eventCategory?.color)
+    .filter((c): c is string => !!c);
+  return colors.length ? [...new Set(colors)] : [DEFAULT_COLOR];
+}
+
+/** Генерируем PNG через Canvas — цвета точные, без артефактов SVG */
+function makeMarkerPng(colors: string[], count = 1): string {
+  const size = 36;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d')!;
+  const cx = size / 2; const cy = size / 2; const r = 14;
+
+  // Белая окантовка
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 2, 0, 2 * Math.PI);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
+  if (colors.length === 1) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx.fillStyle = colors[0];
+    ctx.fill();
+  } else {
+    const step = (2 * Math.PI) / colors.length;
+    colors.forEach((color, i) => {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, i * step - Math.PI / 2, (i + 1) * step - Math.PI / 2);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  }
+
+  // Белый центр или счётчик
+  if (count > 1) {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold 11px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(count), cx, cy + 1);
+  } else {
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+
+  return c.toDataURL('image/png');
+}
 
 // Ключ для группировки по координатам (округляем до 5 знаков ~1м точность)
 const coordKey = (lat: number, lng: number) =>
@@ -124,15 +165,15 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
 
     for (const [, group] of groups) {
       const first = group[0];
-      const color = getColor(first.eventType?.eventCategory?.namePath);
+      const color = getEventColors(first);
       const pm = new ymaps.Placemark(
         [first.latitude!, first.longitude!],
         {},
         {
           iconLayout:         'default#image',
-          iconImageHref:      svgIcon(color, group.length),
-          iconImageSize:      [28, 28],
-          iconImageOffset:    [-14, -14],
+          iconImageHref:      makeMarkerPng(color, group.length),
+          iconImageSize:      [36, 36],
+          iconImageOffset:    [-18, -18],
           openBalloonOnClick: false,
         }
       );
@@ -249,7 +290,7 @@ function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
         <div className={styles.groupList}>
           {events.map(ev => {
             const cost  = ev.parameters?.cost ?? 0;
-            const color = getColor(ev.eventType?.eventCategory?.namePath);
+            const colors = getEventColors(ev); const color = colors[0];
             return (
               <button key={ev.id} className={styles.groupItem} onClick={() => onSelect(ev)}>
                 <div className={styles.groupDot} style={{ background: color }} />

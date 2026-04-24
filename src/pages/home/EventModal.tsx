@@ -78,18 +78,17 @@ export function EventModal({ event, onClose }: EventModalProps) {
           </div>
 
           {/* Типы снизу обложки */}
-          {event.eventType && (
+          {((event.eventTypes?.length ?? 0) > 0 || event.eventType) && (
             <div className={styles.typeRow}>
-              <span className={styles.typeChip}>
-                {event.eventType.ico && (
-                  <img src={event.eventType.ico} alt="" width={12} height={12} style={{ borderRadius: 2 }} />
-                )}
-                {event.eventType.name}
-              </span>
-              {/* Дополнительные типы если есть */}
-              {event.eventType.eventCategory?.name && (
-                <span className={styles.typeChip}>{event.eventType.eventCategory.name}</span>
-              )}
+              {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : [event.eventType!]).map(t => t && (
+                <span key={t.id} className={styles.typeChip}>
+                  {t.ico && (
+                    <img src={t.ico.startsWith('data:') || t.ico.startsWith('http') ? t.ico : `data:image/png;base64,${t.ico}`}
+                      alt="" width={12} height={12} style={{ borderRadius: 2, objectFit: 'contain' }} />
+                  )}
+                  {t.name}
+                </span>
+              ))}
             </div>
           )}
         </div>

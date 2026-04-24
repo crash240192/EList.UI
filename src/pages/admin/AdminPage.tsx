@@ -249,6 +249,7 @@ function CategoryForm({
     localizationPath: category?.localizationPath ?? '',
     description:      category?.description      ?? '',
     ico:              category?.ico              ?? '',
+    color:            category?.color            ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [err,    setErr]    = useState<string | null>(null);
@@ -280,6 +281,30 @@ function CategoryForm({
       </FormField>
       <FormField label="Иконка (URL или emoji)">
         <input className={styles.input} value={form.ico ?? ''} onChange={set('ico')} placeholder="🎵" />
+      </FormField>
+      <FormField label="Цвет категории">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="color"
+            value={form.color || '#6366f1'}
+            onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+            style={{ width: 40, height: 36, border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', padding: 2, background: 'none' }}
+          />
+          <input
+            className={styles.input}
+            value={form.color ?? ''}
+            onChange={e => setForm(f => ({ ...f, color: e.target.value || null }))}
+            placeholder="#6366f1 (или оставьте пустым)"
+            style={{ fontFamily: 'monospace', fontSize: 13 }}
+          />
+          {form.color && (
+            <button type="button"
+              style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}
+              onClick={() => setForm(f => ({ ...f, color: null }))}>
+              Сбросить
+            </button>
+          )}
+        </div>
       </FormField>
       <div className={styles.formActions}>
         <button className={styles.cancelBtn} onClick={onCancel}>Отмена</button>

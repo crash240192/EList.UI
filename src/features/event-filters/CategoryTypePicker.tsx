@@ -112,12 +112,16 @@ export function CategoryTypePicker({
 
           {!loading && !error && groups.map(({ category, types }) => {
             const catSelected  = selectedCategories.includes(category.id);
-            // Тип "частично" — некоторые типы выбраны, но не вся категория
             const someTypeSel  = types.some(t => selectedTypes.includes(t.id));
             const isIndeterminate = !catSelected && someTypeSel;
+            // Цвет категории или дефолтный акцент приложения
+            const catColor = category.color || 'var(--accent)';
 
             return (
               <div key={category.id} className={styles.group}>
+                {/* Цветная полоса на всю высоту группы */}
+                <div className={styles.catBar} style={{ background: catColor }} />
+
                 {/* Category row */}
                 <label className={`${styles.categoryRow} ${catSelected ? styles.categorySelected : ''}`}>
                   <span className={styles.checkboxWrap}>
@@ -146,6 +150,23 @@ export function CategoryTypePicker({
                           checked={typeSelected}
                           onChange={() => toggleType(type.id, category.id)}
                         />
+                        {/* Иконка типа */}
+                        <span className={styles.typeIcon}>
+                          {type.ico
+                            ? <img
+                                src={type.ico.startsWith('data:') || type.ico.startsWith('http')
+                                  ? type.ico : `data:image/png;base64,${type.ico}`}
+                                alt="" width={14} height={14}
+                                style={{ objectFit: 'contain', borderRadius: 2, display: 'block' }}
+                              />
+                            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" strokeWidth="2" opacity={0.4}>
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="16"/>
+                                <line x1="8" y1="12" x2="16" y2="12"/>
+                              </svg>
+                          }
+                        </span>
                         <span>{type.name}</span>
                       </label>
                     );

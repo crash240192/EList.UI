@@ -42,14 +42,28 @@ export async function fetchEvents(
   };
 
   const data = await apiClient.post<PagedList<IEvent>>('/api/events/search', body);
-  return data.result;
+  const paged = data.result;
+  // Бэкенд возвращает Types (с заглавной) — нормализуем в eventTypes
+  if (paged?.result) {
+    paged.result = paged.result.map((ev: any) => ({
+      ...ev,
+      eventTypes: ev.Types ?? ev.types ?? ev.eventTypes ?? [],
+      eventType:  ev.eventType ?? (ev.Types ?? ev.types ?? ev.eventTypes)?.[0] ?? null,
+    }));
+  }
+  return paged;
 }
 
 // ---- Получить одно мероприятие (GET /api/events/get/{id}) ----
 
 export async function fetchEventById(id: string): Promise<IEvent> {
   const data = await apiClient.get<IEvent>(`/api/events/get/${id}`);
-  return data.result;
+  const ev: any = data.result;
+  return {
+    ...ev,
+    eventTypes: ev.Types ?? ev.types ?? ev.eventTypes ?? [],
+    eventType:  ev.eventType ?? (ev.Types ?? ev.types ?? ev.eventTypes)?.[0] ?? null,
+  };
 }
 
 // ---- Создать мероприятие (POST /api/events/create) ----
@@ -145,7 +159,7 @@ export const MOCK_EVENTS: IEvent[] = [
     creationDate: new Date().toISOString(),
     updateDate: new Date().toISOString(),
     parameters: { id: 'p1', cost: 0, private: false, maxPersonsCount: 500, ageLimit: null, allowedGender: null, allowUsersToInvite: true },
-    eventType: { id: 't1', name: 'Концерт', namePath: 'music/concert', description: null, ico: null, eventCategoryId: 'c1', eventCategory: { id: 'c1', name: 'Музыка', namePath: 'music', ico: null, description: null } },
+    eventType: { id: 't1', name: 'Концерт', namePath: 'music/concert', description: null, ico: null, eventCategoryId: 'c1', eventCategory: { id: 'c1', name: 'Музыка', namePath: 'music', ico: null, description: null, color: null } },
     participantsCount: 47,
     isParticipating: false,
     isOrganizer: false,
@@ -165,7 +179,7 @@ export const MOCK_EVENTS: IEvent[] = [
     creationDate: new Date().toISOString(),
     updateDate: new Date().toISOString(),
     parameters: { id: 'p2', cost: 500, private: false, maxPersonsCount: 200, ageLimit: 16, allowedGender: null, allowUsersToInvite: false },
-    eventType: { id: 't2', name: 'Забег', namePath: 'sport/run', description: null, ico: null, eventCategoryId: 'c2', eventCategory: { id: 'c2', name: 'Спорт', namePath: 'sport', ico: null, description: null } },
+    eventType: { id: 't2', name: 'Забег', namePath: 'sport/run', description: null, ico: null, eventCategoryId: 'c2', eventCategory: { id: 'c2', name: 'Спорт', namePath: 'sport', ico: null, description: null, color: null } },
     participantsCount: 143,
     isParticipating: true,
     isOrganizer: false,
@@ -185,7 +199,7 @@ export const MOCK_EVENTS: IEvent[] = [
     creationDate: new Date().toISOString(),
     updateDate: new Date().toISOString(),
     parameters: { id: 'p3', cost: 0, private: false, maxPersonsCount: 60, ageLimit: 18, allowedGender: null, allowUsersToInvite: true },
-    eventType: { id: 't3', name: 'Открытый микрофон', namePath: 'music/open-mic', description: null, ico: null, eventCategoryId: 'c1', eventCategory: { id: 'c1', name: 'Музыка', namePath: 'music', ico: null, description: null } },
+    eventType: { id: 't3', name: 'Открытый микрофон', namePath: 'music/open-mic', description: null, ico: null, eventCategoryId: 'c1', eventCategory: { id: 'c1', name: 'Музыка', namePath: 'music', ico: null, description: null, color: null } },
     participantsCount: 22,
     isParticipating: false,
     isOrganizer: false,

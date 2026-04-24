@@ -10,6 +10,7 @@ export interface IEventCategory {
   localizationPath: string;
   ico: string | null;
   description: string | null;
+  color: string | null;
 }
 
 export interface IEventCategoryRequest {
@@ -17,6 +18,7 @@ export interface IEventCategoryRequest {
   localizationPath: string;
   ico?: string | null;
   description?: string | null;
+  color?: string | null;
 }
 
 export const categoriesApi = {

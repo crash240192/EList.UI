@@ -55,14 +55,19 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const [viewYear,  setViewYear]  = useState(() => parsed?.getFullYear() ?? new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => parsed?.getMonth()    ?? new Date().getMonth());
   const [selDate,   setSelDate]   = useState<Date | null>(parsed);
-  const [timeH,     setTimeH]     = useState(() => parsed?.getHours()   ?? 0);
-  const [timeM,     setTimeM]     = useState(() => parsed?.getMinutes() ?? 0);
+  const [timeH,     setTimeH]     = useState(() => String(parsed?.getHours()   ?? 0).padStart(2, '0'));
+  const [timeM,     setTimeM]     = useState(() => String(parsed?.getMinutes() ?? 0).padStart(2, '0'));
 
   // Синхронизируем если value изменился снаружи
   useEffect(() => {
     const d = parseValue(value);
     setSelDate(d);
-    if (d) { setViewYear(d.getFullYear()); setViewMonth(d.getMonth()); setTimeH(d.getHours()); setTimeM(d.getMinutes()); }
+    if (d) {
+      setViewYear(d.getFullYear());
+      setViewMonth(d.getMonth());
+      setTimeH(String(d.getHours()).padStart(2, '0'));
+      setTimeM(String(d.getMinutes()).padStart(2, '0'));
+    }
   }, [value]);
 
   // Закрытие по клику вне
@@ -100,14 +105,18 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   }, [open, withTime]);
 
   const handleSelect = useCallback((day: number) => {
-    const d = new Date(viewYear, viewMonth, day, timeH, timeM, 0, 0);
+    const h = parseInt(timeH, 10) || 0;
+    const m = parseInt(timeM, 10) || 0;
+    const d = new Date(viewYear, viewMonth, day, h, m, 0, 0);
     setSelDate(d);
     if (!withTime) { onChange(toISO(d, false)); setOpen(false); }
   }, [viewYear, viewMonth, timeH, timeM, withTime, onChange]);
 
   const handleConfirm = () => {
     if (!selDate) return;
-    const d = new Date(selDate.getFullYear(), selDate.getMonth(), selDate.getDate(), timeH, timeM, 0, 0);
+    const h = parseInt(timeH, 10) || 0;
+    const m = parseInt(timeM, 10) || 0;
+    const d = new Date(selDate.getFullYear(), selDate.getMonth(), selDate.getDate(), h, m, 0, 0);
     onChange(toISO(d, withTime));
     setOpen(false);
   };
@@ -140,10 +149,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return false;
   };
 
-  // Быстрый выбор года
+  // Быстрый выбор года — по умолчанию до текущего + 10 лет вперёд
   const currentYear = new Date().getFullYear();
   const minYear = min ? parseInt(min.slice(0, 4)) : 1900;
-  const maxYear = max ? parseInt(max.slice(0, 4)) : currentYear;
+  const maxYear = max ? parseInt(max.slice(0, 4)) : currentYear + 10;
   const yearRange: number[] = [];
   for (let y = Math.max(minYear, viewYear - 4); y <= Math.min(maxYear, viewYear + 4); y++) yearRange.push(y);
 
@@ -224,11 +233,25 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
             <div className={styles.timePicker}>
               <span className={styles.timeLabel}>Время</span>
               <div className={styles.timeInputs}>
-                <input type="number" className={styles.timeInput} min={0} max={23} value={timeH}
-                  onChange={e => setTimeH(Math.min(23, Math.max(0, +e.target.value)))} />
+                <input type="text" inputMode="numeric" className={styles.timeInput}
+                  value={timeH} placeholder="00" maxLength={2}
+                  onFocus={e => e.target.select()}
+                  onChange={e => setTimeH(e.target.value.replace(/\D/g, ''))}
+                  onBlur={e => {
+                    const n = Math.min(23, Math.max(0, parseInt(e.target.value, 10) || 0));
+                    setTimeH(String(n).padStart(2, '0'));
+                  }}
+                />
                 <span className={styles.timeSep}>:</span>
-                <input type="number" className={styles.timeInput} min={0} max={59} step={15} value={timeM}
-                  onChange={e => setTimeM(Math.min(59, Math.max(0, +e.target.value)))} />
+                <input type="text" inputMode="numeric" className={styles.timeInput}
+                  value={timeM} placeholder="00" maxLength={2}
+                  onFocus={e => e.target.select()}
+                  onChange={e => setTimeM(e.target.value.replace(/\D/g, ''))}
+                  onBlur={e => {
+                    const n = Math.min(59, Math.max(0, parseInt(e.target.value, 10) || 0));
+                    setTimeM(String(n).padStart(2, '0'));
+                  }}
+                />
               </div>
             </div>
           )}

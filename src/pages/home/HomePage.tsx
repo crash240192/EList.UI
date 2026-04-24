@@ -8,7 +8,7 @@ import { useEvents } from '@/features/event-list/useEvents';
 import { useFiltersStore, useFavoritesStore } from '@/app/store';
 import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
 import { EventModal } from './EventModal';
-import { FilterBar } from './FilterBar';
+import { FilterBar } from '@/features/event-filters/FilterBar';
 import { EventMap } from '@/features/event-map/EventMap';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { CityConfirmDialog } from '@/shared/ui/CityConfirmDialog/CityConfirmDialog';

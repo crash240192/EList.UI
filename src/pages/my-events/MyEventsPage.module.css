@@ -185,3 +185,11 @@
 
 .sentinel { height: 50px; display: flex; align-items: center; justify-content: center; }
 .loadingMore { font-size: 13px; color: var(--text-secondary); }
+
+/* Строка под FilterBar: вкладки + кнопка создать */
+.subHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}

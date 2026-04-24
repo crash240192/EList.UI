@@ -62,18 +62,18 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
 
       <div className={styles.coverOverlay} />
 
-      {event.eventType && (
-        <div className={styles.typeBadge}>
-          {event.eventType.ico && (
+      {/* Бейджи всех типов */}
+      {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes : event.eventType ? [event.eventType] : [])!.slice(0, 2).map(t => (
+        <div key={t.id} className={styles.typeBadge}>
+          {t.ico && (
             <img
-              src={event.eventType.ico.startsWith('data:') || event.eventType.ico.startsWith('http')
-                ? event.eventType.ico : `data:image/png;base64,${event.eventType.ico}`}
+              src={t.ico.startsWith('data:') || t.ico.startsWith('http') ? t.ico : `data:image/png;base64,${t.ico}`}
               alt="" width={12} height={12} style={{ objectFit: 'contain', borderRadius: 2 }}
             />
           )}
-          {event.eventType.name}
+          {t.name}
         </div>
-      )}
+      ))}
       {(event.parameters?.ageLimit ?? 0) > 0 && (
         <span className={styles.ageBadge}>{event.parameters!.ageLimit}+</span>
       )}

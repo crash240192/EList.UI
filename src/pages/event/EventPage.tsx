@@ -144,11 +144,21 @@ export default function EventPage() {
 
         {/* Bottom tags */}
         <div className={styles.heroBottom}>
-          {event.eventType?.eventCategory?.name && (
-            <span className={styles.tagCat}>{event.eventType.eventCategory.name}</span>
-          )}
-          {event.eventType?.name && (
-            <span className={styles.tagType}>{event.eventType.name}</span>
+          {/* Категории и типы */}
+          {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : event.eventType ? [event.eventType] : []).map(t => (
+            <span key={t.id} className={styles.tagType} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              {t.ico && (
+                <img src={t.ico.startsWith('data:') || t.ico.startsWith('http') ? t.ico : `data:image/png;base64,${t.ico}`}
+                  alt="" width={12} height={12} style={{ objectFit: 'contain', borderRadius: 2 }} />
+              )}
+              {t.name}
+            </span>
+          ))}
+          {/* Категория первого типа */}
+          {(event.eventTypes?.[0] ?? event.eventType)?.eventCategory?.name && (
+            <span className={styles.tagCat}>
+              {(event.eventTypes?.[0] ?? event.eventType)!.eventCategory!.name}
+            </span>
           )}
           {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
         </div>
@@ -218,8 +228,8 @@ export default function EventPage() {
 
           <div className={styles.actionBtns}>
             <button className={styles.btnShare} aria-label="Поделиться"><ShareIcon /></button>
-            {/* Кнопка «Пригласить» — только для организаторов */}
-            {isOrganizer && accountId && event?.id && (
+            {/* Кнопка «Пригласить» — для организаторов или если разрешено участникам */}
+            {accountId && event?.id && (isOrganizer || (isParticipating && event.parameters?.allowUsersToInvite)) && (
               <button
                 className={styles.btnShare}
                 title="Пригласить подписчиков"
@@ -398,7 +408,7 @@ export default function EventPage() {
 
       {participantsModalOpen && (
         <ParticipantsModal
-          participants={sortedParticipants}
+          eventId={id!}
           organizerIds={new Set(organizers.map(o => o.accountId))}
           currentAccountId={accountId}
           onClose={() => setParticipantsModalOpen(false)}

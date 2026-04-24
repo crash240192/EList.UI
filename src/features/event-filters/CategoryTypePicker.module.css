@@ -115,15 +115,26 @@
 
 .group {
   border-bottom: 1px solid var(--border);
+  position: relative; /* для цветной полосы */
 }
 
 .group:last-child { border-bottom: none; }
+
+/* Цветная полоса слева — задаётся через inline style на .catBar */
+.catBar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 0 2px 2px 0;
+  flex-shrink: 0;
+  pointer-events: none;
+}
 
 .categoryRow {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 18px;
+  padding: 11px 18px 11px 22px; /* увеличен левый отступ для полосы */
   cursor: pointer;
   transition: background 0.15s;
   user-select: none;
@@ -173,7 +184,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 18px 8px 44px;
+  padding: 8px 18px 8px 48px; /* немного увеличен под полосу */
   cursor: pointer;
   font-size: 13px;
   color: var(--text-secondary);
@@ -213,3 +224,9 @@
   transition: background 0.15s;
 }
 .applyBtn:hover { background: var(--accent-hover); }
+
+/* Иконка типа */
+.typeIcon {
+  width: 18px; height: 18px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}

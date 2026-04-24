@@ -13,6 +13,7 @@ export interface IEventCategory {
   namePath: string;     // slug-путь (напр. "music")
   ico: string | null;   // base64 иконка
   description: string | null;
+  color: string | null; // цвет категории, напр. "#6366f1"
 }
 
 export interface IEventType {
@@ -56,6 +57,8 @@ export interface IEvent {
   // Поля, которые фронтенд добавляет / обогащает:
   parameters?: IEventParameters | null;
   eventType?: IEventType | null;
+  /** Список типов мероприятия (приходит из API в поле Types) */
+  eventTypes?: IEventType[];
   /** URL обложки (из MediaAlbum) */
   coverUrl?:      string | null;
   coverImageId?:  string | null;
