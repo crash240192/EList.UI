@@ -156,10 +156,15 @@
     grid-template-columns: 1fr;
   }
   .page {
-    padding: 12px;
+    padding: 0;          /* карточка от края до края */
+  }
+  .card {
+    border-radius: 0;    /* без скруглений на мобиле */
+    border-left: none;
+    border-right: none;
   }
   .content {
-    padding: 16px;
+    padding: 12px 14px;  /* уменьшенные внутренние отступы */
   }
 }
 

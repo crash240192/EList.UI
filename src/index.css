@@ -99,3 +99,12 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
   filter: none;
   opacity: 0.5;
 }
+
+/* ── Мобиль: карточки от края до края ── */
+@media (max-width: 640px) {
+  /* Страницы с одной центральной карточкой убираем боковые отступы */
+  .page-card-mobile {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}

@@ -93,7 +93,7 @@ export function CitySearch({
           placeholder={placeholder}
           value={query}
           onChange={handleChange}
-          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          onFocus={e => { e.target.select(); if (suggestions.length > 0) setOpen(true); }}
           autoComplete="off"
         />
         {(geoLoading || searching) && <span className={styles.spinner}>📡</span>}

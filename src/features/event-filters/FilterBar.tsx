@@ -285,15 +285,15 @@ export function FilterBar({
           </div>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Цена, ₽</span>
-            <input type="number" min={0} step={100} className={styles.epInput}
+            <input type="number" className={styles.epInput}
               placeholder="Любая" value={filters.price ?? ''}
-              onChange={e => setFilter('price', e.target.value ? Number(e.target.value) : undefined)} />
+              onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
           </div>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Радиус, км</span>
-            <input type="number" min={1} max={500} step={5} className={styles.epInput}
+            <input type="number" className={styles.epInput}
               placeholder="25" value={radiusKm}
-              onChange={e => setFilter('locationRange', e.target.value ? Number(e.target.value) * 1000 : DEFAULT_RADIUS_M)} />
+              onChange={e => setFilter('locationRange', e.target.value !== '' ? Number(e.target.value) * 1000 : undefined)} />
           </div>
           <div className={styles.epFooter}>
             <button className={styles.epReset} onClick={handleReset}>Сбросить</button>

@@ -464,7 +464,7 @@ export default function CreateEventPage() {
           {endMode === 'duration' ? (
             <div className={styles.row}>
               <Field label="Часов">
-                <input className={styles.input} type="number" min={0} max={99} value={durationH} onChange={e => setDurationH(e.target.value)} />
+                <input className={styles.input} type="number" value={durationH} onChange={e => setDurationH(e.target.value)} />
               </Field>
               <Field label="Минут">
                 <select className={styles.input} value={durationM} onChange={e => setDurationM(e.target.value)}>
@@ -512,7 +512,7 @@ export default function CreateEventPage() {
                   locked={!canSetCost}
                   value={form.cost}
                   onChange={e => setForm(f => ({ ...f, cost: e.target.value }))}
-                  type="number" min={0} step={50}
+                  type="number" 
                   max={tariffValidator?.costLimit ? String(tariffValidator.costLimit) : undefined}
                   hint={canSetCost && tariffValidator?.costLimit
                     ? `до ${tariffValidator.costLimit.toLocaleString()} ₽`
@@ -524,7 +524,7 @@ export default function CreateEventPage() {
                   locked={!canSetMaxPersons}
                   value={form.maxPersons} placeholder="∞"
                   onChange={e => setForm(f => ({ ...f, maxPersons: e.target.value }))}
-                  type="number" min={1}
+                  type="number" 
                   hint={!canSetMaxPersons ? 'Недоступно в тарифе' : undefined}
                 />
               </Field>
@@ -535,7 +535,7 @@ export default function CreateEventPage() {
                 locked={!canSetAge}
                 value={form.ageLimit} placeholder="Нет"
                 onChange={e => setForm(f => ({ ...f, ageLimit: e.target.value }))}
-                type="number" min={0} max={99}
+                type="number"
                 suffix="лет и старше"
                 hint={!canSetAge ? 'Недоступно в тарифе' : undefined}
               />

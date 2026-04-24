@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchUserInvitations, type IInvitation } from '@/entities/invitation/invitationsApi';
+import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './InvitationsPage.module.css';
 
@@ -28,6 +29,22 @@ export default function InvitationsPage() {
       .catch(() => setErr('Не удалось загрузить приглашения'))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleAccept = async (invId: string, eventId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await apiClient.get(`/api/invitations/accept?invitationId=${invId}`);
+      navigate(`/event/${eventId}`);
+    } catch { /* ignore */ }
+  };
+
+  const handleDecline = async (invId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await apiClient.get(`/api/invitations/decline?invitationId=${invId}`);
+      setItems(prev => prev.filter(i => i.id !== invId));
+    } catch { /* ignore */ }
+  };
 
   return (
     <div className={styles.page}>
@@ -61,7 +78,6 @@ export default function InvitationsPage() {
         <div className={styles.list}>
           {items.map(inv => (
             <div key={inv.id} className={styles.card} onClick={() => navigate(`/event/${inv.eventId}`)}>
-              {/* Обложка */}
               <div className={styles.cover}>
                 {inv.event.coverImageId
                   ? <AuthImage fileId={inv.event.coverImageId} alt={inv.event.name} className={styles.coverImg} />
@@ -71,7 +87,6 @@ export default function InvitationsPage() {
                 }
               </div>
 
-              {/* Контент */}
               <div className={styles.content}>
                 <div className={styles.inviterRow}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -85,16 +100,21 @@ export default function InvitationsPage() {
                   {inv.event.address && (
                     <>
                       <span className={styles.metaDot}>·</span>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
                       <span className={styles.address}>{inv.event.address}</span>
                     </>
                   )}
                 </div>
-              </div>
 
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, opacity: 0.4 }}>
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
+                {/* Кнопки принять/отклонить */}
+                <div className={styles.actions}>
+                  <button className={styles.acceptBtn} onClick={e => handleAccept(inv.id, inv.eventId, e)}>
+                    Принять
+                  </button>
+                  <button className={styles.declineBtn} onClick={e => handleDecline(inv.id, e)}>
+                    Отклонить
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
         </div>
