@@ -52,11 +52,38 @@ export function FilterBar({
   const [expanded,       setExpanded]       = useState(false);
   const [pickerOpen,     setPickerOpen]     = useState(false);
   const [showCity,       setShowCity]       = useState(false);
-  const [cityName,       setCityName]       = useState(() => cookies.get('elist_city_name') ?? '');
+  const [cityName, setCityName] = useState(() => cookies.get('elist_city_name') ?? '');
+
+  // Подставляем координаты и радиус по умолчанию
+  const storedCoords = getStoredUserCoords();
+
+  // Синхронизируем название города если пользователь сменил его в настройках
+  useEffect(() => {
+    const savedName = cookies.get('elist_city_name') ?? '';
+    setCityName(savedName);
+  }, [storedCoords.lat, storedCoords.lng]);
   const [draftTypes,     setDraftTypes]     = useState<string[]>(filters.types ?? []);
   const [draftCats,      setDraftCats]      = useState<string[]>(filters.categories ?? []);
   type QuickDate = 'today'|'tomorrow'|'weekend'|null;
   const [quickDate,      setQuickDate]      = useState<QuickDate>(null);
+
+  // Храним onSearch в ref чтобы избежать stale closure в слушателях событий
+  const onSearchRef = useRef(onSearch);
+  useEffect(() => { onSearchRef.current = onSearch; }, [onSearch]);
+
+  // Слушаем «Искать здесь» от карты
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { lat, lng, radius } = (e as CustomEvent<{ lat: number; lng: number; radius: number }>).detail;
+      setCityName(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      // Все три setFilter — Zustand обновит стор, useEvents среагирует автоматически
+      useFiltersStore.getState().setFilter('latitude',      lat);
+      useFiltersStore.getState().setFilter('longitude',     lng);
+      useFiltersStore.getState().setFilter('locationRange', radius);
+    };
+    window.addEventListener('elist:searchHere', handler);
+    return () => window.removeEventListener('elist:searchHere', handler);
+  }, []);
 
   // Для portal-позиции дропдауна города
   const cityBtnRef = useRef<HTMLButtonElement>(null);
@@ -64,8 +91,6 @@ export function FilterBar({
 
   useEffect(() => { fetchEventTypes().then(setAllTypes).catch(() => {}); }, []);
 
-  // Подставляем координаты и радиус по умолчанию
-  const storedCoords = getStoredUserCoords();
   const savedLocation = useRef<{ lat?: number; lng?: number; range?: number } | null>(null);
 
   useEffect(() => {

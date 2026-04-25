@@ -35,22 +35,9 @@
 
 /* ── Дропдаун — десктоп ── */
 .dropdown {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-  z-index: 1000; overflow: hidden; max-height: 260px; overflow-y: auto;
-}
-
-/* ── На мобиле — фиксированная панель снизу ── */
-@media (max-width: 767px) {
-  .dropdown {
-    position: fixed;
-    left: 0; right: 0; bottom: 0; top: auto;
-    border-radius: 16px 16px 0 0;
-    max-height: 50vh;
-    z-index: 9999;
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
-  }
+  overflow: hidden; max-height: 260px; overflow-y: auto;
 }
 
 .item {

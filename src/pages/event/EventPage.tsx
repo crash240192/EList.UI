@@ -20,6 +20,15 @@ import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
+/** Возвращает белый или тёмный текст под цвет фона */
+function contrastColor(hex: string): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? '#1a1a2e' : '#ffffff';
+}
+
 export default function EventPage() {
   const { id }   = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -145,15 +154,24 @@ export default function EventPage() {
         {/* Bottom tags */}
         <div className={styles.heroBottom}>
           {/* Категории и типы */}
-          {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : event.eventType ? [event.eventType] : []).map(t => (
-            <span key={t.id} className={styles.tagType} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              {t.ico && (
-                <img src={t.ico.startsWith('data:') || t.ico.startsWith('http') ? t.ico : `data:image/png;base64,${t.ico}`}
-                  alt="" width={12} height={12} style={{ objectFit: 'contain', borderRadius: 2 }} />
-              )}
-              {t.name}
-            </span>
-          ))}
+          {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : event.eventType ? [event.eventType] : []).map(t => {
+            const catColor = t.eventCategory?.color ?? '#6366f1';
+                const textColor = contrastColor(catColor);
+            return (
+              <span key={t.id} className={styles.tagType} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                background: `${catColor}55`,
+                border: `1px solid ${catColor}44`,
+                color: textColor,
+              }}>
+                {t.ico && (
+                  <img src={t.ico.startsWith('data:') || t.ico.startsWith('http') ? t.ico : `data:image/png;base64,${t.ico}`}
+                    alt="" width={12} height={12} style={{ objectFit: 'contain', borderRadius: 2 }} />
+                )}
+                {t.name}
+              </span>
+            );
+          })}
           {/* Категория первого типа */}
           {(event.eventTypes?.[0] ?? event.eventType)?.eventCategory?.name && (
             <span className={styles.tagCat}>

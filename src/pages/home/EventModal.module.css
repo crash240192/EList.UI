@@ -33,12 +33,6 @@
 @keyframes scaleIn { from { opacity: 0; transform: translate(-50%,-48%) scale(0.95); } to { opacity: 1; transform: translate(-50%,-50%); } }
 
 /* Ручка */
-.handle {
-  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
-  width: 36px; height: 4px; border-radius: 2px;
-  background: rgba(255,255,255,0.25); z-index: 2;
-}
-
 /* Cover */
 .cover {
   position: relative; height: 148px; flex-shrink: 0;

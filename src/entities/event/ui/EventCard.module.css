@@ -30,8 +30,11 @@
 }
 
 /* Бейджи на обложке */
-.typeBadge {
+.typeBadges {
   position: absolute; bottom: 8px; left: 8px;
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+}
+.typeBadge {
   background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
   color: #fff; font-size: 10px; font-weight: 500;
   padding: 3px 8px; border-radius: 20px;

@@ -70,7 +70,7 @@
 .cityWrap { position: relative; flex-shrink: 0; }
 .cityBtn {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 10px; border-radius: 20px; font-size: 12px;
+  padding: 7px 12px; border-radius: 20px; font-size: 13px;
   border: 1px solid var(--border); background: var(--surface-2);
   cursor: pointer; color: var(--text-primary); font-weight: 500;
   white-space: nowrap; transition: border-color .15s;
@@ -87,23 +87,23 @@
 /* Быстрые кнопки */
 .quickBtn {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 10px; border-radius: 20px; font-size: 12px;
+  padding: 7px 12px; border-radius: 20px; font-size: 13px;
   border: 1px solid var(--border); background: none;
   cursor: pointer; color: var(--text-secondary); white-space: nowrap;
   flex-shrink: 0; transition: all .15s;
 }
 .quickBtn:hover { border-color: var(--accent); color: var(--accent); }
 .quickBtnOn { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
-.quickBtnIcon { padding: 4px 7px; }
+.quickBtnIcon { padding: 7px 9px; }
 
 /* 2 — Кнопка «Дополнительно» прижата вправо через margin-left:auto */
 .moreBtn {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 10px; border-radius: 20px; font-size: 12px;
+  padding: 7px 12px; border-radius: 20px; font-size: 13px;
   border: 1px dashed var(--border); background: none;
   cursor: pointer; color: var(--text-secondary); white-space: nowrap;
   flex-shrink: 0; transition: all .15s;
-  margin-left: auto; /* прижимаем вправо, визуально отделяем от остальных */
+  margin-left: auto;
 }
 .moreBtn:hover   { border-color: var(--accent); color: var(--accent); border-style: solid; }
 .moreBtnOpen     { border-style: solid; border-color: var(--accent); color: var(--accent); }

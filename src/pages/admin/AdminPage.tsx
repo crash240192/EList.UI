@@ -123,7 +123,7 @@ function EventTypesTab() {
                 >
                   {expandedCat === cat.id ? '▾' : '▸'}
                 </button>
-                <div className={styles.itemInfo} onClick={() => setEditingCat(cat)}>
+                <div className={styles.itemInfo} onClick={() => { setEditingCat(cat); setEditingType(null); setNewTypeCatId(null); }}>
                   <span className={styles.itemName}>{cat.name}</span>
                   <span className={styles.itemSub}>{cat.localizationPath}</span>
                 </div>
@@ -146,7 +146,7 @@ function EventTypesTab() {
                 <div className={styles.typesList}>
                   {typesForCat(cat.id).map(tp => (
                     <div key={tp.id} className={styles.typeRow}>
-                      <div className={styles.itemInfo} onClick={() => setEditingType(tp)}>
+                      <div className={styles.itemInfo} onClick={() => { setEditingType(tp); setEditingCat(null); }}>
                         {tp.ico && (
                           icoToDisplayUrl(tp.ico).startsWith('data:') || icoToDisplayUrl(tp.ico).startsWith('http')
                             ? <img src={icoToDisplayUrl(tp.ico)} alt="" style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />
@@ -191,6 +191,7 @@ function EventTypesTab() {
         </button>
         {editingCat !== null && (
           <CategoryForm
+            key={editingCat === 'new' ? 'new-cat' : editingCat.id}
             category={editingCat === 'new' ? null : editingCat}
             onSave={async (data) => {
               if (editingCat === 'new') {
@@ -207,6 +208,7 @@ function EventTypesTab() {
 
         {editingType !== null && (
           <TypeForm
+            key={editingType === 'new' ? 'new-type' : editingType.id}
             type={editingType === 'new' ? null : editingType}
             categories={categories}
             defaultCategoryId={newTypeCatId}
@@ -523,6 +525,7 @@ function ContactTypesTab() {
         </button>
         {editing !== null ? (
           <ContactTypeForm
+            key={editing === 'new' ? 'new-contact' : (editing as IContactType).id}
             item={editing === 'new' ? null : editing}
             onSave={async (data) => {
               if (editing === 'new') {
@@ -692,6 +695,7 @@ function TariffsTab() {
         </button>
         {editing !== null ? (
           <TariffForm
+            key={editing === 'new' ? 'new-tariff' : (editing as ITariff).id}
             tariff={editing === 'new' ? null : editing}
             onSave={async (validatorData, tariffData) => {
               if (editing === 'new') {

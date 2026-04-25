@@ -49,6 +49,25 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
   type QuickDate = 'today'|'tomorrow'|'weekend'|null;
   const [quickDate,      setQuickDate]      = useState<QuickDate>(null);
 
+  // Храним onSearch в ref чтобы избежать stale closure
+  const onSearchRef = useRef(onSearch);
+  useEffect(() => { onSearchRef.current = onSearch; }, [onSearch]);
+
+  // Слушаем «Искать здесь» от карты — событие несёт координаты и радиус
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { lat, lng, radius } = (e as CustomEvent<{ lat: number; lng: number; radius: number }>).detail;
+      setCityName(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      setFilter('latitude',      lat);
+      setFilter('longitude',     lng);
+      setFilter('locationRange', radius);
+      // Небольшая задержка чтобы стор успел обновиться перед запросом
+      setTimeout(() => onSearchRef.current(), 50);
+    };
+    window.addEventListener('elist:searchHere', handler);
+    return () => window.removeEventListener('elist:searchHere', handler);
+  }, []);
+
   // Для portal-позиции дропдауна города
   const cityBtnRef = useRef<HTMLButtonElement>(null);
   const [cityDropStyle, setCityDropStyle] = useState<React.CSSProperties>({});

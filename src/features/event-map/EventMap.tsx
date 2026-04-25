@@ -85,11 +85,14 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
-  // Храним актуальный center в ref чтобы closure в обработчике всегда видела свежие координаты
+  // Контекстное меню «Искать здесь»
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; lat: number; lng: number } | null>(null);
+
+  // Храним актуальный center в ref
   const centerRef = useRef(center);
   useEffect(() => { centerRef.current = center; }, [center]);
 
-  // Центрирование по событию от кнопки лого или смены города в фильтрах
+  // Центрирование по событию
   useEffect(() => {
     const handler = (e: Event) => {
       if (!mapRef.current) return;
@@ -97,16 +100,24 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
       const target: [number, number] = (detail?.lat && detail?.lng)
         ? [detail.lat, detail.lng]
         : centerRef.current;
-      // setCenter — правильный метод в Яндекс.Картах API 2.1
       mapRef.current.setCenter(target, 12, { checkZoomRange: true, duration: 500 });
     };
     window.addEventListener('elist:centerMap', handler);
     return () => window.removeEventListener('elist:centerMap', handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Закрытие контекстного меню при клике вне
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const fn = () => setCtxMenu(null);
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, [ctxMenu]);
+
   const { theme } = useThemeStore();
 
-  // Состояние списка мероприятий на одной точке + позиция
+  // Список мероприятий на одной точке
   const [groupState, setGroupState] = useState<{ events: IEvent[]; x: number; y: number } | null>(null);
 
   const showGroup = useCallback((group: IEvent[], x: number, y: number) => {
@@ -116,6 +127,12 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
     }
     setGroupState({ events: group, x, y });
   }, [onMarkerClick]);
+
+  // Применяем «Искать здесь» — пишем координаты и радиус в стор через событие
+  const handleSearchHere = (lat: number, lng: number, radius: number) => {
+    setCtxMenu(null);
+    window.dispatchEvent(new CustomEvent('elist:searchHere', { detail: { lat, lng, radius } }));
+  };
 
   useEffect(() => {
     let destroyed = false;
@@ -128,6 +145,41 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
         type: 'yandex#map',
       });
       mapRef.current = map;
+
+      // Правый клик — контекстное меню
+      map.events.add('contextmenu', (e: any) => {
+        const coords = e.get('coords');         // [lat, lng]
+        const pixel  = e.get('domEvent').originalEvent;
+        if (!coords || !containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        setCtxMenu({
+          x: pixel.clientX - rect.left,
+          y: pixel.clientY - rect.top,
+          lat: coords[0], lng: coords[1],
+        });
+        setGroupState(null);
+      });
+
+      // Долгое нажатие (~600ms) — для тач-устройств
+      let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+      map.events.add('mousedown', (e: any) => {
+        if (e.get('domEvent').originalEvent.button !== 0) return; // только левая кнопка
+        const coords = e.get('coords');
+        const pixel  = e.get('domEvent').originalEvent;
+        if (!coords || !containerRef.current) return;
+        longPressTimer = setTimeout(() => {
+          const rect = containerRef.current!.getBoundingClientRect();
+          setCtxMenu({
+            x: (pixel.touches?.[0]?.clientX ?? pixel.clientX) - rect.left,
+            y: (pixel.touches?.[0]?.clientY ?? pixel.clientY) - rect.top,
+            lat: coords[0], lng: coords[1],
+          });
+          setGroupState(null);
+        }, 600);
+      });
+      map.events.add('mouseup',   () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } });
+      map.events.add('mousemove', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } });
+
       setReady(true);
     }).catch(e => setError(e.message));
     return () => {
@@ -231,6 +283,62 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
         className={styles.eventsMap}
         style={theme === 'dark' ? { filter: 'invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9)' } : undefined}
       />
+
+      {/* Контекстное меню «Искать поблизости» */}
+      {ctxMenu && (
+        <div
+          onMouseDown={e => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            left: Math.min(ctxMenu.x + 4, (containerRef.current?.offsetWidth ?? 300) - 190),
+            top:  Math.min(ctxMenu.y + 4, (containerRef.current?.offsetHeight ?? 400) - 200),
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.28)',
+            zIndex: 50,
+            minWidth: 180,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Заголовок */}
+          <div style={{
+            padding: '8px 14px 6px',
+            fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+            letterSpacing: '0.06em', color: 'var(--text-secondary)',
+            borderBottom: '1px solid var(--border)',
+          }}>
+            Искать поблизости
+          </div>
+
+          {/* Варианты радиуса */}
+          {[
+            { label: '300 м',  radius: 300   },
+            { label: '500 м',  radius: 500   },
+            { label: '1 км',   radius: 1000  },
+            { label: '3 км',   radius: 3000  },
+            { label: '5 км',   radius: 5000  },
+          ].map(({ label, radius }) => (
+            <button key={radius}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', padding: '9px 14px', background: 'none', border: 'none',
+                borderBottom: '1px solid var(--border)',
+                cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', textAlign: 'left',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+              onClick={() => handleSearchHere(ctxMenu.lat, ctxMenu.lng, radius)}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="3" fill="var(--accent)" stroke="none"/>
+              </svg>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Список мероприятий на одной точке */}
       {groupState && (

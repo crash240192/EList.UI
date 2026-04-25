@@ -63,17 +63,24 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
       <div className={styles.coverOverlay} />
 
       {/* Бейджи всех типов */}
-      {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes : event.eventType ? [event.eventType] : [])!.slice(0, 2).map(t => (
-        <div key={t.id} className={styles.typeBadge}>
-          {t.ico && (
-            <img
-              src={t.ico.startsWith('data:') || t.ico.startsWith('http') ? t.ico : `data:image/png;base64,${t.ico}`}
-              alt="" width={12} height={12} style={{ objectFit: 'contain', borderRadius: 2 }}
-            />
-          )}
-          {t.name}
-        </div>
-      ))}
+      <div className={styles.typeBadges}>
+        {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes : event.eventType ? [event.eventType] : [])!.slice(0, 2).map(t => {
+          const catColor = t.eventCategory?.color ?? '#6366f1';
+          return (
+            <div key={t.id} className={styles.typeBadge} style={{
+              background: `${catColor}55`,
+              border: `1px solid ${catColor}99`,
+              color: '#ffffff',
+            }}>
+              {t.ico && (
+                <img src={t.ico.startsWith('data:') || t.ico.startsWith('http') ? t.ico : `data:image/png;base64,${t.ico}`}
+                  alt={t.name} width={12} height={12} style={{ objectFit: 'contain', borderRadius: 2 }} />
+              )}
+              <span>{t.name}</span>
+            </div>
+          );
+        })}
+      </div>
       {(event.parameters?.ageLimit ?? 0) > 0 && (
         <span className={styles.ageBadge}>{event.parameters!.ageLimit}+</span>
       )}
@@ -112,7 +119,7 @@ function Price() {
   const cost = event.parameters?.cost ?? 0;
   return (
     <span className={`${styles.price} ${cost === 0 ? styles.priceFree : styles.pricePaid}`}>
-      {formatPrice(cost)}
+      {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
     </span>
   );
 }

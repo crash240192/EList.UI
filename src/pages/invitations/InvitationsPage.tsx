@@ -8,13 +8,20 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './InvitationsPage.module.css';
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+  });
 }
 
 function inviterName(inv: IInvitation): string {
   const p = inv.inviter?.personInfo;
   if (p?.firstName) return `${p.firstName} ${p.lastName ?? ''}`.trim();
   return inv.inviter?.account?.login ?? 'Неизвестный';
+}
+
+function icoSrc(ico: string): string {
+  return (ico.startsWith('data:') || ico.startsWith('http') || ico.startsWith('/'))
+    ? ico : `data:image/png;base64,${ico}`;
 }
 
 export default function InvitationsPage() {
@@ -30,11 +37,12 @@ export default function InvitationsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleAccept = async (invId: string, eventId: string, e: React.MouseEvent) => {
+  const handleAccept = async (inv: IInvitation, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await apiClient.get(`/api/invitations/accept?invitationId=${invId}`);
-      navigate(`/event/${eventId}`);
+      await apiClient.get(`/api/invitations/accept?invitationId=${inv.id}`);
+      setItems(prev => prev.filter(i => i.id !== inv.id));
+      navigate(`/event/${inv.eventId}`);
     } catch { /* ignore */ }
   };
 
@@ -48,77 +56,111 @@ export default function InvitationsPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Приглашения</h1>
-        {!loading && items.length > 0 && (
-          <span className={styles.count}>{items.length}</span>
-        )}
-      </div>
+      <div className={styles.inner}>
 
-      {loading && (
-        <div className={styles.loadingList}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={styles.skeleton} />
-          ))}
-        </div>
-      )}
+        {/* Заголовок карточки */}
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h1 className={styles.cardTitle}>Приглашения</h1>
+            {!loading && items.length > 0 && (
+              <span className={styles.badge}>{items.length}</span>
+            )}
+          </div>
 
-      {err && <div className={styles.err}>{err}</div>}
+          {/* Загрузка */}
+          {loading && (
+            <div className={styles.skeletons}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className={styles.skeleton} />
+              ))}
+            </div>
+          )}
 
-      {!loading && !err && items.length === 0 && (
-        <div className={styles.empty}>
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.35 }}>
-            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.8 19.8 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
-          </svg>
-          <p>Приглашений пока нет</p>
-        </div>
-      )}
+          {/* Ошибка */}
+          {err && <div className={styles.err}>{err}</div>}
 
-      {!loading && items.length > 0 && (
-        <div className={styles.list}>
-          {items.map(inv => (
-            <div key={inv.id} className={styles.card} onClick={() => navigate(`/event/${inv.eventId}`)}>
-              <div className={styles.cover}>
-                {inv.event.coverImageId
-                  ? <AuthImage fileId={inv.event.coverImageId} alt={inv.event.name} className={styles.coverImg} />
-                  : <div className={styles.coverPlaceholder}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          {/* Пусто */}
+          {!loading && !err && items.length === 0 && (
+            <div className={styles.empty}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.8 19.8 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+              </svg>
+              <p>Приглашений пока нет</p>
+            </div>
+          )}
+
+          {/* Список */}
+          {!loading && items.map(inv => {
+            const event = inv.event;
+            const types = (event as any).eventTypes ?? (event as any).eventType ? [(event as any).eventType] : [];
+            const params = (event as any).parameters;
+            const cost   = params?.cost ?? 0;
+            const age    = params?.ageLimit;
+
+            return (
+              <div key={inv.id} className={styles.item}>
+                {/* Левая часть: обложка + текст */}
+                <div className={styles.itemLeft} onClick={() => navigate(`/event/${inv.eventId}`)}>
+                  <div className={styles.cover}>
+                    {event.coverImageId
+                      ? <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg} />
+                      : <div className={styles.coverPlaceholder} />}
+                  </div>
+                  <div className={styles.content}>
+                    <div className={styles.who}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      <span className={styles.whoName}>{inviterName(inv)}</span>
+                      <span>приглашает</span>
                     </div>
-                }
-              </div>
-
-              <div className={styles.content}>
-                <div className={styles.inviterRow}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  <span className={styles.inviterName}>{inviterName(inv)}</span>
-                  <span className={styles.inviterSuffix}>приглашает</span>
+                    <div className={styles.eName}>{event.name}</div>
+                    <div className={styles.meta}>
+                      <div className={styles.mi}>
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        {formatDate(event.startTime)}
+                      </div>
+                      {event.address && (
+                        <div className={styles.mi}>
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                          {event.address}
+                        </div>
+                      )}
+                      <div className={`${styles.mi} ${cost === 0 ? styles.miFree : styles.miPaid}`}>
+                        {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
+                      </div>
+                      {age && age > 0 && <div className={styles.mi}>{age}+</div>}
+                    </div>
+                    {types.length > 0 && (
+                      <div className={styles.chips}>
+                        {types.filter(Boolean).slice(0, 3).map((t: any) => {
+                          const color = t.eventCategory?.color ?? '#6366f1';
+                          return (
+                            <span key={t.id} className={styles.chip} style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
+                              {t.ico && <img src={icoSrc(t.ico)} alt="" width={10} height={10} style={{ objectFit: 'contain', borderRadius: 2 }} />}
+                              {t.name}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className={styles.eventName}>{inv.event.name}</div>
-                <div className={styles.eventMeta}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  {formatDate(inv.event.startTime)}
-                  {inv.event.address && (
-                    <>
-                      <span className={styles.metaDot}>·</span>
-                      <span className={styles.address}>{inv.event.address}</span>
-                    </>
-                  )}
-                </div>
 
-                {/* Кнопки принять/отклонить */}
-                <div className={styles.actions}>
-                  <button className={styles.acceptBtn} onClick={e => handleAccept(inv.id, inv.eventId, e)}>
+                {/* Правая часть: кнопки вертикально */}
+                <div className={styles.itemActions}>
+                  <button className={`${styles.btn} ${styles.btnOk}`} onClick={e => handleAccept(inv, e)}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                     Принять
                   </button>
-                  <button className={styles.declineBtn} onClick={e => handleDecline(inv.id, e)}>
+                  <button className={`${styles.btn} ${styles.btnNo}`} onClick={e => handleDecline(inv.id, e)}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     Отклонить
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      )}
+      </div>
     </div>
   );
 }

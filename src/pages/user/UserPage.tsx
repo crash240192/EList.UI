@@ -160,6 +160,15 @@ export default function UserPage() {
     ]).then(([s, sc]) => { setSubsCount(s); setSubscrCount(sc); });
   }, [profileAccountId]);
 
+  useEffect(() => {
+    if (!profileAccountId || !myAccountId || isOwnProfile) return;
+    fetchSubscriptions(myAccountId)
+      .then(list => {
+        setIsSubscribed(list.some(s => s.account.id === profileAccountId));
+      })
+      .catch(() => {});
+  }, [profileAccountId, myAccountId, isOwnProfile]);
+
   const handleSubscribe = useCallback(async (settings: INotifySettings) => {
     if (!profileAccountId) return;
     await subscribe(profileAccountId, settings);

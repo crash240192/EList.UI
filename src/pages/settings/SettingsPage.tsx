@@ -178,6 +178,9 @@ function CitySection() {
       cookies.set('elist_acct_lat', String(selectedCity.lat), 30);
       cookies.set('elist_acct_lng', String(selectedCity.lng), 30);
       cookies.set('elist_city_decided', '1', 30);
+      // Синхронизируем название города для FilterBar
+      const displayName = selectedCity.shortName ?? selectedCity.name;
+      cookies.set('elist_city_name', displayName, 30);
       setMsg({ text: `Город изменён на ${selectedCity.name}`, ok: true });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });

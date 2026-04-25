@@ -1,6 +1,7 @@
 // shared/ui/CitySearch/CitySearch.tsx
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import type { ICity } from '@/features/auth/useGeoCity';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import styles from './CitySearch.module.css';
@@ -24,14 +25,35 @@ export function CitySearch({
   const [suggestions, setSuggestions] = useState<ICity[]>([]);
   const [open,        setOpen]        = useState(false);
   const [searching,   setSearching]   = useState(false);
+  const [dropStyle,   setDropStyle]   = useState<React.CSSProperties>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const wrapRef     = useRef<HTMLDivElement>(null);
+  const inputRef    = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setQuery(value); }, [value]);
 
+  // Вычисляем позицию дропдауна под полем ввода
+  const updateDropPos = useCallback(() => {
+    if (!inputRef.current) return;
+    const r = inputRef.current.getBoundingClientRect();
+    setDropStyle({
+      position: 'fixed',
+      top: r.bottom + 4,
+      left: r.left,
+      width: r.width,
+      zIndex: 9999,
+    });
+  }, []);
+
+  // Закрытие по клику вне
   useEffect(() => {
     const fn = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      const drop = document.querySelector('[data-citysearch-drop]');
+      if (
+        wrapRef.current?.contains(e.target as Node) ||
+        drop?.contains(e.target as Node)
+      ) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', fn);
     return () => document.removeEventListener('mousedown', fn);
@@ -66,16 +88,21 @@ export function CitySearch({
         items.push({ name: name + suffix, shortName: name, lat: coords[0], lng: coords[1] });
       });
       setSuggestions(items);
-      setOpen(items.length > 0);
+      if (items.length > 0) { updateDropPos(); setOpen(true); }
+      else setOpen(false);
     } catch { setSuggestions([]); }
     finally { setSearching(false); }
-  }, []);
+  }, [updateDropPos]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value;
     setQuery(q);
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => search(q), 350);
+  };
+
+  const handleFocus = () => {
+    if (suggestions.length > 0) { updateDropPos(); setOpen(true); }
   };
 
   const handleSelect = (city: ICity) => {
@@ -89,11 +116,12 @@ export function CitySearch({
     <div ref={wrapRef} className={`${styles.wrap} ${className ?? ''}`}>
       <div className={styles.inputRow}>
         <input
+          ref={inputRef}
           className={styles.input}
           placeholder={placeholder}
           value={query}
           onChange={handleChange}
-          onFocus={e => { e.target.select(); if (suggestions.length > 0) setOpen(true); }}
+          onFocus={handleFocus}
           autoComplete="off"
         />
         {(geoLoading || searching) && <span className={styles.spinner}>📡</span>}
@@ -111,8 +139,8 @@ export function CitySearch({
         )}
       </div>
 
-      {open && suggestions.length > 0 && (
-        <div className={styles.dropdown}>
+      {open && suggestions.length > 0 && createPortal(
+        <div data-citysearch-drop style={dropStyle} className={styles.dropdown}>
           {suggestions.map((c, i) => (
             <button key={i} className={styles.item}
               onMouseDown={e => { e.preventDefault(); handleSelect(c); }}>
@@ -123,7 +151,8 @@ export function CitySearch({
               {c.name}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
