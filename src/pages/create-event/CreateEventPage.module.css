@@ -347,3 +347,18 @@
 }
 .confirmOk:hover:not(:disabled) { background: var(--accent-hover); }
 .confirmOk:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Двухколоночная строка дата+длительность */
+.dateRow {
+  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;
+}
+/* Для многодневного — одинаковые колонки */
+.dateRowEqual {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start;
+}
+@media (max-width: 480px) { .dateRowEqual { grid-template-columns: 1fr; } }
+
+/* Обёртка колеса длительности — выравнивание по высоте поля */
+.durationWheelWrap {
+  display: flex; align-items: center; padding: 4px 0;
+}

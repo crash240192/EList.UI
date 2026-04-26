@@ -167,3 +167,62 @@
   border-bottom-color: var(--accent);
   background: rgba(99,102,241,0.06);
 }
+
+/* ── Мобильная компактная строка ── */
+.mobileBar {
+  display: none; /* Скрыта на десктопе */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px 10px;
+  align-items: center; gap: 7px;
+  position: relative; z-index: 10;
+}
+.mobileFilterBtn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--surface-2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; position: relative;
+  color: var(--text-secondary); transition: all .12s;
+}
+.mobileFilterBtn:hover { border-color: var(--accent); color: var(--accent); }
+.mobileFilterBadge {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--accent); color: #fff;
+  font-size: 9px; font-weight: 700;
+  width: 15px; height: 15px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .bar { display: none; } /* Прячем десктопный FilterBar */
+  .mobileBar { display: flex; }
+}
+
+/* Мобильные вкладки под строкой поиска */
+.mobileTabsRow {
+  display: none;
+  background: var(--surface);
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+}
+.mobileTab {
+  flex: 1; padding: 9px 6px; font-size: 12px; font-weight: 500;
+  color: var(--text-secondary); background: none; border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer; transition: all .12s; white-space: nowrap;
+}
+.mobileTab:hover { color: var(--text-primary); }
+.mobileTabActive { color: var(--accent) !important; border-bottom-color: var(--accent); }
+
+@media (max-width: 640px) {
+  .mobileTabsRow { display: flex; }
+  .mobileBar { border-radius: 14px 14px 0 0; border-bottom: none; }
+}
+
+/* Слайдер радиуса */
+.epSlider {
+  width: 100%; accent-color: var(--accent);
+  height: 4px; cursor: pointer; margin-top: 4px;
+}

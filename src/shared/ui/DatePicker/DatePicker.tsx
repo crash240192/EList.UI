@@ -1,21 +1,17 @@
 // shared/ui/DatePicker/DatePicker.tsx
-// Кастомный выбор даты (и опционально времени) в стилистике EList
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './DatePicker.module.css';
 
 interface DatePickerProps {
-  /** Значение в формате ISO или YYYY-MM-DD */
   value: string;
   onChange: (iso: string) => void;
-  /** Показывать выбор времени */
   withTime?: boolean;
-  /** Только дата, без времени (если withTime=false) */
   placeholder?: string;
   label?: string;
-  min?: string; // YYYY-MM-DD
-  max?: string; // YYYY-MM-DD
+  min?: string;
+  max?: string;
   className?: string;
   hasError?: boolean;
 }
@@ -23,6 +19,8 @@ interface DatePickerProps {
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
                  'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
 
 function parseValue(value: string): Date | null {
   if (!value) return null;
@@ -31,9 +29,9 @@ function parseValue(value: string): Date | null {
 }
 
 function formatDisplay(date: Date, withTime: boolean): string {
-  const day   = date.getDate();
+  const day = date.getDate();
   const month = MONTHS[date.getMonth()];
-  const year  = date.getFullYear();
+  const year = date.getFullYear();
   if (!withTime) return `${day} ${month} ${year}`;
   const hh = String(date.getHours()).padStart(2, '0');
   const mm = String(date.getMinutes()).padStart(2, '0');
@@ -45,20 +43,92 @@ function toISO(date: Date, withTime: boolean): string {
   return date.toISOString();
 }
 
+// Колесо прокрутки для выбора часов/минут
+function TimeWheel({ items, selected, onSelect }: {
+  items: string[];
+  selected: string;
+  onSelect: (v: string) => void;
+}) {
+  const ITEM_H = 36;
+  const VISIBLE = 5; // видимых строк
+  const listRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const startY = useRef(0);
+  const startIdx = useRef(0);
+  const [idx, setIdx] = useState(() => Math.max(0, items.indexOf(selected)));
+
+  useEffect(() => {
+    const i = Math.max(0, items.indexOf(selected));
+    setIdx(i);
+    if (listRef.current) {
+      listRef.current.scrollTop = i * ITEM_H;
+    }
+  }, [selected, items]);
+
+  const scrollToIdx = useCallback((i: number) => {
+    const clamped = Math.max(0, Math.min(items.length - 1, i));
+    setIdx(clamped);
+    onSelect(items[clamped]);
+    if (listRef.current) {
+      listRef.current.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
+    }
+  }, [items, onSelect]);
+
+  const handleScroll = useCallback(() => {
+    if (!listRef.current) return;
+    const i = Math.round(listRef.current.scrollTop / ITEM_H);
+    if (i !== idx) { setIdx(i); onSelect(items[Math.min(i, items.length - 1)]); }
+  }, [idx, items, onSelect]);
+
+  return (
+    <div className={styles.wheel} style={{ height: ITEM_H * VISIBLE }}>
+      {/* Подсветка выбранного */}
+      <div className={styles.wheelHighlight} style={{ top: ITEM_H * Math.floor(VISIBLE / 2) }} />
+      <div
+        ref={listRef}
+        className={styles.wheelList}
+        onScroll={handleScroll}
+        style={{ height: ITEM_H * VISIBLE }}
+      >
+        {/* Паддинг сверху и снизу чтобы крайние элементы попадали в центр */}
+        <div style={{ height: ITEM_H * Math.floor(VISIBLE / 2) }} />
+        {items.map((v, i) => (
+          <div key={v}
+            className={`${styles.wheelItem} ${i === idx ? styles.wheelItemActive : ''}`}
+            style={{ height: ITEM_H }}
+            onClick={() => scrollToIdx(i)}>
+            {v}
+          </div>
+        ))}
+        <div style={{ height: ITEM_H * Math.floor(VISIBLE / 2) }} />
+      </div>
+    </div>
+  );
+}
+
 export function DatePicker({ value, onChange, withTime = false, placeholder, min, max, className, hasError }: DatePickerProps) {
-  const [open, setOpen]     = useState(false);
-  const wrapRef             = useRef<HTMLDivElement>(null);
-  const fieldRef            = useRef<HTMLButtonElement>(null);
+  const [open, setOpen]       = useState(false);
+  const wrapRef               = useRef<HTMLDivElement>(null);
+  const fieldRef              = useRef<HTMLButtonElement>(null);
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
+  const [isMobile, setIsMobile] = useState(false);
 
   const parsed = parseValue(value);
-  const [viewYear,  setViewYear]  = useState(() => parsed?.getFullYear() ?? new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(() => parsed?.getMonth()    ?? new Date().getMonth());
+  const [viewYear,  setViewYear]  = useState(() => {
+    if (parsed) return parsed.getFullYear();
+    if (max) return parseInt(max.slice(0, 4));
+    return new Date().getFullYear();
+  });
+  const [viewMonth, setViewMonth] = useState(() => parsed?.getMonth() ?? new Date().getMonth());
   const [selDate,   setSelDate]   = useState<Date | null>(parsed);
-  const [timeH,     setTimeH]     = useState(() => String(parsed?.getHours()   ?? 0).padStart(2, '0'));
-  const [timeM,     setTimeM]     = useState(() => String(parsed?.getMinutes() ?? 0).padStart(2, '0'));
+  const [timeH, setTimeH] = useState(() => String(parsed?.getHours()   ?? 0).padStart(2, '0'));
+  const [timeM, setTimeM] = useState(() => String(
+    Math.round((parsed?.getMinutes() ?? 0) / 5) * 5
+  ).padStart(2, '0'));
 
-  // Синхронизируем если value изменился снаружи
+  // Свайп месяцев
+  const swipeStartX = useRef<number | null>(null);
+
   useEffect(() => {
     const d = parseValue(value);
     setSelDate(d);
@@ -66,16 +136,14 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       setViewYear(d.getFullYear());
       setViewMonth(d.getMonth());
       setTimeH(String(d.getHours()).padStart(2, '0'));
-      setTimeM(String(d.getMinutes()).padStart(2, '0'));
+      setTimeM(String(Math.round(d.getMinutes() / 5) * 5).padStart(2, '0'));
     }
   }, [value]);
 
-  // Закрытие по клику вне
   useEffect(() => {
     const fn = (e: MouseEvent) => {
       const target = e.target as Node;
       if (wrapRef.current && !wrapRef.current.contains(target)) {
-        // Также проверяем portal-popup через data-атрибут
         const popup = document.querySelector('[data-datepicker-popup]');
         if (!popup || !popup.contains(target)) setOpen(false);
       }
@@ -86,99 +154,96 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return () => { document.removeEventListener('mousedown', fn); document.removeEventListener('keydown', esc); };
   }, []);
 
-  // Вычисляем позицию popup при открытии
-  // На мобиле используем visualViewport — он учитывает открытую клавиатуру
+  const computePosition = useCallback(() => {
+    if (!fieldRef.current) return;
+    const mobile = window.innerWidth < 600;
+    setIsMobile(mobile);
+    if (mobile) {
+      // Модальное по центру экрана
+      setPopupStyle({ position: 'fixed', zIndex: 9999 });
+      return;
+    }
+    const rect = fieldRef.current.getBoundingClientRect();
+    const popupH = withTime ? 460 : 360;
+    const vvp = window.visualViewport;
+    const viewH = vvp ? vvp.height : window.innerHeight;
+    const viewW = vvp ? vvp.width  : window.innerWidth;
+    const offsetY = vvp ? vvp.offsetTop : 0;
+    const spaceBelow = viewH - (rect.bottom - offsetY);
+    const spaceAbove = rect.top - offsetY;
+    const showAbove  = spaceBelow < popupH && spaceAbove > spaceBelow;
+    const popupWidth = 296;
+    const left = Math.min(rect.left, viewW - popupWidth - 8);
+    const top  = showAbove ? rect.top + offsetY - popupH - 6 : rect.bottom + offsetY + 6;
+    setPopupStyle({
+      position: 'fixed',
+      left,
+      top: Math.max(offsetY + 4, Math.min(top, offsetY + viewH - popupH - 4)),
+      width: popupWidth,
+      zIndex: 9999,
+    });
+  }, [withTime]);
+
   useEffect(() => {
-    if (!open || !fieldRef.current) return;
-
-    const compute = () => {
-      if (!fieldRef.current) return;
-      const rect = fieldRef.current.getBoundingClientRect();
-      const popupH = withTime ? 420 : 360;
-
-      // visualViewport даёт реальную видимую высоту (за вычетом клавиатуры)
-      const vvp = window.visualViewport;
-      const viewH  = vvp ? vvp.height  : window.innerHeight;
-      const viewW  = vvp ? vvp.width   : window.innerWidth;
-      const offsetY = vvp ? vvp.offsetTop : 0;
-
-      // Позиция кнопки относительно видимого viewport
-      const rectTopInView  = rect.top  - offsetY;
-      const rectBotInView  = rect.bottom - offsetY;
-
-      const spaceBelow = viewH - rectBotInView;
-      const spaceAbove = rectTopInView;
-      const showAbove  = spaceBelow < popupH && spaceAbove > spaceBelow;
-
-      // На мобиле (узкий экран) — растягиваем на всю ширину с отступами
-      const isMobile = viewW < 480;
-      const popupWidth = isMobile ? viewW - 16 : 280;
-      const left = isMobile
-        ? 8
-        : Math.min(rect.left, viewW - popupWidth - 8);
-
-      const top = showAbove
-        ? rect.top + offsetY - popupH - 6
-        : rect.bottom + offsetY + 6;
-
-      setPopupStyle({
-        position: 'fixed',
-        left,
-        top: Math.max(offsetY + 4, Math.min(top, offsetY + viewH - popupH - 4)),
-        width: popupWidth,
-        zIndex: 9999,
-      });
-    };
-
-    compute();
-
-    // Пересчитываем при изменении размера (открытие/закрытие клавиатуры)
-    window.visualViewport?.addEventListener('resize', compute);
-    window.visualViewport?.addEventListener('scroll', compute);
+    if (!open) return;
+    computePosition();
+    window.visualViewport?.addEventListener('resize', computePosition);
+    window.visualViewport?.addEventListener('scroll', computePosition);
     return () => {
-      window.visualViewport?.removeEventListener('resize', compute);
-      window.visualViewport?.removeEventListener('scroll', compute);
+      window.visualViewport?.removeEventListener('resize', computePosition);
+      window.visualViewport?.removeEventListener('scroll', computePosition);
     };
-  }, [open, withTime]);
+  }, [open, computePosition]);
 
-  const handleSelect = useCallback((day: number) => {
-    const h = parseInt(timeH, 10) || 0;
-    const m = parseInt(timeM, 10) || 0;
-    const d = new Date(viewYear, viewMonth, day, h, m, 0, 0);
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  const handleSwipeTouchStart = (e: React.TouchEvent) => {
+    swipeStartX.current = e.touches[0].clientX;
+  };
+  const handleSwipeTouchEnd = (e: React.TouchEvent) => {
+    if (swipeStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - swipeStartX.current;
+    if (Math.abs(dx) > 40) { if (dx < 0) nextMonth(); else prevMonth(); }
+    swipeStartX.current = null;
+  };
+
+  const handleSelect = (day: number) => {
+    const d = new Date(viewYear, viewMonth, day);
     setSelDate(d);
-    if (!withTime) { onChange(toISO(d, false)); setOpen(false); }
-  }, [viewYear, viewMonth, timeH, timeM, withTime, onChange]);
+    if (!withTime) {
+      onChange(toISO(d, false));
+      setOpen(false);
+    }
+  };
 
   const handleConfirm = () => {
     if (!selDate) return;
-    const h = parseInt(timeH, 10) || 0;
-    const m = parseInt(timeM, 10) || 0;
-    const d = new Date(selDate.getFullYear(), selDate.getMonth(), selDate.getDate(), h, m, 0, 0);
-    onChange(toISO(d, withTime));
+    const d = new Date(selDate);
+    d.setHours(parseInt(timeH, 10) || 0, parseInt(timeM, 10) || 0, 0, 0);
+    onChange(toISO(d, true));
     setOpen(false);
   };
 
-  const handleClear = () => { onChange(''); setSelDate(null); setOpen(false); };
+  const handleClear = () => {
+    setSelDate(null);
+    onChange('');
+  };
 
-  // Строим сетку дней
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=вс
+  // Строим ячейки календаря
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const offset   = firstDay === 0 ? 6 : firstDay - 1;
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const daysInPrev  = new Date(viewYear, viewMonth, 0).getDate();
-  // Понедельник = 0, смещаем
-  const startOffset = (firstDay === 0 ? 6 : firstDay - 1);
-
-  const cells: { day: number; month: 'prev' | 'cur' | 'next' }[] = [];
-  for (let i = startOffset - 1; i >= 0; i--) cells.push({ day: daysInPrev - i, month: 'prev' });
+  const cells: { day: number; month: 'prev'|'cur'|'next' }[] = [];
+  for (let i = offset - 1; i >= 0; i--) cells.push({ day: daysInPrev - i, month: 'prev' });
   for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: 'cur' });
-  let next = 1;
-  while (cells.length % 7 !== 0) cells.push({ day: next++, month: 'next' });
+  const needed = Math.ceil(cells.length / 7) * 7;
+  for (let d = 1; cells.length < needed; d++) cells.push({ day: d, month: 'next' });
 
   const today = new Date();
-  const isToday  = (d: number) => d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
-  const isSelected = (d: number) => selDate
-    ? d === selDate.getDate() && viewMonth === selDate.getMonth() && viewYear === selDate.getFullYear()
-    : false;
-
+  const isToday    = (d: number) => d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
+  const isSelected = (d: number) => selDate ? (d === selDate.getDate() && viewMonth === selDate.getMonth() && viewYear === selDate.getFullYear()) : false;
   const isDisabled = (d: number) => {
     const dt = new Date(viewYear, viewMonth, d);
     if (min && dt < new Date(min)) return true;
@@ -186,122 +251,122 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return false;
   };
 
-  // Быстрый выбор года — по умолчанию до текущего + 10 лет вперёд
   const currentYear = new Date().getFullYear();
   const minYear = min ? parseInt(min.slice(0, 4)) : 1900;
   const maxYear = max ? parseInt(max.slice(0, 4)) : currentYear + 10;
+  // Центрируем диапазон лет вокруг viewYear, но не выходим за min/max
   const yearRange: number[] = [];
-  for (let y = Math.max(minYear, viewYear - 4); y <= Math.min(maxYear, viewYear + 4); y++) yearRange.push(y);
+  const rangeHalf = 6; // показываем 13 лет вокруг текущего
+  const rangeStart = Math.max(minYear, viewYear - rangeHalf);
+  const rangeEnd   = Math.min(maxYear, viewYear + rangeHalf);
+  for (let y = rangeStart; y <= rangeEnd; y++) yearRange.push(y);
 
-  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
-  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+  // Инициализируем viewYear в пределах допустимого диапазона
+  useEffect(() => {
+    if (viewYear > maxYear) setViewYear(maxYear);
+    else if (viewYear < minYear) setViewYear(minYear);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxYear, minYear]);
+
+  const popupContent = (
+    <div data-datepicker-popup
+      className={`${styles.popup} ${isMobile ? styles.popupModal : ''}`}
+      style={isMobile ? undefined : popupStyle}>
+
+      {/* Шапка с навигацией */}
+      <div className={styles.header}
+        onTouchStart={handleSwipeTouchStart}
+        onTouchEnd={handleSwipeTouchEnd}>
+        <button type="button" className={styles.navBtn} onClick={prevMonth}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span className={styles.monthYear}>{MONTHS[viewMonth]} {viewYear}</span>
+        <button type="button" className={styles.navBtn} onClick={nextMonth}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      {/* Быстрый выбор года */}
+      <div className={styles.yearBar}>
+        {yearRange.map(y => (
+          <button key={y} type="button"
+            className={`${styles.yearBtn} ${y === viewYear ? styles.yearBtnActive : ''}`}
+            onClick={() => setViewYear(y)}>
+            {y}
+          </button>
+        ))}
+      </div>
+
+      {/* Дни недели */}
+      <div className={styles.weekRow}>
+        {WEEKDAYS.map(w => <div key={w} className={styles.weekCell}>{w}</div>)}
+      </div>
+
+      {/* Сетка дней — свайп */}
+      <div className={styles.grid}
+        onTouchStart={handleSwipeTouchStart}
+        onTouchEnd={handleSwipeTouchEnd}>
+        {cells.map((c, i) => (
+          <button key={i} type="button"
+            disabled={c.month !== 'cur' || isDisabled(c.day)}
+            onClick={() => c.month === 'cur' && !isDisabled(c.day) && handleSelect(c.day)}
+            className={[
+              styles.day,
+              c.month !== 'cur'                          ? styles.dayOther    : '',
+              c.month === 'cur' && isToday(c.day)        ? styles.dayToday    : '',
+              c.month === 'cur' && isSelected(c.day)     ? styles.daySelected : '',
+              c.month === 'cur' && isDisabled(c.day)     ? styles.dayDisabled : '',
+            ].filter(Boolean).join(' ')}
+          >{c.day}</button>
+        ))}
+      </div>
+
+      {/* Колёса времени */}
+      {withTime && (
+        <div className={styles.timePicker}>
+          <span className={styles.timeLabel}>Время</span>
+          <div className={styles.timeWheels}>
+            <TimeWheel items={HOURS}   selected={timeH} onSelect={setTimeH} />
+            <span className={styles.timeSep}>:</span>
+            <TimeWheel items={MINUTES} selected={timeM} onSelect={setTimeM} />
+          </div>
+        </div>
+      )}
+
+      {/* Кнопки подтверждения */}
+      <div className={styles.footer}>
+        <button type="button" className={styles.cancelBtn} onClick={() => setOpen(false)}>Отмена</button>
+        <button type="button" className={styles.okBtn} onClick={withTime ? handleConfirm : () => setOpen(false)} disabled={!selDate}>
+          {withTime ? 'Выбрать' : 'OK'}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div ref={wrapRef} className={`${styles.wrap} ${className ?? ''}`}>
-      {/* Поле ввода */}
-      <button
-        ref={fieldRef}
-        type="button"
+      <button ref={fieldRef} type="button"
         className={`${styles.field} ${open ? styles.fieldOpen : ''} ${hasError ? styles.fieldError : ''}`}
-        onClick={() => setOpen(v => !v)}
-      >
+        onClick={() => setOpen(v => !v)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.icon}>
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
         </svg>
         <span className={selDate ? styles.fieldValue : styles.fieldPlaceholder}>
           {selDate ? formatDisplay(selDate, withTime) : (placeholder ?? 'Выберите дату')}
         </span>
-        {selDate && (
-          <span className={styles.clearBtn} onClick={e => { e.stopPropagation(); handleClear(); }}>×</span>
-        )}
+        {selDate && <span className={styles.clearBtn} onClick={e => { e.stopPropagation(); handleClear(); }}>×</span>}
       </button>
 
-      {/* Календарь — рендерим через portal чтобы не обрезался overflow:hidden родителей */}
       {open && createPortal(
-        <div data-datepicker-popup className={styles.popup} style={popupStyle}>
-          {/* Хедер */}
-          <div className={styles.header}>
-            <button type="button" className={styles.navBtn} onClick={prevMonth}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <span className={styles.monthYear}>{MONTHS[viewMonth]} {viewYear}</span>
-            <button type="button" className={styles.navBtn} onClick={nextMonth}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
-          </div>
-
-          {/* Быстрый выбор года */}
-          <div className={styles.yearBar}>
-            {yearRange.map(y => (
-              <button key={y} type="button"
-                className={`${styles.yearBtn} ${y === viewYear ? styles.yearBtnActive : ''}`}
-                onClick={() => setViewYear(y)}>
-                {y}
-              </button>
-            ))}
-          </div>
-
-          {/* Дни недели */}
-          <div className={styles.weekRow}>
-            {WEEKDAYS.map(w => <div key={w} className={styles.weekCell}>{w}</div>)}
-          </div>
-
-          {/* Сетка дней */}
-          <div className={styles.grid}>
-            {cells.map((c, i) => (
-              <button key={i} type="button"
-                disabled={c.month !== 'cur' || isDisabled(c.day)}
-                onClick={() => c.month === 'cur' && !isDisabled(c.day) && handleSelect(c.day)}
-                className={[
-                  styles.day,
-                  c.month !== 'cur'            ? styles.dayOther    : '',
-                  c.month === 'cur' && isToday(c.day)    ? styles.dayToday    : '',
-                  c.month === 'cur' && isSelected(c.day) ? styles.daySelected : '',
-                  c.month === 'cur' && isDisabled(c.day) ? styles.dayDisabled : '',
-                ].filter(Boolean).join(' ')}
-              >{c.day}</button>
-            ))}
-          </div>
-
-          {/* Время */}
-          {withTime && (
-            <div className={styles.timePicker}>
-              <span className={styles.timeLabel}>Время</span>
-              <div className={styles.timeInputs}>
-                <input type="text" inputMode="numeric" className={styles.timeInput}
-                  value={timeH} placeholder="00" maxLength={2}
-                  onFocus={e => e.target.select()}
-                  onChange={e => setTimeH(e.target.value.replace(/\D/g, ''))}
-                  onBlur={e => {
-                    const n = Math.min(23, Math.max(0, parseInt(e.target.value, 10) || 0));
-                    setTimeH(String(n).padStart(2, '0'));
-                  }}
-                />
-                <span className={styles.timeSep}>:</span>
-                <input type="text" inputMode="numeric" className={styles.timeInput}
-                  value={timeM} placeholder="00" maxLength={2}
-                  onFocus={e => e.target.select()}
-                  onChange={e => setTimeM(e.target.value.replace(/\D/g, ''))}
-                  onBlur={e => {
-                    const n = Math.min(59, Math.max(0, parseInt(e.target.value, 10) || 0));
-                    setTimeM(String(n).padStart(2, '0'));
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Кнопки */}
-          {withTime && (
-            <div className={styles.footer}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setOpen(false)}>Отмена</button>
-              <button type="button" className={styles.okBtn} onClick={handleConfirm} disabled={!selDate}>Выбрать</button>
-            </div>
-          )}
-        </div>
-      , document.body)}
+        isMobile ? (
+          <>
+            <div className={styles.backdrop} onClick={() => setOpen(false)} />
+            {popupContent}
+          </>
+        ) : popupContent,
+        document.body
+      )}
     </div>
   );
 }

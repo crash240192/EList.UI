@@ -6,6 +6,7 @@ import type { EventViewMode, IEventType } from '@/entities/event';
 import { fetchEventTypes } from '@/entities/event';
 import { useFiltersStore } from '@/app/store';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
+import { MobileFilterSheet } from '@/features/event-filters/MobileFilterSheet';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import type { ICity } from '@/features/auth/useGeoCity';
@@ -52,6 +53,7 @@ export function FilterBar({
   const [expanded,       setExpanded]       = useState(false);
   const [pickerOpen,     setPickerOpen]     = useState(false);
   const [showCity,       setShowCity]       = useState(false);
+  const [mobileSheet,    setMobileSheet]    = useState(false);
   const [cityName, setCityName] = useState(() => cookies.get('elist_city_name') ?? '');
 
   // Подставляем координаты и радиус по умолчанию
@@ -70,6 +72,7 @@ export function FilterBar({
   // Храним onSearch в ref чтобы избежать stale closure в слушателях событий
   const onSearchRef = useRef(onSearch);
   useEffect(() => { onSearchRef.current = onSearch; }, [onSearch]);
+  const radiusDebounce = useRef<ReturnType<typeof setTimeout>>();
 
   // Слушаем «Искать здесь» от карты
   useEffect(() => {
@@ -176,25 +179,33 @@ export function FilterBar({
     onSearch();
   };
 
-  const handleReset = () => {
-    resetFilters();
-    onSearchChange('');
-    setCityName('');
-    setDraftCats([]);
-    setDraftTypes([]);
-    setQuickDate(null);
-    setExpanded(false);
-    // Восстанавливаем дефолтный радиус и координаты
+  // Вспомогательная функция — возврат к родному городу
+  const restoreHomeCity = () => {
+    const homeName = cookies.get('elist_city_name') ?? '';
+    setCityName(homeName);
     if (storedCoords.lat !== 0) {
       setFilter('latitude',  storedCoords.lat);
       setFilter('longitude', storedCoords.lng);
+      window.dispatchEvent(new CustomEvent('elist:centerMap', {
+        detail: { lat: storedCoords.lat, lng: storedCoords.lng },
+      }));
     }
     setFilter('locationRange', DEFAULT_RADIUS_M);
   };
 
+  const handleReset = () => {
+    resetFilters();
+    onSearchChange('');
+    setDraftCats([]);
+    setDraftTypes([]);
+    setQuickDate(null);
+    setExpanded(false);
+    restoreHomeCity();
+  };
+
   // Чипы
   const chips: { label: string; onRemove: () => void }[] = [];
-  if (cityName) chips.push({ label: `📍 ${cityName}`, onRemove: () => { setCityName(''); setFilter('latitude', undefined); setFilter('longitude', undefined); } });
+  if (cityName) chips.push({ label: `📍 ${cityName}`, onRemove: restoreHomeCity });
   if (quickDate === 'today')    chips.push({ label: 'Сегодня',  onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
   if (quickDate === 'tomorrow') chips.push({ label: 'Завтра',   onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
   if (quickDate === 'weekend')  chips.push({ label: 'Выходные', onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
@@ -210,6 +221,45 @@ export function FilterBar({
 
   return (
     <>
+    {/* ── Мобильная компактная строка (только на мобиле) ── */}
+    <div className={styles.mobileBar}>
+      <div className={styles.searchWrap} style={{ flex: 1 }}>
+        <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input className={styles.searchInput} placeholder="Поиск..."
+          value={searchName} onChange={e => onSearchChange(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleApply()} />
+        {searchName && <button className={styles.clearBtn} onClick={() => onSearchChange('')}>✕</button>}
+      </div>
+      <button className={styles.mobileFilterBtn} onClick={() => setMobileSheet(true)}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/>
+        </svg>
+        {chips.length > 0 && <span className={styles.mobileFilterBadge}>{chips.length}</span>}
+      </button>
+      <div className={styles.viewToggle}>
+        <button className={`${styles.viewBtn} ${viewMode === 'list' ? styles.viewActive : ''}`} onClick={() => onViewModeChange('list')}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        </button>
+        <button className={`${styles.viewBtn} ${viewMode === 'map' ? styles.viewActive : ''}`} onClick={() => onViewModeChange('map')}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    {/* ── Мобильные вкладки (если переданы tabs) ── */}
+    {tabs && tabs.length > 0 && (
+      <div className={styles.mobileTabsRow}>
+        {tabs.map(t => (
+          <button key={t.key}
+            className={`${styles.mobileTab} ${activeTab === t.key ? styles.mobileTabActive : ''}`}
+            onClick={() => onTabChange?.(t.key)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+    )}
+
+    {/* ── Десктоп: полный FilterBar ── */}
     <div className={styles.bar}>
       {/* ── Вкладки (опционально) ── */}
       {tabs && tabs.length > 0 && (
@@ -267,6 +317,7 @@ export function FilterBar({
         <button className={`${styles.quickBtn} ${quickDate === 'today'    ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('today')}>Сегодня</button>
         <button className={`${styles.quickBtn} ${quickDate === 'tomorrow' ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('tomorrow')}>Завтра</button>
         <button className={`${styles.quickBtn} ${quickDate === 'weekend'  ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('weekend')}>Выходные</button>
+        <div className={styles.sep}/>
         <button className={`${styles.quickBtn} ${filters.price === 0      ? styles.quickBtnOn : ''}`} onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>Бесплатно</button>
 
         <div className={styles.sep}/>
@@ -312,13 +363,20 @@ export function FilterBar({
             <span className={styles.epLabel}>Цена, ₽</span>
             <input type="number" className={styles.epInput}
               placeholder="Любая" value={filters.price ?? ''}
+              onFocus={e => e.currentTarget.select()}
               onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
           </div>
-          <div className={styles.epBlock}>
-            <span className={styles.epLabel}>Радиус, км</span>
-            <input type="number" className={styles.epInput}
-              placeholder="25" value={radiusKm}
-              onChange={e => setFilter('locationRange', e.target.value !== '' ? Number(e.target.value) * 1000 : undefined)} />
+          <div className={styles.epBlock} style={{ flex: '2 1 160px' }}>
+            <span className={styles.epLabel}>Радиус: {radiusKm || 25} км</span>
+            <input type="range" min={1} max={100} step={1}
+              className={styles.epSlider}
+              value={radiusKm || 25}
+              onChange={e => {
+                setFilter('locationRange', Number(e.target.value) * 1000);
+                clearTimeout(radiusDebounce.current);
+                radiusDebounce.current = setTimeout(() => onSearchRef.current(), 1200);
+              }}
+            />
           </div>
           <div className={styles.epFooter}>
             <button className={styles.epReset} onClick={handleReset}>Сбросить</button>
@@ -344,6 +402,29 @@ export function FilterBar({
         onClose={() => { setPickerOpen(false); handleApply(); }}
       />
     )}
+
+    <MobileFilterSheet
+      open={mobileSheet}
+      onClose={() => setMobileSheet(false)}
+      onApply={handleApply}
+      onReset={handleReset}
+      filters={filters}
+      setFilter={setFilter}
+      cityName={cityName}
+      setCityName={setCityName}
+      quickDate={quickDate}
+      setQuickDate={setQuickDate}
+      draftTypes={draftTypes}
+      setDraftTypes={setDraftTypes}
+      draftCats={draftCats}
+      setDraftCats={setDraftCats}
+      allTypes={allTypes}
+      pickerOpen={pickerOpen}
+      setPickerOpen={setPickerOpen}
+      chips={chips}
+      handleCitySelect={handleCitySelect}
+      handleQuickDate={handleQuickDate}
+    />
     </>
   );
 }

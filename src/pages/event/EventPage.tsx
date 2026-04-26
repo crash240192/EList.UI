@@ -253,8 +253,12 @@ export default function EventPage() {
                 title="Пригласить подписчиков"
                 onClick={() => setInviteModalOpen(true)}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.8 19.8 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M3 21v-1a6 6 0 0 1 9.29-5"/>
+                  <circle cx="19" cy="17" r="4"/>
+                  <line x1="19" y1="14" x2="19" y2="20"/>
+                  <line x1="16" y1="17" x2="22" y2="17"/>
                 </svg>
               </button>
             )}
@@ -387,7 +391,7 @@ export default function EventPage() {
             {/* Map */}
             {event.latitude != null && event.longitude != null && (
               <div className={styles.mapCard}>
-                <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} />
+                <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} draggable={false} />
               </div>
             )}
 

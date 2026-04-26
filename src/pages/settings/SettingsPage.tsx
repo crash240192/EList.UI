@@ -118,15 +118,18 @@ function PersonSection() {
       </div>
       <Row label="Имя">
         <input className={styles.input} value={form.firstName}
-          onChange={set('firstName')} placeholder="Имя" />
+          onChange={set('firstName')} placeholder="Имя" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Фамилия">
         <input className={styles.input} value={form.lastName}
-          onChange={set('lastName')} placeholder="Фамилия" />
+          onChange={set('lastName')} placeholder="Фамилия" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Отчество">
         <input className={styles.input} value={form.patronymic}
-          onChange={set('patronymic')} placeholder="Отчество" />
+          onChange={set('patronymic')} placeholder="Отчество" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Пол">
         <select className={styles.input} value={form.gender} onChange={set('gender')}>
@@ -137,7 +140,8 @@ function PersonSection() {
       </Row>
       <Row label="Дата рождения">
         <input className={styles.input} type="date" value={form.birthDate}
-          onChange={set('birthDate')} />
+          onChange={set('birthDate')} 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <SaveRow msg={msg} saving={saving} onSave={handleSave} />
     </SectionCard>
@@ -378,17 +382,20 @@ function PasswordSection() {
       <Row label="Текущий пароль">
         <input className={styles.input} type="password"
           value={form.oldPassword} onChange={set('oldPassword')}
-          placeholder="Введите текущий пароль" />
+          placeholder="Введите текущий пароль" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Новый пароль">
         <input className={styles.input} type="password"
           value={form.newPassword} onChange={set('newPassword')}
-          placeholder="Минимум 6 символов" />
+          placeholder="Минимум 6 символов" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Подтверждение">
         <input className={styles.input} type="password"
           value={form.newPasswordConfirmation} onChange={set('newPasswordConfirmation')}
-          placeholder="Повторите новый пароль" />
+          placeholder="Повторите новый пароль" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <SaveRow msg={msg} saving={saving} onSave={handleSave} label="Изменить пароль" />
     </SectionCard>
