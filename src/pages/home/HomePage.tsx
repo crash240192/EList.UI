@@ -75,7 +75,10 @@ export default function HomePage() {
             <EventMap
               events={events}
               onMarkerClick={handleEventClick}
-              center={[userCoords.lat, userCoords.lng]}
+              center={[
+                filters.latitude ?? userCoords.lat,
+                filters.longitude ?? userCoords.lng,
+              ]}
             />
           </div>
         ) : (
