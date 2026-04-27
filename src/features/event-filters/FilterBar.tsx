@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import type { EventViewMode, IEventType } from '@/entities/event';
 import { fetchEventTypes } from '@/entities/event';
 import { useFiltersStore } from '@/app/store';
-import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';;
+import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { MobileFilterSheet } from '@/features/event-filters/MobileFilterSheet';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
@@ -318,6 +318,9 @@ export function FilterBar({
         <button className={`${styles.quickBtn} ${quickDate === 'today'    ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('today')}>Сегодня</button>
         <button className={`${styles.quickBtn} ${quickDate === 'tomorrow' ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('tomorrow')}>Завтра</button>
         <button className={`${styles.quickBtn} ${quickDate === 'weekend'  ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('weekend')}>Выходные</button>
+
+        <div className={styles.sep}/>
+        <button className={`${styles.quickBtn} ${filters.price === 0      ? styles.quickBtnOn : ''}`} onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>Бесплатно</button>
 
         <div className={styles.sep}/>
 
