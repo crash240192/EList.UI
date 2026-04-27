@@ -108,3 +108,11 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
     padding-right: 0 !important;
   }
 }
+
+/* Иконки типов/категорий — в тёмной теме инвертируем чёрные SVG/PNG */
+.event-type-ico {
+  filter: invert(1) brightness(1.5);
+}
+.light-theme .event-type-ico {
+  filter: none;
+}

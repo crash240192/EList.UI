@@ -30,7 +30,14 @@ export function CitySearch({
   const wrapRef     = useRef<HTMLDivElement>(null);
   const inputRef    = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setQuery(value); }, [value]);
+  const prevValueRef = useRef(value);
+  useEffect(() => {
+    // Синхронизируем query только если value изменился снаружи (не из нашего handleSelect)
+    if (value !== prevValueRef.current) {
+      prevValueRef.current = value;
+      setQuery(value);
+    }
+  }, [value]);
 
   // Вычисляем позицию дропдауна под полем ввода
   const updateDropPos = useCallback(() => {
@@ -101,12 +108,17 @@ export function CitySearch({
     debounceRef.current = setTimeout(() => search(q), 350);
   };
 
-  const handleFocus = () => {
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Выделяем текст при фокусе — через setTimeout чтобы не конфликтовать с кликом
+    const target = e.target;
+    setTimeout(() => target.select(), 0);
     if (suggestions.length > 0) { updateDropPos(); setOpen(true); }
   };
 
   const handleSelect = (city: ICity) => {
-    setQuery(city.shortName ?? city.name);
+    const name = city.shortName ?? city.name;
+    setQuery(name);
+    prevValueRef.current = name;
     setSuggestions([]);
     setOpen(false);
     onSelect(city);
@@ -124,16 +136,19 @@ export function CitySearch({
           onFocus={handleFocus}
           autoComplete="off"
         />
-        {(geoLoading || searching) && <span className={styles.spinner}>📡</span>}
-        {!geoLoading && !searching && detectedCoords && query && <span className={styles.ok}>✓</span>}
+        {searching && <span className={styles.spinner}>📡</span>}
+        {!searching && detectedCoords && query && <span className={styles.ok}>✓</span>}
         {onAutoDetect && (
           <button type="button" className={styles.autoBtn} onClick={onAutoDetect}
-            disabled={geoLoading} title="Определить автоматически">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-              <path d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
-            </svg>
+            title="Определить автоматически">
+            {geoLoading
+              ? <span className={styles.spinner}>📡</span>
+              : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+                  <path d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+                </svg>
+            }
             <span className={styles.autoBtnText}>Определить</span>
           </button>
         )}

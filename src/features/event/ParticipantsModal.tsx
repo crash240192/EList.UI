@@ -51,7 +51,7 @@ export function ParticipantsModal({
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', esc);
-    setTimeout(() => searchRef.current?.focus(), 50);
+    // Не фокусируем автоматически — не вызываем клавиатуру на мобиле
     return () => document.removeEventListener('keydown', esc);
   }, [onClose]);
 
@@ -138,7 +138,7 @@ export function ParticipantsModal({
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.searchIcon}>
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <input ref={searchRef} className={styles.searchInput}
+          <input ref={searchRef} className={styles.searchInput} onFocus={e => e.currentTarget.select()}
             placeholder="Поиск по имени или логину..."
             value={search} onChange={e => setSearch(e.target.value)} />
           {search && <button className={styles.searchClear} onClick={() => setSearch('')}>×</button>}

@@ -3,6 +3,7 @@
 import React, { createContext, useContext } from 'react';
 import type { IEvent } from '../types';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './EventCard.module.css';
 
 interface EventCardContextValue { event: IEvent; }
@@ -73,7 +74,7 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
               color: '#ffffff',
             }}>
               {t.ico && (
-                <img src={t.ico.startsWith('data:') || t.ico.startsWith('http') ? t.ico : `data:image/png;base64,${t.ico}`}
+                <img src={icoToUrl(t.ico) ?? ''} className="event-type-ico"
                   alt={t.name} width={12} height={12} style={{ objectFit: 'contain', borderRadius: 2 }} />
               )}
               <span>{t.name}</span>

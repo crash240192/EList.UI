@@ -149,7 +149,7 @@ function EventTypesTab() {
                       <div className={styles.itemInfo} onClick={() => { setEditingType(tp); setEditingCat(null); }}>
                         {tp.ico && (
                           icoToDisplayUrl(tp.ico).startsWith('data:') || icoToDisplayUrl(tp.ico).startsWith('http')
-                            ? <img src={icoToDisplayUrl(tp.ico)} alt="" style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />
+                            ? <img src={icoToDisplayUrl(tp.ico)} alt="" className="event-type-ico" style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />
                             : <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{tp.ico}</span>
                         )}
                         <span className={styles.itemName}>{tp.name}</span>

@@ -1,9 +1,11 @@
 // pages/home/EventModal.tsx
 
 import { useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './EventModal.module.css';
 
 function contrastColor(hex: string): string {
@@ -22,9 +24,9 @@ function categoryGradient(p?: string | null) {
   return 'linear-gradient(135deg,#4f46e5,#7c3aed)';
 }
 
-interface EventModalProps { event: IEvent; onClose: () => void; }
+interface EventModalProps { event: IEvent; onClose: () => void; children?: React.ReactNode; }
 
-export function EventModal({ event, onClose }: EventModalProps) {
+export function EventModal({ event, onClose, children }: EventModalProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -94,7 +96,7 @@ export function EventModal({ event, onClose }: EventModalProps) {
                     color: textColor,
                   }}>
                     {t.ico && (
-                      <img src={t.ico.startsWith('data:') || t.ico.startsWith('http') ? t.ico : `data:image/png;base64,${t.ico}`}
+                      <img src={icoToUrl(t.ico) ?? ''} className="event-type-ico"
                         alt="" width={12} height={12} style={{ borderRadius: 2, objectFit: 'contain' }} />
                     )}
                     {t.name}
@@ -174,6 +176,7 @@ export function EventModal({ event, onClose }: EventModalProps) {
               Подробнее →
             </button>
           </div>
+          {children}
         </div>
       </div>
     </>

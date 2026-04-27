@@ -128,8 +128,16 @@ const DEFAULT_FILTERS: IEventsSearchParams = {
   startTime: new Date().toISOString(),
 };
 
+// Стор фильтров для главной страницы поиска
 export const useFiltersStore = create<FiltersState>()((set) => ({
   filters:      DEFAULT_FILTERS,
   setFilter:    (key, value) => set((s) => ({ filters: { ...s.filters, [key]: value } })),
   resetFilters: () => set({ filters: DEFAULT_FILTERS }),
+}));
+
+// Стор фильтров для страницы "Мои мероприятия" — независимый от главной
+export const useMyEventsFiltersStore = create<FiltersState>()((set) => ({
+  filters:      { pageIndex: 0, pageSize: 20 },
+  setFilter:    (key, value) => set((s) => ({ filters: { ...s.filters, [key]: value } })),
+  resetFilters: () => set({ filters: { pageIndex: 0, pageSize: 20 } }),
 }));

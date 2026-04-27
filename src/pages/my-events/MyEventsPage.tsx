@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { EventCard } from '@/entities/event';
 import { useMyEvents, type OwnerFilter } from '@/features/event-list/useMyEvents';
 import { FilterBar } from '@/features/event-filters/FilterBar';
-import { useFiltersStore, useFavoritesStore } from '@/app/store';
+import { useMyEventsFiltersStore, useFavoritesStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
 import type { IEventsSearchParams, EventViewMode } from '@/entities/event';
@@ -23,7 +23,7 @@ export default function MyEventsPage() {
   const navigate = useNavigate();
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const { accountId, loading: accountLoading } = useAccountId();
-  const { filters, setFilter, resetFilters } = useFiltersStore();
+  const { filters, setFilter, resetFilters } = useMyEventsFiltersStore();
 
   const [tab,         setTab]         = useState<Tab>('active');
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all');
@@ -69,6 +69,7 @@ export default function MyEventsPage() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onSearch={handleSearch}
+        useStore={useMyEventsFiltersStore}
         hideCity
         tabs={OWNER_TABS}
         activeTab={ownerFilter}

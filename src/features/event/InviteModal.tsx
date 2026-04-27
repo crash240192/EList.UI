@@ -36,7 +36,7 @@ export function InviteModal({ eventId, currentAccountId, onClose, onSent }: Invi
       .then(setSubscribers)
       .catch(() => setErr('Не удалось загрузить подписчиков'))
       .finally(() => setLoading(false));
-    setTimeout(() => searchRef.current?.focus(), 50);
+    setTimeout(() => searchRef.current?.select?.(), 200);
 
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', esc);
@@ -101,7 +101,7 @@ export function InviteModal({ eventId, currentAccountId, onClose, onSent }: Invi
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.searchIcon}>
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <input ref={searchRef} className={styles.searchInput}
+          <input ref={searchRef} className={styles.searchInput} onFocus={e => e.currentTarget.select()}
             placeholder="Поиск по имени или логину..."
             value={search} onChange={e => setSearch(e.target.value)} />
           {search && <button className={styles.searchClear} onClick={() => setSearch('')}>×</button>}

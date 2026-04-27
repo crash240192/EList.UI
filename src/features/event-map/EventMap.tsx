@@ -136,22 +136,27 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
 
   useEffect(() => {
     let destroyed = false;
+    const el = containerRef.current; // захватываем ДО async
+    let handlePointerDown: ((e: PointerEvent) => void) | null = null;
+    let handlePointerUp:   (() => void) | null = null;
+    let handlePointerMove: ((e: PointerEvent) => void) | null = null;
+
     loadYandexMaps().then(() => {
-      if (destroyed || !containerRef.current) return;
+      if (destroyed || !el) return;
       const ymaps = (window as any).ymaps;
-      const map = new ymaps.Map(containerRef.current, {
+      const map = new ymaps.Map(el, {
         center, zoom,
         controls: ['zoomControl', 'typeSelector'],
         type: 'yandex#map',
       });
       mapRef.current = map;
 
-      // Правый клик — контекстное меню
+      // Правый клик — контекстное меню (десктоп)
       map.events.add('contextmenu', (e: any) => {
-        const coords = e.get('coords');         // [lat, lng]
+        const coords = e.get('coords');
         const pixel  = e.get('domEvent').originalEvent;
-        if (!coords || !containerRef.current) return;
-        const rect = containerRef.current.getBoundingClientRect();
+        if (!coords || !el) return;
+        const rect = el.getBoundingClientRect();
         setCtxMenu({
           x: pixel.clientX - rect.left,
           y: pixel.clientY - rect.top,
@@ -160,30 +165,61 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
         setGroupState(null);
       });
 
-      // Долгое нажатие (~600ms) — для тач-устройств
+      // Долгое нажатие — pointerdown работает и для touch и для mouse
       let longPressTimer: ReturnType<typeof setTimeout> | null = null;
-      map.events.add('mousedown', (e: any) => {
-        if (e.get('domEvent').originalEvent.button !== 0) return; // только левая кнопка
-        const coords = e.get('coords');
-        const pixel  = e.get('domEvent').originalEvent;
-        if (!coords || !containerRef.current) return;
+      let longPressMoved = false;
+      let longPressX = 0, longPressY = 0;
+
+      handlePointerDown = (e: PointerEvent) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        longPressMoved = false;
+        longPressX = e.clientX;
+        longPressY = e.clientY;
+
         longPressTimer = setTimeout(() => {
-          const rect = containerRef.current!.getBoundingClientRect();
-          setCtxMenu({
-            x: (pixel.touches?.[0]?.clientX ?? pixel.clientX) - rect.left,
-            y: (pixel.touches?.[0]?.clientY ?? pixel.clientY) - rect.top,
-            lat: coords[0], lng: coords[1],
-          });
-          setGroupState(null);
+          if (longPressMoved || !el) return;
+          const rect = el.getBoundingClientRect();
+          const x = longPressX - rect.left;
+          const y = longPressY - rect.top;
+          try {
+            const coords = map.converter.pageToGeo([longPressX, longPressY]);
+            if (!coords) return;
+            setCtxMenu({ x, y, lat: coords[0], lng: coords[1] });
+            setGroupState(null);
+            if (navigator.vibrate) navigator.vibrate(40);
+          } catch { /* ignore */ }
         }, 600);
-      });
-      map.events.add('mouseup',   () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } });
-      map.events.add('mousemove', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } });
+      };
+
+      handlePointerUp = () => {
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      };
+
+      handlePointerMove = (e: PointerEvent) => {
+        const dx = e.clientX - longPressX;
+        const dy = e.clientY - longPressY;
+        if (Math.sqrt(dx * dx + dy * dy) > 8) {
+          longPressMoved = true;
+          if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        }
+      };
+
+      el.addEventListener('pointerdown',   handlePointerDown);
+      el.addEventListener('pointerup',     handlePointerUp);
+      el.addEventListener('pointermove',   handlePointerMove);
+      el.addEventListener('pointercancel', handlePointerUp);
 
       setReady(true);
     }).catch(e => setError(e.message));
+
     return () => {
       destroyed = true;
+      if (el) {
+        if (handlePointerDown)  el.removeEventListener('pointerdown',   handlePointerDown);
+        if (handlePointerUp)    el.removeEventListener('pointerup',     handlePointerUp);
+        if (handlePointerMove)  el.removeEventListener('pointermove',   handlePointerMove);
+        if (handlePointerUp)    el.removeEventListener('pointercancel', handlePointerUp);
+      }
       mapRef.current?.destroy?.();
       mapRef.current = null;
     };

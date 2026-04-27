@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { fetchUserInvitations, type IInvitation } from '@/entities/invitation/invitationsApi';
 import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { EventModal } from '@/pages/home/EventModal';
+import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './InvitationsPage.module.css';
 
 function formatDate(iso: string) {
@@ -19,16 +21,13 @@ function inviterName(inv: IInvitation): string {
   return inv.inviter?.account?.login ?? 'Неизвестный';
 }
 
-function icoSrc(ico: string): string {
-  return (ico.startsWith('data:') || ico.startsWith('http') || ico.startsWith('/'))
-    ? ico : `data:image/png;base64,${ico}`;
-}
-
 export default function InvitationsPage() {
   const navigate = useNavigate();
   const [items,   setItems]   = useState<IInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [err,     setErr]     = useState<string | null>(null);
+  const [previewInv,  setPreviewInv]  = useState<IInvitation | null>(null);
+  const [confirmDecl, setConfirmDecl] = useState<IInvitation | null>(null);
 
   useEffect(() => {
     fetchUserInvitations()
@@ -37,20 +36,20 @@ export default function InvitationsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleAccept = async (inv: IInvitation, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const doAccept = async (inv: IInvitation) => {
     try {
       await apiClient.get(`/api/invitations/accept?invitationId=${inv.id}`);
       setItems(prev => prev.filter(i => i.id !== inv.id));
+      setPreviewInv(null);
       navigate(`/event/${inv.eventId}`);
     } catch { /* ignore */ }
   };
 
-  const handleDecline = async (invId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const doDecline = async (inv: IInvitation) => {
     try {
-      await apiClient.get(`/api/invitations/decline?invitationId=${invId}`);
-      setItems(prev => prev.filter(i => i.id !== invId));
+      await apiClient.get(`/api/invitations/decline?invitationId=${inv.id}`);
+      setItems(prev => prev.filter(i => i.id !== inv.id));
+      setConfirmDecl(null);
     } catch { /* ignore */ }
   };
 
@@ -92,7 +91,9 @@ export default function InvitationsPage() {
           {/* Список */}
           {!loading && items.map(inv => {
             const event = inv.event;
-            const types = (event as any).eventTypes ?? (event as any).eventType ? [(event as any).eventType] : [];
+            const types = (event as any).eventTypes?.length > 0
+              ? (event as any).eventTypes
+              : (event as any).eventType ? [(event as any).eventType] : [];
             const params = (event as any).parameters;
             const cost   = params?.cost ?? 0;
             const age    = params?.ageLimit;
@@ -135,7 +136,7 @@ export default function InvitationsPage() {
                           const color = t.eventCategory?.color ?? '#6366f1';
                           return (
                             <span key={t.id} className={styles.chip} style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
-                              {t.ico && <img src={icoSrc(t.ico)} alt="" width={10} height={10} style={{ objectFit: 'contain', borderRadius: 2 }} />}
+                              {t.ico && <img src={icoToUrl(t.ico) ?? undefined} alt="" width={10} height={10} style={{ objectFit: 'contain', borderRadius: 2 }} />}
                               {t.name}
                             </span>
                           );
@@ -147,11 +148,13 @@ export default function InvitationsPage() {
 
                 {/* Правая часть: кнопки вертикально */}
                 <div className={styles.itemActions}>
-                  <button className={`${styles.btn} ${styles.btnOk}`} onClick={e => handleAccept(inv, e)}>
+                  <button className={`${styles.btn} ${styles.btnOk}`}
+                    onClick={e => { e.stopPropagation(); setPreviewInv(inv); }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                     Принять
                   </button>
-                  <button className={`${styles.btn} ${styles.btnNo}`} onClick={e => handleDecline(inv.id, e)}>
+                  <button className={`${styles.btn} ${styles.btnNo}`}
+                    onClick={e => { e.stopPropagation(); setConfirmDecl(inv); }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     Отклонить
                   </button>
@@ -161,6 +164,40 @@ export default function InvitationsPage() {
           })}
         </div>
       </div>
+
+      {/* Предпросмотр мероприятия при нажатии «Принять» */}
+      {previewInv && (
+        <EventModal
+          event={previewInv.event as any}
+          onClose={() => setPreviewInv(null)}
+        >
+          <div className={styles.previewActions}>
+            <button className={styles.laterBtn} onClick={() => setPreviewInv(null)}>
+              Решу позже
+            </button>
+            <button className={styles.acceptConfirmBtn} onClick={() => doAccept(previewInv)}>
+              ✓ Принять приглашение
+            </button>
+          </div>
+        </EventModal>
+      )}
+
+      {/* Диалог подтверждения отклонения */}
+      {confirmDecl && (
+        <>
+          <div className={styles.dialogBackdrop} onClick={() => setConfirmDecl(null)} />
+          <div className={styles.dialog}>
+            <div className={styles.dialogTitle}>Отклонить приглашение?</div>
+            <div className={styles.dialogText}>
+              Вы уверены, что хотите отклонить приглашение на «{confirmDecl.event.name}»?
+            </div>
+            <div className={styles.dialogBtns}>
+              <button className={styles.dialogCancel} onClick={() => setConfirmDecl(null)}>Отмена</button>
+              <button className={styles.dialogDecline} onClick={() => doDecline(confirmDecl)}>Отклонить</button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

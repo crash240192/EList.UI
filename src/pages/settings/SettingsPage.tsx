@@ -72,7 +72,7 @@ function PersonSection() {
 
   const initials  = (form.firstName?.[0] ?? '') + (form.lastName?.[0] ?? '');
   const accountId = getStoredAccountId() ?? '';
-  const myAvatarFileId = useMyAvatar();
+  const { fileId: myAvatarFileId, refresh: refreshAvatar } = useMyAvatar();
 
   useEffect(() => {
     getMyPersonInfo().then(p => {
@@ -114,19 +114,23 @@ function PersonSection() {
           accountId={accountId}
           fileId={myAvatarFileId}
           size={80}
+          onChanged={() => refreshAvatar()}
         />
       </div>
       <Row label="Имя">
         <input className={styles.input} value={form.firstName}
-          onChange={set('firstName')} placeholder="Имя" />
+          onChange={set('firstName')} placeholder="Имя" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Фамилия">
         <input className={styles.input} value={form.lastName}
-          onChange={set('lastName')} placeholder="Фамилия" />
+          onChange={set('lastName')} placeholder="Фамилия" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Отчество">
         <input className={styles.input} value={form.patronymic}
-          onChange={set('patronymic')} placeholder="Отчество" />
+          onChange={set('patronymic')} placeholder="Отчество" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Пол">
         <select className={styles.input} value={form.gender} onChange={set('gender')}>
@@ -137,7 +141,8 @@ function PersonSection() {
       </Row>
       <Row label="Дата рождения">
         <input className={styles.input} type="date" value={form.birthDate}
-          onChange={set('birthDate')} />
+          onChange={set('birthDate')} 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <SaveRow msg={msg} saving={saving} onSave={handleSave} />
     </SectionCard>
@@ -165,7 +170,22 @@ function CitySection() {
   }, [coords]);
 
   const handleAutoDetect = () => {
-    if (detectedCity) setSelectedCity(detectedCity);
+    if (detectedCity) {
+      setSelectedCity(detectedCity);
+    } else if (!geoLoading && navigator.geolocation) {
+      // Геолокация ещё не определена — запрашиваем вручную
+      navigator.geolocation.getCurrentPosition(pos => {
+        const { latitude, longitude } = pos.coords;
+        // useGeoCity уже должен был это сделать — просто обновляем координаты
+        import('@/features/auth/useGeoCity').then(({ POPULAR_CITIES }) => {
+          const nearest = POPULAR_CITIES.reduce((best, city) => {
+            const d = Math.hypot(city.lat - latitude, city.lng - longitude);
+            return d < Math.hypot(best.lat - latitude, best.lng - longitude) ? city : best;
+          });
+          setSelectedCity(nearest);
+        });
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -378,17 +398,20 @@ function PasswordSection() {
       <Row label="Текущий пароль">
         <input className={styles.input} type="password"
           value={form.oldPassword} onChange={set('oldPassword')}
-          placeholder="Введите текущий пароль" />
+          placeholder="Введите текущий пароль" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Новый пароль">
         <input className={styles.input} type="password"
           value={form.newPassword} onChange={set('newPassword')}
-          placeholder="Минимум 6 символов" />
+          placeholder="Минимум 6 символов" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Подтверждение">
         <input className={styles.input} type="password"
           value={form.newPasswordConfirmation} onChange={set('newPasswordConfirmation')}
-          placeholder="Повторите новый пароль" />
+          placeholder="Повторите новый пароль" 
+                  onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <SaveRow msg={msg} saving={saving} onSave={handleSave} label="Изменить пароль" />
     </SectionCard>

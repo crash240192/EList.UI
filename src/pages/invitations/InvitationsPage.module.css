@@ -137,3 +137,52 @@
   }
   .btn { flex-direction: column; width: 100%; padding: 6px 0; }
 }
+
+/* ── Кнопки предпросмотра (внутри EventModal) ── */
+.previewActions {
+  display: flex; gap: 10px; padding: 12px 14px;
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.laterBtn {
+  flex: 1; background: none; border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px; font-size: 13px;
+  color: var(--text-secondary); cursor: pointer; transition: all .12s;
+}
+.laterBtn:hover { border-color: var(--accent); color: var(--accent); }
+.acceptConfirmBtn {
+  flex: 2; background: var(--accent); color: #fff;
+  border: none; border-radius: 10px; padding: 10px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .12s;
+}
+.acceptConfirmBtn:hover { background: var(--accent-hover, #4f46e5); }
+
+/* ── Диалог отклонения ── */
+.dialogBackdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 600;
+}
+.dialog {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 601; width: min(340px, 90vw);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.dialogTitle { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+.dialogText { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px; }
+.dialogBtns { display: flex; gap: 10px; justify-content: flex-end; }
+.dialogCancel {
+  background: none; border: 1px solid var(--border);
+  border-radius: 9px; padding: 8px 16px; font-size: 13px;
+  color: var(--text-secondary); cursor: pointer;
+}
+.dialogCancel:hover { background: var(--surface-2); }
+.dialogDecline {
+  background: rgba(239,68,68,.1); color: #dc2626;
+  border: 1px solid rgba(239,68,68,.25);
+  border-radius: 9px; padding: 8px 16px; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: background .12s;
+}
+.dialogDecline:hover { background: rgba(239,68,68,.2); }

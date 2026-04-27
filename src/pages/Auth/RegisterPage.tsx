@@ -381,7 +381,7 @@ export default function RegisterPage() {
                   onChange={iso => setForm2(f => ({ ...f, birthDate: iso }))}
                   placeholder="Выберите дату рождения"
                   min="1900-01-01"
-                  max={(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 6); return d.toISOString().slice(0,10); })()}
+                  max={new Date().toISOString().slice(0, 10)}
                 />
               </Field>
             </div>

@@ -4,6 +4,7 @@
 
 import { useEffect } from 'react';
 import { useEventTypes } from './useEventTypes';
+import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './CategoryTypePicker.module.css';
 
 interface CategoryTypePickerProps {
@@ -154,8 +155,7 @@ export function CategoryTypePicker({
                         <span className={styles.typeIcon}>
                           {type.ico
                             ? <img
-                                src={type.ico.startsWith('data:') || type.ico.startsWith('http')
-                                  ? type.ico : `data:image/png;base64,${type.ico}`}
+                                src={icoToUrl(type.ico) ?? ''} className="event-type-ico"
                                 alt="" width={14} height={14}
                                 style={{ objectFit: 'contain', borderRadius: 2, display: 'block' }}
                               />
