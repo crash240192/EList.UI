@@ -14,6 +14,9 @@ import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker'
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
+import { AlbumSection } from './AlbumSection';
+import type { IAlbum } from '@/entities/media/albumApi';
+import { assignAlbumToEvent } from '@/entities/media/albumApi';
 import { InviteModal } from '@/features/event/InviteModal';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
@@ -90,6 +93,7 @@ export default function CreateEventPage() {
   const [endMode,   setEndMode]   = useState<'duration' | 'multiday'>('duration');
   const [durationH, setDurationH] = useState('2');
   const [durationM, setDurationM] = useState('0');
+  const [albums,    setAlbums]    = useState<IAlbum[]>([]);
 
   // Кошелёк / тариф
   const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
@@ -302,6 +306,10 @@ export default function CreateEventPage() {
         });
         // Предлагаем пригласить подписчиков
         const newEventId = createResult?.result ?? createResult as unknown as string;
+        // Привязываем альбомы к созданному событию
+        if (newEventId && albums.length > 0) {
+          await Promise.allSettled(albums.map(a => assignAlbumToEvent(newEventId, a.id)));
+        }
         if (newEventId && accountId) {
           setCreatedEventId(newEventId);
           setCreatedAccountId(accountId);
@@ -611,13 +619,14 @@ export default function CreateEventPage() {
           </Section>
         )}
 
-        {/* Фотоальбом — заглушка */}
-        <Section title="Фотоальбом">
-          <div className={styles.albumPlaceholder}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><circle cx="9" cy="15" r="2"/><path d="M14 13l3 3"/></svg>
-            <span className={styles.albumHint}>Загрузка фотографий с мероприятия</span>
-            <span className={styles.albumSub}>Будет доступно после публикации</span>
-          </div>
+        {/* Фотоальбомы */}
+        <Section title="Фотоальбомы">
+          <AlbumSection
+            albums={albums}
+            onAlbumsChange={setAlbums}
+            accountId={null}
+            organizationId={null}
+          />
         </Section>
 
       </div>

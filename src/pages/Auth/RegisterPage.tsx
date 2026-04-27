@@ -304,8 +304,8 @@ export default function RegisterPage() {
                   ? <div className={regStyles.loadingSelect}>Загрузка...</div>
                   : (
                     <Select
-                      value={form1.contactType}
-                      onChange={v => setForm1(f => ({...f, contactType: v}))}
+                      value={form1.contactTypeId}
+                      onChange={v => setForm1(f => ({...f, contactTypeId: v}))}
                       options={[]}
                     />
                   )}
@@ -338,7 +338,7 @@ export default function RegisterPage() {
               </Field>
             </div>
 
-            <button className={styles.submitBtn} style={{ marginTop: 4 }} onClick={handleStep1} disabled={loading}>
+            <button className={styles.submitBtn} style={{ marginTop: 14 }} onClick={handleStep1} disabled={loading}>
               {loading ? <span className={styles.spinner} /> : 'Далее →'}
             </button>
 
@@ -368,7 +368,7 @@ export default function RegisterPage() {
               <Field label="Пол">
                 <Select
                   value={form2.gender}
-                  onChange={v => setForm2(f => ({...f, gender: v}))}
+                  onChange={v => setForm2(f => ({...f, gender: v as '' | 'Male' | 'Female'}))}
                   placeholder="Не указан"
                   options={[{ value: 'Male', label: 'Мужской' }, { value: 'Female', label: 'Женский' }]}
                 />
@@ -384,12 +384,12 @@ export default function RegisterPage() {
               </Field>
             </div>
 
-            <button className={styles.submitBtn}
+            <button className={styles.submitBtn} style={{ marginTop: 14 }}
               onClick={() => finishRegistration(form2)} disabled={loading}>
               {loading ? <span className={styles.spinner} /> : 'Сохранить и войти'}
             </button>
 
-            <button className={regStyles.skipBtn}
+            <button className={regStyles.skipBtn} style={{ marginTop: 6 }}
               onClick={() => finishRegistration()} disabled={loading}>
               Заполнить позже
             </button>

@@ -24,6 +24,7 @@ interface FilterBarProps {
   onViewModeChange: (v: EventViewMode) => void;
   onSearch: () => void;
   useStore?: typeof useFiltersStore;
+  hideCity?: boolean;
   hideViewToggle?: boolean;
   tabs?: { key: string; label: string }[];
   activeTab?: string;

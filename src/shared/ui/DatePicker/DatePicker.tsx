@@ -39,8 +39,14 @@ function formatDisplay(date: Date, withTime: boolean): string {
 }
 
 function toISO(date: Date, withTime: boolean): string {
-  if (!withTime) return date.toISOString().slice(0, 10);
-  return date.toISOString();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const yy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  if (!withTime) return `${yy}-${mm}-${dd}`;
+  const hh = pad(date.getHours());
+  const mi = pad(date.getMinutes());
+  return `${yy}-${mm}-${dd}T${hh}:${mi}:00`;
 }
 
 // Колесо прокрутки для выбора часов/минут
@@ -254,19 +260,16 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const currentYear = new Date().getFullYear();
   const minYear = min ? parseInt(min.slice(0, 4)) : 1900;
   const maxYear = max ? parseInt(max.slice(0, 4)) : currentYear + 10;
-  // Центрируем диапазон лет вокруг viewYear, но не выходим за min/max
   const yearRange: number[] = [];
-  const rangeHalf = 6; // показываем 13 лет вокруг текущего
-  const rangeStart = Math.max(minYear, viewYear - rangeHalf);
-  const rangeEnd   = Math.min(maxYear, viewYear + rangeHalf);
-  for (let y = rangeStart; y <= rangeEnd; y++) yearRange.push(y);
+  for (let y = minYear; y <= maxYear; y++) yearRange.push(y);
 
-  // Инициализируем viewYear в пределах допустимого диапазона
+  // Скроллим к выбранному году при открытии
+  const yearListRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (viewYear > maxYear) setViewYear(maxYear);
-    else if (viewYear < minYear) setViewYear(minYear);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxYear, minYear]);
+    if (!open || !yearListRef.current) return;
+    const btn = yearListRef.current.querySelector('[data-year-active]') as HTMLElement;
+    if (btn) btn.scrollIntoView({ block: 'center', behavior: 'instant' });
+  }, [open]);
 
   const popupContent = (
     <div data-datepicker-popup
@@ -293,9 +296,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
           disabled={viewYear <= minYear}>
           ‹
         </button>
-        <div className={styles.yearList}>
+        <div className={styles.yearList} ref={yearListRef}>
           {yearRange.map(y => (
             <button key={y} type="button"
+              data-year-active={y === viewYear ? '' : undefined}
               className={`${styles.yearBtn} ${y === viewYear ? styles.yearBtnActive : ''}`}
               onClick={() => setViewYear(y)}>
               {y}

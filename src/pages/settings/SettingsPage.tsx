@@ -134,7 +134,7 @@ function PersonSection() {
                   onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Пол">
-        <Select value={form.gender} onChange={v => setForm(f => ({ ...f, gender: v }))}
+        <Select value={form.gender} onChange={v => setForm(f => ({ ...f, gender: v as '' | 'Male' | 'Female' }))}
           placeholder="Не указан"
           options={[{ value: 'Male', label: 'Мужской' }, { value: 'Female', label: 'Женский' }]}
         />
