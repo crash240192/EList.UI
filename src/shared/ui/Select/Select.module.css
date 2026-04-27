@@ -1,0 +1,45 @@
+/* shared/ui/Select/Select.module.css */
+
+.wrap { position: relative; width: 100%; }
+
+.btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 8px 11px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 9px; cursor: pointer; font-family: inherit;
+  font-size: 13px; text-align: left;
+  transition: border-color .15s;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btnOpen { border-color: var(--accent); }
+
+.value    { color: var(--text-primary); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.placeholder { color: var(--text-muted); flex: 1; }
+
+.arrow { flex-shrink: 0; color: var(--text-muted); transition: transform .15s; }
+.arrowOpen { transform: rotate(180deg); }
+
+/* Дропдаун */
+.dropdown {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  overflow: hidden; max-height: 260px; overflow-y: auto;
+  scrollbar-width: thin;
+  animation: dropIn .12s ease;
+}
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 9px 14px;
+  font-size: 13px; color: var(--text-primary);
+  cursor: pointer; transition: background .1s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.item:hover { background: var(--surface-2); }
+.itemActive { color: var(--accent); font-weight: 500; }
+.itemPlaceholder { color: var(--text-muted); }

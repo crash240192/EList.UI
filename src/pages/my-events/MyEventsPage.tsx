@@ -71,6 +71,7 @@ export default function MyEventsPage() {
         onSearch={handleSearch}
         useStore={useMyEventsFiltersStore}
         hideCity
+        hideViewToggle
         tabs={OWNER_TABS}
         activeTab={ownerFilter}
         onTabChange={key => setOwnerFilter(key as OwnerFilter)}

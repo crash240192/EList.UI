@@ -19,6 +19,7 @@ import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import { validateContactValue, getMaskInputMode } from '@/shared/lib/contactMask';
+import { Select, type SelectOption } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import type { Gender } from '@/shared/api/types';
@@ -302,14 +303,11 @@ export default function RegisterPage() {
                 {contactsLoading
                   ? <div className={regStyles.loadingSelect}>Загрузка...</div>
                   : (
-                    <select className={styles.select}
-                      value={form1.contactTypeId} onChange={set1('contactTypeId')}>
-                      {contactTypes.map(ct => (
-                        <option key={ct.id} value={ct.id}>
-                          {ct.name || ct.localizedName || ct.namePath}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={form1.contactType}
+                      onChange={v => setForm1(f => ({...f, contactType: v}))}
+                      options={[]}
+                    />
                   )}
               </Field>
 
@@ -368,12 +366,12 @@ export default function RegisterPage() {
                   value={form2.patronymic} onChange={set2('patronymic')} />
               </Field>
               <Field label="Пол">
-                <select className={styles.select}
-                  value={form2.gender} onChange={set2('gender')}>
-                  <option value="">Не указывать</option>
-                  <option value="Male">Мужской</option>
-                  <option value="Female">Женский</option>
-                </select>
+                <Select
+                  value={form2.gender}
+                  onChange={v => setForm2(f => ({...f, gender: v}))}
+                  placeholder="Не указан"
+                  options={[{ value: 'Male', label: 'Мужской' }, { value: 'Female', label: 'Женский' }]}
+                />
               </Field>
               <Field label="Дата рождения">
                 <DatePicker

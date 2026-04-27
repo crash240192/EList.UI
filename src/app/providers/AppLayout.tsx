@@ -5,6 +5,8 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useThemeStore, useAuthStore, useFiltersStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
+import { useMyAvatar } from '@/features/auth/useAvatar';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './AppLayout.module.css';
 
 const NAV_ITEMS = [
@@ -23,6 +25,7 @@ export function AppLayout() {
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
   const { filters } = useFiltersStore();
+  const { fileId: myAvatarFileId } = useMyAvatar();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -71,12 +74,25 @@ export function AppLayout() {
         </div>
 
         <div className={styles.headerRight}>
-          <button className={styles.iconBtn} onClick={toggleTheme} aria-label="Переключить тему">
-            {theme === 'dark' ? '☀️' : '🌙'}
+          <button className={styles.themeToggle} onClick={toggleTheme} aria-label="Переключить тему" title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.themeIcoLeft}>
+              <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+            </svg>
+            <div className={`${styles.themeTrack} ${theme === 'light' ? styles.themeTrackLight : ''}`}>
+              <div className={styles.themeThumb} />
+            </div>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.themeIcoRight}>
+              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+            </svg>
           </button>
           {isAuthenticated() ? (
             <button className={styles.avatarBtn} onClick={() => navigate('/user/me')} aria-label="Профиль">
-              <span>👤</span>
+              {myAvatarFileId
+                ? <AuthImage fileId={myAvatarFileId} alt="Аватар" className={styles.avatarImg} />
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#fff' }}>
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
+              }
             </button>
           ) : (
             <button className={styles.loginBtn} onClick={() => navigate('/login')}>Войти</button>

@@ -8,6 +8,7 @@ import {
   tariffApi, tariffValidatorApi,
   type ITariff, type ITariffValidator, type ITariffPeriod, type ITariffRequest,
 } from '@/entities/admin/adminApi';
+import { Select } from '@/shared/ui/Select/Select';
 import styles from './AdminPage.module.css';
 
 type AdminTab = 'eventTypes' | 'contactTypes' | 'tariffs';
@@ -393,9 +394,12 @@ function TypeForm({
       <h3 className={styles.formTitle}>{type ? 'Редактировать тип' : 'Новый тип мероприятия'}</h3>
       {err && <div className={styles.formError}>{err}</div>}
       <FormField label="Категория *">
-        <select className={styles.input} value={form.eventCategoryId} onChange={set('eventCategoryId')}>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <Select
+        value={form.eventCategoryId}
+        onChange={v => set('eventCategoryId')({ target: { value: v } } as any)}
+        placeholder="Выберите категорию"
+        options={categories.map(cat => ({ value: cat.id, label: cat.name }))}
+      />
       </FormField>
       <FormField label="Название *">
         <input className={styles.input} value={form.name} onChange={set('name')} placeholder="Концерт" />

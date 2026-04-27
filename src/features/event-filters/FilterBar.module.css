@@ -30,9 +30,27 @@
   width: 16px; height: 16px; font-size: 11px; cursor: pointer;
   color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
 }
-.viewToggle { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
-.viewBtn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; color: var(--text-secondary); }
-.viewActive { background: var(--surface-2); color: var(--text-primary); }
+.viewToggle {
+  display: flex; align-items: center; gap: 5px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-secondary); padding: 4px 6px;
+  border-radius: 8px; flex-shrink: 0;
+  transition: background .12s;
+}
+.viewToggle:hover { background: var(--surface-2); }
+.viewTrack {
+  width: 30px; height: 17px; border-radius: 9px;
+  background: var(--surface-2); border: 1.5px solid var(--border);
+  position: relative; flex-shrink: 0; transition: background .2s, border-color .2s;
+}
+.viewTrackOn { background: var(--accent); border-color: var(--accent); }
+.viewThumb {
+  position: absolute; top: 1.5px; left: 1.5px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform .2s, background .2s;
+}
+.viewTrackOn .viewThumb { transform: translateX(13px); background: #fff; }
 
 /* ── Чипы ── */
 .chipsRow {
@@ -121,17 +139,20 @@
   font-size: 10px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .06em;
   color: var(--text-muted); white-space: nowrap;
+  height: 14px; /* Фиксируем высоту лейбла */
 }
 .epInput {
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 8px; padding: 6px 9px;
   font-size: 13px; color: var(--text-primary);
+  height: 34px; /* Фиксируем высоту поля */
   width: 110px; outline: none; font-family: inherit; transition: border-color .15s;
+  display: flex; align-items: center;
 }
 .epInput:focus { border-color: var(--accent); }
-/* DatePicker поля — шире */
-.epBlock:first-child .epInput,
-.epBlock:nth-child(2) .epInput { width: auto; }
+/* DatePicker-кнопка тоже должна быть той же высоты */
+.epBlock:first-child button,
+.epBlock:nth-child(2) button { height: 34px; min-width: 140px; }
 .epFooter { display: flex; gap: 6px; align-items: flex-end; margin-left: auto; }
 .epReset {
   background: none; border: 1px solid var(--border);
@@ -223,8 +244,12 @@
 
 /* Слайдер радиуса */
 .epSlider {
-  width: 100%; accent-color: var(--accent);
-  height: 4px; cursor: pointer; margin-top: 4px;
+  width: 160px; max-width: 100%;
+  accent-color: var(--accent);
+  height: 4px; cursor: pointer;
+  margin: auto 0 5px; /* выравниваем по центру блока */
+  display: block;
+  align-self: center;
 }
 
 /* Мини-лейбл группы в quickRow */

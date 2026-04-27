@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import type { EventViewMode, IEventType } from '@/entities/event';
 import { fetchEventTypes } from '@/entities/event';
 import { useFiltersStore } from '@/app/store';
-import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
+import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';;
 import { MobileFilterSheet } from '@/features/event-filters/MobileFilterSheet';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
@@ -24,7 +24,7 @@ interface FilterBarProps {
   onViewModeChange: (v: EventViewMode) => void;
   onSearch: () => void;
   useStore?: typeof useFiltersStore;
-  hideCity?: boolean;
+  hideViewToggle?: boolean;
   tabs?: { key: string; label: string }[];
   activeTab?: string;
   onTabChange?: (key: string) => void;
@@ -41,7 +41,7 @@ function weekendRange()  {
 
 export function FilterBar({
   searchName, onSearchChange, viewMode, onViewModeChange, onSearch,
-  useStore: useStoreOverride, hideCity = false, tabs, activeTab, onTabChange,
+  useStore: useStoreOverride, hideCity = false, hideViewToggle = false, tabs, activeTab, onTabChange,
 }: FilterBarProps) {
   const storeDefault = useFiltersStore();
   const storeOverride = useStoreOverride?.();
@@ -233,14 +233,16 @@ export function FilterBar({
         </svg>
         {chips.length > 0 && <span className={styles.mobileFilterBadge}>{chips.length}</span>}
       </button>
-      <div className={styles.viewToggle}>
-        <button className={`${styles.viewBtn} ${viewMode === 'list' ? styles.viewActive : ''}`} onClick={() => onViewModeChange('list')}>
+      {!hideViewToggle && (
+        <button className={styles.viewToggle} onClick={() => onViewModeChange(viewMode === 'map' ? 'list' : 'map')}
+          title={viewMode === 'map' ? 'Показать списком' : 'Показать на карте'}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <div className={`${styles.viewTrack} ${viewMode === 'map' ? styles.viewTrackOn : ''}`}>
+            <div className={styles.viewThumb} />
+          </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         </button>
-        <button className={`${styles.viewBtn} ${viewMode === 'map' ? styles.viewActive : ''}`} onClick={() => onViewModeChange('map')}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-        </button>
-      </div>
+      )}
     </div>
 
     {/* ── Мобильные вкладки (если переданы tabs) ── */}
@@ -280,14 +282,16 @@ export function FilterBar({
             onKeyDown={e => e.key === 'Enter' && handleApply()} />
           {searchName && <button className={styles.clearBtn} onClick={() => onSearchChange('')}>✕</button>}
         </div>
-        <div className={styles.viewToggle}>
-          <button className={`${styles.viewBtn} ${viewMode === 'list' ? styles.viewActive : ''}`} onClick={() => onViewModeChange('list')} title="Список">
+        {!hideViewToggle && (
+          <button className={styles.viewToggle} onClick={() => onViewModeChange(viewMode === 'map' ? 'list' : 'map')}
+            title={viewMode === 'map' ? 'Показать списком' : 'Показать на карте'}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <div className={`${styles.viewTrack} ${viewMode === 'map' ? styles.viewTrackOn : ''}`}>
+              <div className={styles.viewThumb} />
+            </div>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           </button>
-          <button className={`${styles.viewBtn} ${viewMode === 'map' ? styles.viewActive : ''}`} onClick={() => onViewModeChange('map')} title="Карта">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          </button>
-        </div>
+        )}
       </div>
 
       {/* ── Чипы ── */}
@@ -318,9 +322,6 @@ export function FilterBar({
         <button className={`${styles.quickBtn} ${quickDate === 'today'    ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('today')}>Сегодня</button>
         <button className={`${styles.quickBtn} ${quickDate === 'tomorrow' ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('tomorrow')}>Завтра</button>
         <button className={`${styles.quickBtn} ${quickDate === 'weekend'  ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('weekend')}>Выходные</button>
-
-        <div className={styles.sep}/>
-        <button className={`${styles.quickBtn} ${filters.price === 0      ? styles.quickBtnOn : ''}`} onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>Бесплатно</button>
 
         <div className={styles.sep}/>
 

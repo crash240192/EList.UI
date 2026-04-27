@@ -15,6 +15,7 @@ import { cookies } from '@/shared/lib/cookies';
 import { AvatarUpload } from '@/shared/ui/AvatarUpload/AvatarUpload';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
+import { Select } from '@/shared/ui/Select/Select';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import styles from './SettingsPage.module.css';
 
@@ -133,11 +134,10 @@ function PersonSection() {
                   onFocus={e => (e.target as HTMLInputElement).select()} />
       </Row>
       <Row label="Пол">
-        <select className={styles.input} value={form.gender} onChange={set('gender')}>
-          <option value="">Не указан</option>
-          <option value="Male">Мужской</option>
-          <option value="Female">Женский</option>
-        </select>
+        <Select value={form.gender} onChange={v => setForm(f => ({ ...f, gender: v }))}
+          placeholder="Не указан"
+          options={[{ value: 'Male', label: 'Мужской' }, { value: 'Female', label: 'Женский' }]}
+        />
       </Row>
       <Row label="Дата рождения">
         <input className={styles.input} type="date" value={form.birthDate}
@@ -326,10 +326,9 @@ function ContactForm({ types, initial, onSave, onCancel }: {
 
   return (
     <div className={styles.contactForm}>
-      <select className={styles.input} value={form.typeId}
-        onChange={e => setForm(f => ({ ...f, typeId: e.target.value }))}>
-        {types.map(t => <option key={t.id} value={t.id}>{t.name || t.localizedName}</option>)}
-      </select>
+      <Select value={form.typeId} onChange={v => setForm(f => ({ ...f, typeId: v }))}
+        options={types.map(t => ({ value: t.id, label: t.name || t.localizedName || '' }))}
+      />
       <input className={styles.input} placeholder="Значение"
         value={form.value}
         onChange={e => setForm(f => ({ ...f, value: e.target.value }))} />

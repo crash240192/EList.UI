@@ -286,15 +286,27 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
         </button>
       </div>
 
-      {/* Быстрый выбор года */}
+      {/* Быстрый выбор года со стрелками */}
       <div className={styles.yearBar}>
-        {yearRange.map(y => (
-          <button key={y} type="button"
-            className={`${styles.yearBtn} ${y === viewYear ? styles.yearBtnActive : ''}`}
-            onClick={() => setViewYear(y)}>
-            {y}
-          </button>
-        ))}
+        <button type="button" className={styles.yearNavBtn}
+          onClick={() => setViewYear(y => Math.max(minYear, y - 1))}
+          disabled={viewYear <= minYear}>
+          ‹
+        </button>
+        <div className={styles.yearList}>
+          {yearRange.map(y => (
+            <button key={y} type="button"
+              className={`${styles.yearBtn} ${y === viewYear ? styles.yearBtnActive : ''}`}
+              onClick={() => setViewYear(y)}>
+              {y}
+            </button>
+          ))}
+        </div>
+        <button type="button" className={styles.yearNavBtn}
+          onClick={() => setViewYear(y => Math.min(maxYear, y + 1))}
+          disabled={viewYear >= maxYear}>
+          ›
+        </button>
       </div>
 
       {/* Дни недели */}
