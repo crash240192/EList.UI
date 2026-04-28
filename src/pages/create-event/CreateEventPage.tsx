@@ -247,7 +247,7 @@ export default function CreateEventPage() {
   };
 
   const scrollTo = (err: FieldError) => {
-    const map: Record<FieldError, React.RefObject<HTMLElement | null>> = {
+    const map: Partial<Record<FieldError, React.RefObject<HTMLElement | null>>> = {
       name: nameRef, type: typeRef, location: locationRef,
       startDate: startDateRef, startTime: startTimeRef,
       endDate: endDateRef, endTime: endTimeRef,

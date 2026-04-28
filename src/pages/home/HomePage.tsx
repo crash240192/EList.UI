@@ -2,6 +2,7 @@
 // Главная страница: карта + список + фильтры
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { IEvent, EventViewMode, IEventsSearchParams } from '@/entities/event';
 import { EventCard } from '@/entities/event';
 import { useEvents } from '@/features/event-list/useEvents';
@@ -25,6 +26,7 @@ export default function HomePage() {
   const [selectedEvent, setSelectedEvent] = useState<IEvent | null>(null);
   const [searchName, setSearchName] = useState('');
 
+  const navigate = useNavigate();
   const { filters, setFilter } = useFiltersStore();
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const {
