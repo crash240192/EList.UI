@@ -741,7 +741,8 @@ function TariffsTab() {
 
 const EMPTY_VALIDATOR_STR = {
   costLimit: '', personsLimit: '', ageLimit: '',
-  allowPrivate: false, allowGenderSegregation: false,
+  maxEventsCount: '', createDateMaxPeriod: '',
+  allowPrivate: false, allowGenderSegregation: false, allowMultidaysEvent: false,
 };
 
 function TariffForm({ tariff, onSave, onCancel }: {
@@ -754,7 +755,6 @@ function TariffForm({ tariff, onSave, onCancel }: {
   const [days,  setDays]  = useState(String((tariff as any)?.periodDays ?? 30));
 
   const [validatorStr, setValidatorStr] = useState(EMPTY_VALIDATOR_STR);
-  const [validatorBool, setValidatorBool] = useState({ allowPrivate: false, allowGenderSegregation: false });
   const [loadingV,  setLoadingV]  = useState(!!tariff?.validatorId);
 
   // Сбрасываем и перезагружаем при смене тарифа
@@ -763,7 +763,6 @@ function TariffForm({ tariff, onSave, onCancel }: {
     setCost(String(tariff?.cost ?? 0));
     setDays(String((tariff as any)?.periodDays ?? 30));
     setValidatorStr(EMPTY_VALIDATOR_STR);
-    setValidatorBool({ allowPrivate: false, allowGenderSegregation: false });
     setErr(null);
 
     if (!tariff?.validatorId) { setLoadingV(false); return; }
@@ -771,12 +770,15 @@ function TariffForm({ tariff, onSave, onCancel }: {
     tariffValidatorApi.getByTariff(tariff.id).then(v => {
       if (v) {
         setValidatorStr({
-          costLimit:    v.costLimit    ? String(v.costLimit)    : '',
-          personsLimit: v.personsLimit ? String(v.personsLimit) : '',
-          ageLimit:     v.ageLimit     ? String(v.ageLimit)     : '',
-          allowPrivate: false, allowGenderSegregation: false,
+          costLimit:           v.costLimit    ? String(v.costLimit)    : '',
+          personsLimit:        v.personsLimit ? String(v.personsLimit) : '',
+          ageLimit:            v.ageLimit     ? String(v.ageLimit)     : '',
+          maxEventsCount:      v.maxEventsCount      != null ? String(v.maxEventsCount)      : '',
+          createDateMaxPeriod: v.createDateMaxPeriod != null ? String(v.createDateMaxPeriod) : '',
+          allowPrivate:            !!v.allowPrivate,
+          allowGenderSegregation:  !!v.allowGenderSegregation,
+          allowMultidaysEvent:     !!v.allowMultidaysEvent,
         });
-        setValidatorBool({ allowPrivate: !!v.allowPrivate, allowGenderSegregation: !!v.allowGenderSegregation });
       }
     }).finally(() => setLoadingV(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -789,11 +791,14 @@ function TariffForm({ tariff, onSave, onCancel }: {
     if (!name.trim()) { setErr('Укажите название'); return; }
     setSaving(true); setErr(null);
     const validator: ITariffValidator = {
-      costLimit:             parseFloat(validatorStr.costLimit)    || 0,
-      personsLimit:          parseInt(validatorStr.personsLimit)    || 0,
-      ageLimit:              parseInt(validatorStr.ageLimit)        || 0,
-      allowPrivate:          validatorBool.allowPrivate,
-      allowGenderSegregation: validatorBool.allowGenderSegregation,
+      costLimit:              validatorStr.costLimit           !== '' ? parseFloat(validatorStr.costLimit)           : null as any,
+      personsLimit:           validatorStr.personsLimit        !== '' ? parseInt(validatorStr.personsLimit)          : null as any,
+      ageLimit:               validatorStr.ageLimit            !== '' ? parseInt(validatorStr.ageLimit)              : null as any,
+      maxEventsCount:         validatorStr.maxEventsCount      !== '' ? parseInt(validatorStr.maxEventsCount)        : null,
+      createDateMaxPeriod:    validatorStr.createDateMaxPeriod !== '' ? parseInt(validatorStr.createDateMaxPeriod)   : null,
+      allowPrivate:           validatorStr.allowPrivate,
+      allowGenderSegregation: validatorStr.allowGenderSegregation,
+      allowMultidaysEvent:    validatorStr.allowMultidaysEvent,
     };
     try {
       await onSave(validator, {
@@ -850,15 +855,32 @@ function TariffForm({ tariff, onSave, onCancel }: {
             onChange={e => setValidatorStr(v => ({ ...v, ageLimit: e.target.value }))} />
         </div>
         <label className={styles.checkboxLabel}>
-          <input type="checkbox" checked={validatorBool.allowPrivate}
-            onChange={e => setValidatorBool(v => ({ ...v, allowPrivate: e.target.checked }))} />
+          <input type="checkbox" checked={validatorStr.allowPrivate}
+            onChange={e => setValidatorStr(v => ({ ...v, allowPrivate: e.target.checked }))} />
           Разрешить приватные события
         </label>
         <label className={styles.checkboxLabel}>
-          <input type="checkbox" checked={validatorBool.allowGenderSegregation}
-            onChange={e => setValidatorBool(v => ({ ...v, allowGenderSegregation: e.target.checked }))} />
+          <input type="checkbox" checked={validatorStr.allowGenderSegregation}
+            onChange={e => setValidatorStr(v => ({ ...v, allowGenderSegregation: e.target.checked }))} />
           Разрешить ограничение по полу
         </label>
+        <label className={styles.checkboxLabel}>
+          <input type="checkbox" checked={validatorStr.allowMultidaysEvent}
+            onChange={e => setValidatorStr(v => ({ ...v, allowMultidaysEvent: e.target.checked }))} />
+          Разрешить многодневные события
+        </label>
+        <div className={styles.field}>
+          <label className={styles.label}>Макс. кол-во активных событий (пусто = без ограничений)</label>
+          <input className={styles.input} type="number" min={0}
+            value={validatorStr.maxEventsCount} placeholder="не задано"
+            onChange={e => setValidatorStr(v => ({ ...v, maxEventsCount: e.target.value }))} />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Макс. дней до начала события (пусто = без ограничений)</label>
+          <input className={styles.input} type="number" min={1}
+            value={validatorStr.createDateMaxPeriod} placeholder="не задано"
+            onChange={e => setValidatorStr(v => ({ ...v, createDateMaxPeriod: e.target.value }))} />
+        </div>
       </div>
 
       <div className={styles.formActions}>

@@ -49,7 +49,7 @@ const EMPTY: FormState = {
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
 };
 
-type FieldError = 'name' | 'type' | 'location' | 'startDate' | 'startTime' | 'endDate' | 'endTime';
+type FieldError = 'name' | 'type' | 'location' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | 'cost' | 'maxPersons' | 'ageLimit';
 
 // ---- Helpers ----
 
@@ -235,9 +235,14 @@ export default function CreateEventPage() {
       if (!form.endDate) errs.add('endDate');
       if (!form.endTime) errs.add('endTime');
     }
+    // Проверяем ограничения тарифа
+    if (maxCost != null && parseFloat(form.cost) > maxCost)              errs.add('cost');
+    if (maxPersons != null && form.maxPersons && parseInt(form.maxPersons) > maxPersons) errs.add('maxPersons');
+    if (maxAge != null && form.ageLimit && parseInt(form.ageLimit) > maxAge)             errs.add('ageLimit');
+
     setFieldErrors(errs);
     if (!errs.size) return null;
-    return (['name','type','location','startDate','startTime','endDate','endTime'] as FieldError[])
+    return (['name','type','location','startDate','startTime','endDate','endTime','cost','maxPersons','ageLimit'] as FieldError[])
       .find(f => errs.has(f)) ?? null;
   };
 
@@ -261,7 +266,11 @@ export default function CreateEventPage() {
       showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
         location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
         startTime:'⚠️ Укажите время начала', endDate:'⚠️ Укажите дату окончания',
-        endTime:'⚠️ Укажите время окончания' }[firstErr]);
+        endTime:'⚠️ Укажите время окончания',
+        cost: `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
+        maxPersons: `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
+        ageLimit: `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
+      }[firstErr]);
       scrollTo(firstErr); return;
     }
     setSaving(true);
@@ -332,7 +341,11 @@ export default function CreateEventPage() {
       showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
         location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
         startTime:'⚠️ Укажите время начала', endDate:'⚠️ Укажите дату окончания',
-        endTime:'⚠️ Укажите время окончания' }[firstErr]);
+        endTime:'⚠️ Укажите время окончания',
+        cost: `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
+        maxPersons: `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
+        ageLimit: `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
+      }[firstErr]);
       scrollTo(firstErr); return;
     }
     setConfirmOpen(true);
@@ -451,12 +464,17 @@ export default function CreateEventPage() {
         {/* Дата и время */}
         <Section title="Дата и время *">
           {/* Переключатель режима — вверху */}
-          <div className={styles.endModeToggle}>
-            <button className={`${styles.modeBtn} ${endMode === 'duration' ? styles.modeBtnActive : ''}`}
-              onClick={() => setEndMode('duration')}>По длительности</button>
-            <button className={`${styles.modeBtn} ${endMode === 'multiday' ? styles.modeBtnActive : ''}`}
-              onClick={() => setEndMode('multiday')}>Многодневное</button>
-          </div>
+          {/* Переключатель режима — скрываем если тариф не разрешает многодневные */}
+          {tariffValidator?.allowMultidaysEvent !== false && (
+            <div className={styles.endModeToggle}>
+              <button className={`${styles.modeBtn} ${endMode === 'duration' ? styles.modeBtnActive : ''}`}
+                onClick={() => setEndMode('duration')}>По длительности</button>
+              <button className={`${styles.modeBtn} ${endMode === 'multiday' ? styles.modeBtnActive : ''}`}
+                onClick={() => { if (tariffValidator?.allowMultidaysEvent === false) return; setEndMode('multiday'); }}>
+                Многодневное
+              </button>
+            </div>
+          )}
 
           {/* Две колонки */}
           <div className={endMode === 'duration' ? styles.dateRow : styles.dateRowEqual}>
@@ -477,6 +495,9 @@ export default function CreateEventPage() {
                   }}
                   placeholder="Дата и время начала"
                   hasError={hasErr('startDate') || hasErr('startTime')}
+                  max={tariffValidator?.createDateMaxPeriod != null
+                    ? (() => { const d = new Date(); d.setDate(d.getDate() + tariffValidator!.createDateMaxPeriod!); return d.toISOString().slice(0,10); })()
+                    : undefined}
                 />
               </div>
             </Field>
@@ -539,9 +560,11 @@ export default function CreateEventPage() {
                   locked={!canSetCost}
                   value={form.cost}
                   onChange={e => setForm(f => ({ ...f, cost: e.target.value }))}
-                  type="number" 
-                  max={maxCost ? String(maxCost) : undefined}
-                  hint={canSetCost && tariffValidator?.costLimit
+                  type="number"
+                  hasError={hasErr('cost')}
+                  hint={hasErr('cost')
+                    ? `Превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`
+                    : canSetCost && tariffValidator?.costLimit
                     ? `до ${tariffValidator.costLimit.toLocaleString()} ₽`
                     : !canSetCost ? 'Недоступно в тарифе' : undefined}
                 />
@@ -552,8 +575,10 @@ export default function CreateEventPage() {
                   value={form.maxPersons} placeholder="∞"
                   onChange={e => setForm(f => ({ ...f, maxPersons: e.target.value }))}
                   type="number"
-                  max={maxPersons ? String(maxPersons) : undefined}
-                  hint={!canSetMaxPersons
+                  hasError={hasErr('maxPersons')}
+                  hint={hasErr('maxPersons')
+                    ? `Превышает лимит тарифа (до ${maxPersons})`
+                    : !canSetMaxPersons
                     ? 'Недоступно в тарифе — только без лимита'
                     : maxPersons ? `до ${maxPersons} человек` : undefined}
                 />
@@ -564,17 +589,12 @@ export default function CreateEventPage() {
               <LockedInput
                 locked={!canSetAge}
                 value={form.ageLimit} placeholder="0+"
-                onChange={e => {
-                  const val = e.target.value;
-                  // Если в тарифе есть ограничение — не даём ставить выше
-                  if (maxAge != null && parseInt(val) > maxAge) return;
-                  setForm(f => ({ ...f, ageLimit: val }));
-                }}
+                onChange={e => setForm(f => ({ ...f, ageLimit: e.target.value }))}
                 type="number"
-                max={maxAge ? String(maxAge) : undefined}
-                suffix="+"
-                hint={!canSetAge
-                  ? 'Недоступно в тарифе — только 0+'
+                hasError={hasErr('ageLimit')}
+                hint={hasErr('ageLimit')
+                  ? `Превышает лимит тарифа (до ${maxAge}+)`
+                  : !canSetAge ? 'Недоступно в тарифе — только 0+'
                   : maxAge ? `до ${maxAge}+` : undefined}
               />
             </Field>
@@ -761,22 +781,21 @@ function Field({ label, children, error }: { label: string; children: React.Reac
   );
 }
 
-function LockedInput({ locked, hint, suffix, ...props }: {
-  locked?: boolean; hint?: string; suffix?: string;
+function LockedInput({ locked, hint, suffix, hasError, ...props }: {
+  locked?: boolean; hint?: string; suffix?: string; hasError?: boolean;
 } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
         <input
-          className={`${styles.input} ${locked ? styles.inputLocked : ''}`}
+          className={`${styles.input} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''}`}
           disabled={locked} {...props}
           style={suffix ? { flex: 1 } : undefined}
-        
-                  onFocus={e => (e.target as HTMLInputElement).select()} />
+          onFocus={e => (e.target as HTMLInputElement).select()} />
         {suffix && <span className={styles.inputSuffix}>{suffix}</span>}
         {locked && <span className={styles.lockBadge}>🔒 тариф</span>}
       </div>
-      {hint && <div className={`${styles.fieldHint} ${locked ? styles.fieldHintWarn : ''}`}>{hint}</div>}
+      {hint && <div className={`${styles.fieldHint} ${hasError ? styles.fieldHintErr : locked ? styles.fieldHintWarn : ''}`}>{hint}</div>}
     </div>
   );
 }

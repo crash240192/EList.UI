@@ -1,7 +1,7 @@
 // pages/home/HomePage.tsx
 // Главная страница: карта + список + фильтры
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { IEvent, EventViewMode, IEventsSearchParams } from '@/entities/event';
 import { EventCard } from '@/entities/event';
 import { useEvents } from '@/features/event-list/useEvents';
@@ -34,6 +34,12 @@ export default function HomePage() {
     confirmCity,
     keepOldCity,
   } = useUserLocation();
+
+  // Запоминаем начальный центр при монтировании — не меняем его при навигации
+  const initialCenter = useRef<[number, number]>([
+    filters.latitude ?? userCoords.lat,
+    filters.longitude ?? userCoords.lng,
+  ]);
 
   const debouncedName = useDebounce(searchName, 300);
 
@@ -70,15 +76,12 @@ export default function HomePage() {
       {/* ---- Content area ---- */}
       <div className={styles.content}>
         {viewMode === 'map' ? (
-          /* MAP VIEW — реальная Leaflet карта */
+          /* MAP VIEW */
           <div className={styles.mapPlaceholder}>
             <EventMap
               events={events}
               onMarkerClick={handleEventClick}
-              center={[
-                filters.latitude ?? userCoords.lat,
-                filters.longitude ?? userCoords.lng,
-              ]}
+              center={initialCenter.current}
             />
           </div>
         ) : (
@@ -105,7 +108,7 @@ export default function HomePage() {
                     <EventCard.Preset
                       key={event.id}
                       event={event}
-                      onClick={handleEventClick}
+                      onClick={e => navigate(`/event/${e.id}`)}
                       isFavorite={isFavorite(event.id)}
                       onFavorite={toggleFav}
                     />

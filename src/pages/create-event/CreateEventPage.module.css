@@ -362,3 +362,4 @@
 .durationWheelWrap {
   display: flex; align-items: center; padding: 4px 0;
 }
+.fieldHintErr { font-size: 11px; color: var(--danger); margin-top: 3px; }

@@ -79,11 +79,14 @@ export const typesApi = {
 
 export interface ITariffValidator {
   id?: string;
-  costLimit: number;
-  personsLimit: number;
+  costLimit: number | null;
+  personsLimit: number | null;
   allowPrivate: boolean;
-  ageLimit: number;
+  ageLimit: number | null;
   allowGenderSegregation: boolean;
+  maxEventsCount: number | null;
+  createDateMaxPeriod: number | null;
+  allowMultidaysEvent: boolean;
 }
 
 export interface ITariffPeriod {

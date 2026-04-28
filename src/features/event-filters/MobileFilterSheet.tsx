@@ -81,18 +81,6 @@ export function MobileFilterSheet({
           </button>
         </div>
 
-        {/* Активные фильтры (чипы) */}
-        {chips.length > 0 && (
-          <div className={styles.chipsRow}>
-            {chips.map((c, i) => (
-              <div key={i} className={styles.chip}>
-                {c.label}
-                <span className={styles.chipX} onClick={c.onRemove}>×</span>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Контент с прокруткой */}
         <div className={styles.body}>
 

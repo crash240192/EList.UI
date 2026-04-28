@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { useAuthStore } from '@/app/store';
-import { getStoredAccountId } from '@/entities/user/api';
+import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
 import { useEvents } from '@/features/event-list/useEvents';
@@ -127,7 +127,11 @@ export default function UserPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
 
-  const myAccountId      = getStoredAccountId();
+  const [myAccountId, setMyAccountId] = useState<string | null>(getStoredAccountId());
+  useEffect(() => {
+    if (!myAccountId) getOrFetchAccountId().then(setMyAccountId).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const isOwnProfile     = !id || id === 'me' || id === myAccountId;
   const targetId         = isOwnProfile ? null : id;
   const profileAccountId = isOwnProfile ? (myAccountId ?? '') : (id ?? '');
@@ -328,7 +332,7 @@ export default function UserPage() {
                   onClick={() => setActiveTab('created')}
                 >Организует</button>
               </div>
-              <UserEventList accountId={profileAccountId} tab={activeTab} />
+              {profileAccountId ? <UserEventList accountId={profileAccountId} tab={activeTab} /> : null}
             </div>
           </div>
 

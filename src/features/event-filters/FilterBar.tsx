@@ -118,6 +118,11 @@ export function FilterBar({
       if (!filters.latitude && storedCoords.lat !== 0) {
         setFilter('latitude',  storedCoords.lat);
         setFilter('longitude', storedCoords.lng);
+        // При первом заходе подставляем название города из профиля
+        if (!cityName) {
+          const name = cookies.get('elist_city_name') ?? '';
+          if (name) setCityName(name);
+        }
       }
       if (!filters.locationRange) setFilter('locationRange', DEFAULT_RADIUS_M);
     }
@@ -179,14 +184,17 @@ export function FilterBar({
 
   // Вспомогательная функция — возврат к родному городу
   const restoreHomeCity = () => {
-    const homeName = cookies.get('elist_city_name') ?? '';
-    setCityName(homeName);
+    // Сбрасываем название — в кнопке появится "По всем городам"
+    setCityName('');
     if (storedCoords.lat !== 0) {
       setFilter('latitude',  storedCoords.lat);
       setFilter('longitude', storedCoords.lng);
       window.dispatchEvent(new CustomEvent('elist:centerMap', {
         detail: { lat: storedCoords.lat, lng: storedCoords.lng },
       }));
+    } else {
+      setFilter('latitude', undefined);
+      setFilter('longitude', undefined);
     }
     setFilter('locationRange', DEFAULT_RADIUS_M);
   };
@@ -208,10 +216,6 @@ export function FilterBar({
   if (quickDate === 'tomorrow') chips.push({ label: 'Завтра',   onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
   if (quickDate === 'weekend')  chips.push({ label: 'Выходные', onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
   if (filters.price === 0)      chips.push({ label: 'Бесплатно', onRemove: () => setFilter('price', undefined) });
-  (filters.types ?? []).forEach(tid => {
-    const t = allTypes.find(x => x.id === tid);
-    if (t) chips.push({ label: t.name, onRemove: () => { const n = (filters.types ?? []).filter(x => x !== tid); setFilter('types', n.length ? n : undefined); setDraftTypes(n); } });
-  });
 
   const QUICK_TYPES = allTypes.slice(0, 5);
   const hasExpandedActive = (!quickDate && !!(filters.startTime || filters.endTime)) || (!!filters.price && filters.price > 0) || (!!filters.locationRange && filters.locationRange !== DEFAULT_RADIUS_M);
@@ -294,16 +298,6 @@ export function FilterBar({
           </button>
         )}
       </div>
-
-      {/* ── Чипы ── */}
-      {chips.length > 0 && (
-        <div className={styles.chipsRow}>
-          {chips.map((c, i) => (
-            <div key={i} className={styles.chip}>{c.label}<span className={styles.chipClose} onClick={c.onRemove}>×</span></div>
-          ))}
-          <button className={styles.clearAll} onClick={handleReset}>Сбросить всё</button>
-        </div>
-      )}
 
       {/* ── Быстрые фильтры ── */}
       <div className={styles.quickRow}>

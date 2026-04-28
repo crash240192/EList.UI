@@ -265,11 +265,29 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
 
   // Скроллим к выбранному году при открытии
   const yearListRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open || !yearListRef.current) return;
+
+  const scrollToActiveYear = useCallback(() => {
+    if (!yearListRef.current) return;
     const btn = yearListRef.current.querySelector('[data-year-active]') as HTMLElement;
-    if (btn) btn.scrollIntoView({ block: 'center', behavior: 'instant' });
+    if (btn) btn.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, []);
+
+  // Центрируем год при открытии
+  useEffect(() => {
+    if (!open) return;
+    // instant при первом открытии, smooth при последующих изменениях
+    requestAnimationFrame(() => {
+      const btn = yearListRef.current?.querySelector('[data-year-active]') as HTMLElement;
+      if (btn) btn.scrollIntoView({ block: 'center', behavior: 'instant' });
+    });
   }, [open]);
+
+  // Центрируем год при каждом его изменении (стрелки, клик)
+  useEffect(() => {
+    if (!open) return;
+    requestAnimationFrame(scrollToActiveYear);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewYear]);
 
   const popupContent = (
     <div data-datepicker-popup
