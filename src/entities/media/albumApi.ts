@@ -46,6 +46,19 @@ export async function deleteAlbum(albumId: string): Promise<void> {
 
 /** Получить альбомы события */
 export async function getEventAlbums(eventId: string): Promise<IAlbum[]> {
-  const res = await apiClient.get<IAlbum[]>(`/api/media/albums/byEvent?eventId=${eventId}`);
+  const res = await apiClient.get<IAlbum[]>(`/api/media/albums/byEvent/${eventId}`);
   return ((res as any).result ?? res) as IAlbum[];
+}
+
+export interface IAlbumFile {
+  id: string;
+  fileId: string;
+  albumId: string;
+}
+
+/** Получить файлы альбома */
+export async function getAlbumFiles(albumId: string, pageIndex = 1, pageSize = 50): Promise<IAlbumFile[]> {
+  const res = await apiClient.get<any>(`/api/media/albums/${albumId}/files?pageIndex=${pageIndex}&pageSize=${pageSize}`);
+  const paged = (res as any).result ?? res;
+  return paged.result ?? [];
 }

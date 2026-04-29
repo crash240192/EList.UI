@@ -1,0 +1,150 @@
+/* EventAlbums.module.css */
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Основной блок ── */
+.wrap { padding: 0 0 24px; }
+.header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 14px;
+}
+.title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.count {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 1px 8px;
+  font-size: 12px; color: var(--text-muted);
+}
+
+/* Сетка альбомов */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+/* ── Карточка альбома ── */
+.albumCard {
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface);
+  cursor: pointer; transition: transform .15s, border-color .15s;
+}
+.albumCard:hover { transform: translateY(-2px); border-color: var(--accent); }
+
+.albumCover {
+  height: 120px; position: relative;
+  background: var(--surface-2);
+}
+.albumCoverImg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.albumCoverEmpty {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+}
+
+.privateBadge {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,0.55); color: #fff;
+  border-radius: 6px; padding: 3px 5px;
+  display: flex; align-items: center;
+}
+
+.albumMeta { padding: 8px 10px; }
+.albumName { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.albumDesc { font-size: 11px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Спиннер картинки ── */
+.imgWrap { width: 100%; height: 100%; position: relative; }
+.img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.imgLoaded { opacity: 1; }
+.imgHidden { opacity: 0; position: absolute; }
+.imgSpinner {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+}
+.imgError {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); background: var(--surface-2);
+}
+
+/* ── Скелетон ── */
+.loading { display: flex; gap: 12px; }
+.skeleton {
+  flex: 1; height: 160px; border-radius: 12px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ── Модалка просмотра ── */
+.viewerBackdrop {
+  position: fixed; inset: 0; z-index: 800;
+  background: rgba(0,0,0,0.88);
+  display: flex; align-items: center; justify-content: center;
+}
+.viewerFs { background: #000; }
+
+.viewer {
+  width: min(900px, 98vw);
+  max-height: 96dvh;
+  display: flex; flex-direction: column;
+  border-radius: 14px; overflow: hidden;
+  background: var(--surface);
+}
+
+.viewerHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.viewerTitle { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.viewerCount { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.viewerBtn {
+  width: 30px; height: 30px; border-radius: 7px;
+  border: 1px solid var(--border); background: none;
+  cursor: pointer; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s;
+}
+.viewerBtn:hover { background: var(--surface-2); }
+
+/* Главное фото */
+.viewerMain {
+  flex: 1; position: relative; overflow: hidden;
+  min-height: 300px; background: #000;
+  display: flex; align-items: center; justify-content: center;
+}
+.viewerImg {
+  width: 100%; height: 100%; object-fit: contain;
+  display: block; max-height: 60dvh;
+}
+
+/* Стрелки */
+.arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(0,0,0,0.5); border: none; cursor: pointer;
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  transition: background .12s; z-index: 1;
+}
+.arrow:hover { background: rgba(0,0,0,0.75); }
+.arrowLeft  { left: 12px; }
+.arrowRight { right: 12px; }
+
+/* Полоса миниатюр */
+.viewerStrip {
+  display: flex; gap: 6px; padding: 8px 12px;
+  overflow-x: auto; flex-shrink: 0;
+  scrollbar-width: thin;
+  border-top: 1px solid var(--border);
+}
+.thumb {
+  width: 56px; height: 56px; border-radius: 6px;
+  overflow: hidden; flex-shrink: 0; cursor: pointer;
+  border: 2px solid transparent; transition: border-color .12s;
+  background: var(--surface-2);
+}
+.thumbActive { border-color: var(--accent); }
+.thumbImg { width: 100%; height: 100%; object-fit: cover; display: block; }

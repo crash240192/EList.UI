@@ -17,6 +17,7 @@ import { ParticipantsModal } from '@/features/event/ParticipantsModal';
 import { InviteModal } from '@/features/event/InviteModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { EventAlbums } from './EventAlbums';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -418,6 +419,11 @@ export default function EventPage() {
         </div>{/* end twoCol */}
       </div>{/* end content */}
       </div>{/* end card */}
+
+      {/* Фотоальбомы */}
+      <div style={{ padding: '0 16px', maxWidth: 960, margin: '0 auto', width: '100%' }}>
+        <EventAlbums eventId={id!} />
+      </div>
 
       {/* Диалог подтверждения отмены мероприятия */}
       {cancelConfirm && (

@@ -80,7 +80,8 @@ export function setUnauthorizedHandler(fn: () => void): void {
 
 async function request<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs = 20_000
 ): Promise<CommandResult<T>> {
   const clientHash = getOrCreateClientHash();
   const authToken  = getAuthToken();
@@ -95,30 +96,37 @@ async function request<T>(
     headers['Authorization'] = authToken;
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (response.status === 401) {
-    // Не сбрасываем сессию для эндпоинтов активации — они могут вернуть 401
-    // потому что аккаунт ещё не активирован, а не потому что токен протух
-    const isActivationEndpoint = path.includes('activation') || path.includes('activate');
-    if (!isActivationEndpoint) {
-      clearAuthToken();
-      onUnauthorized?.();
+  try {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      ...options, headers, signal: controller.signal,
+    });
+
+    if (response.status === 401) {
+      const isActivationEndpoint = path.includes('activation') || path.includes('activate');
+      if (!isActivationEndpoint) {
+        clearAuthToken();
+        onUnauthorized?.();
+      }
+      throw new ApiError(401, 'Необходима авторизация');
     }
-    throw new ApiError(401, 'Необходима авторизация');
+
+    if (!response.ok) {
+      throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data: CommandResult<T> = await response.json();
+
+    if (!data.success) {
+      throw new ApiError(data.errorCode ?? 0, data.message ?? 'Ошибка API', data.message);
+    }
+
+    return data;
+  } finally {
+    clearTimeout(timer);
   }
-
-  if (!response.ok) {
-    throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const data: CommandResult<T> = await response.json();
-
-  if (!data.success) {
-    throw new ApiError(data.errorCode ?? 0, data.message ?? 'Ошибка API', data.message);
-  }
-
-  return data;
 }
 
 export const apiClient = {
