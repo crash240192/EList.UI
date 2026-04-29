@@ -38,6 +38,7 @@ export async function fetchEvents(
   const body = {
     pageIndex: 0,
     pageSize: 20,
+    active: true,  // по умолчанию ищем только активные мероприятия
     ...params,
   };
 

@@ -94,7 +94,7 @@ export default function EventPage() {
     if (!id) return;
     setActionLoading(true);
     try {
-      await apiClient.put(`/api/events/update/${id}`, { active: false });
+      await apiClient.delete(`/api/events/${id}/cancel`);
       setEvent(ev => ev ? { ...ev, active: false } : ev);
       setCancelConfirm(false);
     } finally { setActionLoading(false); }

@@ -25,11 +25,12 @@ export default function MyEventsPage() {
   const { accountId, loading: accountLoading } = useAccountId();
   const { filters, setFilter, resetFilters } = useMyEventsFiltersStore();
 
-  const [tab,         setTab]         = useState<Tab>('active');
-  const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all');
-  const [searchName,  setSearchName]  = useState('');
-  const [viewMode,    setViewMode]    = useState<EventViewMode>('list');
+  const [tab,           setTab]           = useState<Tab>('active');
+  const [ownerFilter,   setOwnerFilter]   = useState<OwnerFilter>('all');
+  const [searchName,    setSearchName]    = useState('');
+  const [viewMode,      setViewMode]      = useState<EventViewMode>('list');
   const [searchVersion, setSearchVersion] = useState(0);
+  const [showCancelled, setShowCancelled] = useState(false);
 
   const handleSearch = () => setSearchVersion(v => v + 1);
 
@@ -44,10 +45,13 @@ export default function MyEventsPage() {
     startTime:  filters.startTime,
     endTime:    filters.endTime,
     price:      filters.price,
+    // Для вкладки «Организую» с чекбоксом: если показываем отменённые — active: false
+    ...(ownerFilter === 'mine' && showCancelled ? { active: false } : {}),
   // @ts-ignore
     _v:         searchVersion,
   }), [debouncedName, selectedCategories, selectedTypes,
-       filters.startTime, filters.endTime, filters.price, searchVersion]);
+       filters.startTime, filters.endTime, filters.price,
+       ownerFilter, showCancelled, searchVersion]);
 
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useMyEvents({
     accountId,
@@ -85,9 +89,18 @@ export default function MyEventsPage() {
           <button className={`${styles.tab} ${tab === 'archive' ? styles.tabActive : ''}`}
             onClick={() => setTab('archive')}>Прошедшие</button>
         </div>
-        <button className={styles.createBtn} onClick={() => navigate('/create-event')}>
-          + Создать
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {ownerFilter === 'mine' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={showCancelled}
+                onChange={e => setShowCancelled(e.target.checked)} />
+              Показывать отменённые
+            </label>
+          )}
+          <button className={styles.createBtn} onClick={() => navigate('/create-event')}>
+            + Создать
+          </button>
+        </div>
       </div>
 
       {/* ---- Content ---- */}
