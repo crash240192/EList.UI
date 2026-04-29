@@ -837,19 +837,19 @@ function TariffForm({ tariff, onSave, onCancel }: {
           Ограничения тарифа
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>Макс. стоимость события (₽, пусто = только бесплатные)</label>
+          <label className={styles.label}>Макс. стоимость события (₽, пусто = без ограничений)</label>
           <input className={styles.input} type="number" min={0}
             value={validatorStr.costLimit} placeholder="не задано"
             onChange={e => setValidatorStr(v => ({ ...v, costLimit: e.target.value }))} />
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>Макс. участников события (пусто = только без лимита)</label>
+          <label className={styles.label}>Макс. участников события (пусто = без ограничений)</label>
           <input className={styles.input} type="number" min={0}
             value={validatorStr.personsLimit} placeholder="не задано"
             onChange={e => setValidatorStr(v => ({ ...v, personsLimit: e.target.value }))} />
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>Макс. возрастное ограничение (пусто = только 0+)</label>
+          <label className={styles.label}>Макс. возрастное ограничение (пусто = без ограничений)</label>
           <input className={styles.input} type="number" min={0} max={99}
             value={validatorStr.ageLimit} placeholder="не задано"
             onChange={e => setValidatorStr(v => ({ ...v, ageLimit: e.target.value }))} />
