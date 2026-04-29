@@ -152,4 +152,10 @@ export const useMyEventsFiltersStore = create<FiltersState>()((set) => ({
   filters:      { pageIndex: 0, pageSize: 20 },
   setFilter:    (key, value) => set((s) => ({ filters: { ...s.filters, [key]: value } })),
   resetFilters: () => set({ filters: { pageIndex: 0, pageSize: 20 } }),
+  viewMode:     'list',
+  setViewMode:  (v) => set({ viewMode: v }),
+  mapCenter:    null,
+  setMapCenter: (c) => set({ mapCenter: c }),
+  mapZoom:      12,
+  setMapZoom:   (z) => set({ mapZoom: z }),
 }));
