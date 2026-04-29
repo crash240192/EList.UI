@@ -11,6 +11,8 @@ interface AlbumSectionProps {
   onAlbumsChange: (albums: IAlbum[]) => void;
   accountId: string | null;
   organizationId?: string | null;
+  /** Если передан — альбом привязывается к событию сразу после создания (режим редактирования) */
+  eventId?: string | null;
 }
 
 // ── Модальное окно создания альбома ──────────────────────────────────────────
@@ -130,11 +132,15 @@ function CreateAlbumModal({ onClose, onCreate, accountId, organizationId }: Crea
 }
 
 // ── Основной компонент ────────────────────────────────────────────────────────
-export function AlbumSection({ albums, onAlbumsChange, accountId, organizationId }: AlbumSectionProps) {
+export function AlbumSection({ albums, onAlbumsChange, accountId, organizationId, eventId }: AlbumSectionProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const handleCreate = (album: IAlbum) => {
+  const handleCreate = async (album: IAlbum) => {
+    // Если мероприятие уже существует (режим редактирования) — привязываем сразу
+    if (eventId) {
+      try { await assignAlbumToEvent(eventId, album.id); } catch { /* ignore */ }
+    }
     onAlbumsChange([...albums, album]);
   };
 

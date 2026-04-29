@@ -177,7 +177,7 @@
   border-radius: 8px; pointer-events: none; z-index: 1;
 }
 .wheelList {
-  overflow-y: scroll; scroll-snap-type: y mandatory;
+  overflow-y: scroll;
   scrollbar-width: none; -ms-overflow-style: none;
 }
 .wheelList::-webkit-scrollbar { display: none; }

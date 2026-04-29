@@ -17,6 +17,7 @@ import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { AlbumSection } from './AlbumSection';
 import type { IAlbum } from '@/entities/media/albumApi';
 import { assignAlbumToEvent } from '@/entities/media/albumApi';
+import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { InviteModal } from '@/features/event/InviteModal';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
@@ -212,15 +213,17 @@ export default function CreateEventPage() {
   // Нет тарифа → только бесплатные, без лимита по людям, только 0+
   const tv = tariffValidator;
   const hasTariff        = !!tariff && !!tv;
-  const canSetCost       = hasTariff && (tv!.costLimit != null && tv!.costLimit > 0);
-  const maxCost          = tv?.costLimit ?? null;
-  const canSetMaxPersons = hasTariff && (tv!.personsLimit != null && tv!.personsLimit > 0);
-  const maxPersons       = tv?.personsLimit ?? null;
+  // null = нет ограничений (разрешено любое значение); число = максимально допустимое
+  const maxCost      = tv?.costLimit    ?? null;
+  const maxPersons   = tv?.personsLimit ?? null;
+  const maxAge       = tv?.ageLimit     ?? null;
+  // Поле заблокировано только если тариф явно запрещает (лимит = 0, не null)
+  const canSetCost       = !hasTariff || maxCost    === null || maxCost    > 0;
+  const canSetMaxPersons = !hasTariff || maxPersons === null || maxPersons > 0;
+  const canSetAge        = !hasTariff || maxAge     === null || maxAge     > 0;
   const canSetPrivate    = hasTariff ? !!tv!.allowPrivate : false;
   const canSetGender     = hasTariff ? !!tv!.allowGenderSegregation : false;
-  const canSetAge        = hasTariff && (tv!.ageLimit != null && tv!.ageLimit > 0);
-  const maxAge           = tv?.ageLimit ?? null;
-  const hasTariffWarning = hasWallet && (!canSetCost || !canSetMaxPersons || !canSetPrivate || !canSetGender || !canSetAge);
+  const hasTariffWarning = hasWallet && (!canSetPrivate || !canSetGender);
   const tariffName       = tariff?.name ?? 'текущем';
 
   // Validation
@@ -495,6 +498,7 @@ export default function CreateEventPage() {
                   }}
                   placeholder="Дата и время начала"
                   hasError={hasErr('startDate') || hasErr('startTime')}
+                  min={!isEditing ? new Date().toISOString().slice(0, 10) : undefined}
                   max={tariffValidator?.createDateMaxPeriod != null
                     ? (() => { const d = new Date(); d.setDate(d.getDate() + tariffValidator!.createDateMaxPeriod!); return d.toISOString().slice(0,10); })()
                     : undefined}
@@ -531,6 +535,7 @@ export default function CreateEventPage() {
                     }}
                     placeholder="Дата и время окончания"
                     hasError={hasErr('endDate') || hasErr('endTime')}
+                    min={form.startDate || new Date().toISOString().slice(0, 10)}
                   />
                 </div>
               </Field>
@@ -560,7 +565,7 @@ export default function CreateEventPage() {
                   locked={!canSetCost}
                   value={form.cost}
                   onChange={e => setForm(f => ({ ...f, cost: e.target.value }))}
-                  type="number"
+                  type="number" min="0"
                   hasError={hasErr('cost')}
                   hint={hasErr('cost')
                     ? `Превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`
@@ -574,7 +579,7 @@ export default function CreateEventPage() {
                   locked={!canSetMaxPersons}
                   value={form.maxPersons} placeholder="∞"
                   onChange={e => setForm(f => ({ ...f, maxPersons: e.target.value }))}
-                  type="number"
+                  type="number" min="0"
                   hasError={hasErr('maxPersons')}
                   hint={hasErr('maxPersons')
                     ? `Превышает лимит тарифа (до ${maxPersons})`
@@ -590,7 +595,7 @@ export default function CreateEventPage() {
                 locked={!canSetAge}
                 value={form.ageLimit} placeholder="0+"
                 onChange={e => setForm(f => ({ ...f, ageLimit: e.target.value }))}
-                type="number"
+                type="number" min="0"
                 hasError={hasErr('ageLimit')}
                 hint={hasErr('ageLimit')
                   ? `Превышает лимит тарифа (до ${maxAge}+)`
@@ -646,6 +651,7 @@ export default function CreateEventPage() {
             onAlbumsChange={setAlbums}
             accountId={null}
             organizationId={null}
+            eventId={isEditing ? (id ?? null) : null}
           />
         </Section>
 
@@ -658,10 +664,30 @@ export default function CreateEventPage() {
         <div className={styles.previewCard}>
           <div className={styles.previewCover}>
             {coverUrl
-              ? <img src={coverUrl} alt="Обложка" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+              ? <img src={coverUrl} alt="Обложка" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
               : <span className={styles.previewCoverEmpty}>нет обложки</span>}
           </div>
           <div className={styles.previewBody}>
+            {/* Типы мероприятия */}
+            {selectedTypeObjects.length > 0 && (
+              <div className={styles.previewTypes}>
+                {selectedTypeObjects.slice(0, 3).map(t => {
+                  const color = t.eventCategory?.color ?? '#6366f1';
+                  return (
+                    <span key={t.id} className={styles.previewTypeChip}
+                      style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
+                      {t.ico && <img src={icoToUrl(t.ico) ?? undefined} alt="" width={10} height={10} className="event-type-ico" style={{ objectFit: 'contain' }} />}
+                      {t.name}
+                    </span>
+                  );
+                })}
+                {selectedTypeObjects.length > 3 && (
+                  <span className={styles.previewTypeChip} style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', border: '0.5px solid var(--border)' }}>
+                    +{selectedTypeObjects.length - 3}
+                  </span>
+                )}
+              </div>
+            )}
             <div className={styles.previewName}>{form.name || <span style={{color:'var(--text-muted)'}}>Название мероприятия</span>}</div>
             {(form.isPrivate || form.ageLimit) && (
               <div className={styles.previewBadges}>
@@ -681,9 +707,17 @@ export default function CreateEventPage() {
                 {form.address}
               </div>
             )}
-            {parseFloat(form.cost) === 0
-              ? <div className={styles.previewFree}>Бесплатно</div>
-              : <div className={styles.previewCost}>{parseFloat(form.cost).toLocaleString('ru-RU')} ₽</div>}
+            {form.maxPersons && (
+              <div className={styles.previewRow}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                до {form.maxPersons} участников
+              </div>
+            )}
+            <div className={styles.previewPriceRow}>
+              {parseFloat(form.cost) === 0
+                ? <div className={styles.previewFree}>Бесплатно</div>
+                : <div className={styles.previewCost}>{parseFloat(form.cost).toLocaleString('ru-RU')} ₽</div>}
+            </div>
           </div>
         </div>
 

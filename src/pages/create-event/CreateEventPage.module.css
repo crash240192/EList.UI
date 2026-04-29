@@ -363,3 +363,11 @@
   display: flex; align-items: center; padding: 4px 0;
 }
 .fieldHintErr { font-size: 11px; color: var(--danger); margin-top: 3px; }
+
+.previewTypes { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.previewTypeChip {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 500;
+  padding: 2px 7px; border-radius: 10px;
+}
+.previewPriceRow { margin-top: 4px; }

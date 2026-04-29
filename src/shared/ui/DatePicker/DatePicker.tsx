@@ -1,6 +1,6 @@
 // shared/ui/DatePicker/DatePicker.tsx
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './DatePicker.module.css';
 
@@ -56,11 +56,9 @@ function TimeWheel({ items, selected, onSelect }: {
   onSelect: (v: string) => void;
 }) {
   const ITEM_H = 36;
-  const VISIBLE = 5; // видимых строк
+  const VISIBLE = 5;
   const listRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const startY = useRef(0);
-  const startIdx = useRef(0);
+  const settleTimer = useRef<ReturnType<typeof setTimeout>>();
   const [idx, setIdx] = useState(() => Math.max(0, items.indexOf(selected)));
 
   useEffect(() => {
@@ -82,13 +80,20 @@ function TimeWheel({ items, selected, onSelect }: {
 
   const handleScroll = useCallback(() => {
     if (!listRef.current) return;
-    const i = Math.round(listRef.current.scrollTop / ITEM_H);
-    if (i !== idx) { setIdx(i); onSelect(items[Math.min(i, items.length - 1)]); }
-  }, [idx, items, onSelect]);
+    clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      if (!listRef.current) return;
+      const i = Math.round(listRef.current.scrollTop / ITEM_H);
+      const clamped = Math.max(0, Math.min(items.length - 1, i));
+      setIdx(clamped);
+      onSelect(items[clamped]);
+      // Снэп к ячейке после остановки
+      listRef.current.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
+    }, 80);
+  }, [items, onSelect]);
 
   return (
     <div className={styles.wheel} style={{ height: ITEM_H * VISIBLE }}>
-      {/* Подсветка выбранного */}
       <div className={styles.wheelHighlight} style={{ top: ITEM_H * Math.floor(VISIBLE / 2) }} />
       <div
         ref={listRef}
@@ -96,7 +101,6 @@ function TimeWheel({ items, selected, onSelect }: {
         onScroll={handleScroll}
         style={{ height: ITEM_H * VISIBLE }}
       >
-        {/* Паддинг сверху и снизу чтобы крайние элементы попадали в центр */}
         <div style={{ height: ITEM_H * Math.floor(VISIBLE / 2) }} />
         {items.map((v, i) => (
           <div key={v}
@@ -120,17 +124,23 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const [isMobile, setIsMobile] = useState(false);
 
   const parsed = parseValue(value);
+  // Дефолт для selDate — текущие дата/время если не выбрано (кнопка сразу активна)
+  const nowDefault = new Date();
   const [viewYear,  setViewYear]  = useState(() => {
     if (parsed) return parsed.getFullYear();
     if (max) return parseInt(max.slice(0, 4));
-    return new Date().getFullYear();
+    return nowDefault.getFullYear();
   });
-  const [viewMonth, setViewMonth] = useState(() => parsed?.getMonth() ?? new Date().getMonth());
-  const [selDate,   setSelDate]   = useState<Date | null>(parsed);
-  const [timeH, setTimeH] = useState(() => String(parsed?.getHours()   ?? 0).padStart(2, '0'));
-  const [timeM, setTimeM] = useState(() => String(
-    Math.round((parsed?.getMinutes() ?? 0) / 5) * 5
-  ).padStart(2, '0'));
+  const [viewMonth, setViewMonth] = useState(() => parsed?.getMonth() ?? nowDefault.getMonth());
+  const [selDate,   setSelDate]   = useState<Date | null>(parsed ?? (withTime ? new Date(nowDefault) : null));
+  const [timeH, setTimeH] = useState(() =>
+    parsed ? String(parsed.getHours()).padStart(2, '0')
+    : String(nowDefault.getHours()).padStart(2, '0')
+  );
+  const [timeM, setTimeM] = useState(() => {
+    if (parsed) return String(Math.round(parsed.getMinutes() / 5) * 5).padStart(2, '0');
+    return String(Math.round(nowDefault.getMinutes() / 5) * 5).padStart(2, '0');
+  });
 
   // Свайп месяцев
   const swipeStartX = useRef<number | null>(null);
@@ -160,34 +170,35 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return () => { document.removeEventListener('mousedown', fn); document.removeEventListener('keydown', esc); };
   }, []);
 
+  const popupRef = useRef<HTMLDivElement>(null);
+
   const computePosition = useCallback(() => {
     if (!fieldRef.current) return;
     const mobile = window.innerWidth < 600;
     setIsMobile(mobile);
     if (mobile) {
-      // Модальное по центру экрана
       setPopupStyle({ position: 'fixed', zIndex: 9999 });
       return;
     }
     const rect = fieldRef.current.getBoundingClientRect();
-    const popupH = withTime ? 460 : 360;
-    const vvp = window.visualViewport;
-    const viewH = vvp ? vvp.height : window.innerHeight;
-    const viewW = vvp ? vvp.width  : window.innerWidth;
-    const offsetY = vvp ? vvp.offsetTop : 0;
-    const spaceBelow = viewH - (rect.bottom - offsetY);
-    const spaceAbove = rect.top - offsetY;
-    const showAbove  = spaceBelow < popupH && spaceAbove > spaceBelow;
+    const viewH = window.innerHeight;
+    const viewW = window.innerWidth;
     const popupWidth = 296;
-    const left = Math.min(rect.left, viewW - popupWidth - 8);
-    const top  = showAbove ? rect.top + offsetY - popupH - 6 : rect.bottom + offsetY + 6;
-    setPopupStyle({
-      position: 'fixed',
-      left,
-      top: Math.max(offsetY + 4, Math.min(top, offsetY + viewH - popupH - 4)),
-      width: popupWidth,
-      zIndex: 9999,
-    });
+
+    // Реальная высота если уже отрендерен, иначе оценка
+    const realH = popupRef.current?.offsetHeight ?? (withTime ? 560 : 400);
+    const left = Math.max(4, Math.min(rect.left, viewW - popupWidth - 8));
+
+    let top: number;
+    if (rect.bottom + realH + 6 <= viewH - 4) {
+      top = rect.bottom + 6;                          // снизу
+    } else if (rect.top - realH - 6 >= 4) {
+      top = rect.top - realH - 6;                    // сверху
+    } else {
+      top = Math.max(4, viewH - realH - 4);          // прижимаем к нижнему краю
+    }
+
+    setPopupStyle({ position: 'fixed', left, top, width: popupWidth, zIndex: 9999 });
   }, [withTime]);
 
   useEffect(() => {
@@ -200,6 +211,13 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       window.visualViewport?.removeEventListener('scroll', computePosition);
     };
   }, [open, computePosition]);
+
+  // Пересчитываем позицию после того как попап реально отрендерился с реальной высотой
+  useLayoutEffect(() => {
+    if (!open || !popupRef.current) return;
+    computePosition();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
@@ -224,10 +242,11 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   };
 
   const handleConfirm = () => {
-    if (!selDate) return;
-    const d = new Date(selDate);
+    const base = selDate ?? nowDefault; // если дата не кликнута — берём текущую
+    const d = new Date(base);
     d.setHours(parseInt(timeH, 10) || 0, parseInt(timeM, 10) || 0, 0, 0);
     onChange(toISO(d, true));
+    setSelDate(d);
     setOpen(false);
   };
 
@@ -251,9 +270,17 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const isToday    = (d: number) => d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
   const isSelected = (d: number) => selDate ? (d === selDate.getDate() && viewMonth === selDate.getMonth() && viewYear === selDate.getFullYear()) : false;
   const isDisabled = (d: number) => {
-    const dt = new Date(viewYear, viewMonth, d);
-    if (min && dt < new Date(min)) return true;
-    if (max && dt > new Date(max + 'T23:59:59')) return true;
+    const dt = new Date(viewYear, viewMonth, d); // локальное время
+    if (min) {
+      const [my, mm, md] = min.split('-').map(Number);
+      const minDt = new Date(my, mm - 1, md); // тоже локальное
+      if (dt < minDt) return true;
+    }
+    if (max) {
+      const [my, mm, md] = max.split('-').map(Number);
+      const maxDt = new Date(my, mm - 1, md);
+      if (dt > maxDt) return true;
+    }
     return false;
   };
 
@@ -275,10 +302,14 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   // Центрируем год при открытии
   useEffect(() => {
     if (!open) return;
-    // instant при первом открытии, smooth при последующих изменениях
     requestAnimationFrame(() => {
-      const btn = yearListRef.current?.querySelector('[data-year-active]') as HTMLElement;
-      if (btn) btn.scrollIntoView({ block: 'center', behavior: 'instant' });
+      if (!yearListRef.current) return;
+      const btn = yearListRef.current.querySelector('[data-year-active]') as HTMLElement;
+      if (!btn) return;
+      const container = yearListRef.current;
+      const btnOffset = btn.offsetLeft;
+      const btnWidth  = btn.offsetWidth;
+      container.scrollLeft = btnOffset - container.clientWidth / 2 + btnWidth / 2;
     });
   }, [open]);
 
@@ -291,6 +322,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
 
   const popupContent = (
     <div data-datepicker-popup
+      ref={popupRef}
       className={`${styles.popup} ${isMobile ? styles.popupModal : ''}`}
       style={isMobile ? undefined : popupStyle}>
 
