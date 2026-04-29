@@ -136,11 +136,7 @@ export function AlbumSection({ albums, onAlbumsChange, accountId, organizationId
   const [showCreate, setShowCreate] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const handleCreate = async (album: IAlbum) => {
-    // Если мероприятие уже существует (режим редактирования) — привязываем сразу
-    if (eventId) {
-      try { await assignAlbumToEvent(eventId, album.id); } catch { /* ignore */ }
-    }
+  const handleCreate = (album: IAlbum) => {
     onAlbumsChange([...albums, album]);
   };
 
