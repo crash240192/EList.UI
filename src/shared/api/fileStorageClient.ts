@@ -92,14 +92,8 @@ export function fileUrl(fileId: string): string {
  * Используется для <img> которые требуют токен
  */
 export async function fetchAuthedImage(fileId: string): Promise<string> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15_000); // 15 сек таймаут
-  try {
-    const res = await fetch(fileUrl(fileId), { headers: authHeaders(), signal: controller.signal });
-    if (!res.ok) throw new Error(`Файл не найден: ${res.status}`);
-    const blob = await res.blob();
-    return URL.createObjectURL(blob);
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await fetch(fileUrl(fileId), { headers: authHeaders() });
+  if (!res.ok) throw new Error(`Файл не найден: ${res.status}`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
