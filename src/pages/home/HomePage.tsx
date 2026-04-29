@@ -22,12 +22,11 @@ const AD_BLOCK_ID = import.meta.env.VITE_YANDEX_AD_BLOCK_ID ?? '';
 const AD_EVERY    = 12; // реклама каждые N карточек
 
 export default function HomePage() {
-  const [viewMode, setViewMode] = useState<EventViewMode>('map');
   const [selectedEvent, setSelectedEvent] = useState<IEvent | null>(null);
   const [searchName, setSearchName] = useState('');
 
   const navigate = useNavigate();
-  const { filters, setFilter } = useFiltersStore();
+  const { filters, setFilter, viewMode, setViewMode, mapCenter, setMapCenter, mapZoom, setMapZoom } = useFiltersStore();
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const {
     coords: userCoords,
@@ -37,11 +36,9 @@ export default function HomePage() {
     keepOldCity,
   } = useUserLocation();
 
-  // Запоминаем начальный центр при монтировании — не меняем его при навигации
-  const initialCenter = useRef<[number, number]>([
-    filters.latitude ?? userCoords.lat,
-    filters.longitude ?? userCoords.lng,
-  ]);
+  // Центр карты: всегда из стора (живёт между навигациями)
+  const computedCenter: [number, number] = mapCenter
+    ?? [filters.latitude ?? userCoords.lat, filters.longitude ?? userCoords.lng];
 
   const debouncedName = useDebounce(searchName, 300);
 
@@ -83,7 +80,10 @@ export default function HomePage() {
             <EventMap
               events={events}
               onMarkerClick={handleEventClick}
-              center={initialCenter.current}
+              center={computedCenter}
+              zoom={mapZoom}
+              onCenterChange={setMapCenter}
+              onZoomChange={setMapZoom}
             />
           </div>
         ) : (

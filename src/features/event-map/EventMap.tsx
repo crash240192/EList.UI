@@ -13,6 +13,8 @@ interface EventMapProps {
   onMarkerClick: (event: IEvent) => void;
   center?: [number, number];
   zoom?: number;
+  onCenterChange?: (center: [number, number]) => void;
+  onZoomChange?: (zoom: number) => void;
 }
 
 const DEFAULT_COLOR = '#6366f1';
@@ -78,7 +80,7 @@ function makeMarkerPng(colors: string[], count = 1): string {
 const coordKey = (lat: number, lng: number) =>
   `${lat.toFixed(5)},${lng.toFixed(5)}`;
 
-export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], zoom = 12 }: EventMapProps) {
+export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], zoom = 12, onCenterChange, onZoomChange }: EventMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const clusterRef   = useRef<any>(null);
@@ -150,6 +152,17 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
         type: 'yandex#map',
       });
       mapRef.current = map;
+
+      // Сохраняем центр и зум при перемещении — пропускаем первое срабатывание (начальная анимация загрузки)
+      let firstActionEnd = true;
+      map.events.add('actionend', () => {
+        if (firstActionEnd) { firstActionEnd = false; return; }
+        const c = map.getCenter() as [number, number];
+        const z = map.getZoom() as number;
+        centerRef.current = c;
+        onCenterChange?.(c);
+        onZoomChange?.(z);
+      });
 
       // Правый клик — контекстное меню (десктоп)
       map.events.add('contextmenu', (e: any) => {

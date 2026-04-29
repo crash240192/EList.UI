@@ -238,10 +238,14 @@ export default function CreateEventPage() {
       if (!form.endDate) errs.add('endDate');
       if (!form.endTime) errs.add('endTime');
     }
+    // Проверяем отрицательные значения
+    if (form.cost && parseFloat(form.cost) < 0)                                           errs.add('cost');
+    if (form.maxPersons && parseInt(form.maxPersons) < 0)                                 errs.add('maxPersons');
+    if (form.ageLimit && parseInt(form.ageLimit) < 0)                                     errs.add('ageLimit');
     // Проверяем ограничения тарифа
-    if (maxCost != null && parseFloat(form.cost) > maxCost)              errs.add('cost');
-    if (maxPersons != null && form.maxPersons && parseInt(form.maxPersons) > maxPersons) errs.add('maxPersons');
-    if (maxAge != null && form.ageLimit && parseInt(form.ageLimit) > maxAge)             errs.add('ageLimit');
+    if (maxCost != null && parseFloat(form.cost) > maxCost)                               errs.add('cost');
+    if (maxPersons != null && form.maxPersons && parseInt(form.maxPersons) > maxPersons)  errs.add('maxPersons');
+    if (maxAge != null && form.ageLimit && parseInt(form.ageLimit) > maxAge)              errs.add('ageLimit');
 
     setFieldErrors(errs);
     if (!errs.size) return null;
@@ -270,9 +274,9 @@ export default function CreateEventPage() {
         location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
         startTime:'⚠️ Укажите время начала', endDate:'⚠️ Укажите дату окончания',
         endTime:'⚠️ Укажите время окончания',
-        cost: `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
-        maxPersons: `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
+        cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
+        maxPersons: parseInt(form.maxPersons) < 0 ? '⚠️ Количество участников не может быть отрицательным' : `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
+        ageLimit: parseInt(form.ageLimit) < 0 ? '⚠️ Возрастное ограничение не может быть отрицательным' : `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -345,9 +349,9 @@ export default function CreateEventPage() {
         location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
         startTime:'⚠️ Укажите время начала', endDate:'⚠️ Укажите дату окончания',
         endTime:'⚠️ Укажите время окончания',
-        cost: `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
-        maxPersons: `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
+        cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
+        maxPersons: parseInt(form.maxPersons) < 0 ? '⚠️ Количество участников не может быть отрицательным' : `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
+        ageLimit: parseInt(form.ageLimit) < 0 ? '⚠️ Возрастное ограничение не может быть отрицательным' : `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -564,7 +568,7 @@ export default function CreateEventPage() {
                 <LockedInput
                   locked={!canSetCost}
                   value={form.cost}
-                  onChange={e => setForm(f => ({ ...f, cost: e.target.value }))}
+                  onChange={e => { const v = e.target.value; if (v === '' || parseFloat(v) >= 0) setForm(f => ({ ...f, cost: v })); }}
                   type="number" min="0"
                   hasError={hasErr('cost')}
                   hint={hasErr('cost')
@@ -578,7 +582,7 @@ export default function CreateEventPage() {
                 <LockedInput
                   locked={!canSetMaxPersons}
                   value={form.maxPersons} placeholder="∞"
-                  onChange={e => setForm(f => ({ ...f, maxPersons: e.target.value }))}
+                  onChange={e => { const v = e.target.value; if (v === '' || parseInt(v) >= 0) setForm(f => ({ ...f, maxPersons: v })); }}
                   type="number" min="0"
                   hasError={hasErr('maxPersons')}
                   hint={hasErr('maxPersons')
@@ -594,7 +598,7 @@ export default function CreateEventPage() {
               <LockedInput
                 locked={!canSetAge}
                 value={form.ageLimit} placeholder="0+"
-                onChange={e => setForm(f => ({ ...f, ageLimit: e.target.value }))}
+                onChange={e => { const v = e.target.value; if (v === '' || parseInt(v) >= 0) setForm(f => ({ ...f, ageLimit: v })); }}
                 type="number" min="0"
                 hasError={hasErr('ageLimit')}
                 hint={hasErr('ageLimit')

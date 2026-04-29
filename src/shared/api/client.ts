@@ -36,6 +36,17 @@ export function isAuthenticated(): boolean { return !!getAuthToken(); }
 let onUnauthorized: (() => void) | null = null;
 export function setUnauthorizedHandler(fn: () => void): void { onUnauthorized = fn; }
 
+const REQUEST_TIMEOUT_MS = 30_000; // 30 секунд
+
+function withTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new ApiError(0, 'Превышено время ожидания ответа сервера')), REQUEST_TIMEOUT_MS)
+    ),
+  ]);
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<CommandResult<T>> {
   const clientHash = getOrCreateClientHash();
   const authToken  = getAuthToken();
@@ -47,18 +58,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
   };
   if (authToken) headers['Authorization'] = authToken;
 
-  const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const fetchPromise = fetch(`${BASE_URL}${path}`, { ...options, headers }).then(async response => {
+    if (response.status === 401) {
+      const isActivation = path.includes('activation') || path.includes('activate');
+      if (!isActivation) { clearAuthToken(); onUnauthorized?.(); }
+      throw new ApiError(401, 'Необходима авторизация');
+    }
+    if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+    const data: CommandResult<T> = await response.json();
+    if (!data.success) throw new ApiError(data.errorCode ?? 0, data.message ?? 'Ошибка API', data.message);
+    return data;
+  });
 
-  if (response.status === 401) {
-    const isActivation = path.includes('activation') || path.includes('activate');
-    if (!isActivation) { clearAuthToken(); onUnauthorized?.(); }
-    throw new ApiError(401, 'Необходима авторизация');
-  }
-  if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
-
-  const data: CommandResult<T> = await response.json();
-  if (!data.success) throw new ApiError(data.errorCode ?? 0, data.message ?? 'Ошибка API', data.message);
-  return data;
+  return withTimeout(fetchPromise);
 }
 
 export const apiClient = {

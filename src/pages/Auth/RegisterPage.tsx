@@ -122,13 +122,16 @@ export default function RegisterPage() {
   });
 
   useEffect(() => {
+    let cancelled = false;
     fetchContactTypes()
       .then(types => {
+        if (cancelled) return;
         setContactTypes(types);
         if (types.length > 0) setForm1(f => ({ ...f, contactTypeId: types[0].id }));
       })
       .catch(() => {})
-      .finally(() => setContactsLoading(false));
+      .finally(() => { if (!cancelled) setContactsLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const selectedContactType = contactTypes.find(ct => ct.id === form1.contactTypeId);
@@ -306,7 +309,7 @@ export default function RegisterPage() {
                     <Select
                       value={form1.contactTypeId}
                       onChange={v => setForm1(f => ({...f, contactTypeId: v}))}
-                      options={[]}
+                      options={contactTypes.map(ct => ({ value: ct.id, label: ct.name || ct.localizedName || '' }))}
                     />
                   )}
               </Field>

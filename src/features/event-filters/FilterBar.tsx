@@ -157,6 +157,9 @@ export function FilterBar({
     setFilter('latitude',  city.lat);
     setFilter('longitude', city.lng);
     setShowCity(false);
+    // Обновляем центр карты в сторе — работает и при режиме «список»
+    useFiltersStore.getState().setMapCenter([city.lat, city.lng]);
+    useFiltersStore.getState().setMapZoom(12);
     window.dispatchEvent(new CustomEvent('elist:centerMap', { detail: { lat: city.lat, lng: city.lng } }));
   };
 
@@ -184,17 +187,22 @@ export function FilterBar({
 
   // Вспомогательная функция — возврат к родному городу
   const restoreHomeCity = () => {
-    // Сбрасываем название — в кнопке появится "По всем городам"
     setCityName('');
-    if (storedCoords.lat !== 0) {
-      setFilter('latitude',  storedCoords.lat);
-      setFilter('longitude', storedCoords.lng);
+    const home = storedCoords.lat !== 0 ? storedCoords : null;
+    if (home) {
+      setFilter('latitude',  home.lat);
+      setFilter('longitude', home.lng);
+      // Обновляем центр карты в сторе — работает и при режиме «список»
+      useFiltersStore.getState().setMapCenter([home.lat, home.lng]);
+      useFiltersStore.getState().setMapZoom(12);
+      // Если карта сейчас открыта — двигаем её немедленно
       window.dispatchEvent(new CustomEvent('elist:centerMap', {
-        detail: { lat: storedCoords.lat, lng: storedCoords.lng },
+        detail: { lat: home.lat, lng: home.lng },
       }));
     } else {
       setFilter('latitude', undefined);
       setFilter('longitude', undefined);
+      useFiltersStore.getState().setMapCenter(null as any);
     }
     setFilter('locationRange', DEFAULT_RADIUS_M);
   };
@@ -303,11 +311,18 @@ export function FilterBar({
       <div className={styles.quickRow}>
         {/* Город */}
         {!hideCity && (
-          <button ref={cityBtnRef} className={styles.cityBtn} onClick={() => setShowCity(v => !v)}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            {cityName || 'Город'}
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points={showCity ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/></svg>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button ref={cityBtnRef} className={styles.cityBtn} onClick={() => setShowCity(v => !v)}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              {cityName || 'По всем городам'}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points={showCity ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/></svg>
+            </button>
+            {cityName && (
+              <button className={styles.cityIconBtn} title="Сбросить город" onClick={restoreHomeCity}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            )}
+          </div>
         )}
 
         <div className={styles.sep}/>

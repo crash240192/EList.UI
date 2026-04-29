@@ -259,3 +259,12 @@
   align-self: center; flex-shrink: 0; white-space: nowrap;
   user-select: none; padding: 0 2px;
 }
+
+.cityIconBtn {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: none; border: 1px solid var(--border);
+  cursor: pointer; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background .12s, color .12s;
+}
+.cityIconBtn:hover { background: var(--surface-2); color: var(--text-primary); }

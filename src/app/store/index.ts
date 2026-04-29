@@ -120,6 +120,12 @@ interface FiltersState {
   filters: IEventsSearchParams;
   setFilter: <K extends keyof IEventsSearchParams>(key: K, value: IEventsSearchParams[K]) => void;
   resetFilters: () => void;
+  viewMode: 'map' | 'list';
+  setViewMode: (v: 'map' | 'list') => void;
+  mapCenter: [number, number] | null;
+  setMapCenter: (c: [number, number]) => void;
+  mapZoom: number;
+  setMapZoom: (z: number) => void;
 }
 
 const DEFAULT_FILTERS: IEventsSearchParams = {
@@ -133,6 +139,12 @@ export const useFiltersStore = create<FiltersState>()((set) => ({
   filters:      DEFAULT_FILTERS,
   setFilter:    (key, value) => set((s) => ({ filters: { ...s.filters, [key]: value } })),
   resetFilters: () => set({ filters: DEFAULT_FILTERS }),
+  viewMode:     'map',
+  setViewMode:  (v) => set({ viewMode: v }),
+  mapCenter:    null,
+  setMapCenter: (c) => set({ mapCenter: c }),
+  mapZoom:      12,
+  setMapZoom:   (z) => set({ mapZoom: z }),
 }));
 
 // Стор фильтров для страницы "Мои мероприятия" — независимый от главной
