@@ -3,8 +3,8 @@
 
 set -e
 
-BACKEND_URL="${BACKEND_URL:-http://92.118.113.6:35028}"
-FILE_STORAGE_URL="${FILE_STORAGE_URL:-http://92.118.113.6:35029}"
+export BACKEND_URL="${BACKEND_URL:-http://92.118.113.6:35028}"
+export FILE_STORAGE_URL="${FILE_STORAGE_URL:-http://92.118.113.6:35029}"
 
 echo ">>> Starting EList UI"
 echo "    BACKEND_URL      = $BACKEND_URL"

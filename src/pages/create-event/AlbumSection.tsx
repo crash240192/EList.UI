@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { createAlbum, deleteAlbum, type IAlbum, type ICreateAlbumPayload } from '@/entities/media/albumApi';
+import { createAlbum, deleteAlbum, assignAlbumToEvent, type IAlbum, type ICreateAlbumPayload } from '@/entities/media/albumApi';
 import styles from './AlbumSection.module.css';
 
 interface AlbumSectionProps {

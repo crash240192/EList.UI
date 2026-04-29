@@ -53,7 +53,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Копируем entrypoint
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh && \
+RUN sed -i 's/\r//' /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh && \
     chown -R nginx:nginx /usr/share/nginx/html && \
     chmod -R 755 /usr/share/nginx/html
 
