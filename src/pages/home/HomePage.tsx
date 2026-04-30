@@ -34,7 +34,15 @@ export default function HomePage() {
     detectedCity,
     confirmCity,
     keepOldCity,
+    triggerCityCheck,
   } = useUserLocation();
+
+  // Слушаем событие сброса города из FilterBar
+  useEffect(() => {
+    const handler = () => triggerCityCheck();
+    window.addEventListener('elist:resetCityDecision', handler);
+    return () => window.removeEventListener('elist:resetCityDecision', handler);
+  }, [triggerCityCheck]);
 
   // Центр карты: всегда из стора (живёт между навигациями)
   const computedCenter: [number, number] = mapCenter
