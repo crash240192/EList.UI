@@ -46,6 +46,7 @@ export default function EventPage() {
   const [inviteModalOpen,       setInviteModalOpen]       = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
   const isOrganizer     = !!accountId && organizers.some(o => o.accountId === accountId);
@@ -149,6 +150,32 @@ export default function EventPage() {
                 <HeartIcon filled={isFavorite(event.id)} />
               </button>
               <button className={styles.heroBtn} aria-label="Поделиться"><ShareIcon /></button>
+              {/* Мобильное меню управления — только для организатора */}
+              {isOrganizer && (
+                <div className={styles.mobileMenuWrap}>
+                  <button className={styles.heroBtn} onClick={() => setMobileMenuOpen(v => !v)} aria-label="Меню">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                    </svg>
+                  </button>
+                  {mobileMenuOpen && (
+                    <>
+                      <div className={styles.mobileMenuBackdrop} onClick={() => setMobileMenuOpen(false)} />
+                      <div className={styles.mobileMenu}>
+                        <button className={styles.mobileMenuItem} onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>✏️ Редактировать</button>
+                        <button className={styles.mobileMenuItem}>👥 Добавить организатора</button>
+                        {event.parameters?.private && <button className={styles.mobileMenuItem}>✅ Белый список</button>}
+                        {event.active && (
+                          <button className={`${styles.mobileMenuItem} ${styles.mobileMenuItemDanger}`}
+                            onClick={() => { setCancelConfirm(true); setMobileMenuOpen(false); }}>
+                            ❌ Отменить мероприятие
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -169,6 +196,17 @@ export default function EventPage() {
               <span className={styles.tagCat}>{(event.eventTypes?.[0] ?? event.eventType)!.eventCategory!.name}</span>
             )}
             {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
+            {event.parameters?.ageLimit && (
+              <span className={styles.tagAge}>{event.parameters.ageLimit}+</span>
+            )}
+            {event.parameters?.private && (
+              <span className={styles.tagPrivate}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+                Закрытое
+              </span>
+            )}
           </div>
         </div>
 
@@ -231,7 +269,8 @@ export default function EventPage() {
               </div>
             )}
 
-            {/* Цена */}
+            {/* Цена + заполненность (на мобиле — одна строка) */}
+            <div className={styles.priceAndFill}>
             <div className={styles.priceBlock}>
               <div className={cost === 0 ? styles.priceVal : styles.priceValPaid}>
                 {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
@@ -253,6 +292,7 @@ export default function EventPage() {
                 </div>
               </div>
             )}
+            </div>
 
             {sortedParticipants.length > 0 && (
               <div className={styles.partRow} onClick={() => setParticipantsModalOpen(true)}>
@@ -324,28 +364,6 @@ export default function EventPage() {
               )}
             </div>
 
-            {/* Детали */}
-            <div className={styles.detailsGrid}>
-              {event.parameters?.ageLimit && (
-                <div className={styles.detailCard}>
-                  <div className={styles.detailLbl}>Возраст</div>
-                  <div className={styles.detailVal}>{event.parameters.ageLimit}+</div>
-                </div>
-              )}
-              {event.parameters?.private != null && (
-                <div className={styles.detailCard}>
-                  <div className={styles.detailLbl}>Формат</div>
-                  <div className={styles.detailVal}>{event.parameters.private ? 'Приватное' : 'Открытое'}</div>
-                </div>
-              )}
-              {maxPersons && (
-                <div className={styles.detailCard}>
-                  <div className={styles.detailLbl}>Мест</div>
-                  <div className={styles.detailVal}>{maxPersons}</div>
-                </div>
-              )}
-            </div>
-
             {/* Карта */}
             {event.latitude != null && event.longitude != null && (
               <div>
@@ -403,67 +421,35 @@ export default function EventPage() {
   );
 }
 
-        {/* ── Hero ── */}
-        <div className={styles.hero} style={!(event.coverImageId || event.coverUrl) ? {
-          background: 'linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)',
-        } : undefined}>
-        {event.coverImageId ? (
-          <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.heroImg}
-            fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.heroImg} /> : undefined} />
-        ) : event.coverUrl ? (
-          <img src={event.coverUrl} alt={event.name} className={styles.heroImg} />
-        ) : null}
-        <div className={styles.heroOverlay} />
+// ── Cancel dialog ──
 
-        {/* Top controls */}
-        <div className={styles.heroTop}>
-          <button className={styles.heroBtn} onClick={() => navigate(-1)} aria-label="Назад">
-            <ChevronLeft />
+function CancelConfirmDialog({ eventName, loading, onConfirm, onClose }: {
+  eventName: string; loading: boolean; onConfirm: () => void; onClose: () => void;
+}) {
+  return (
+    <>
+      <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',backdropFilter:'blur(2px)',zIndex:500 }} onClick={onClose} />
+      <div style={{ position:'fixed',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'min(360px,90vw)',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:16,padding:'24px 20px',zIndex:501,textAlign:'center' }}>
+        <div style={{ fontSize:36,marginBottom:8 }}>❌</div>
+        <h3 style={{ fontSize:16,fontWeight:700,color:'var(--text-primary)',margin:'0 0 8px' }}>Отменить мероприятие?</h3>
+        <p style={{ fontSize:13,color:'var(--text-secondary)',margin:'0 0 20px',lineHeight:1.5 }}>
+          «{eventName}» будет помечено как неактуальное. Участники увидят что мероприятие отменено.
+        </p>
+        <div style={{ display:'flex',gap:10 }}>
+          <button style={{ flex:1,background:'none',border:'1px solid var(--border)',borderRadius:10,padding:'10px',fontSize:13,fontWeight:500,color:'var(--text-secondary)',cursor:'pointer' }} onClick={onClose}>
+            Нет, назад
           </button>
-          <div className={styles.heroTopRight}>
-            <button
-              className={`${styles.heroBtn} ${isFavorite(event.id) ? styles.heroBtnFav : ''}`}
-              onClick={() => toggleFav(event.id)} aria-label="В избранное"
-            >
-              <HeartIcon filled={isFavorite(event.id)} />
-            </button>
-            <button className={styles.heroBtn} aria-label="Поделиться"><ShareIcon /></button>
-          </div>
-        </div>
-
-        {/* Bottom tags */}
-        <div className={styles.heroBottom}>
-          {/* Категории и типы */}
-          {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : event.eventType ? [event.eventType] : []).map(t => {
-            const catColor = t.eventCategory?.color ?? '#6366f1';
-                const textColor = contrastColor(catColor);
-            return (
-              <span key={t.id} className={styles.tagType} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                background: `${catColor}55`,
-                border: `1px solid ${catColor}44`,
-                color: textColor,
-              }}>
-                {t.ico && (
-                  <img src={icoToUrl(t.ico) ?? ''} className="event-type-ico"
-                    alt="" width={12} height={12} style={{ objectFit: 'contain', borderRadius: 2 }} />
-                )}
-                {t.name}
-              </span>
-            );
-          })}
-          {/* Категория первого типа */}
-          {(event.eventTypes?.[0] ?? event.eventType)?.eventCategory?.name && (
-            <span className={styles.tagCat}>
-              {(event.eventTypes?.[0] ?? event.eventType)!.eventCategory!.name}
-            </span>
-          )}
-          {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
+          <button style={{ flex:1,background:'var(--danger)',color:'#fff',border:'none',borderRadius:10,padding:'10px',fontSize:13,fontWeight:600,cursor:'pointer',opacity:loading ? 0.6 : 1 }}
+            onClick={onConfirm} disabled={loading}>
+            {loading ? 'Отмена...' : 'Да, отменить'}
+          </button>
         </div>
       </div>
+    </>
+  );
+}
 
-
-// ── Date helpers ──
+// ── Skeleton ──
 
 function PageSkeleton() {
   return (

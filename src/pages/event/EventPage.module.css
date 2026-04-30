@@ -112,7 +112,7 @@
 .detailVal { font-size:12px; font-weight:500; color:var(--text-primary); margin-top:2px; }
 
 /* Map */
-.mapBlock { border-radius:10px; overflow:hidden; border:1px solid var(--border); height:150px; cursor:pointer; }
+.mapBlock { border-radius:10px; overflow:hidden; border:1px solid var(--border); height:173px; cursor:pointer; }
 
 /* Discussion stub */
 .discussionStub { border:1px dashed var(--border); border-radius:10px; padding:20px; text-align:center; color:var(--text-muted); font-size:12px; line-height:1.6; }
@@ -138,3 +138,32 @@
   .actionTitle { font-size:14px; }
 }
 .errorIcon { font-size: 36px; }
+
+/* Hero badges */
+.tagAge     { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:600; backdrop-filter:blur(6px); background:rgba(239,68,68,.6); color:#fff; border:.5px solid rgba(239,68,68,.4); }
+.tagPrivate { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); background:rgba(0,0,0,.35); color:#fff; border:.5px solid rgba(255,255,255,.2); display:inline-flex; align-items:center; gap:4px; }
+
+/* Mobile dots menu */
+.mobileMenuWrap { position:relative; display:none; }
+.mobileMenuBackdrop { position:fixed; inset:0; z-index:200; }
+.mobileMenu {
+  position:absolute; top:calc(100% + 8px); right:0;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.25); min-width:200px; z-index:201;
+  overflow:hidden;
+}
+.mobileMenuItem { display:block; width:100%; text-align:left; padding:11px 14px; background:none; border:none; border-bottom:1px solid var(--border); font-size:13px; color:var(--text-primary); cursor:pointer; font-family:inherit; }
+.mobileMenuItem:last-child { border-bottom:none; }
+.mobileMenuItem:hover { background:var(--surface-2); }
+.mobileMenuItemDanger { color:var(--danger)!important; }
+
+/* Mobile: price + fill in one row */
+.priceAndFill { display:flex; flex-direction:column; gap:10px; }
+
+@media (max-width:680px) {
+  .mobileMenuWrap { display:block; }
+  .mgmtSection { display:none; }
+  .priceAndFill { flex-direction:row; align-items:flex-start; gap:12px; }
+  .priceAndFill > * { flex:1; }
+  .mapBlock { height:175px; }
+}

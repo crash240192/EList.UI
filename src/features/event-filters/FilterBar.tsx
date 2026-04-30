@@ -205,7 +205,6 @@ export function FilterBar({
       useFiltersStore.getState().setMapCenter(null as any);
     }
     setFilter('locationRange', DEFAULT_RADIUS_M);
-    window.dispatchEvent(new CustomEvent('elist:resetCityDecision'));
   };
 
   // Слушаем обновление родного города (из диалога подтверждения)
