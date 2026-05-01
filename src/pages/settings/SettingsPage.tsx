@@ -17,6 +17,7 @@ import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
 import { Select } from '@/shared/ui/Select/Select';
 import { useMyAvatar } from '@/features/auth/useAvatar';
+import { useFiltersStore } from '@/app/store';
 import styles from './SettingsPage.module.css';
 
 type Tab = 'profile' | 'security';
@@ -197,10 +198,23 @@ function CitySection() {
       cookies.set('elist_user_lng', String(selectedCity.lng), 30);
       cookies.set('elist_acct_lat', String(selectedCity.lat), 30);
       cookies.set('elist_acct_lng', String(selectedCity.lng), 30);
-      cookies.set('elist_city_decided', '1', 30);
-      // Синхронизируем название города для FilterBar
+      cookies.delete('elist_city_decided');
+      // Сохраняем название родного города
       const displayName = selectedCity.shortName ?? selectedCity.name;
+      cookies.set('elist_home_city_name', displayName, 30);
       cookies.set('elist_city_name', displayName, 30);
+      // Уведомляем FilterBar — обновляем фильтр и двигаем карту
+      window.dispatchEvent(new CustomEvent('elist:homeCityChanged', {
+        detail: { lat: selectedCity.lat, lng: selectedCity.lng, name: displayName },
+      }));
+      // Обновляем стор карты напрямую (FilterBar может быть не смонтирован)
+      const store = useFiltersStore.getState();
+      store.setMapCenter([selectedCity.lat, selectedCity.lng]);
+      store.setMapZoom(12);
+      store.setFilter('latitude',  selectedCity.lat);
+      store.setFilter('longitude', selectedCity.lng);
+      // Пользователь сам выбрал город — диалог определения не нужен, помечаем решение принятым
+      cookies.set('elist_city_decided', '1', 30);
       setMsg({ text: `Город изменён на ${selectedCity.name}`, ok: true });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });

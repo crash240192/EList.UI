@@ -171,9 +171,9 @@ function AlbumCard({ album, onClick }: { album: IAlbum; onClick: () => void }) {
 }
 
 // ── Основной блок ──────────────────────────────────────────────────────────────
-interface EventAlbumsProps { eventId: string; }
+interface EventAlbumsProps { eventId: string; compact?: boolean; }
 
-export function EventAlbums({ eventId }: EventAlbumsProps) {
+export function EventAlbums({ eventId, compact }: EventAlbumsProps) {
   const [albums,  setAlbums]  = useState<IAlbum[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewer,  setViewer]  = useState<{ album: IAlbum; files: IAlbumFile[]; idx: number } | null>(null);
@@ -202,6 +202,23 @@ export function EventAlbums({ eventId }: EventAlbumsProps) {
     </div>
   );
   if (!albums.length) return null;
+
+  if (compact) {
+    return (
+      <div className={styles.albumsSection}>
+        <div className={styles.header}>
+          <div className={styles.title}>Фотоальбомы</div>
+          <span className={styles.count}>{albums.length}</span>
+        </div>
+        <div className={styles.grid} style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {albums.slice(0, 4).map(a => (
+            <AlbumCard key={a.id} album={a} onClick={() => openAlbum(a)} />
+          ))}
+        </div>
+        {viewer && <AlbumViewer album={viewer.album} files={viewer.files} initialIdx={viewer.idx} onClose={() => setViewer(null)} />}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.wrap}>

@@ -187,15 +187,15 @@ export function FilterBar({
 
   // Вспомогательная функция — возврат к родному городу
   const restoreHomeCity = () => {
-    setCityName('');
+    // Берём РОДНОЙ город из отдельной cookie (не поисковый фильтр)
+    const homeName = cookies.get('elist_home_city_name') ?? cookies.get('elist_city_name') ?? '';
+    setCityName(homeName);
     const home = storedCoords.lat !== 0 ? storedCoords : null;
     if (home) {
       setFilter('latitude',  home.lat);
       setFilter('longitude', home.lng);
-      // Обновляем центр карты в сторе — работает и при режиме «список»
       useFiltersStore.getState().setMapCenter([home.lat, home.lng]);
       useFiltersStore.getState().setMapZoom(12);
-      // Если карта сейчас открыта — двигаем её немедленно
       window.dispatchEvent(new CustomEvent('elist:centerMap', {
         detail: { lat: home.lat, lng: home.lng },
       }));
@@ -206,6 +206,25 @@ export function FilterBar({
     }
     setFilter('locationRange', DEFAULT_RADIUS_M);
   };
+
+  // Слушаем обновление родного города (из диалога подтверждения)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { lat, lng, name } = (e as CustomEvent<{lat:number;lng:number;name:string}>).detail;
+      // Обновляем cookie родного города и текущий фильтр
+      cookies.set('elist_home_city_name', name, 30);
+      cookies.set('elist_city_name', name, 30);
+      setCityName(name);
+      setFilter('latitude', lat);
+      setFilter('longitude', lng);
+      useFiltersStore.getState().setMapCenter([lat, lng]);
+      useFiltersStore.getState().setMapZoom(12);
+      // Двигаем карту если она открыта
+      window.dispatchEvent(new CustomEvent('elist:centerMap', { detail: { lat, lng } }));
+    };
+    window.addEventListener('elist:homeCityChanged', handler);
+    return () => window.removeEventListener('elist:homeCityChanged', handler);
+  }, [setFilter]);
 
   const handleReset = () => {
     resetFilters();
@@ -314,7 +333,7 @@ export function FilterBar({
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button ref={cityBtnRef} className={styles.cityBtn} onClick={() => setShowCity(v => !v)}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              {cityName || 'По всем городам'}
+              {cityName || 'Мой город'}
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points={showCity ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/></svg>
             </button>
             {cityName && (
