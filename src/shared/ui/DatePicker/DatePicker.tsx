@@ -12,6 +12,7 @@ interface DatePickerProps {
   label?: string;
   min?: string;
   max?: string;
+  minTime?: string; // 'HH:MM' — блокируем время раньше если выбранная дата = дата начала
   className?: string;
   hasError?: boolean;
 }
@@ -116,12 +117,14 @@ function TimeWheel({ items, selected, onSelect }: {
   );
 }
 
-export function DatePicker({ value, onChange, withTime = false, placeholder, min, max, className, hasError }: DatePickerProps) {
+export function DatePicker({ value, onChange, withTime = false, placeholder, min, max, minTime, className, hasError }: DatePickerProps) {
   const [open, setOpen]       = useState(false);
   const wrapRef               = useRef<HTMLDivElement>(null);
   const fieldRef              = useRef<HTMLButtonElement>(null);
-  const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
-  const [isMobile, setIsMobile] = useState(false);
+  const [popupStyle] = useState<React.CSSProperties>({
+    position: 'fixed', width: 296, zIndex: 9999,
+  });
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 600);
 
   const parsed = parseValue(value);
   // Дефолт для selDate — текущие дата/время если не выбрано (кнопка сразу активна)
@@ -172,52 +175,87 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
 
   const popupRef = useRef<HTMLDivElement>(null);
 
-  const computePosition = useCallback(() => {
-    if (!fieldRef.current) return;
-    const mobile = window.innerWidth < 600;
-    setIsMobile(mobile);
-    if (mobile) {
-      setPopupStyle({ position: 'fixed', zIndex: 9999 });
+  const placePopup = useCallback(() => {
+    if (!fieldRef.current || !popupRef.current) return;
+
+    const s      = popupRef.current.style;
+    const viewH  = window.innerHeight;
+    const viewW  = window.innerWidth;
+    const popupH = popupRef.current.offsetHeight;
+    const navH   = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-h') || '56');
+    const isSmall = viewW < 600;
+
+    setIsMobile(isSmall);
+
+    if (isSmall) {
+      // Мобиль — по центру экрана через JS (не через CSS-класс)
+      const W = Math.min(340, viewW - 16);
+      s.position  = 'fixed';
+      s.width     = `${W}px`;
+      s.left      = `${(viewW - W) / 2}px`;
+      s.top       = `${Math.max(navH + 8, Math.round((viewH - popupH) / 2))}px`;
+      s.transform = 'none';
+      s.zIndex    = '9999';
       return;
     }
-    const rect = fieldRef.current.getBoundingClientRect();
-    const viewH = window.innerHeight;
-    const viewW = window.innerWidth;
-    const popupWidth = 296;
 
-    // Реальная высота если уже отрендерен, иначе оценка
-    const realH = popupRef.current?.offsetHeight ?? (withTime ? 560 : 400);
-    const left = Math.max(4, Math.min(rect.left, viewW - popupWidth - 8));
+    // Десктоп — под полем со сдвигом вверх если не влезает
+    const field  = fieldRef.current.getBoundingClientRect();
+    const W      = 296;
+    const GAP    = 8;
+    const SAFE   = 20;
 
-    let top: number;
-    if (rect.bottom + realH + 6 <= viewH - 4) {
-      top = rect.bottom + 6;                          // снизу
-    } else if (rect.top - realH - 6 >= 4) {
-      top = rect.top - realH - 6;                    // сверху
-    } else {
-      top = Math.max(4, viewH - realH - 4);          // прижимаем к нижнему краю
-    }
+    const left   = Math.max(4, Math.min(field.left, viewW - W - 4));
+    let   top    = field.bottom + GAP;
+    const maxTop = viewH - popupH - SAFE;
+    if (top > maxTop) top = maxTop;
+    top = Math.max(navH + 4, top);
 
-    setPopupStyle({ position: 'fixed', left, top, width: popupWidth, zIndex: 9999 });
-  }, [withTime]);
+    s.position  = 'fixed';
+    s.width     = `${W}px`;
+    s.left      = `${left}px`;
+    s.top       = `${top}px`;
+    s.transform = 'none';
+    s.zIndex    = '9999';
+  }, []);
+
+  // Повторяем rAF пока offsetHeight не станет реальным (Chrome рендерит портал лениво)
+  useEffect(() => {
+    if (!open) return;
+    let raf: number;
+    let attempts = 0;
+
+    const tryPlace = () => {
+      if (!popupRef.current) return;
+      if (popupRef.current.offsetHeight === 0 && attempts < 15) {
+        attempts++;
+        raf = requestAnimationFrame(tryPlace);
+        return;
+      }
+      placePopup();
+    };
+
+    raf = requestAnimationFrame(tryPlace);
+    return () => cancelAnimationFrame(raf);
+  }, [open, placePopup]);
 
   useEffect(() => {
     if (!open) return;
-    computePosition();
-    window.visualViewport?.addEventListener('resize', computePosition);
-    window.visualViewport?.addEventListener('scroll', computePosition);
+    window.addEventListener('resize', placePopup);
+    window.addEventListener('scroll', placePopup, true);
     return () => {
-      window.visualViewport?.removeEventListener('resize', computePosition);
-      window.visualViewport?.removeEventListener('scroll', computePosition);
+      window.removeEventListener('resize', placePopup);
+      window.removeEventListener('scroll', placePopup, true);
     };
-  }, [open, computePosition]);
+  }, [open, placePopup]);
 
-  // Пересчитываем позицию после того как попап реально отрендерился с реальной высотой
-  useLayoutEffect(() => {
-    if (!open || !popupRef.current) return;
-    computePosition();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  // Определяем тип устройства сразу
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 600);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
@@ -235,10 +273,14 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const handleSelect = (day: number) => {
     const d = new Date(viewYear, viewMonth, day);
     setSelDate(d);
-    if (!withTime) {
-      onChange(toISO(d, false));
-      setOpen(false);
-    }
+    if (!withTime) { onChange(toISO(d, false)); setOpen(false); }
+  };
+
+  // Выбор дня с явным указанием года/месяца (для соседних месяцев)
+  const handleSelectFull = (year: number, month: number, day: number) => {
+    const d = new Date(year, month, day);
+    setSelDate(d);
+    if (!withTime) { onChange(toISO(d, false)); setOpen(false); }
   };
 
   const handleConfirm = () => {
@@ -284,6 +326,15 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return false;
   };
 
+  // Если выбранная дата совпадает с min-датой — ограничиваем время
+  const isSameDayAsMin = selDate && min
+    ? (() => { const [y,m,d] = min.split('-').map(Number); return selDate.getFullYear()===y && selDate.getMonth()===m-1 && selDate.getDate()===d; })()
+    : false;
+  const [minH, minM] = (isSameDayAsMin && minTime) ? minTime.split(':').map(Number) : [0, 0];
+
+  const availableHours   = HOURS.filter(h   => !isSameDayAsMin || parseInt(h) >= minH);
+  const availableMinutes = MINUTES.filter(m2 => !isSameDayAsMin || parseInt(timeH) > minH || parseInt(m2) >= minM);
+
   const currentYear = new Date().getFullYear();
   const minYear = min ? parseInt(min.slice(0, 4)) : 1900;
   const maxYear = max ? parseInt(max.slice(0, 4)) : currentYear + 10;
@@ -323,13 +374,14 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const popupContent = (
     <div data-datepicker-popup
       ref={popupRef}
-      className={`${styles.popup} ${isMobile ? styles.popupModal : ''}`}
-      style={isMobile ? undefined : popupStyle}>
+      className={styles.popup}
+      style={undefined}>
 
       {/* Шапка с навигацией */}
       <div className={styles.header}
         onTouchStart={handleSwipeTouchStart}
-        onTouchEnd={handleSwipeTouchEnd}>
+        onTouchEnd={handleSwipeTouchEnd}
+        onWheel={e => { e.preventDefault(); e.deltaY > 0 ? nextMonth() : prevMonth(); }}>
         <button type="button" className={styles.navBtn} onClick={prevMonth}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
@@ -340,7 +392,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       </div>
 
       {/* Быстрый выбор года со стрелками */}
-      <div className={styles.yearBar}>
+      <div className={styles.yearBar}
+        onWheel={e => { e.preventDefault(); e.deltaY > 0
+          ? setViewYear(y => Math.min(maxYear, y + 1))
+          : setViewYear(y => Math.max(minYear, y - 1)); }}>
         <button type="button" className={styles.yearNavBtn}
           onClick={() => setViewYear(y => Math.max(minYear, y - 1))}
           disabled={viewYear <= minYear}>
@@ -372,10 +427,29 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       <div className={styles.grid}
         onTouchStart={handleSwipeTouchStart}
         onTouchEnd={handleSwipeTouchEnd}>
-        {cells.map((c, i) => (
+        {cells.map((c, i) => {
+          const targetYear  = c.month === 'prev' ? (viewMonth === 0 ? viewYear - 1 : viewYear)
+                            : c.month === 'next' ? (viewMonth === 11 ? viewYear + 1 : viewYear)
+                            : viewYear;
+          const targetMonth = c.month === 'prev' ? (viewMonth === 0 ? 11 : viewMonth - 1)
+                            : c.month === 'next' ? (viewMonth === 11 ? 0 : viewMonth + 1)
+                            : viewMonth;
+          const cellDisabled = (() => {
+            const dt = new Date(targetYear, targetMonth, c.day);
+            if (min) { const [y,m,d] = min.split('-').map(Number); if (dt < new Date(y,m-1,d)) return true; }
+            if (max) { const [y,m,d] = max.split('-').map(Number); if (dt > new Date(y,m-1,d)) return true; }
+            return false;
+          })();
+          if (c.month !== 'cur' && cellDisabled) return null; // п.2: не рендерим заблокированные дни соседних месяцев
+          return (
           <button key={i} type="button"
-            disabled={c.month !== 'cur' || isDisabled(c.day)}
-            onClick={() => c.month === 'cur' && !isDisabled(c.day) && handleSelect(c.day)}
+            disabled={c.month === 'cur' && isDisabled(c.day)}
+            onClick={() => {
+              if (cellDisabled) return;
+              if (c.month === 'prev') { prevMonth(); handleSelectFull(targetYear, targetMonth, c.day); }
+              else if (c.month === 'next') { nextMonth(); handleSelectFull(targetYear, targetMonth, c.day); }
+              else if (!isDisabled(c.day)) { handleSelect(c.day); }
+            }}
             className={[
               styles.day,
               c.month !== 'cur'                          ? styles.dayOther    : '',
@@ -384,7 +458,8 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
               c.month === 'cur' && isDisabled(c.day)     ? styles.dayDisabled : '',
             ].filter(Boolean).join(' ')}
           >{c.day}</button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Колёса времени */}
@@ -392,9 +467,9 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
         <div className={styles.timePicker}>
           <span className={styles.timeLabel}>Время</span>
           <div className={styles.timeWheels}>
-            <TimeWheel items={HOURS}   selected={timeH} onSelect={setTimeH} />
+            <TimeWheel items={availableHours}   selected={timeH} onSelect={setTimeH} />
             <span className={styles.timeSep}>:</span>
-            <TimeWheel items={MINUTES} selected={timeM} onSelect={setTimeM} />
+            <TimeWheel items={availableMinutes} selected={timeM} onSelect={setTimeM} />
           </div>
         </div>
       )}
@@ -425,12 +500,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       </button>
 
       {open && createPortal(
-        isMobile ? (
-          <>
-            <div className={styles.backdrop} onClick={() => setOpen(false)} />
-            {popupContent}
-          </>
-        ) : popupContent,
+        <>
+          <div className={styles.backdrop} style={{ zIndex: 9998 }} onClick={() => setOpen(false)} />
+          {popupContent}
+        </>,
         document.body
       )}
     </div>

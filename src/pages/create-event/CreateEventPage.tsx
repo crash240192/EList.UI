@@ -540,6 +540,7 @@ export default function CreateEventPage() {
                     placeholder="Дата и время окончания"
                     hasError={hasErr('endDate') || hasErr('endTime')}
                     min={form.startDate || new Date().toISOString().slice(0, 10)}
+                    minTime={form.startDate && form.endDate && form.startDate === form.endDate ? form.startTime : undefined}
                   />
                 </div>
               </Field>
@@ -568,7 +569,7 @@ export default function CreateEventPage() {
                 <LockedInput
                   locked={!canSetCost}
                   value={form.cost}
-                  onChange={e => { const v = e.target.value; if (v === '' || parseFloat(v) >= 0) setForm(f => ({ ...f, cost: v })); }}
+                  onChange={e => { const v = e.target.value.replace(/[^0-9.,]/g, ''); setForm(f => ({ ...f, cost: v })); }}
                   type="number" min="0"
                   hasError={hasErr('cost')}
                   hint={hasErr('cost')
@@ -582,7 +583,7 @@ export default function CreateEventPage() {
                 <LockedInput
                   locked={!canSetMaxPersons}
                   value={form.maxPersons} placeholder="∞"
-                  onChange={e => { const v = e.target.value; if (v === '' || parseInt(v) >= 0) setForm(f => ({ ...f, maxPersons: v })); }}
+                  onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setForm(f => ({ ...f, maxPersons: v })); }}
                   type="number" min="0"
                   hasError={hasErr('maxPersons')}
                   hint={hasErr('maxPersons')
@@ -598,7 +599,7 @@ export default function CreateEventPage() {
               <LockedInput
                 locked={!canSetAge}
                 value={form.ageLimit} placeholder="0+"
-                onChange={e => { const v = e.target.value; if (v === '' || parseInt(v) >= 0) setForm(f => ({ ...f, ageLimit: v })); }}
+                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setForm(f => ({ ...f, ageLimit: v })); }}
                 type="number" min="0"
                 hasError={hasErr('ageLimit')}
                 hint={hasErr('ageLimit')

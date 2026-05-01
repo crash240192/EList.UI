@@ -19,6 +19,7 @@ interface MobileFilterSheetProps {
   onClose: () => void;
   onApply: () => void;
   onReset: () => void;
+  onResetCity: () => void;
 
   // Данные
   filters: IEventsSearchParams;
@@ -40,7 +41,7 @@ interface MobileFilterSheetProps {
 }
 
 export function MobileFilterSheet({
-  open, onClose, onApply, onReset,
+  open, onClose, onApply, onReset, onResetCity,
   filters, setFilter, cityName, setCityName,
   quickDate, setQuickDate,
   draftTypes, setDraftTypes, draftCats, setDraftCats,
@@ -86,7 +87,14 @@ export function MobileFilterSheet({
 
           {/* Город */}
           <div className={styles.section}>
-            <div className={styles.sectionLabel}>Город</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div className={styles.sectionLabel} style={{ margin: 0 }}>Город</div>
+              {cityName && (
+                <button onClick={onResetCity} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--accent)', padding: 0 }}>
+                  ← Мой город
+                </button>
+              )}
+            </div>
             <CitySearch value={cityName} onSelect={handleCitySelect} placeholder="Поиск города..." />
           </div>
 

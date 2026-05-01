@@ -118,11 +118,10 @@ export function FilterBar({
       if (!filters.latitude && storedCoords.lat !== 0) {
         setFilter('latitude',  storedCoords.lat);
         setFilter('longitude', storedCoords.lng);
-        // При первом заходе подставляем название города из профиля
-        if (!cityName) {
-          const name = cookies.get('elist_city_name') ?? '';
-          if (name) setCityName(name);
-        }
+        // При первом заходе всегда берём РОДНОЙ город, игнорируя предыдущий поиск
+        const homeName = cookies.get('elist_home_city_name') ?? cookies.get('elist_city_name') ?? '';
+        setCityName(homeName);
+        if (homeName) cookies.set('elist_city_name', homeName, 30);
       }
       if (!filters.locationRange) setFilter('locationRange', DEFAULT_RADIUS_M);
     }
@@ -450,6 +449,7 @@ export function FilterBar({
       onClose={() => setMobileSheet(false)}
       onApply={handleApply}
       onReset={handleReset}
+      onResetCity={restoreHomeCity}
       filters={filters}
       setFilter={setFilter}
       cityName={cityName}
