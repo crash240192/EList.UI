@@ -10,12 +10,14 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "flatpickr": "^4.6.13",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.1",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
+    "@types/flatpickr": "^3.0.2",
     "@types/node": "^25.6.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
