@@ -45,3 +45,17 @@ export {
 } from './eventExtrasApi';
 
 export type { IEventParameters, IEventOrganizator } from './eventExtrasApi';
+
+export {
+  fetchEventRating,
+  voteEventRating,
+} from './ratingApi';
+
+export type {
+  RatingType,
+  IRatingVoteRequest,
+  IRatingItem,
+  IRatingPage,
+  IRatingAccount,
+  IRatingPersonInfo,
+} from './ratingApi';

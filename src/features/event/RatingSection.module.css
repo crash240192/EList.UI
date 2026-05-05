@@ -1,0 +1,86 @@
+/* RatingSection.module.css */
+
+.section { display:flex; flex-direction:column; gap:10px; }
+
+.secLabel {
+  font-size:10px; font-weight:600; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--text-muted);
+}
+
+/* Summary row */
+.summary {
+  display:flex; align-items:center; gap:12px;
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:10px; padding:10px 14px;
+}
+.summaryScore {
+  font-size:26px; font-weight:700; color:var(--text-primary); line-height:1;
+}
+.summaryRight { display:flex; flex-direction:column; gap:3px; }
+.summaryCount { font-size:11px; color:var(--text-muted); }
+
+/* Stars */
+.stars { display:inline-flex; align-items:center; gap:2px; }
+.star { color:var(--border); flex-shrink:0; transition:color .1s; }
+.starFilled { color:#f59e0b; }
+.starInteractive { cursor:pointer; }
+.starInteractive:hover { color:#f59e0b; }
+
+/* Vote form */
+.voteForm {
+  display:flex; flex-direction:column; gap:8px;
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:10px; padding:12px 14px;
+}
+.voteFormLabel { font-size:11px; color:var(--text-secondary); font-weight:500; }
+
+.commentArea {
+  resize:vertical; min-height:52px; max-height:140px;
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:8px 10px; font-size:12px; color:var(--text-primary);
+  font-family:inherit; line-height:1.5; outline:none;
+  transition:border-color .12s;
+}
+.commentArea:focus { border-color:var(--accent); }
+.commentArea::placeholder { color:var(--text-muted); }
+
+.voteBtn {
+  align-self:flex-start; height:32px; padding:0 16px; border-radius:8px;
+  background:var(--accent); color:#fff; border:none;
+  font-size:12px; font-weight:500; cursor:pointer; transition:background .15s;
+}
+.voteBtn:hover:not(:disabled) { background:var(--accent-hover,#4f46e5); }
+.voteBtn:disabled { opacity:.45; cursor:not-allowed; }
+
+.voteError { font-size:11px; color:var(--danger,#ef4444); }
+
+/* Voted badge */
+.votedBadge {
+  font-size:11px; color:#10b981;
+  background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.2);
+  border-radius:8px; padding:6px 12px;
+}
+
+/* Ratings list */
+.list { display:flex; flex-direction:column; gap:8px; margin-top:2px; }
+
+.ratingItem {
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:10px; padding:10px 12px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.ratingItemHeader { display:flex; align-items:center; gap:9px; }
+.ratingItemAvatar {
+  width:28px; height:28px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:600; color:#fff;
+}
+.ratingItemMeta { display:flex; flex-direction:column; gap:2px; }
+.ratingItemName { font-size:12px; font-weight:500; color:var(--text-primary); }
+.ratingItemComment { font-size:12px; color:var(--text-secondary); line-height:1.5; margin:0; }
+
+/* Loading */
+.loadingRow { padding:10px 0; }
+.skeletonLine { height:14px; border-radius:6px; background:var(--surface-2); animation:shimmer 1.4s ease infinite; }
+@keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:.45} }

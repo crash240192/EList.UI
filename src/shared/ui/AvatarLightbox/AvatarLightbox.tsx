@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './AvatarLightbox.module.css';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 interface AvatarLightboxProps {
   fileIds:   string[];   // история: [0] = самый свежий
@@ -13,6 +14,7 @@ interface AvatarLightboxProps {
 }
 
 export function AvatarLightbox({ fileIds, startIndex = 0, initials, onClose }: AvatarLightboxProps) {
+  useModalBackButton(onClose);
   const [idx, setIdx] = useState(startIndex);
 
   const prev = useCallback(() => setIdx(i => Math.max(0, i - 1)), []);

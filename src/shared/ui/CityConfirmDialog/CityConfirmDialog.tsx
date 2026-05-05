@@ -1,6 +1,7 @@
 // shared/ui/CityConfirmDialog/CityConfirmDialog.tsx
 
 import styles from './CityConfirmDialog.module.css';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 interface Props {
   cityName: string;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function CityConfirmDialog({ cityName, onConfirm, onKeep }: Props) {
+  useModalBackButton(onKeep);
   return (
     <>
       <div className={styles.backdrop} />

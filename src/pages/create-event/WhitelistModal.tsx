@@ -1,49 +1,56 @@
-// features/event/InviteModal.tsx
-// Модальное окно выбора подписчиков для приглашения на событие
+// pages/create-event/WhitelistModal.tsx
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchSubscribers } from '@/entities/user/subscriptionApi';
 import type { ISubscriptionItem } from '@/entities/user/subscriptionApi';
-import { createInvitations } from '@/entities/invitation/invitationsApi';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
-import styles from './InviteModal.module.css';
+import styles from './WhitelistModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
-interface InviteModalProps {
-  eventId: string;
-  currentAccountId: string;
+export interface IWhitelistUser {
+  accountId: string;
+  login: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  avatarFileId?: string | null;
+}
+
+interface Props {
+  myAccountId: string;
+  current: IWhitelistUser[];
+  onAdd: (users: IWhitelistUser[]) => void;
   onClose: () => void;
-  onSent?: (count: number) => void;
 }
 
-function getInitials(p: ISubscriptionItem): string {
-  const pi = p.personInfo;
+function getInitials(s: ISubscriptionItem): string {
+  const pi = s.personInfo;
   if (pi?.firstName) return `${pi.firstName[0]}${pi.lastName?.[0] ?? ''}`.toUpperCase();
-  return p.account.login[0].toUpperCase();
+  return s.account.login[0].toUpperCase();
 }
 
-export function InviteModal({ eventId, currentAccountId, onClose, onSent }: InviteModalProps) {
+export function WhitelistModal({ myAccountId, current, onAdd, onClose }: Props) {
   useModalBackButton(onClose);
   const [subscribers, setSubscribers] = useState<ISubscriptionItem[]>([]);
   const [loading,     setLoading]     = useState(true);
-  const [sending,     setSending]     = useState(false);
+  const [err,         setErr]         = useState<string | null>(null);
   const [search,      setSearch]      = useState('');
   const [selected,    setSelected]    = useState<Set<string>>(new Set());
-  const [err,         setErr]         = useState<string | null>(null);
-  const [sent,        setSent]        = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const currentIds = useMemo(() => new Set(current.map(u => u.accountId)), [current]);
+
   useEffect(() => {
-    fetchSubscribers(currentAccountId)
-      .then(setSubscribers)
+    fetchSubscribers(myAccountId)
+      .then(list => setSubscribers(list.filter(s => !currentIds.has(s.account.id))))
       .catch(() => setErr('Не удалось загрузить подписчиков'))
       .finally(() => setLoading(false));
-    setTimeout(() => searchRef.current?.select?.(), 200);
+
+    setTimeout(() => searchRef.current?.focus(), 100);
 
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', esc);
     return () => document.removeEventListener('keydown', esc);
-  }, [currentAccountId, onClose]);
+  }, [myAccountId, onClose]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return subscribers;
@@ -55,38 +62,34 @@ export function InviteModal({ eventId, currentAccountId, onClose, onSent }: Invi
     );
   }, [subscribers, search]);
 
-  const toggleSelect = (id: string) =>
-    setSelected(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+  const toggle = (id: string) =>
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const selectAll = () => setSelected(new Set(filtered.map(s => s.account.id)));
   const clearAll  = () => setSelected(new Set());
 
-  const handleSend = async () => {
-    if (selected.size === 0) return;
-    setSending(true); setErr(null);
-    try {
-      await createInvitations({ accountIds: [...selected], eventId });
-      setSent(true);
-      onSent?.(selected.size);
-      setTimeout(onClose, 1200);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Ошибка отправки');
-    } finally { setSending(false); }
+  const handleConfirm = () => {
+    const picked = subscribers
+      .filter(s => selected.has(s.account.id))
+      .map(s => ({
+        accountId:    s.account.id,
+        login:        s.account.login,
+        firstName:    s.personInfo?.firstName ?? null,
+        lastName:     s.personInfo?.lastName  ?? null,
+        avatarFileId: null,
+      }));
+    onAdd(picked);
+    onClose();
   };
 
   return (
     <>
       <div className={styles.backdrop} onClick={onClose} />
-      <div className={styles.modal} role="dialog" aria-modal aria-label="Пригласить">
+      <div className={styles.modal} role="dialog" aria-modal aria-label="Белый список">
 
-        {/* Хедер */}
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <h3 className={styles.title}>Пригласить</h3>
+            <h3 className={styles.title}>Белый список</h3>
             {subscribers.length > 0 && (
               <span className={styles.count}>{subscribers.length} подписчиков</span>
             )}
@@ -98,18 +101,21 @@ export function InviteModal({ eventId, currentAccountId, onClose, onSent }: Invi
           </button>
         </div>
 
-        {/* Поиск */}
         <div className={styles.searchWrap}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.searchIcon}>
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <input ref={searchRef} className={styles.searchInput} onFocus={e => e.currentTarget.select()}
+          <input
+            ref={searchRef}
+            className={styles.searchInput}
             placeholder="Поиск по имени или логину..."
-            value={search} onChange={e => setSearch(e.target.value)} />
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onFocus={e => e.currentTarget.select()}
+          />
           {search && <button className={styles.searchClear} onClick={() => setSearch('')}>×</button>}
         </div>
 
-        {/* Выбрать всё */}
         {filtered.length > 0 && !loading && (
           <div className={styles.selectAllRow}>
             <span className={styles.selectedCount}>
@@ -121,17 +127,19 @@ export function InviteModal({ eventId, currentAccountId, onClose, onSent }: Invi
           </div>
         )}
 
-        {/* Список */}
         <div className={styles.list}>
           {loading ? (
             <div className={styles.empty}>Загрузка...</div>
           ) : err ? (
-            <div className={styles.empty} style={{ color: 'var(--danger)' }}>{err}</div>
+            <div className={styles.emptyErr}>{err}</div>
           ) : filtered.length === 0 ? (
             <div className={styles.empty}>{search ? 'Никого не найдено' : 'Нет подписчиков'}</div>
           ) : filtered.map(s => (
-            <div key={s.account.id} className={`${styles.item} ${selected.has(s.account.id) ? styles.itemSelected : ''}`}
-              onClick={() => toggleSelect(s.account.id)}>
+            <div
+              key={s.account.id}
+              className={`${styles.item} ${selected.has(s.account.id) ? styles.itemSelected : ''}`}
+              onClick={() => toggle(s.account.id)}
+            >
               <div className={styles.checkbox}>
                 {selected.has(s.account.id) && (
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
@@ -144,7 +152,9 @@ export function InviteModal({ eventId, currentAccountId, onClose, onSent }: Invi
               </div>
               <div className={styles.info}>
                 <div className={styles.name}>
-                  {s.personInfo?.firstName ? `${s.personInfo.firstName} ${s.personInfo.lastName ?? ''}`.trim() : s.account.login}
+                  {s.personInfo?.firstName
+                    ? `${s.personInfo.firstName} ${s.personInfo.lastName ?? ''}`.trim()
+                    : s.account.login}
                 </div>
                 <div className={styles.login}>@{s.account.login}</div>
               </div>
@@ -152,26 +162,13 @@ export function InviteModal({ eventId, currentAccountId, onClose, onSent }: Invi
           ))}
         </div>
 
-        {/* Футер */}
         <div className={styles.footer}>
-          {err && !loading && <span className={styles.footerErr}>{err}</span>}
-          {sent ? (
-            <div className={styles.sentMsg}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              Приглашения отправлены!
-            </div>
-          ) : (
-            <>
-              <button className={styles.cancelBtn} onClick={onClose} disabled={sending}>Отмена</button>
-              <button className={styles.sendBtn} onClick={handleSend}
-                disabled={selected.size === 0 || sending}>
-                {sending ? 'Отправка...' : `Пригласить${selected.size > 0 ? ` (${selected.size})` : ''}`}
-              </button>
-            </>
-          )}
+          <button className={styles.cancelBtn} onClick={onClose}>Отмена</button>
+          <button className={styles.confirmBtn} onClick={handleConfirm} disabled={selected.size === 0}>
+            {`Добавить${selected.size > 0 ? ` (${selected.size})` : ''}`}
+          </button>
         </div>
+
       </div>
     </>
   );

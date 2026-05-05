@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\projects\\\\eList\\\\EList.UI\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(sed -n '30,33p' \"c:/projects/eList/EList.UI/src/pages/create-event/WhitelistModal.tsx\")",
+      "Bash(sed -n '19,26p' \"c:/projects/eList/EList.UI/src/features/event-filters/CategoryTypePicker.tsx\")",
+      "Bash(sed -n '25,27p' \"c:/projects/eList/EList.UI/src/features/event/InviteModal.tsx\")",
+      "Bash(sed -n '35,47p' \"c:/projects/eList/EList.UI/src/features/event/ParticipantsModal.tsx\")",
+      "Bash(sed -n '16,20p' \"c:/projects/eList/EList.UI/src/shared/ui/AvatarLightbox/AvatarLightbox.tsx\")",
+      "Bash(sed -n '12,14p' \"c:/projects/eList/EList.UI/src/shared/ui/CityConfirmDialog/CityConfirmDialog.tsx\")",
+      "Bash(sed -n '11,13p' \"c:/projects/eList/EList.UI/src/shared/ui/LogoutConfirmModal/LogoutConfirmModal.tsx\")"
+    ]
+  }
+}

@@ -52,7 +52,9 @@ export function FilterBar({
   const [pickerOpen,     setPickerOpen]     = useState(false);
   const [showCity,       setShowCity]       = useState(false);
   const [mobileSheet,    setMobileSheet]    = useState(false);
-  const [cityName, setCityName] = useState(() => cookies.get('elist_city_name') ?? '');
+  const [cityName, setCityName] = useState(() =>
+    cookies.get('elist_home_city_name') ?? cookies.get('elist_city_name') ?? ''
+  );
 
   // Подставляем координаты и радиус по умолчанию
   const storedCoords = getStoredUserCoords();

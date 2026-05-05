@@ -188,17 +188,38 @@
   background: rgba(99,102,241,0.04);
   border: 0.5px solid rgba(99,102,241,0.2); border-radius: 10px;
 }
+.whitelistHeader {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 4px;
+}
 .whitelistTitle {
   display: flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 4px;
+  font-size: 12px; font-weight: 600; color: var(--accent);
 }
 .whitelistHint { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
-.whitelistInput { display: flex; gap: 8px; }
-.whitelistAdd {
-  background: var(--accent); color: #fff; border: none;
-  border-radius: 7px; padding: 0 14px; font-size: 12px; font-weight: 500;
-  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+.whitelistList {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;
 }
+.whitelistChip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 10px; font-size: 12px;
+}
+.whitelistChipName { color: var(--text-primary); font-weight: 500; }
+.whitelistChipLogin { color: var(--text-muted); }
+.whitelistChipRemove {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 16px; line-height: 1; padding: 0 0 0 2px;
+}
+.whitelistChipRemove:hover { color: var(--danger); }
+.whitelistAdd {
+  height: 30px; padding: 0 12px;
+  background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.35);
+  border-radius: 7px; font-size: 12px; font-weight: 500;
+  color: var(--accent); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.whitelistAdd:hover { background: rgba(99,102,241,0.18); border-color: var(--accent); }
 
 /* ── Фотоальбом заглушка ── */
 .albumPlaceholder {

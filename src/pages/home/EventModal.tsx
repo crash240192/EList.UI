@@ -7,6 +7,7 @@ import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './EventModal.module.css';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 function contrastColor(hex: string): string {
   const c = hex.replace('#', '');
@@ -27,6 +28,7 @@ function categoryGradient(p?: string | null) {
 interface EventModalProps { event: IEvent; onClose: () => void; children?: React.ReactNode; }
 
 export function EventModal({ event, onClose, children }: EventModalProps) {
+  useModalBackButton(onClose);
   const navigate = useNavigate();
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 // shared/ui/LogoutConfirmModal/LogoutConfirmModal.tsx
 
 import styles from './LogoutConfirmModal.module.css';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 interface Props {
   onConfirm: () => void;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function LogoutConfirmModal({ onConfirm, onCancel }: Props) {
+  useModalBackButton(onCancel);
   return (
     <>
       <div className={styles.backdrop} onClick={onCancel} />

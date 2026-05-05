@@ -8,6 +8,7 @@ import type { IEventType } from '@/entities/event';
 import { fetchEventTypesByEvent } from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
 import { getOrFetchAccountId } from '@/entities/user/api';
+import { useAccountId } from '@/features/auth/useAccountId';
 import { getWalletByAccount } from '@/entities/user/walletApi';
 import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } from '@/entities/admin/adminApi';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
@@ -21,6 +22,8 @@ import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { InviteModal } from '@/features/event/InviteModal';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
+import { WhitelistModal } from './WhitelistModal';
+import type { IWhitelistUser } from './WhitelistModal';
 import styles from './CreateEventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -71,6 +74,7 @@ export default function CreateEventPage() {
   const navigate  = useNavigate();
   const { id }    = useParams<{ id: string }>();
   const isEditing = !!id;
+  const { accountId } = useAccountId();
 
   const [form,        setForm]        = useState<FormState>(EMPTY);
   const [loading,     setLoading]     = useState(isEditing);
@@ -95,6 +99,8 @@ export default function CreateEventPage() {
   const [durationH, setDurationH] = useState('2');
   const [durationM, setDurationM] = useState('0');
   const [albums,    setAlbums]    = useState<IAlbum[]>([]);
+  const [whitelist, setWhitelist] = useState<IWhitelistUser[]>([]);
+  const [whitelistModalOpen, setWhitelistModalOpen] = useState(false);
 
   // Кошелёк / тариф
   const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
@@ -634,16 +640,35 @@ export default function CreateEventPage() {
             {/* Белый список — только для приватных */}
             {form.isPrivate && canSetPrivate && (
               <div className={styles.whitelist}>
-                <div className={styles.whitelistTitle}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  Белый список участников
+                <div className={styles.whitelistHeader}>
+                  <div className={styles.whitelistTitle}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Белый список участников
+                  </div>
+                  <button className={styles.whitelistAdd} onClick={() => setWhitelistModalOpen(true)}>
+                    + Добавить
+                  </button>
                 </div>
                 <p className={styles.whitelistHint}>Только эти пользователи смогут записаться на мероприятие</p>
-                <div className={styles.whitelistInput}>
-                  <input className={styles.input} placeholder="Логин или ID пользователя..." 
-                  onFocus={e => (e.target as HTMLInputElement).select()} />
-                  <button className={styles.whitelistAdd}>Добавить</button>
-                </div>
+
+                {/* Список добавленных */}
+                {whitelist.length > 0 && (
+                  <div className={styles.whitelistList}>
+                    {whitelist.map(u => {
+                      const name = u.firstName ? `${u.firstName} ${u.lastName ?? ''}`.trim() : u.login;
+                      return (
+                        <div key={u.accountId} className={styles.whitelistChip}>
+                          <span className={styles.whitelistChipName}>{name}</span>
+                          <span className={styles.whitelistChipLogin}>@{u.login}</span>
+                          <button className={styles.whitelistChipRemove}
+                            onClick={() => setWhitelist(w => w.filter(x => x.accountId !== u.accountId))}>
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </Section>
@@ -788,6 +813,16 @@ export default function CreateEventPage() {
           currentAccountId={createdAccountId}
           onClose={() => { setInviteModalOpen(false); navigate('/my-events'); }}
           onSent={() => { setInviteModalOpen(false); navigate('/my-events'); }}
+        />
+      )}
+
+      {/* Белый список */}
+      {whitelistModalOpen && accountId && (
+        <WhitelistModal
+          myAccountId={accountId}
+          current={whitelist}
+          onAdd={users => setWhitelist(w => [...w, ...users])}
+          onClose={() => setWhitelistModalOpen(false)}
         />
       )}
 

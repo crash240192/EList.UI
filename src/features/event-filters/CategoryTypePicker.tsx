@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { useEventTypes } from './useEventTypes';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './CategoryTypePicker.module.css';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 interface CategoryTypePickerProps {
   /** Выбранные ID категорий */
@@ -22,6 +23,7 @@ export function CategoryTypePicker({
   onChange,
   onClose,
 }: CategoryTypePickerProps) {
+  useModalBackButton(onClose);
   const { groups, loading, error } = useEventTypes();
 
   // Закрытие по Escape

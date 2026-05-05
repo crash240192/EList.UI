@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import type { ISubscriptionItem } from '@/entities/user/subscriptionApi';
 import { UserChip } from '@/entities/user/ui/UserChip';
 import styles from './SubscribersListModal.module.css';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 interface Props {
   title: string;
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function SubscribersListModal({ title, fetchFn, currentAccountId, onClose }: Props) {
+  useModalBackButton(onClose);
   const navigate = useNavigate();
   const [items,   setItems]   = useState<ISubscriptionItem[]>([]);
   const [loading, setLoading] = useState(true);

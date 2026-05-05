@@ -11,6 +11,7 @@ import type { IEventType } from '@/entities/event';
 import type { IEventsSearchParams } from '@/entities/event';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './MobileFilterSheet.module.css';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 const DEFAULT_RADIUS_M = 25000;
 
@@ -48,7 +49,7 @@ export function MobileFilterSheet({
   allTypes, pickerOpen, setPickerOpen, chips,
   handleCitySelect, handleQuickDate,
 }: MobileFilterSheetProps) {
-
+  useModalBackButton(onClose, open);
   const sheetRef = useRef<HTMLDivElement>(null);
   const radiusKm = filters.locationRange ? Math.round(filters.locationRange / 1000) : '';
 

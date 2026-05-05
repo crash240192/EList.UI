@@ -152,6 +152,19 @@ export function useUserLocation(): UseUserLocationResult {
         }
       }
 
+      // Если название родного города ещё не записано (или координаты сменились) —
+      // геокодируем и сохраняем, затем обновляем FilterBar через событие
+      const existingHomeName = cookies.get('elist_home_city_name');
+      if (!existingHomeName || accountChanged) {
+        getCityName(accountCoords).then(name => {
+          if (cancelled || !name) return;
+          cookies.set('elist_home_city_name', name, 30);
+          window.dispatchEvent(new CustomEvent('elist:homeCityChanged', {
+            detail: { lat: accountCoords.lat, lng: accountCoords.lng, name },
+          }));
+        }).catch(() => {});
+      }
+
       // 3. Показываем диалог только если пользователь ещё не принял решение
       if (isDecisionDone()) return;
 

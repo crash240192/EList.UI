@@ -17,6 +17,7 @@ import { ParticipantsModal } from '@/features/event/ParticipantsModal';
 import { InviteModal } from '@/features/event/InviteModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { RatingWidget } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import styles from './EventPage.module.css';
 
@@ -213,6 +214,7 @@ export default function EventPage() {
         {/* ── Action row ── */}
         <div className={styles.actionRow}>
           <h1 className={styles.actionTitle}>{event.name}</h1>
+          <RatingWidget eventId={id!} eventStartTime={event.startTime} accountId={accountId} />
           <div className={styles.actionBtns}>
             {accountId && event?.id && (isOrganizer || (isParticipating && event.parameters?.allowUsersToInvite)) && (
               <button className={styles.btnIcon} title="Пригласить" onClick={() => setInviteModalOpen(true)}>

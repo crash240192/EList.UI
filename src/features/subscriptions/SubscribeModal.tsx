@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { INotifySettings } from '@/entities/user/subscriptionApi';
 import styles from './SubscribeModal.module.css';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 interface Props {
   targetLogin: string;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function SubscribeModal({ targetLogin, onConfirm, onCancel }: Props) {
+  useModalBackButton(onCancel);
   const [settings, setSettings] = useState<INotifySettings>({
     notifyParticipated: true,
     notifyEventCreated: true,

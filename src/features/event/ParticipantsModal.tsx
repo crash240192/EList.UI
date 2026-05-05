@@ -6,6 +6,7 @@ import type { IParticipantView } from '@/entities/event';
 import { fetchEventParticipantsPage } from '@/entities/event/participationApi';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import styles from './ParticipantsModal.module.css';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 interface ParticipantsModalProps {
   eventId: string;
@@ -34,6 +35,7 @@ const PAGE_SIZE = 20;
 export function ParticipantsModal({
   eventId, organizerIds = new Set(), currentAccountId, onClose,
 }: ParticipantsModalProps) {
+  useModalBackButton(onClose);
   const navigate = useNavigate();
   const [items,    setItems]    = useState<IParticipantView[]>([]);
   const [total,    setTotal]    = useState(0);
