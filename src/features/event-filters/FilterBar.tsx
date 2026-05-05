@@ -449,6 +449,7 @@ export function FilterBar({
       onClose={() => setMobileSheet(false)}
       onApply={handleApply}
       onReset={handleReset}
+      onResetCity={restoreHomeCity}
       filters={filters}
       setFilter={setFilter}
       cityName={cityName}

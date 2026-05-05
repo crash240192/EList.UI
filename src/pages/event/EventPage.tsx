@@ -270,7 +270,7 @@ export default function EventPage() {
             )}
 
             {/* Цена + заполненность (на мобиле — одна строка) */}
-            <div className={styles.priceAndFill}>
+            <div className={`${styles.priceAndFill} ${!maxPersons ? styles.priceOnly : ''}`}>
             <div className={styles.priceBlock}>
               <div className={cost === 0 ? styles.priceVal : styles.priceValPaid}>
                 {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
@@ -280,18 +280,14 @@ export default function EventPage() {
                 : <span className={styles.priceBadgePaid}>Платное</span>}
             </div>
 
-            {/* Прогресс + аватарки участников */}
-            {maxPersons && (
-              <div className={styles.fillWrap}>
-                <div className={styles.fillTop}>
-                  <span className={styles.fillLbl}>Заполненность</span>
-                  <span className={styles.fillVal}>{participants.length} / {maxPersons}</span>
-                </div>
-                <div className={styles.fillTrack}>
+            {maxPersons ? (
+              <div className={styles.priceBlock}>
+                <div className={styles.priceValPaid}>{participants.length} / {maxPersons}</div>
+                <div className={styles.fillTrack} style={{ flex: 1, maxWidth: 60, alignSelf: 'center' }}>
                   <div className={styles.fillInner} style={{ width: `${Math.min(fillPct ?? 0, 100)}%` }} />
                 </div>
               </div>
-            )}
+            ) : null}
             </div>
 
             {sortedParticipants.length > 0 && (

@@ -167,3 +167,9 @@
   .priceAndFill > * { flex:1; }
   .mapBlock { height:175px; }
 }
+
+/* Цена на всю ширину если нет вместимости */
+@media (max-width:680px) {
+  .priceOnly { flex-direction:column!important; }
+  .priceOnly > * { flex:none!important; width:100%; }
+}
