@@ -75,6 +75,9 @@ input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 /* Плавная цветовая схема на всех элементах при смене темы */
 * { transition: background-color var(--transition), border-color var(--transition); }
+/* Кнопки — добавляем переход для box-shadow */
+button { transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition); }
+button:hover:not(:disabled) { box-shadow: 0 0 8px 2px rgba(99, 102, 241, 0.3); }
 /* Но не для анимаций */
 *[class*='skeleton'],
 *[class*='Skeleton'] { transition: none; }

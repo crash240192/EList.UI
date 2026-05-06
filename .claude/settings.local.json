@@ -10,7 +10,9 @@
       "Bash(sed -n '35,47p' \"c:/projects/eList/EList.UI/src/features/event/ParticipantsModal.tsx\")",
       "Bash(sed -n '16,20p' \"c:/projects/eList/EList.UI/src/shared/ui/AvatarLightbox/AvatarLightbox.tsx\")",
       "Bash(sed -n '12,14p' \"c:/projects/eList/EList.UI/src/shared/ui/CityConfirmDialog/CityConfirmDialog.tsx\")",
-      "Bash(sed -n '11,13p' \"c:/projects/eList/EList.UI/src/shared/ui/LogoutConfirmModal/LogoutConfirmModal.tsx\")"
+      "Bash(sed -n '11,13p' \"c:/projects/eList/EList.UI/src/shared/ui/LogoutConfirmModal/LogoutConfirmModal.tsx\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\Elist\\\\EList.UI\\\\src\\\\app\" -Recurse -Name)",
+      "Bash(Select-String -Pattern \"\\(sidebar|nav|Sidebar|Nav\\)\")"
     ]
   }
 }

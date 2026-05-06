@@ -178,10 +178,10 @@
   color: var(--text-secondary); text-decoration: none;
   font-size: 13px; font-weight: 500;
   white-space: nowrap;
-  transition: background var(--transition), color var(--transition);
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition);
   min-width: 0;
 }
-.navItem:hover { background: var(--surface-2); color: var(--text-primary); }
+.navItem:hover { background: var(--surface-2); color: var(--text-primary); box-shadow: 0 0 8px 2px rgba(99,102,241,0.2); }
 .navActive     { background: rgba(99,102,241,0.12) !important; color: var(--accent) !important; }
 
 .navIcon {
