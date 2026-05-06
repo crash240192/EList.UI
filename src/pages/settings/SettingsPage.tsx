@@ -171,22 +171,18 @@ function CitySection() {
   }, [coords]);
 
   const handleAutoDetect = () => {
-    if (detectedCity) {
-      setSelectedCity(detectedCity);
-    } else if (!geoLoading && navigator.geolocation) {
-      // Геолокация ещё не определена — запрашиваем вручную
-      navigator.geolocation.getCurrentPosition(pos => {
-        const { latitude, longitude } = pos.coords;
-        // useGeoCity уже должен был это сделать — просто обновляем координаты
-        import('@/features/auth/useGeoCity').then(({ POPULAR_CITIES }) => {
-          const nearest = POPULAR_CITIES.reduce((best, city) => {
-            const d = Math.hypot(city.lat - latitude, city.lng - longitude);
-            return d < Math.hypot(best.lat - latitude, best.lng - longitude) ? city : best;
-          });
-          setSelectedCity(nearest);
-        });
-      });
+    // Используем лучший доступный источник координат
+    const source = detectedCity
+      ? { lat: detectedCity.lat, lng: detectedCity.lng }
+      : coords;
+
+    let nearest: ICity | null = null;
+    let minDist = Infinity;
+    for (const city of POPULAR_CITIES) {
+      const d = Math.hypot(city.lat - source.lat, city.lng - source.lng);
+      if (d < minDist) { minDist = d; nearest = city; }
     }
+    if (nearest) setSelectedCity(nearest);
   };
 
   const handleSave = async () => {

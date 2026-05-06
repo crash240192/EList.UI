@@ -59,9 +59,9 @@ export function FilterBar({
   // Подставляем координаты и радиус по умолчанию
   const storedCoords = getStoredUserCoords();
 
-  // Синхронизируем название города если пользователь сменил его в настройках
+  // Синхронизируем название города при смене координат (например, после входа в аккаунт)
   useEffect(() => {
-    const savedName = cookies.get('elist_city_name') ?? '';
+    const savedName = cookies.get('elist_home_city_name') ?? cookies.get('elist_city_name') ?? '';
     setCityName(savedName);
   }, [storedCoords.lat, storedCoords.lng]);
   const [draftTypes,     setDraftTypes]     = useState<string[]>(filters.types ?? []);

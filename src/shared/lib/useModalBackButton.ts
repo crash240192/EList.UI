@@ -9,6 +9,8 @@
 
 import { useEffect, useRef } from 'react';
 
+const STATE_KEY = 'elistModal';
+
 export function useModalBackButton(onClose: () => void, isOpen = true): void {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -16,7 +18,7 @@ export function useModalBackButton(onClose: () => void, isOpen = true): void {
   useEffect(() => {
     if (!isOpen) return;
 
-    history.pushState({ modal: true }, '');
+    history.pushState({ [STATE_KEY]: true }, '');
     let closedByBack = false;
 
     const handler = () => {
@@ -27,7 +29,12 @@ export function useModalBackButton(onClose: () => void, isOpen = true): void {
 
     return () => {
       window.removeEventListener('popstate', handler);
-      if (!closedByBack) history.back();
+      // Only go back if history still holds our marker.
+      // If navigate() was called, React Router replaced the state — no marker —
+      // so we must NOT call history.back() or it would undo the navigation.
+      if (!closedByBack && history.state?.[STATE_KEY] === true) {
+        history.back();
+      }
     };
   }, [isOpen]);
 }

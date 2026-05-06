@@ -104,6 +104,7 @@ export function CitySearch({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value;
     setQuery(q);
+    prevValueRef.current = q; // track user input so external value changes are detected correctly
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => search(q), 350);
   };
