@@ -54,7 +54,7 @@ export async function fetchEventRating(
 ): Promise<IRatingPage> {
   const params = new URLSearchParams({
     eventId,
-    eventRatingType: ratingType,
+    eventRatingType: ratingType.toLowerCase(),
     pageIndex: String(pageIndex),
     pageSize: String(pageSize),
   });

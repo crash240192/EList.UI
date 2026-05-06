@@ -31,12 +31,20 @@ function getGrade(score: number): Grade {
   return               { label: 'F−', color: '#dc2626', rot:  5 };
 }
 
+function getSimpleGrade(score: number): Grade {
+  if (score >= 5)  return { label: 'A', color: '#4ade80', rot: -3 };
+  if (score >= 4)  return { label: 'B', color: '#3b82f6', rot:  4 };
+  if (score >= 3)  return { label: 'C', color: '#f59e0b', rot: -6 };
+  if (score >= 2)  return { label: 'D', color: '#f97316', rot:  3 };
+  return                   { label: 'F', color: '#ef4444', rot: -8 };
+}
+
 // Слегка неровный круг — имитация нарисованного от руки
 const ROUGH_CIRCLE =
-  'M21,4.5 C30.5,3.5 37,11 36.5,20 C36,29.5 29,37 20,36.5 C11,37 3.5,30 4,20.5 C4.5,10.5 11,4 20,4';
+  'M24,6 C34,2 41,12 38,22 C36,33 26,38 14,36 C3,34 -1,26 2,17 C5,8 14,4 23,5 C28,5 34,8 31,14';
 
-function GradeBadge({ score, size = 'sm' }: { score: number; size?: 'xs' | 'sm' | 'lg' }) {
-  const { label, color, rot } = getGrade(score);
+function GradeBadge({ score, size = 'sm', simple = false }: { score: number; size?: 'xs' | 'sm' | 'lg'; simple?: boolean }) {
+  const { label, color, rot } = simple ? getSimpleGrade(score) : getGrade(score);
   const long = label.length > 1;
   return (
     <span
@@ -65,7 +73,7 @@ function GradePicker({ value, onChange }: { value: number; onChange: (v: number)
           onClick={() => onChange(value === v ? 0 : v)}
           title={getGrade(v).label}
         >
-          <GradeBadge score={v} size="sm" />
+          <GradeBadge score={v} size="sm" simple />
           <span className={styles.gpNum}>{v}</span>
         </button>
       ))}
@@ -85,7 +93,7 @@ function RatingItemRow({ item }: { item: IRatingItem }) {
         <div className={styles.ratingItemAvatar}>{name[0]?.toUpperCase() ?? '?'}</div>
         <div className={styles.ratingItemMeta}>
           <span className={styles.ratingItemName}>{name}</span>
-          {item.value > 0 && <GradeBadge score={item.value} size="xs" />}
+          {item.value > 0 && <GradeBadge score={item.value} size="xs" simple />}
         </div>
       </div>
       {item.comment && <p className={styles.ratingItemComment}>{item.comment}</p>}

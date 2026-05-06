@@ -18,7 +18,8 @@
       "Bash(curl -s \"http://92.118.113.6:35028/eList/swagger/v1/swagger.json\" -o \"d:/tmp_swagger.json\")",
       "Bash(rm d:/tmp_swagger.json)",
       "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\Elist\\\\EList.UI\\\\src\\\\app\" -Recurse -Name)",
-      "Bash(Select-String -Pattern \"\\(sidebar|nav|Sidebar|Nav\\)\")"
+      "Bash(Select-String -Pattern \"\\(sidebar|nav|Sidebar|Nav\\)\")",
+      "Bash(xargs grep *)"
     ],
     "additionalDirectories": [
       "d:\\Projects\\eList_Github\\EList.UI"
