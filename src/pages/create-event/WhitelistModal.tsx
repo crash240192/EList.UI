@@ -38,7 +38,7 @@ export function WhitelistModal({ myAccountId, current, listType, onAdd, onClose 
   const [search,      setSearch]      = useState('');
   const [subscribers, setSubscribers] = useState<ISubscriptionItem[]>([]);
   const [total,       setTotal]       = useState(0);
-  const [page,        setPage]        = useState(1);
+  const [page,        setPage]        = useState(0);
   const [loading,     setLoading]     = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [err,         setErr]         = useState<string | null>(null);
@@ -53,8 +53,8 @@ export function WhitelistModal({ myAccountId, current, listType, onAdd, onClose 
     let cancelled = false;
     setLoading(true);
     setErr(null);
-    setPage(1);
-    fetchSubscribers(myAccountId, { name: debouncedSearch || undefined, pageIndex: 1, pageSize: PAGE_SIZE })
+    setPage(0);
+    fetchSubscribers(myAccountId, { name: debouncedSearch || undefined, pageIndex: 0, pageSize: PAGE_SIZE })
       .then(data => {
         if (cancelled) return;
         // Отфильтровываем уже добавленных

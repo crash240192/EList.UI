@@ -11,7 +11,7 @@ import { useEvents } from '@/features/event-list/useEvents';
 import { useFavoritesStore } from '@/app/store';
 import {
   fetchSubscriptionsCount, fetchSubscribersCount,
-  fetchSubscriptions, fetchSubscribers,
+  fetchSubscriptions,
   subscribe, unsubscribe,
   type INotifySettings,
 } from '@/entities/user/subscriptionApi';
@@ -359,12 +359,12 @@ export default function UserPage() {
       )}
       {listModal === 'subscriptions' && (
         <SubscribersListModal title="Подписки"
-          fetchFn={params => fetchSubscriptions(profileAccountId, params)}
+          accountId={profileAccountId} listType="subscriptions"
           currentAccountId={myAccountId} onClose={() => setListModal(null)} />
       )}
       {listModal === 'subscribers' && (
         <SubscribersListModal title="Подписчики"
-          fetchFn={params => fetchSubscribers(profileAccountId, params)}
+          accountId={profileAccountId} listType="subscribers"
           currentAccountId={myAccountId} onClose={() => setListModal(null)} />
       )}
 

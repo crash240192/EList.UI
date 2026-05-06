@@ -235,16 +235,18 @@ export default function CreateEventPage() {
 
   const handleAddToList = async (users: IWhitelistUser[]) => {
     if (isEditing && id) {
-      await addToBWList(listApiType(), id, users.map(u => u.accountId))
-        .catch(() => showToast('❌ Не удалось добавить в список'));
+      try {
+        await addToBWList(listApiType(), id, users.map(u => u.accountId));
+      } catch { return; }
     }
     setCurrentList(prev => [...prev, ...users]);
   };
 
   const handleRemoveFromList = async (accountId: string) => {
     if (isEditing && id) {
-      await removeFromBWList(listApiType(), id, accountId)
-        .catch(() => showToast('❌ Не удалось удалить из списка'));
+      try {
+        await removeFromBWList(listApiType(), id, accountId);
+      } catch { return; }
     }
     setCurrentList(prev => prev.filter(x => x.accountId !== accountId));
   };

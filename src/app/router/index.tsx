@@ -4,7 +4,9 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
-import { setUnauthorizedHandler } from '@/shared/api/client';
+import { setUnauthorizedHandler, setApiErrorHandler } from '@/shared/api/client';
+import { useToastStore } from '@/app/store';
+import { ToastContainer } from '@/shared/ui/Toast/Toast';
 
 const HomePage        = lazy(() => import('@/pages/home/HomePage'));
 const EventPage       = lazy(() => import('@/pages/event/EventPage'));
@@ -59,6 +61,16 @@ setUnauthorizedHandler(() => {
   router.navigate('/login', { replace: true });
 });
 
+// Регистрируем обработчик API-ошибок (success === false с непустым message)
+setApiErrorHandler((message) => {
+  useToastStore.getState().add(message);
+});
+
 export function AppRouter() {
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      <ToastContainer />
+    </>
+  );
 }

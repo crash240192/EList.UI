@@ -36,6 +36,9 @@ export function isAuthenticated(): boolean { return !!getAuthToken(); }
 let onUnauthorized: (() => void) | null = null;
 export function setUnauthorizedHandler(fn: () => void): void { onUnauthorized = fn; }
 
+let onApiError: ((message: string) => void) | null = null;
+export function setApiErrorHandler(fn: (message: string) => void): void { onApiError = fn; }
+
 const REQUEST_TIMEOUT_MS = 30_000; // 30 секунд
 
 function withTimeout<T>(promise: Promise<T>): Promise<T> {
@@ -66,7 +69,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
     }
     if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
     const data: CommandResult<T> = await response.json();
-    if (!data.success) throw new ApiError(data.errorCode ?? 0, data.message ?? 'Ошибка API', data.message);
+    if (!data.success) {
+      const msg = data.message || 'Ошибка API';
+      if (data.message) onApiError?.(data.message);
+      throw new ApiError(data.errorCode ?? 0, msg, data.message);
+    }
     return data;
   });
 

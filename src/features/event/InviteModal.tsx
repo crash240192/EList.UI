@@ -30,7 +30,7 @@ export function InviteModal({ eventId, currentAccountId, onClose, onSent }: Invi
   const [search,      setSearch]      = useState('');
   const [subscribers, setSubscribers] = useState<ISubscriptionItem[]>([]);
   const [total,       setTotal]       = useState(0);
-  const [page,        setPage]        = useState(1);
+  const [page,        setPage]        = useState(0);
   const [loading,     setLoading]     = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selected,    setSelected]    = useState<Set<string>>(new Set());
@@ -46,8 +46,8 @@ export function InviteModal({ eventId, currentAccountId, onClose, onSent }: Invi
     let cancelled = false;
     setLoading(true);
     setErr(null);
-    setPage(1);
-    fetchSubscribers(currentAccountId, { name: debouncedSearch || undefined, pageIndex: 1, pageSize: PAGE_SIZE })
+    setPage(0);
+    fetchSubscribers(currentAccountId, { name: debouncedSearch || undefined, pageIndex: 0, pageSize: PAGE_SIZE })
       .then(data => {
         if (cancelled) return;
         setSubscribers(data.items);

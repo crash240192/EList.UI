@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { ISubscriptionItem, ISubscriptionPage, ISubscriptionSearchParams } from '@/entities/user/subscriptionApi';
+import type { ISubscriptionItem } from '@/entities/user/subscriptionApi';
+import { fetchSubscriptions, fetchSubscribers } from '@/entities/user/subscriptionApi';
 import { useDebounce, useInfiniteScroll } from '@/shared/hooks';
 import { UserChip } from '@/entities/user/ui/UserChip';
 import styles from './SubscribersListModal.module.css';
@@ -10,37 +11,36 @@ import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 const PAGE_SIZE = 20;
 
-type FetchFn = (params: ISubscriptionSearchParams) => Promise<ISubscriptionPage>;
-
 interface Props {
   title: string;
-  fetchFn: FetchFn;
+  accountId: string;
+  listType: 'subscriptions' | 'subscribers';
   currentAccountId: string | null;
   onClose: () => void;
 }
 
-export function SubscribersListModal({ title, fetchFn, currentAccountId, onClose }: Props) {
+export function SubscribersListModal({ title, accountId, listType, currentAccountId, onClose }: Props) {
   useModalBackButton(onClose);
   const navigate = useNavigate();
 
   const [search,      setSearch]      = useState('');
   const [items,       setItems]       = useState<ISubscriptionItem[]>([]);
   const [total,       setTotal]       = useState(0);
-  const [page,        setPage]        = useState(1);
+  const [page,        setPage]        = useState(0);
   const [loading,     setLoading]     = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error,       setError]       = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useDebounce(search, 350);
+  const fetchFn = listType === 'subscriptions' ? fetchSubscriptions : fetchSubscribers;
 
-  // Начальная загрузка и поиск
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    setPage(1);
-    fetchFn({ name: debouncedSearch || undefined, pageIndex: 1, pageSize: PAGE_SIZE })
+    setPage(0);
+    fetchFn(accountId, { name: debouncedSearch || undefined, pageIndex: 0, pageSize: PAGE_SIZE })
       .then(data => {
         if (cancelled) return;
         setItems(data.items);
@@ -49,18 +49,24 @@ export function SubscribersListModal({ title, fetchFn, currentAccountId, onClose
       .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [debouncedSearch, fetchFn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, accountId, listType]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || items.length >= total) return;
     const nextPage = page + 1;
     setLoadingMore(true);
     try {
-      const data = await fetchFn({ name: debouncedSearch || undefined, pageIndex: nextPage, pageSize: PAGE_SIZE });
+      const data = await fetchFn(accountId, {
+        name: debouncedSearch || undefined,
+        pageIndex: nextPage,
+        pageSize: PAGE_SIZE,
+      });
       setItems(prev => [...prev, ...data.items]);
       setPage(nextPage);
     } finally { setLoadingMore(false); }
-  }, [loadingMore, items.length, total, page, debouncedSearch, fetchFn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingMore, items.length, total, page, debouncedSearch, accountId, listType]);
 
   const sentinelRef = useInfiniteScroll(loadMore);
 

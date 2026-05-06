@@ -112,6 +112,27 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   hydrate:          () => set({ token: getAuthToken(), activationRequired: getActivationRequired() }),
 }));
 
+// ---- Toast Store ----
+
+export interface ToastItem { id: number; message: string; type: 'error' | 'success' | 'info'; }
+
+interface ToastState {
+  toasts: ToastItem[];
+  add: (message: string, type?: ToastItem['type']) => void;
+  remove: (id: number) => void;
+}
+
+export const useToastStore = create<ToastState>()((set, get) => ({
+  toasts: [],
+  add: (message, type = 'error') => {
+    if (get().toasts.some(t => t.message === message)) return;
+    const id = Date.now();
+    set(s => ({ toasts: [...s.toasts, { id, message, type }] }));
+    setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 5000);
+  },
+  remove: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
+}));
+
 // ---- Filters Store ----
 
 import type { IEventsSearchParams } from '@/entities/event';

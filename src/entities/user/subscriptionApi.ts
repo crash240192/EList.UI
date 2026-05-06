@@ -68,13 +68,13 @@ export async function fetchSubscriptions(
   accountId: string,
   params?: ISubscriptionSearchParams,
 ): Promise<ISubscriptionPage> {
-  const pageSize  = params?.pageSize  ?? 20;
-  const pageIndex = params?.pageIndex ?? 1;
+  const pageSize  = Math.max(1, params?.pageSize  || 20);
+  const pageIndex = params?.pageIndex ?? 0;
   try {
     const r = await apiClient.post<any>('/api/subscriptions/getSubscriptions', {
       accountId,
       name:      params?.name?.trim() || undefined,
-      pageIndes: pageIndex, // typo in API
+      pageIndex,
       pageSize,
     });
     const paged = r?.result ?? {};
@@ -96,13 +96,13 @@ export async function fetchSubscribers(
   accountId: string,
   params?: ISubscriptionSearchParams,
 ): Promise<ISubscriptionPage> {
-  const pageSize  = params?.pageSize  ?? 20;
-  const pageIndex = params?.pageIndex ?? 1;
+  const pageSize  = Math.max(1, params?.pageSize  || 20);
+  const pageIndex = params?.pageIndex ?? 0;
   try {
     const r = await apiClient.post<any>('/api/subscriptions/getSubscribers', {
       accountId,
       name:      params?.name?.trim() || undefined,
-      pageIndes: pageIndex, // typo in API
+      pageIndex,
       pageSize,
     });
     const paged = r?.result ?? {};
