@@ -15,10 +15,22 @@ export interface ISubscriptionPersonInfo {
   patronymic: string | null;
 }
 
-// Один элемент списка подписок/подписчиков
 export interface ISubscriptionItem {
   account: ISubscriptionAccount;
   personInfo: ISubscriptionPersonInfo | null;
+}
+
+export interface ISubscriptionSearchParams {
+  name?: string;
+  pageIndex?: number;
+  pageSize?: number;
+}
+
+export interface ISubscriptionPage {
+  items: ISubscriptionItem[];
+  total: number;
+  pageIndex: number;
+  pageSize: number;
 }
 
 export interface INotifySettings {
@@ -29,7 +41,7 @@ export interface INotifySettings {
 
 // ---- API ----
 
-/** GET /api/subscriptions/getSubscriptionsCount — кол-во подписок */
+/** GET /api/subscriptions/getSubscriptionsCount */
 export async function fetchSubscriptionsCount(accountId?: string): Promise<number> {
   try {
     const path = accountId
@@ -40,7 +52,7 @@ export async function fetchSubscriptionsCount(accountId?: string): Promise<numbe
   } catch { return 0; }
 }
 
-/** GET /api/subscriptions/getSubscribersCount — кол-во подписчиков */
+/** GET /api/subscriptions/getSubscribersCount */
 export async function fetchSubscribersCount(accountId?: string): Promise<number> {
   try {
     const path = accountId
@@ -51,37 +63,63 @@ export async function fetchSubscribersCount(accountId?: string): Promise<number>
   } catch { return 0; }
 }
 
-/** GET /api/subscriptions/getSubscriptions/{accountId} */
-export async function fetchSubscriptions(accountId: string): Promise<ISubscriptionItem[]> {
+/** POST /api/subscriptions/getSubscriptions */
+export async function fetchSubscriptions(
+  accountId: string,
+  params?: ISubscriptionSearchParams,
+): Promise<ISubscriptionPage> {
+  const pageSize  = params?.pageSize  ?? 20;
+  const pageIndex = params?.pageIndex ?? 1;
   try {
-    const r = await apiClient.get<any>(`/api/subscriptions/getSubscriptions/${accountId}`);
-    const list = r?.result?.result ?? r?.result ?? [];
-    if (!Array.isArray(list)) return [];
-    return list.map((item: any) => {
-      const src = item.subscribedTo ?? item;
-      return { account: src.account, personInfo: src.personInfo ?? null };
+    const r = await apiClient.post<any>('/api/subscriptions/getSubscriptions', {
+      accountId,
+      name:      params?.name?.trim() || undefined,
+      pageIndes: pageIndex, // typo in API
+      pageSize,
     });
-  } catch { return []; }
+    const paged = r?.result ?? {};
+    const list: any[] = paged?.result ?? [];
+    return {
+      items: list.map(item => ({
+        account:    item.subscribedTo?.account    ?? item.account,
+        personInfo: item.subscribedTo?.personInfo ?? item.personInfo ?? null,
+      })),
+      total:     paged?.total     ?? list.length,
+      pageIndex: paged?.pageIndex ?? pageIndex,
+      pageSize:  paged?.pageSize  ?? pageSize,
+    };
+  } catch { return { items: [], total: 0, pageIndex, pageSize }; }
 }
 
-/** GET /api/subscriptions/getSubscribers/{accountId} */
-export async function fetchSubscribers(accountId: string): Promise<ISubscriptionItem[]> {
+/** POST /api/subscriptions/getSubscribers */
+export async function fetchSubscribers(
+  accountId: string,
+  params?: ISubscriptionSearchParams,
+): Promise<ISubscriptionPage> {
+  const pageSize  = params?.pageSize  ?? 20;
+  const pageIndex = params?.pageIndex ?? 1;
   try {
-    const r = await apiClient.get<any>(`/api/subscriptions/getSubscribers/${accountId}`);
-    const list = r?.result?.result ?? r?.result ?? [];
-    if (!Array.isArray(list)) return [];
-    return list.map((item: any) => {
-      const src = item.subscriber ?? item;
-      return { account: src.account, personInfo: src.personInfo ?? null };
+    const r = await apiClient.post<any>('/api/subscriptions/getSubscribers', {
+      accountId,
+      name:      params?.name?.trim() || undefined,
+      pageIndes: pageIndex, // typo in API
+      pageSize,
     });
-  } catch { return []; }
+    const paged = r?.result ?? {};
+    const list: any[] = paged?.result ?? [];
+    return {
+      items: list.map(item => ({
+        account:    item.subscriber?.account    ?? item.account,
+        personInfo: item.subscriber?.personInfo ?? item.personInfo ?? null,
+      })),
+      total:     paged?.total     ?? list.length,
+      pageIndex: paged?.pageIndex ?? pageIndex,
+      pageSize:  paged?.pageSize  ?? pageSize,
+    };
+  } catch { return { items: [], total: 0, pageIndex, pageSize }; }
 }
 
-/**
- * Подписаться + задать настройки уведомлений.
- * 1. GET /api/subscriptions/subscribe/{accountId}
- * 2. PUT /api/subscriptions/update/{accountId}  (с настройками)
- */
+/** Подписаться */
 export async function subscribe(accountId: string, notify: INotifySettings): Promise<void> {
   await apiClient.get(`/api/subscriptions/subscribe/${accountId}`);
   await apiClient.put(`/api/subscriptions/update/${accountId}`, notify);

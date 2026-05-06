@@ -166,9 +166,9 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!profileAccountId || !myAccountId || isOwnProfile) return;
-    fetchSubscriptions(myAccountId)
-      .then(list => {
-        setIsSubscribed(list.some(s => s.account.id === profileAccountId));
+    fetchSubscriptions(myAccountId, { pageSize: 200 })
+      .then(page => {
+        setIsSubscribed(page.items.some((s: { account: { id: string } }) => s.account.id === profileAccountId));
       })
       .catch(() => {});
   }, [profileAccountId, myAccountId, isOwnProfile]);
@@ -358,11 +358,13 @@ export default function UserPage() {
         <SubscribeModal targetLogin={account.login} onConfirm={handleSubscribe} onCancel={() => setShowSubscribe(false)} />
       )}
       {listModal === 'subscriptions' && (
-        <SubscribersListModal title="Подписки" fetchFn={() => fetchSubscriptions(profileAccountId)}
+        <SubscribersListModal title="Подписки"
+          fetchFn={params => fetchSubscriptions(profileAccountId, params)}
           currentAccountId={myAccountId} onClose={() => setListModal(null)} />
       )}
       {listModal === 'subscribers' && (
-        <SubscribersListModal title="Подписчики" fetchFn={() => fetchSubscribers(profileAccountId)}
+        <SubscribersListModal title="Подписчики"
+          fetchFn={params => fetchSubscribers(profileAccountId, params)}
           currentAccountId={myAccountId} onClose={() => setListModal(null)} />
       )}
 

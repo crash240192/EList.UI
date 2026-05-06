@@ -87,6 +87,32 @@ export async function leaveEvent(eventId: string): Promise<void> {
   await apiClient.get(`/api/participations/leave/${eventId}`);
 }
 
+// ---- Чёрный / белый список ----
+
+export type BWListType = 'blackList' | 'whiteList';
+
+export interface IBWListUser {
+  id: string;
+  eventId: string;
+  accountId: string;
+  account: { id: string; login: string; active: boolean };
+  personInfo: { firstName: string | null; lastName: string | null } | null;
+}
+
+export async function getBWList(listType: BWListType, eventId: string, pageSize = 100): Promise<IBWListUser[]> {
+  const data = await apiClient.get<any>(`/api/participations/${listType}/${eventId}?pageIndex=1&pageSize=${pageSize}`);
+  return data?.result?.result ?? [];
+}
+
+export async function addToBWList(listType: BWListType, eventId: string, accountIds: string[]): Promise<void> {
+  if (accountIds.length === 0) return;
+  await apiClient.post(`/api/participations/${listType}/addUsers`, { eventId, accountIds });
+}
+
+export async function removeFromBWList(listType: BWListType, eventId: string, accountId: string): Promise<void> {
+  await apiClient.delete(`/api/participations/${listType}/deleteUser?eventId=${eventId}&accountId=${accountId}`);
+}
+
 /**
  * GET /api/events/eventTypes/byEvent/{eventId}
  */

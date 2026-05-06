@@ -10,7 +10,16 @@
       "Bash(sed -n '35,47p' \"c:/projects/eList/EList.UI/src/features/event/ParticipantsModal.tsx\")",
       "Bash(sed -n '16,20p' \"c:/projects/eList/EList.UI/src/shared/ui/AvatarLightbox/AvatarLightbox.tsx\")",
       "Bash(sed -n '12,14p' \"c:/projects/eList/EList.UI/src/shared/ui/CityConfirmDialog/CityConfirmDialog.tsx\")",
-      "Bash(sed -n '11,13p' \"c:/projects/eList/EList.UI/src/shared/ui/LogoutConfirmModal/LogoutConfirmModal.tsx\")"
+      "Bash(sed -n '11,13p' \"c:/projects/eList/EList.UI/src/shared/ui/LogoutConfirmModal/LogoutConfirmModal.tsx\")",
+      "Bash(curl -s \"http://92.118.113.6:35028/eList/swagger/v1/swagger.json\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); paths={k:v for k,v in d['paths'].items\\(\\) if 'participation' in k.lower\\(\\) or 'Participation' in k}; print\\(json.dumps\\(paths, ensure_ascii=False, indent=2\\)\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(del \"d:\\\\Projects\\\\eList_Github\\\\EList.UI\\\\.swagger_cache.json\")",
+      "Bash(curl -s \"http://92.118.113.6:35028/eList/swagger/v1/swagger.json\" -o \"d:/tmp_swagger.json\")",
+      "Bash(rm d:/tmp_swagger.json)"
+    ],
+    "additionalDirectories": [
+      "d:\\Projects\\eList_Github\\EList.UI"
     ]
   }
 }

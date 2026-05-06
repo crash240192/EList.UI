@@ -133,6 +133,11 @@
 }
 .sendBtn:hover:not(:disabled) { background: var(--accent-hover, #4f46e5); }
 .sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.loadMore {
+  text-align: center; padding: 12px;
+  font-size: 12px; color: var(--text-muted); cursor: pointer;
+}
+.loadMore:hover { color: var(--text-secondary); }
 .sentMsg {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; font-weight: 500; color: var(--success); flex: 1;

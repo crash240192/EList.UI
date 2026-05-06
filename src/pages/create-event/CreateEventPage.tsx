@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchEventById, fetchEventTypes as fetchAllEventTypes, MOCK_EVENTS } from '@/entities/event';
 import type { IEventType } from '@/entities/event';
-import { fetchEventTypesByEvent } from '@/entities/event/participationApi';
+import { fetchEventTypesByEvent, getBWList, addToBWList, removeFromBWList, type BWListType } from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { useAccountId } from '@/features/auth/useAccountId';
@@ -100,7 +100,8 @@ export default function CreateEventPage() {
   const [durationM, setDurationM] = useState('0');
   const [albums,    setAlbums]    = useState<IAlbum[]>([]);
   const [whitelist, setWhitelist] = useState<IWhitelistUser[]>([]);
-  const [whitelistModalOpen, setWhitelistModalOpen] = useState(false);
+  const [blacklist, setBlacklist] = useState<IWhitelistUser[]>([]);
+  const [listModalOpen, setListModalOpen] = useState(false);
 
   // Кошелёк / тариф
   const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
@@ -152,6 +153,15 @@ export default function CreateEventPage() {
       : fetchEventById(id!);
     const loadTypes = USE_MOCK ? Promise.resolve([]) : fetchEventTypesByEvent(id!);
 
+    const mapBWList = (items: Awaited<ReturnType<typeof getBWList>>): IWhitelistUser[] =>
+      items.map(item => ({
+        accountId: item.accountId,
+        login:     item.account.login,
+        firstName: item.personInfo?.firstName ?? null,
+        lastName:  item.personInfo?.lastName  ?? null,
+        avatarFileId: null,
+      }));
+
     Promise.all([loadEvent, loadTypes]).then(([ev, evTypes]) => {
       const toDate = (s: string) => s.slice(0, 10);
       const toTime = (s: string) => s.slice(11, 16);
@@ -185,6 +195,10 @@ export default function CreateEventPage() {
         } else { setEndMode('multiday'); }
       }
 
+      // Загружаем обе очереди списков — какая окажется нужной, зависит от isPrivate
+      getBWList('blackList', id!).then(items => setBlacklist(mapBWList(items))).catch(() => {});
+      getBWList('whiteList',  id!).then(items => setWhitelist(mapBWList(items))).catch(() => {});
+
       if (evTypes.length > 0) {
         setSelectedTypes(evTypes.map(t => t.id));
         setSelectedCategories([...new Set(evTypes.map(t =>
@@ -211,6 +225,29 @@ export default function CreateEventPage() {
 
   const hasErr = (f: FieldError) => fieldErrors.has(f);
   const typeCount = selectedCategories.length + selectedTypes.length;
+
+  // Хелперы для работы со списком участников
+  const listApiType = (): BWListType => form.isPrivate ? 'whiteList' : 'blackList';
+  const currentList  = form.isPrivate ? whitelist : blacklist;
+  const setCurrentList = form.isPrivate
+    ? (fn: (prev: IWhitelistUser[]) => IWhitelistUser[]) => setWhitelist(fn)
+    : (fn: (prev: IWhitelistUser[]) => IWhitelistUser[]) => setBlacklist(fn);
+
+  const handleAddToList = async (users: IWhitelistUser[]) => {
+    if (isEditing && id) {
+      await addToBWList(listApiType(), id, users.map(u => u.accountId))
+        .catch(() => showToast('❌ Не удалось добавить в список'));
+    }
+    setCurrentList(prev => [...prev, ...users]);
+  };
+
+  const handleRemoveFromList = async (accountId: string) => {
+    if (isEditing && id) {
+      await removeFromBWList(listApiType(), id, accountId)
+        .catch(() => showToast('❌ Не удалось удалить из списка'));
+    }
+    setCurrentList(prev => prev.filter(x => x.accountId !== accountId));
+  };
 
   // Чипы выбранных типов
   const selectedTypeObjects = allTypes.filter(t => selectedTypes.includes(t.id));
@@ -331,6 +368,17 @@ export default function CreateEventPage() {
         // Привязываем альбомы к созданному событию
         if (newEventId && albums.length > 0) {
           await Promise.allSettled(albums.map(a => assignAlbumToEvent(newEventId, a.id)));
+        }
+        // Сохраняем чёрный/белый список
+        if (newEventId) {
+          const listUsers = form.isPrivate ? whitelist : blacklist;
+          if (listUsers.length > 0) {
+            await addToBWList(
+              form.isPrivate ? 'whiteList' : 'blackList',
+              newEventId,
+              listUsers.map(u => u.accountId)
+            ).catch(() => {});
+          }
         }
         if (newEventId && accountId) {
           setCreatedEventId(newEventId);
@@ -637,31 +685,34 @@ export default function CreateEventPage() {
               />
             </div>
 
-            {/* Белый список — только для приватных */}
-            {form.isPrivate && canSetPrivate && (
+            {/* Список участников: чёрный (по умолчанию) или белый (для приватных) */}
+            {(!form.isPrivate || canSetPrivate) && (
               <div className={styles.whitelist}>
                 <div className={styles.whitelistHeader}>
                   <div className={styles.whitelistTitle}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    Белый список участников
+                    {form.isPrivate ? 'Белый список участников' : 'Чёрный список участников'}
                   </div>
-                  <button className={styles.whitelistAdd} onClick={() => setWhitelistModalOpen(true)}>
+                  <button className={styles.whitelistAdd} onClick={() => setListModalOpen(true)}>
                     + Добавить
                   </button>
                 </div>
-                <p className={styles.whitelistHint}>Только эти пользователи смогут записаться на мероприятие</p>
+                <p className={styles.whitelistHint}>
+                  {form.isPrivate
+                    ? 'Только эти пользователи смогут записаться на мероприятие'
+                    : 'Эти пользователи не смогут записаться на мероприятие'}
+                </p>
 
-                {/* Список добавленных */}
-                {whitelist.length > 0 && (
+                {currentList.length > 0 && (
                   <div className={styles.whitelistList}>
-                    {whitelist.map(u => {
+                    {currentList.map(u => {
                       const name = u.firstName ? `${u.firstName} ${u.lastName ?? ''}`.trim() : u.login;
                       return (
                         <div key={u.accountId} className={styles.whitelistChip}>
                           <span className={styles.whitelistChipName}>{name}</span>
                           <span className={styles.whitelistChipLogin}>@{u.login}</span>
                           <button className={styles.whitelistChipRemove}
-                            onClick={() => setWhitelist(w => w.filter(x => x.accountId !== u.accountId))}>
+                            onClick={() => handleRemoveFromList(u.accountId)}>
                             ×
                           </button>
                         </div>
@@ -816,13 +867,14 @@ export default function CreateEventPage() {
         />
       )}
 
-      {/* Белый список */}
-      {whitelistModalOpen && accountId && (
+      {/* Список участников (чёрный или белый) */}
+      {listModalOpen && accountId && (
         <WhitelistModal
           myAccountId={accountId}
-          current={whitelist}
-          onAdd={users => setWhitelist(w => [...w, ...users])}
-          onClose={() => setWhitelistModalOpen(false)}
+          current={currentList}
+          listType={form.isPrivate ? 'whitelist' : 'blacklist'}
+          onAdd={handleAddToList}
+          onClose={() => setListModalOpen(false)}
         />
       )}
 

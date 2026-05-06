@@ -116,6 +116,12 @@
   font-size: 13px; color: var(--danger);
 }
 
+.loadMore {
+  text-align: center; padding: 12px;
+  font-size: 12px; color: var(--text-muted); cursor: pointer;
+}
+.loadMore:hover { color: var(--text-secondary); }
+
 /* Футер */
 .footer {
   display: flex; align-items: center; gap: 8px; justify-content: flex-end;
