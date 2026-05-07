@@ -107,6 +107,14 @@
 .name { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .login { font-size: 11px; color: var(--text-secondary); }
 
+.itemDisabled { cursor: default; opacity: 0.65; }
+.itemDisabled:hover { background: transparent; }
+.orgBadge {
+  font-size: 10px; font-weight: 500; color: var(--text-muted);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
+}
+
 .empty {
   padding: 32px 16px; text-align: center;
   font-size: 13px; color: var(--text-muted);

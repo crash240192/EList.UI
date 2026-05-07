@@ -143,8 +143,8 @@
 .tagAge     { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:600; backdrop-filter:blur(6px); background:rgba(239,68,68,.6); color:#fff; border:.5px solid rgba(239,68,68,.4); }
 .tagPrivate { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); background:rgba(0,0,0,.35); color:#fff; border:.5px solid rgba(255,255,255,.2); display:inline-flex; align-items:center; gap:4px; }
 
-/* Mobile dots menu */
-.mobileMenuWrap { position:relative; display:none; }
+/* Dots menu (organizer controls) */
+.mobileMenuWrap { position:relative; }
 .mobileMenuBackdrop { position:fixed; inset:0; z-index:200; }
 .mobileMenu {
   position:absolute; top:calc(100% + 8px); right:0;
@@ -161,8 +161,6 @@
 .priceAndFill { display:flex; flex-direction:column; gap:10px; }
 
 @media (max-width:680px) {
-  .mobileMenuWrap { display:block; }
-  .mgmtSection { display:none; }
   .priceAndFill { flex-direction:row; align-items:flex-start; gap:12px; }
   .priceAndFill > * { flex:1; }
   .mapBlock { height:175px; }

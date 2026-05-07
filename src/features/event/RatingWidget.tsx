@@ -123,12 +123,14 @@ function RatingModal({ eventId, ratingType, accountId, initialData, onClose, onD
   const [loading,     setLoading]     = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showForm,    setShowForm]    = useState(false);
+  const [editingId,   setEditingId]   = useState<string | null>(null);
   const [voteValue,   setVoteValue]   = useState(0);
   const [comment,     setComment]     = useState('');
   const [submitting,  setSubmitting]  = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const voted = !!accountId && data.items.some(i => i.accountId === accountId);
+  const myItem = accountId ? data.items.find(i => i.accountId === accountId) ?? null : null;
+  const voted = !!myItem;
   const score = data.resultRating;
   const hasMore = data.items.length < data.total;
 
@@ -162,23 +164,42 @@ function RatingModal({ eventId, ratingType, accountId, initialData, onClose, onD
     finally { setLoadingMore(false); }
   }, [eventId, ratingType, pageIndex]);
 
+  const handleEdit = useCallback(() => {
+    if (!myItem) return;
+    setVoteValue(myItem.value);
+    setComment(myItem.comment);
+    setEditingId(myItem.id);
+    setShowForm(true);
+  }, [myItem]);
+
+  const handleCancel = useCallback(() => {
+    setShowForm(false);
+    setEditingId(null);
+    setVoteValue(0);
+    setComment('');
+    setSubmitError(null);
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     if (!accountId || voteValue === 0) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await voteEventRating({ accountId, eventId, comment, value: voteValue, ratingType });
+      await voteEventRating({ id: editingId ?? undefined, accountId, eventId, comment, value: voteValue, ratingType });
       const updated = await fetchEventRating(eventId, ratingType, 0, PAGE_SIZE);
       setData(updated);
       setPageIndex(1);
       onDataUpdate(updated);
       setShowForm(false);
+      setEditingId(null);
+      setVoteValue(0);
+      setComment('');
     } catch (e: any) {
       setSubmitError(e?.serverMessage ?? e?.message ?? 'Ошибка при отправке');
     } finally {
       setSubmitting(false);
     }
-  }, [accountId, eventId, comment, voteValue, ratingType, onDataUpdate]);
+  }, [accountId, eventId, comment, voteValue, ratingType, editingId, onDataUpdate]);
 
   return (
     <>
@@ -223,15 +244,16 @@ function RatingModal({ eventId, ratingType, accountId, initialData, onClose, onD
 
         {accountId && (
           <div className={styles.modalFooter}>
-            {voted ? (
-              <div className={styles.votedBadge}>✓ Вы уже оценили это мероприятие</div>
-            ) : !showForm ? (
-              <button className={styles.leaveReviewBtn} onClick={() => setShowForm(true)}>
-                Оставить отзыв
+            {!showForm ? (
+              <button
+                className={styles.leaveReviewBtn}
+                onClick={voted ? handleEdit : () => setShowForm(true)}
+              >
+                {voted ? 'Редактировать отзыв' : 'Оставить отзыв'}
               </button>
             ) : (
               <div className={styles.voteForm}>
-                <div className={styles.voteFormLabel}>Ваша оценка</div>
+                <div className={styles.voteFormLabel}>{editingId ? 'Редактировать оценку' : 'Ваша оценка'}</div>
                 <GradePicker value={voteValue} onChange={setVoteValue} />
                 <textarea
                   className={styles.commentArea}
@@ -243,13 +265,13 @@ function RatingModal({ eventId, ratingType, accountId, initialData, onClose, onD
                 />
                 {submitError && <div className={styles.voteError}>{submitError}</div>}
                 <div className={styles.voteFormBtns}>
-                  <button className={styles.cancelBtn} onClick={() => setShowForm(false)}>Отмена</button>
+                  <button className={styles.cancelBtn} onClick={handleCancel}>Отмена</button>
                   <button
                     className={styles.submitBtn}
                     disabled={voteValue === 0 || submitting}
                     onClick={handleSubmit}
                   >
-                    {submitting ? 'Отправка...' : 'Отправить'}
+                    {submitting ? 'Отправка...' : editingId ? 'Сохранить' : 'Отправить'}
                   </button>
                 </div>
               </div>

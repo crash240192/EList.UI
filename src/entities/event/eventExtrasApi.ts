@@ -16,6 +16,32 @@ export interface IEventParameters {
   allowUsersToInvite: boolean;
 }
 
+export interface IAssignEventParametersRequest {
+  cost: number;
+  private: boolean;
+  maxPersonsCount?: number | null;
+  ageLimit?: number | null;
+  allowedGender?: Gender | null;
+  allowUsersToInvite: boolean;
+}
+
+/**
+ * POST /api/events/eventParameters/assignToEvent/{eventId}
+ */
+export async function assignEventParameters(
+  eventId: string,
+  payload: IAssignEventParametersRequest,
+): Promise<void> {
+  await apiClient.post(`/api/events/eventParameters/assignToEvent/${eventId}`, payload);
+}
+
+/**
+ * POST /api/EventOrganizators/assign/{eventId}
+ */
+export async function assignEventOrganizators(eventId: string, accountIds: string[]): Promise<void> {
+  await apiClient.post(`/api/EventOrganizators/assign/${eventId}`, accountIds);
+}
+
 /**
  * GET /api/events/eventParameters/byEvent/{eventId}
  */

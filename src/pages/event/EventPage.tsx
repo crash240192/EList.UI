@@ -15,6 +15,7 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserChip } from '@/entities/user/ui/UserChip';
 import { ParticipantsModal } from '@/features/event/ParticipantsModal';
 import { InviteModal } from '@/features/event/InviteModal';
+import { AddOrganizerModal } from '@/features/event/AddOrganizerModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { RatingWidget } from '@/features/event/RatingWidget';
@@ -48,6 +49,7 @@ export default function EventPage() {
   const [descExpanded,  setDescExpanded]  = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
   const isOrganizer     = !!accountId && organizers.some(o => o.accountId === accountId);
@@ -164,7 +166,7 @@ export default function EventPage() {
                       <div className={styles.mobileMenuBackdrop} onClick={() => setMobileMenuOpen(false)} />
                       <div className={styles.mobileMenu}>
                         <button className={styles.mobileMenuItem} onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>✏️ Редактировать</button>
-                        <button className={styles.mobileMenuItem}>👥 Добавить организатора</button>
+                        <button className={styles.mobileMenuItem} onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>👥 Добавить организатора</button>
                         {event.parameters?.private && <button className={styles.mobileMenuItem}>✅ Белый список</button>}
                         {event.active && (
                           <button className={`${styles.mobileMenuItem} ${styles.mobileMenuItemDanger}`}
@@ -224,14 +226,10 @@ export default function EventPage() {
                 </svg>
               </button>
             )}
-            {isOrganizer ? (
-              <button className={styles.btnJoin} onClick={() => navigate(`/edit-event/${event.id}`)}>Редактировать</button>
-            ) : (
-              <button className={`${styles.btnJoin} ${isParticipating ? styles.btnLeave : ''}`}
-                onClick={handleParticipate} disabled={actionLoading || !accountId}>
-                {actionLoading ? '...' : isParticipating ? 'Покинуть' : 'Участвовать'}
-              </button>
-            )}
+            <button className={`${styles.btnJoin} ${isParticipating ? styles.btnLeave : ''}`}
+              onClick={handleParticipate} disabled={actionLoading || !accountId || isOrganizer}>
+              {actionLoading ? '...' : isParticipating ? 'Покинуть' : 'Участвовать'}
+            </button>
           </div>
         </div>
 
@@ -329,21 +327,6 @@ export default function EventPage() {
               </div>
             )}
 
-            {/* Управление */}
-            {isOrganizer && (
-              <div className={styles.mgmtSection}>
-                <div className={styles.secLabel}>Управление</div>
-                <div className={styles.mgmtBtns}>
-                  <button className={styles.mgmtBtn}>👥 Добавить организатора</button>
-                  {event.parameters?.private && <button className={styles.mgmtBtn}>✅ Белый список</button>}
-                  {event.active && (
-                    <button className={`${styles.mgmtBtn} ${styles.mgmtBtnDanger}`} onClick={() => setCancelConfirm(true)}>
-                      ❌ Отменить мероприятие
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* ── Правая панель ── */}
@@ -414,6 +397,15 @@ export default function EventPage() {
       )}
       {inviteModalOpen && accountId && event?.id && (
         <InviteModal eventId={event.id} currentAccountId={accountId} onClose={() => setInviteModalOpen(false)} />
+      )}
+      {addOrgModalOpen && accountId && id && (
+        <AddOrganizerModal
+          eventId={id}
+          currentAccountId={accountId}
+          existingOrganizerIds={new Set(organizers.map(o => o.accountId))}
+          onClose={() => setAddOrgModalOpen(false)}
+          onSuccess={() => fetchEventOrganizators(id).then(setOrganizers)}
+        />
       )}
     </div>
   );
