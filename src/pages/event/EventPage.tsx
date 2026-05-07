@@ -16,6 +16,7 @@ import { UserChip } from '@/entities/user/ui/UserChip';
 import { ParticipantsModal } from '@/features/event/ParticipantsModal';
 import { InviteModal } from '@/features/event/InviteModal';
 import { AddOrganizerModal } from '@/features/event/AddOrganizerModal';
+import { BWListModal } from '@/features/event/BWListModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { RatingWidget } from '@/features/event/RatingWidget';
@@ -50,6 +51,7 @@ export default function EventPage() {
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
+  const [bwListOpen,      setBwListOpen]      = useState(false);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
   const isOrganizer     = !!accountId && organizers.some(o => o.accountId === accountId);
@@ -167,7 +169,9 @@ export default function EventPage() {
                       <div className={styles.mobileMenu}>
                         <button className={styles.mobileMenuItem} onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>✏️ Редактировать</button>
                         <button className={styles.mobileMenuItem} onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>👥 Добавить организатора</button>
-                        {event.parameters?.private && <button className={styles.mobileMenuItem}>✅ Белый список</button>}
+                        <button className={styles.mobileMenuItem} onClick={() => { setBwListOpen(true); setMobileMenuOpen(false); }}>
+                          {event.parameters?.private ? '✅ Белый список' : '⛔ Черный список'}
+                        </button>
                         {event.active && (
                           <button className={`${styles.mobileMenuItem} ${styles.mobileMenuItemDanger}`}
                             onClick={() => { setCancelConfirm(true); setMobileMenuOpen(false); }}>
@@ -405,6 +409,13 @@ export default function EventPage() {
           existingOrganizerIds={new Set(organizers.map(o => o.accountId))}
           onClose={() => setAddOrgModalOpen(false)}
           onSuccess={() => fetchEventOrganizators(id).then(setOrganizers)}
+        />
+      )}
+      {bwListOpen && id && (
+        <BWListModal
+          eventId={id}
+          listType={event.parameters?.private ? 'whiteList' : 'blackList'}
+          onClose={() => setBwListOpen(false)}
         />
       )}
     </div>
