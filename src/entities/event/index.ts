@@ -41,10 +41,12 @@ export type { IParticipant, IParticipantView, IParticipantAccount, IParticipantP
 
 export {
   fetchEventParameters,
+  assignEventParameters,
+  assignEventOrganizators,
   fetchEventOrganizators,
 } from './eventExtrasApi';
 
-export type { IEventParameters, IEventOrganizator } from './eventExtrasApi';
+export type { IEventParameters, IEventOrganizator, IAssignEventParametersRequest } from './eventExtrasApi';
 
 export {
   fetchEventRating,

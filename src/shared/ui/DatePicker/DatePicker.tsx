@@ -19,6 +19,15 @@ interface DatePickerProps {
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
                  'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+function nextFiveMinuteSlot(now: Date): { h: string; m: string } {
+  const totalMins = now.getHours() * 60 + now.getMinutes() + 1; // +1 гарантирует будущее
+  const rounded = Math.ceil(totalMins / 5) * 5;
+  return {
+    h: String(Math.floor(rounded / 60) % 24).padStart(2, '0'),
+    m: String(rounded % 60).padStart(2, '0'),
+  };
+}
 const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
@@ -51,24 +60,30 @@ function toISO(date: Date, withTime: boolean): string {
 }
 
 // Колесо прокрутки для выбора часов/минут
-function TimeWheel({ items, selected, onSelect }: {
+function TimeWheel({ items, selected, onSelect, open }: {
   items: string[];
   selected: string;
   onSelect: (v: string) => void;
+  open?: boolean;
 }) {
   const ITEM_H = 36;
   const VISIBLE = 5;
   const listRef = useRef<HTMLDivElement>(null);
   const settleTimer = useRef<ReturnType<typeof setTimeout>>();
+  const rafRef = useRef<number>(0);
   const [idx, setIdx] = useState(() => Math.max(0, items.indexOf(selected)));
 
   useEffect(() => {
     const i = Math.max(0, items.indexOf(selected));
     setIdx(i);
-    if (listRef.current) {
-      listRef.current.scrollTop = i * ITEM_H;
-    }
-  }, [selected, items]);
+    // rAF гарантирует, что display:block уже применён до установки scrollTop
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      if (listRef.current) listRef.current.scrollTop = i * ITEM_H;
+    });
+    return () => cancelAnimationFrame(rafRef.current);
+  // open в deps: при открытии попапа эффект пересчитывается даже если selected не менялся
+  }, [selected, items, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollToIdx = useCallback((i: number) => {
     const clamped = Math.max(0, Math.min(items.length - 1, i));
@@ -134,13 +149,13 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   });
   const [viewMonth, setViewMonth] = useState(() => parsed?.getMonth() ?? nowDefault.getMonth());
   const [selDate,   setSelDate]   = useState<Date | null>(parsed ?? (withTime ? new Date(nowDefault) : null));
-  const [timeH, setTimeH] = useState(() =>
-    parsed ? String(parsed.getHours()).padStart(2, '0')
-    : String(nowDefault.getHours()).padStart(2, '0')
-  );
+  const [timeH, setTimeH] = useState(() => {
+    if (parsed) return String(parsed.getHours()).padStart(2, '0');
+    return nextFiveMinuteSlot(nowDefault).h;
+  });
   const [timeM, setTimeM] = useState(() => {
-    if (parsed) return String(Math.round(parsed.getMinutes() / 5) * 5).padStart(2, '0');
-    return String(Math.round(nowDefault.getMinutes() / 5) * 5).padStart(2, '0');
+    if (parsed) return String(Math.round(parsed.getMinutes() / 5) * 5 % 60).padStart(2, '0');
+    return nextFiveMinuteSlot(nowDefault).m;
   });
 
   // Свайп месяцев
@@ -161,8 +176,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     const fn = (e: MouseEvent) => {
       const target = e.target as Node;
       if (wrapRef.current && !wrapRef.current.contains(target)) {
-        const popup = document.querySelector('[data-datepicker-popup]');
-        if (!popup || !popup.contains(target)) setOpen(false);
+        if (!popupRef.current || !popupRef.current.contains(target)) setOpen(false);
       }
     };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
@@ -243,6 +257,9 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
 
   const handleSelect = (day: number) => {
     const d = new Date(viewYear, viewMonth, day);
+    if (withTime) {
+      d.setHours(parseInt(timeH, 10), parseInt(timeM, 10), 0, 0);
+    }
     setSelDate(d);
     if (!withTime) {
       onChange(toISO(d, false));
@@ -277,7 +294,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
 
   const today = new Date();
   const isToday    = (d: number) => d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
-  const isSelected = (d: number) => selDate ? (d === selDate.getDate() && viewMonth === selDate.getMonth() && viewYear === selDate.getFullYear()) : false;
+  const effectiveSel = selDate ?? (withTime ? today : null);
+  const isSelected = (d: number) => effectiveSel
+    ? d === effectiveSel.getDate() && viewMonth === effectiveSel.getMonth() && viewYear === effectiveSel.getFullYear()
+    : false;
   const isDisabled = (d: number) => {
     const dt = new Date(viewYear, viewMonth, d); // локальное время
     if (min) {
@@ -298,7 +318,14 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const isSameDayAsMin = selDate && min
     ? (() => { const [y,m,d] = min.split('-').map(Number); return selDate.getFullYear()===y && selDate.getMonth()===m-1 && selDate.getDate()===d; })()
     : false;
-  const [minH, minM] = (isSameDayAsMin && minTime) ? minTime.split(':').map(Number) : [0, 0];
+  // Автоматически ограничиваем время текущим моментом, если выбран сегодняшний день и min = сегодня
+  const todayIso = toISO(today, false);
+  const effectiveMinTime = minTime ?? (
+    isSameDayAsMin && min === todayIso
+      ? `${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')}`
+      : undefined
+  );
+  const [minH, minM] = (isSameDayAsMin && effectiveMinTime) ? effectiveMinTime.split(':').map(Number) : [0, 0];
   const availableHours   = HOURS.filter(h => !isSameDayAsMin || parseInt(h) >= minH);
   const availableMinutes = MINUTES.filter(m2 => !isSameDayAsMin || parseInt(timeH) > minH || parseInt(m2) >= minM);
   const minYear = min ? parseInt(min.slice(0, 4)) : 1900;
@@ -408,9 +435,9 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
         <div className={styles.timePicker}>
           <span className={styles.timeLabel}>Время</span>
           <div className={styles.timeWheels}>
-            <TimeWheel items={availableHours}   selected={timeH} onSelect={setTimeH} />
+            <TimeWheel items={availableHours}   selected={timeH} onSelect={setTimeH} open={open} />
             <span className={styles.timeSep}>:</span>
-            <TimeWheel items={availableMinutes} selected={timeM} onSelect={setTimeM} />
+            <TimeWheel items={availableMinutes} selected={timeM} onSelect={setTimeM} open={open} />
           </div>
         </div>
       )}
@@ -418,7 +445,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       {/* Кнопки подтверждения */}
       <div className={styles.footer}>
         <button type="button" className={styles.cancelBtn} onClick={() => setOpen(false)}>Отмена</button>
-        <button type="button" className={styles.okBtn} onClick={withTime ? handleConfirm : () => setOpen(false)} disabled={!selDate}>
+        <button type="button" className={styles.okBtn} onClick={withTime ? handleConfirm : () => setOpen(false)} disabled={!withTime && !selDate}>
           {withTime ? 'Выбрать' : 'OK'}
         </button>
       </div>

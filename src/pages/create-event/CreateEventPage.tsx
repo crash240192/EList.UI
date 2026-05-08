@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchEventById, fetchEventTypes as fetchAllEventTypes, MOCK_EVENTS } from '@/entities/event';
+import { fetchEventById, fetchEventTypes as fetchAllEventTypes, MOCK_EVENTS, assignEventParameters } from '@/entities/event';
 import type { IEventType } from '@/entities/event';
-import { fetchEventTypesByEvent, getBWList, addToBWList, removeFromBWList, type BWListType } from '@/entities/event/participationApi';
+import { fetchEventTypesByEvent, getBWList, addToBWList, removeFromBWList, type BWListType, type IBWListUser } from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { useAccountId } from '@/features/auth/useAccountId';
@@ -111,13 +111,14 @@ export default function CreateEventPage() {
   const { toast, show: showToast } = useToast();
 
   // Refs
-  const nameRef      = useRef<HTMLInputElement>(null);
-  const typeRef      = useRef<HTMLDivElement>(null);
-  const locationRef  = useRef<HTMLDivElement>(null);
-  const startDateRef = useRef<HTMLInputElement>(null);
-  const startTimeRef = useRef<HTMLInputElement>(null);
-  const endDateRef   = useRef<HTMLInputElement>(null);
-  const endTimeRef   = useRef<HTMLInputElement>(null);
+  const nameRef          = useRef<HTMLInputElement>(null);
+  const typeRef          = useRef<HTMLDivElement>(null);
+  const locationRef      = useRef<HTMLDivElement>(null);
+  const startDateRef     = useRef<HTMLInputElement>(null);
+  const startTimeRef     = useRef<HTMLInputElement>(null);
+  const endDateRef       = useRef<HTMLInputElement>(null);
+  const endTimeRef       = useRef<HTMLInputElement>(null);
+  const loadedBWListsRef = useRef<Set<BWListType>>(new Set());
 
   // Загрузка кошелька и тарифа
   useEffect(() => {
@@ -153,15 +154,6 @@ export default function CreateEventPage() {
       : fetchEventById(id!);
     const loadTypes = USE_MOCK ? Promise.resolve([]) : fetchEventTypesByEvent(id!);
 
-    const mapBWList = (items: Awaited<ReturnType<typeof getBWList>>): IWhitelistUser[] =>
-      items.map(item => ({
-        accountId: item.accountId,
-        login:     item.account.login,
-        firstName: item.personInfo?.firstName ?? null,
-        lastName:  item.personInfo?.lastName  ?? null,
-        avatarFileId: null,
-      }));
-
     Promise.all([loadEvent, loadTypes]).then(([ev, evTypes]) => {
       const toDate = (s: string) => s.slice(0, 10);
       const toTime = (s: string) => s.slice(11, 16);
@@ -195,9 +187,14 @@ export default function CreateEventPage() {
         } else { setEndMode('multiday'); }
       }
 
-      // Загружаем обе очереди списков — какая окажется нужной, зависит от isPrivate
-      getBWList('blackList', id!).then(items => setBlacklist(mapBWList(items))).catch(() => {});
-      getBWList('whiteList',  id!).then(items => setWhitelist(mapBWList(items))).catch(() => {});
+      // Загружаем только нужный список при открытии
+      const neededList: BWListType = (ev.parameters?.private ?? false) ? 'whiteList' : 'blackList';
+      loadedBWListsRef.current.add(neededList);
+      getBWList(neededList, id!).then(items => {
+        const mapped = mapBWListItems(items);
+        if (neededList === 'blackList') setBlacklist(mapped);
+        else setWhitelist(mapped);
+      }).catch(() => { loadedBWListsRef.current.delete(neededList); });
 
       if (evTypes.length > 0) {
         setSelectedTypes(evTypes.map(t => t.id));
@@ -225,6 +222,28 @@ export default function CreateEventPage() {
 
   const hasErr = (f: FieldError) => fieldErrors.has(f);
   const typeCount = selectedCategories.length + selectedTypes.length;
+
+  const mapBWListItems = (items: IBWListUser[]): IWhitelistUser[] =>
+    items.map(item => ({
+      accountId:    item.accountId,
+      login:        item.account.login,
+      firstName:    item.personInfo?.firstName ?? null,
+      lastName:     item.personInfo?.lastName  ?? null,
+      avatarFileId: null,
+    }));
+
+  const ensureBWListLoaded = useCallback(async (listType: BWListType) => {
+    if (!id || loadedBWListsRef.current.has(listType)) return;
+    loadedBWListsRef.current.add(listType);
+    try {
+      const items = await getBWList(listType, id);
+      const mapped = mapBWListItems(items);
+      if (listType === 'blackList') setBlacklist(mapped);
+      else setWhitelist(mapped);
+    } catch {
+      loadedBWListsRef.current.delete(listType);
+    }
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Хелперы для работы со списком участников
   const listApiType = (): BWListType => form.isPrivate ? 'whiteList' : 'blackList';
@@ -342,7 +361,15 @@ export default function CreateEventPage() {
           ...(coverUrl ? { coverUrl } : {}),
           ...(coverImageId ? { coverImageId } : {}),
         });
-        navigate('/my-events');
+        await assignEventParameters(id!, {
+          cost:               parseFloat(form.cost) || 0,
+          private:            form.isPrivate,
+          maxPersonsCount:    form.maxPersons ? parseInt(form.maxPersons) : null,
+          ageLimit:           form.ageLimit   ? parseInt(form.ageLimit)   : null,
+          allowedGender:      form.allowedGender || null,
+          allowUsersToInvite: form.allowUsersToInvite,
+        });
+        navigate(`/event/${id}`);
       } else {
         const accountId = await getOrFetchAccountId();
         const createResult = await apiClient.post<string>('/api/events/create', {
@@ -670,7 +697,10 @@ export default function CreateEventPage() {
                 label="Приватное мероприятие"
                 checked={form.isPrivate}
                 locked={!canSetPrivate}
-                onChange={v => setForm(f => ({ ...f, isPrivate: v }))}
+                onChange={v => {
+                  setForm(f => ({ ...f, isPrivate: v }));
+                  if (isEditing) ensureBWListLoaded(v ? 'whiteList' : 'blackList');
+                }}
                 lockedHint="Недоступно в тарифе"
               />
               <Toggle
@@ -680,6 +710,20 @@ export default function CreateEventPage() {
                 onChange={v => setForm(f => ({ ...f, allowedGender: v ? 'Male' : '' }))}
                 lockedHint="Недоступно в тарифе"
               />
+              {form.allowedGender !== '' && canSetGender && (
+                <div className={styles.genderPicker}>
+                  {(['Male', 'Female'] as const).map(g => (
+                    <button
+                      key={g}
+                      type="button"
+                      className={`${styles.genderBtn} ${form.allowedGender === g ? styles.genderBtnActive : ''}`}
+                      onClick={() => setForm(f => ({ ...f, allowedGender: g }))}
+                    >
+                      {g === 'Male' ? 'Мужской' : 'Женский'}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Toggle
                 label="Участники могут приглашать"
                 checked={form.allowUsersToInvite}

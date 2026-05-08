@@ -99,9 +99,11 @@ export interface IBWListUser {
   personInfo: { firstName: string | null; lastName: string | null } | null;
 }
 
-export async function getBWList(listType: BWListType, eventId: string, pageSize = 100): Promise<IBWListUser[]> {
-  const data = await apiClient.get<any>(`/api/participations/${listType}/${eventId}?pageIndex=1&pageSize=${pageSize}`);
-  return data?.result?.result ?? [];
+export async function getBWList(listType: BWListType, eventId: string): Promise<IBWListUser[]> {
+  const data = await apiClient.get<any>(`/api/participations/${listType}/${eventId}`);
+  const result = data?.result;
+  // Эндпоинт возвращает плоский массив (не пагинированный список)
+  return Array.isArray(result) ? result : result?.result ?? [];
 }
 
 export async function addToBWList(listType: BWListType, eventId: string, accountIds: string[]): Promise<void> {
