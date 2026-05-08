@@ -88,15 +88,26 @@ export function MobileFilterSheet({
 
           {/* Город */}
           <div className={styles.section}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <div className={styles.sectionLabel} style={{ margin: 0 }}>Город</div>
+            <div className={styles.sectionLabel}>Город</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <CitySearch value={cityName} onSelect={handleCitySelect} placeholder="Поиск города..." />
+              </div>
               {cityName && (
-                <button onClick={onResetCity} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--accent)', padding: 0 }}>
-                  ← Мой город
+                <button onClick={onResetCity} title="Мой город" style={{
+                  flexShrink: 0, width: 32, height: 32, borderRadius: '50%',
+                  background: 'none', border: '1px solid var(--border)',
+                  cursor: 'pointer', color: 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background .12s, color .12s',
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
                 </button>
               )}
             </div>
-            <CitySearch value={cityName} onSelect={handleCitySelect} placeholder="Поиск города..." />
           </div>
 
           {/* Когда */}
