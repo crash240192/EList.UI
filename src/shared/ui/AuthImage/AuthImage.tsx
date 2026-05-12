@@ -55,11 +55,24 @@ export function AuthImage({
   useEffect(() => {
     if (!fileId) return;
     const k = cacheKey(fileId, fullSize);
-    if (blobCache.has(k)) { setSrc(blobCache.get(k)!); return; }
     setError(false);
+    if (blobCache.has(k)) {
+      setSrc(blobCache.get(k)!);
+      return;
+    }
+    setSrc(null);
+    let cancelled = false;
     getOrFetchBlob(fileId, fullSize)
-      .then(url => setSrc(url))
-      .catch(() => { setError(true); onErrorProp?.(); });
+      .then(url => {
+        if (!cancelled) setSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(true);
+          onErrorProp?.();
+        }
+      });
+    return () => { cancelled = true; };
   }, [fileId, fullSize]);
 
   if (error || !src) return <>{fallback ?? null}</>;
