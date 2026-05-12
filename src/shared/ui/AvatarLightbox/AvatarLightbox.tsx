@@ -48,6 +48,7 @@ export function AvatarLightbox({ fileIds, startIndex = 0, initials, onClose }: A
         <div className={styles.imageWrap}>
           <AuthImage
             fileId={fileIds[idx]}
+            fullSize
             alt={initials}
             className={styles.image}
             fallback={

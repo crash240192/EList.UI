@@ -87,12 +87,23 @@ export function fileUrl(fileId: string): string {
   return `${FILE_STORAGE_BASE}/api/download/${fileId}`;
 }
 
+/** Заголовки для GET /api/download/{fileId}: без FullSize — превью; FullSize: true — оригинал. */
+function downloadHeaders(options?: { fullSize?: boolean }): Record<string, string> {
+  const h = { ...authHeaders() };
+  if (options?.fullSize) h.FullSize = 'true';
+  return h;
+}
+
 /**
  * Загружает файл с авторизационными заголовками и возвращает blob: URL
- * Используется для <img> которые требуют токен
+ * Используется для <img> которые требуют токен.
+ * @param fullSize — иначе API отдаёт миниатюру (изображение/видео для превью).
  */
-export async function fetchAuthedImage(fileId: string): Promise<string> {
-  const res = await fetch(fileUrl(fileId), { headers: authHeaders() });
+export async function fetchAuthedImage(
+  fileId: string,
+  options?: { fullSize?: boolean },
+): Promise<string> {
+  const res = await fetch(fileUrl(fileId), { headers: downloadHeaders(options) });
   if (!res.ok) throw new Error(`Файл не найден: ${res.status}`);
   const blob = await res.blob();
   return URL.createObjectURL(blob);

@@ -140,7 +140,7 @@ export default function EventPage() {
           background: 'linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)',
         } : undefined}>
           {event.coverImageId ? (
-            <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.heroImg}
+            <AuthImage fileId={event.coverImageId} fullSize alt={event.name} className={styles.heroImg}
               fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.heroImg} /> : undefined} />
           ) : event.coverUrl ? (
             <img src={event.coverUrl} alt={event.name} className={styles.heroImg} />
