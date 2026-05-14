@@ -74,10 +74,14 @@ export default function HomePage() {
     }
   }, []);
 
-  /** Поиск по видимой области карты (центр + радиус до угла экрана) */
+  /** Видимая область карты → в стор уходят центр и радиус (метры); search/short подхватывает через `params`. */
   const handleMapSearchArea = useCallback((area: { lat: number; lng: number; radiusM: number }) => {
+    setFilter('latitude', area.lat);
+    setFilter('longitude', area.lng);
+    setFilter('locationRange', area.radiusM);
+    setMapCenter([area.lat, area.lng]);
     window.dispatchEvent(new CustomEvent('elist:mapBoundsSearch', { detail: area }));
-  }, []);
+  }, [setFilter, setMapCenter]);
 
   // Ручной триггер поиска (по кнопке «Искать» в фильтрах)
   // useEvents уже реагирует на изменение params автоматически,

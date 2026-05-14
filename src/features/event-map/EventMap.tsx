@@ -209,14 +209,16 @@ export function EventMap({
       };
 
       // Сохраняем центр и зум при перемещении; область поиска — отдельно (debounce)
-      map.events.add('actionend', () => {
+      const onViewportChange = () => {
         const c = map.getCenter() as [number, number];
         const z = map.getZoom() as number;
         centerRef.current = c;
         onCenterChange?.(c);
         onZoomChange?.(z);
         scheduleSearchArea();
-      });
+      };
+      map.events.add('actionend', onViewportChange);
+      map.events.add('boundschange', onViewportChange);
 
       // Первичная синхронизация области поиска с видимой картой
       requestAnimationFrame(() => scheduleSearchArea());

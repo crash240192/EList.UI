@@ -86,20 +86,15 @@ export function FilterBar({
     return () => window.removeEventListener('elist:searchHere', handler);
   }, [hideCity, setFilter, setMapCenter]);
 
-  // Видимая область карты → центр и радиус поиска
+  // Подпись в фильтре, когда область поиска задаётся картой (координаты пишет HomePage в стор)
   useEffect(() => {
     if (hideCity) return;
-    const handler = (e: Event) => {
-      const { lat, lng, radiusM } = (e as CustomEvent<{ lat: number; lng: number; radiusM: number }>).detail;
+    const handler = () => {
       setCityName(MAP_AREA_LABEL);
-      setFilter('latitude', lat);
-      setFilter('longitude', lng);
-      setFilter('locationRange', radiusM);
-      setMapCenter([lat, lng]);
     };
     window.addEventListener('elist:mapBoundsSearch', handler);
     return () => window.removeEventListener('elist:mapBoundsSearch', handler);
-  }, [hideCity, setFilter, setMapCenter]);
+  }, [hideCity]);
 
   // Для portal-позиции дропдауна города
   const cityBtnRef = useRef<HTMLButtonElement>(null);

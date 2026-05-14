@@ -1,4 +1,6 @@
-// Загрузка компактных точек для карты (search/short, до 500 шт.)
+// Загрузка компактных точек для карты (search/short, до 500 шт.).
+// В запрос уходят те же поля, что и в обычный search: в т.ч. latitude, longitude, locationRange (м) —
+// на главной их выставляет карта по видимой области.
 
 import { useState, useEffect, useCallback } from 'react';
 import type { IEventsSearchParams, IEventSearchShortItem } from '@/entities/event';
