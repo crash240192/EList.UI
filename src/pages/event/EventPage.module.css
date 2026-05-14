@@ -8,12 +8,22 @@
 }
 
 /* Hero */
-.hero { position:relative; height:220px; }
+.hero { position:relative; height:220px; overflow:hidden; }
 .heroImg { width:100%; height:100%; object-fit:cover; display:block; }
-.heroOverlay { position:absolute; inset:0; background:linear-gradient(to bottom,rgba(0,0,0,.05) 30%,rgba(0,0,0,.6) 100%); }
-.heroTop { position:absolute; top:14px; left:14px; right:14px; display:flex; justify-content:space-between; align-items:center; }
+.heroOverlay {
+  position:absolute; inset:0; z-index:1;
+  background:linear-gradient(to bottom,rgba(0,0,0,.05) 30%,rgba(0,0,0,.6) 100%);
+  pointer-events:none;
+}
+.heroTop {
+  position:absolute; top:14px; left:14px; right:14px; z-index:4;
+  display:flex; justify-content:space-between; align-items:center;
+}
 .heroTopRight { display:flex; gap:8px; }
-.heroBottom { position:absolute; bottom:14px; left:14px; display:flex; gap:5px; flex-wrap:wrap; }
+.heroBottom {
+  position:absolute; bottom:14px; left:14px; z-index:4;
+  display:flex; gap:5px; flex-wrap:wrap;
+}
 .heroBtn { width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,.18); backdrop-filter:blur(8px); border:.5px solid rgba(255,255,255,.25); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s; }
 .heroBtn:hover { background:rgba(255,255,255,.3); }
 .heroBtnFav { background:rgba(239,68,68,.5)!important; }

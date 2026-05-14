@@ -1,7 +1,7 @@
 // pages/home/HomePage.tsx
 // Главная страница: карта + список + фильтры
 
-import { useState, useCallback, useEffect, useRef, Fragment } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { IEvent, IEventsSearchParams } from '@/entities/event';
 import { EventCard, fetchEventById, EVENTS_MAP_SHORT_PAGE_SIZE } from '@/entities/event';
@@ -23,6 +23,23 @@ import styles from './HomePage.module.css';
 const AD_BLOCK_ID = import.meta.env.VITE_YANDEX_AD_BLOCK_ID ?? '';
 const AD_EVERY    = 12; // реклама каждые N карточек
 
+const HOME_LIST_UI_KEY = 'elist_home_list_ui_v1';
+const HOME_SEARCH_KEY  = 'elist_home_list_search_v1';
+
+interface StoredListUi { scrollTop: number; paramsKey: string }
+
+function readStoredListUi(): StoredListUi | null {
+  try {
+    const raw = sessionStorage.getItem(HOME_LIST_UI_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as StoredListUi;
+    if (typeof o.scrollTop !== 'number' || typeof o.paramsKey !== 'string') return null;
+    return o;
+  } catch {
+    return null;
+  }
+}
+
 function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
   const R = 6371000;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -37,10 +54,19 @@ function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng:
 
 export default function HomePage() {
   const [selectedEvent, setSelectedEvent] = useState<IEvent | null>(null);
-  const [searchName, setSearchName] = useState('');
+  const [searchName, setSearchName] = useState(() => {
+    try {
+      return sessionStorage.getItem(HOME_SEARCH_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [mapTruncationOpen, setMapTruncationOpen] = useState(false);
 
   const navigate = useNavigate();
+  const listElRef = useRef<HTMLDivElement>(null);
+  const scrollSaveTimerRef = useRef<number | null>(null);
+  const prevParamsKeyRef = useRef<string | null>(null);
   const { filters, setFilter, viewMode, setViewMode, mapCenter, setMapCenter, mapZoom, setMapZoom } =
     useFiltersStore();
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
@@ -79,10 +105,59 @@ export default function HomePage() {
     name: debouncedName || undefined,
   };
 
+  const paramsKey = useMemo(() => JSON.stringify(params), [filters, debouncedName]);
+
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useEvents(params, viewMode === 'list');
   const { items: mapShortItems, isLoading: mapShortLoading, error: mapShortError, total: mapShortTotal } =
     useEventsMapShort(params, viewMode === 'map');
   const sentinelRef = useInfiniteScroll(loadMore);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(HOME_SEARCH_KEY, searchName);
+    } catch { /* ignore */ }
+  }, [searchName]);
+
+  useEffect(() => {
+    if (prevParamsKeyRef.current !== null && prevParamsKeyRef.current !== paramsKey) {
+      try {
+        sessionStorage.removeItem(HOME_LIST_UI_KEY);
+      } catch { /* ignore */ }
+    }
+    prevParamsKeyRef.current = paramsKey;
+  }, [paramsKey]);
+
+  useEffect(() => {
+    if (viewMode !== 'list' || isLoading) return;
+    const el = listElRef.current;
+    if (!el) return;
+    const stored = readStoredListUi();
+    if (!stored || stored.paramsKey !== paramsKey) return;
+    const top = stored.scrollTop;
+    requestAnimationFrame(() => {
+      el.scrollTop = top;
+    });
+  }, [viewMode, isLoading, paramsKey, events.length]);
+
+  useEffect(() => {
+    const el = listElRef.current;
+    if (!el || viewMode !== 'list') return;
+    const onScroll = () => {
+      if (scrollSaveTimerRef.current) window.clearTimeout(scrollSaveTimerRef.current);
+      scrollSaveTimerRef.current = window.setTimeout(() => {
+        scrollSaveTimerRef.current = null;
+        try {
+          const payload: StoredListUi = { scrollTop: el.scrollTop, paramsKey };
+          sessionStorage.setItem(HOME_LIST_UI_KEY, JSON.stringify(payload));
+        } catch { /* ignore */ }
+      }, 150);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (scrollSaveTimerRef.current) window.clearTimeout(scrollSaveTimerRef.current);
+    };
+  }, [viewMode, paramsKey]);
 
   useEffect(() => {
     if (viewMode !== 'map') {
@@ -175,7 +250,7 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          <div className={styles.list}>
+          <div className={styles.list} ref={listElRef}>
             {isLoading ? (
               <div className={styles.loading}>
                 {Array.from({ length: 6 }).map((_, i) => (

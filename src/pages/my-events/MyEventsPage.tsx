@@ -1,6 +1,6 @@
 // pages/my-events/MyEventsPage.tsx
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EventCard } from '@/entities/event';
 import { useMyEvents, type OwnerFilter } from '@/features/event-list/useMyEvents';
@@ -12,6 +12,36 @@ import type { IEventsSearchParams, EventViewMode } from '@/entities/event';
 import styles from './MyEventsPage.module.css';
 
 type Tab = 'active' | 'archive';
+
+const SS_TAB = 'elist_my_events_tab_v1';
+const SS_OWNER = 'elist_my_events_owner_v1';
+const SS_CANCELLED = 'elist_my_events_show_cancelled_v1';
+const SS_LIST_UI = 'elist_my_events_list_ui_v1';
+
+function readTab(): Tab {
+  try {
+    const v = sessionStorage.getItem(SS_TAB);
+    return v === 'archive' ? 'archive' : 'active';
+  } catch {
+    return 'active';
+  }
+}
+
+function readOwner(): OwnerFilter {
+  try {
+    const v = sessionStorage.getItem(SS_OWNER);
+    if (v === 'mine' || v === 'others' || v === 'all') return v;
+  } catch { /* ignore */ }
+  return 'all';
+}
+
+function readShowCancelled(): boolean {
+  try {
+    return sessionStorage.getItem(SS_CANCELLED) === '1';
+  } catch {
+    return false;
+  }
+}
 
 const OWNER_TABS = [
   { key: 'all',    label: 'Все мои' },
@@ -25,12 +55,16 @@ export default function MyEventsPage() {
   const { accountId, loading: accountLoading } = useAccountId();
   const { filters, setFilter, resetFilters } = useMyEventsFiltersStore();
 
-  const [tab,           setTab]           = useState<Tab>('active');
-  const [ownerFilter,   setOwnerFilter]   = useState<OwnerFilter>('all');
+  const [tab,           setTab]           = useState<Tab>(readTab);
+  const [ownerFilter,   setOwnerFilter]   = useState<OwnerFilter>(readOwner);
   const [searchName,    setSearchName]    = useState('');
   const [viewMode,      setViewMode]      = useState<EventViewMode>('list');
   const [searchVersion, setSearchVersion] = useState(0);
-  const [showCancelled, setShowCancelled] = useState(false);
+  const [showCancelled, setShowCancelled] = useState(readShowCancelled);
+
+  const listElRef = useRef<HTMLDivElement>(null);
+  const scrollSaveTimerRef = useRef<number | null>(null);
+  const prevListKeyRef = useRef<string | null>(null);
 
   const handleSearch = () => setSearchVersion(v => v + 1);
 
@@ -60,8 +94,80 @@ export default function MyEventsPage() {
     tab,
   });
 
-  const sentinelRef = useInfiniteScroll(loadMore);
   const isReady = !accountLoading && !!accountId;
+
+  const listUiKey = useMemo(
+    () => JSON.stringify({ tab, ownerFilter, extraParams }),
+    [tab, ownerFilter, extraParams],
+  );
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SS_TAB, tab);
+    } catch { /* ignore */ }
+  }, [tab]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SS_OWNER, ownerFilter);
+    } catch { /* ignore */ }
+  }, [ownerFilter]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SS_CANCELLED, showCancelled ? '1' : '0');
+    } catch { /* ignore */ }
+  }, [showCancelled]);
+
+  useEffect(() => {
+    if (prevListKeyRef.current !== null && prevListKeyRef.current !== listUiKey) {
+      try {
+        sessionStorage.removeItem(SS_LIST_UI);
+      } catch { /* ignore */ }
+    }
+    prevListKeyRef.current = listUiKey;
+  }, [listUiKey]);
+
+  useEffect(() => {
+    if (!isReady || isLoading) return;
+    const el = listElRef.current;
+    if (!el) return;
+    try {
+      const raw = sessionStorage.getItem(SS_LIST_UI);
+      if (!raw) return;
+      const o = JSON.parse(raw) as { scrollTop?: number; listUiKey?: string };
+      if (o.listUiKey !== listUiKey) return;
+      const top = o.scrollTop;
+      if (typeof top !== 'number') return;
+      requestAnimationFrame(() => {
+        el.scrollTop = top;
+      });
+    } catch { /* ignore */ }
+  }, [isReady, isLoading, listUiKey, events.length]);
+
+  useEffect(() => {
+    const el = listElRef.current;
+    if (!el || !isReady) return;
+    const onScroll = () => {
+      if (scrollSaveTimerRef.current) window.clearTimeout(scrollSaveTimerRef.current);
+      scrollSaveTimerRef.current = window.setTimeout(() => {
+        scrollSaveTimerRef.current = null;
+        try {
+          sessionStorage.setItem(
+            SS_LIST_UI,
+            JSON.stringify({ scrollTop: el.scrollTop, listUiKey }),
+          );
+        } catch { /* ignore */ }
+      }, 150);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (scrollSaveTimerRef.current) window.clearTimeout(scrollSaveTimerRef.current);
+    };
+  }, [isReady, listUiKey]);
+
+  const sentinelRef = useInfiniteScroll(loadMore);
 
   return (
     <div className={styles.page}>
@@ -104,7 +210,7 @@ export default function MyEventsPage() {
       </div>
 
       {/* ---- Content ---- */}
-      <div className={styles.list}>
+      <div className={styles.list} ref={listElRef}>
         {!isReady || isLoading ? (
           <div className={styles.grid}>
             {Array.from({ length: 6 }).map((_, i) => (
