@@ -1,7 +1,7 @@
 // pages/event/EventAlbums.tsx
 // Блок альбомов на странице мероприятия
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getEventAlbums, getAlbumFiles, type IAlbum, type IAlbumFile } from '@/entities/media/albumApi';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
@@ -16,9 +16,17 @@ function SpinnerImage({
 }: { fileId: string; alt?: string; className?: string; fullSize?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
+
+  useLayoutEffect(() => {
+    setLoaded(false);
+    setError(false);
+  }, [fileId, fullSize]);
+
+  const ownSpinner = !fullSize;
+
   return (
     <div className={styles.imgWrap} style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {!loaded && !error && (
+      {ownSpinner && !loaded && !error && (
         <div className={styles.imgSpinner}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
             style={{ animation: 'spin 1s linear infinite' }}>
@@ -33,8 +41,14 @@ function SpinnerImage({
           </svg>
         </div>
       ) : (
-        <AuthImage fileId={fileId} fullSize={fullSize} alt={alt ?? ''} className={`${className ?? styles.img} ${loaded ? styles.imgLoaded : styles.imgHidden}`}
-          onLoad={() => setLoaded(true)} onError={() => setError(true)} />
+        <AuthImage
+          fileId={fileId}
+          fullSize={fullSize}
+          alt={alt ?? ''}
+          className={`${className ?? styles.img} ${fullSize || loaded ? styles.imgLoaded : styles.imgHidden}`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+        />
       )}
     </div>
   );
