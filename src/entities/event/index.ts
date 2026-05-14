@@ -6,6 +6,7 @@ export type {
   IEventType,
   //IEventParameters,
   IEventsSearchParams,
+  IEventSearchShortItem,
   ICreateEventRequest,
   IEventParametersRequest,
   IEventPagedList,
@@ -16,6 +17,8 @@ export type {
 export {
   fetchEvents,
   fetchEventsMock,
+  fetchEventsSearchShort,
+  fetchEventsSearchShortMock,
   fetchEventById,
   createEvent,
   updateEvent,

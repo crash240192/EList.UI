@@ -1,11 +1,11 @@
 // pages/home/HomePage.tsx
 // Главная страница: карта + список + фильтры
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import type { IEvent, EventViewMode, IEventsSearchParams } from '@/entities/event';
-import { EventCard } from '@/entities/event';
+import { useState, useCallback, useEffect } from 'react';
+import type { IEvent, IEventsSearchParams } from '@/entities/event';
+import { EventCard, fetchEventById } from '@/entities/event';
 import { useEvents } from '@/features/event-list/useEvents';
+import { useEventsMapShort } from '@/features/event-list/useEventsMapShort';
 import { useFiltersStore, useFavoritesStore } from '@/app/store';
 import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
 import { EventModal } from './EventModal';
@@ -25,7 +25,6 @@ export default function HomePage() {
   const [selectedEvent, setSelectedEvent] = useState<IEvent | null>(null);
   const [searchName, setSearchName] = useState('');
 
-  const navigate = useNavigate();
   const { filters, setFilter, viewMode, setViewMode, mapCenter, setMapCenter, mapZoom, setMapZoom } = useFiltersStore();
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const {
@@ -55,11 +54,24 @@ export default function HomePage() {
     name: debouncedName || undefined,
   };
 
-  const { events, isLoading, isLoadingMore, hasMore, loadMore } = useEvents(params);
+  const { events, isLoading, isLoadingMore, hasMore, loadMore } = useEvents(params, viewMode === 'list');
+  const { items: mapShortItems, isLoading: mapShortLoading, error: mapShortError } = useEventsMapShort(
+    params,
+    viewMode === 'map',
+  );
   const sentinelRef = useInfiniteScroll(loadMore);
 
-  const handleEventClick = useCallback((event: IEvent) => {
+  const handleListEventClick = useCallback((event: IEvent) => {
     setSelectedEvent(event);
+  }, []);
+
+  const handleMapMarkerClick = useCallback(async (eventId: string) => {
+    try {
+      const ev = await fetchEventById(eventId);
+      setSelectedEvent(ev);
+    } catch {
+      /* превью не загрузилось — модалку не открываем */
+    }
   }, []);
 
   /** Поиск по видимой области карты (центр + радиус до угла экрана) */
@@ -90,15 +102,25 @@ export default function HomePage() {
         {viewMode === 'map' ? (
           /* MAP VIEW */
           <div className={styles.mapPlaceholder}>
-            <EventMap
-              events={events}
-              onMarkerClick={handleEventClick}
-              center={computedCenter}
-              zoom={mapZoom}
-              onCenterChange={setMapCenter}
-              onZoomChange={setMapZoom}
-              onSearchAreaChange={viewMode === 'map' ? handleMapSearchArea : undefined}
-            />
+            <div className={styles.mapWrap}>
+              {mapShortLoading && (
+                <div className={styles.mapLoadingOverlay} aria-busy>
+                  <span className={styles.mapLoadingText}>Загрузка точек…</span>
+                </div>
+              )}
+              {mapShortError && (
+                <div className={styles.mapErrorBanner}>{mapShortError}</div>
+              )}
+              <EventMap
+                events={mapShortItems}
+                onMarkerClick={handleMapMarkerClick}
+                center={computedCenter}
+                zoom={mapZoom}
+                onCenterChange={setMapCenter}
+                onZoomChange={setMapZoom}
+                onSearchAreaChange={handleMapSearchArea}
+              />
+            </div>
           </div>
         ) : (
           /* LIST VIEW */
@@ -124,7 +146,7 @@ export default function HomePage() {
                     <EventCard.Preset
                       key={event.id}
                       event={event}
-                      onClick={e => navigate(`/event/${e.id}`)}
+                      onClick={e => handleListEventClick(e)}
                       isFavorite={isFavorite(event.id)}
                       onFavorite={toggleFav}
                     />

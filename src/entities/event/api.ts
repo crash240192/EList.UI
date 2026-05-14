@@ -12,6 +12,7 @@ import type {
   IEventType,
   IEventParameters,
   IEventsSearchParams,
+  IEventSearchShortItem,
   ICreateEventRequest,
   IEventParametersRequest,
 } from './types';
@@ -50,6 +51,32 @@ export async function fetchEvents(
       ...ev,
       eventTypes: ev.Types ?? ev.types ?? ev.eventTypes ?? [],
       eventType:  ev.eventType ?? (ev.Types ?? ev.types ?? ev.eventTypes)?.[0] ?? null,
+    }));
+  }
+  return paged;
+}
+
+/** Поиск для карты: компактные точки (POST /api/events/search/short) */
+export async function fetchEventsSearchShort(
+  params: IEventsSearchParams = {}
+): Promise<PagedList<IEventSearchShortItem>> {
+  const body = {
+    pageIndex: 0,
+    pageSize: 500,
+    active: true,
+    ...params,
+    pageSize: 500,
+    pageIndex: 0,
+  };
+  const data = await apiClient.post<PagedList<IEventSearchShortItem>>('/api/events/search/short', body);
+  const paged = data.result;
+  if (paged?.result) {
+    paged.result = paged.result.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      colors: Array.isArray(row.colors) ? row.colors : [],
     }));
   }
   return paged;
@@ -229,5 +256,30 @@ export async function fetchEventsMock(
     pageSize,
     total: events.length,
     result: events.slice(pageIndex * pageSize, pageIndex * pageSize + pageSize),
+  };
+}
+
+function mockEventToShort(ev: IEvent): IEventSearchShortItem {
+  const types = ev.eventTypes ?? (ev.eventType ? [ev.eventType] : []);
+  const colors = [...new Set(types.map(t => t.eventCategory?.color).filter((c): c is string => !!c))];
+  return {
+    id: ev.id,
+    name: ev.name,
+    latitude: ev.latitude,
+    longitude: ev.longitude,
+    colors: colors.length ? colors : ['#6366f1'],
+  };
+}
+
+/** Мок для search/short */
+export async function fetchEventsSearchShortMock(
+  params: IEventsSearchParams = {}
+): Promise<PagedList<IEventSearchShortItem>> {
+  const full = await fetchEventsMock({ ...params, pageIndex: 0, pageSize: 500 });
+  return {
+    pageIndex: 0,
+    pageSize: 500,
+    total: full.total,
+    result: full.result.map(mockEventToShort),
   };
 }

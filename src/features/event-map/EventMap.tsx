@@ -3,7 +3,7 @@
 // При совпадении координат показываем список мероприятий на точке.
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { IEvent } from '@/entities/event';
+import type { IEventSearchShortItem } from '@/entities/event';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
@@ -16,8 +16,9 @@ export interface MapSearchArea {
 }
 
 interface EventMapProps {
-  events: IEvent[];
-  onMarkerClick: (event: IEvent) => void;
+  events: IEventSearchShortItem[];
+  /** По id подгружается полное событие на стороне страницы */
+  onMarkerClick: (eventId: string) => void;
   center?: [number, number];
   zoom?: number;
   onCenterChange?: (center: [number, number]) => void;
@@ -30,13 +31,10 @@ interface EventMapProps {
 
 const DEFAULT_COLOR = '#6366f1';
 
-/** Цвет по типам мероприятия: берём из category.color или дефолт */
-function getEventColors(event: IEvent): string[] {
-  const types = event.eventTypes ?? (event.eventType ? [event.eventType] : []);
-  const colors = types
-    .map(t => t.eventCategory?.color)
-    .filter((c): c is string => !!c);
-  return colors.length ? [...new Set(colors)] : [DEFAULT_COLOR];
+/** Цвета маркера из ответа search/short */
+function markerColors(item: IEventSearchShortItem): string[] {
+  const c = item.colors?.filter(Boolean) ?? [];
+  return c.length ? [...new Set(c)] : [DEFAULT_COLOR];
 }
 
 /** Генерируем PNG через Canvas — цвета точные, без артефактов SVG */
@@ -142,11 +140,11 @@ export function EventMap({
   const { theme } = useThemeStore();
 
   // Список мероприятий на одной точке
-  const [groupState, setGroupState] = useState<{ events: IEvent[]; x: number; y: number } | null>(null);
+  const [groupState, setGroupState] = useState<{ events: IEventSearchShortItem[]; x: number; y: number } | null>(null);
 
-  const showGroup = useCallback((group: IEvent[], x: number, y: number) => {
+  const showGroup = useCallback((group: IEventSearchShortItem[], x: number, y: number) => {
     if (group.length === 1) {
-      onMarkerClick(group[0]);
+      onMarkerClick(group[0].id);
       return;
     }
     setGroupState({ events: group, x, y });
@@ -309,7 +307,7 @@ export function EventMap({
     }
 
     // Группируем мероприятия по координатам
-    const groups = new Map<string, IEvent[]>();
+    const groups = new Map<string, IEventSearchShortItem[]>();
     for (const ev of events) {
       if (ev.latitude == null || ev.longitude == null) continue;
       const key = coordKey(ev.latitude, ev.longitude);
@@ -326,7 +324,7 @@ export function EventMap({
 
     for (const [, group] of groups) {
       const first = group[0];
-      const color = getEventColors(first);
+      const color = markerColors(first);
       const pm = new ymaps.Placemark(
         [first.latitude!, first.longitude!],
         {},
@@ -359,9 +357,9 @@ export function EventMap({
     clusterer.events.add('click', (e: any) => {
       const target = e.get('target');
       const placemarks: any[] = target.getGeoObjects?.() ?? [];
-      const clusterEvents: IEvent[] = [];
+      const clusterEvents: IEventSearchShortItem[] = [];
       placemarks.forEach((pm: any) => {
-        (pm._elistGroup ?? []).forEach((ev: IEvent) => clusterEvents.push(ev));
+        (pm._elistGroup ?? []).forEach((ev: IEventSearchShortItem) => clusterEvents.push(ev));
       });
       if (clusterEvents.length > 0) {
         const pageX = e.get('pageX') as number;
@@ -455,7 +453,7 @@ export function EventMap({
           events={groupState.events}
           anchorX={groupState.x}
           anchorY={groupState.y}
-          onSelect={ev => { setGroupState(null); onMarkerClick(ev); }}
+          onSelect={id => { setGroupState(null); onMarkerClick(id); }}
           onClose={() => setGroupState(null)}
         />
       )}
@@ -466,10 +464,10 @@ export function EventMap({
 // ---- Модальный список мероприятий в одной точке ----
 
 function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
-  events: IEvent[];
+  events: IEventSearchShortItem[];
   anchorX: number;
   anchorY: number;
-  onSelect: (ev: IEvent) => void;
+  onSelect: (id: string) => void;
   onClose: () => void;
 }) {
   const MODAL_W = 300;
@@ -506,16 +504,15 @@ function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
         </div>
         <div className={styles.groupList}>
           {events.map(ev => {
-            const cost  = ev.parameters?.cost ?? 0;
-            const colors = getEventColors(ev); const color = colors[0];
+            const colors = markerColors(ev);
+            const color = colors[0];
             return (
-              <button key={ev.id} className={styles.groupItem} onClick={() => onSelect(ev)}>
+              <button key={ev.id} className={styles.groupItem} onClick={() => onSelect(ev.id)}>
                 <div className={styles.groupDot} style={{ background: color }} />
                 <div className={styles.groupItemInfo}>
                   <span className={styles.groupItemName}>{ev.name}</span>
                   <span className={styles.groupItemMeta}>
-                    {ev.eventType?.name && <span>{ev.eventType.name}</span>}
-                    <span>{cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}</span>
+                    <span>Подробнее</span>
                   </span>
                 </div>
                 <span className={styles.groupArrow}>›</span>

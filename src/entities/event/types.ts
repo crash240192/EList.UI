@@ -72,6 +72,15 @@ export interface IEvent {
   anticipationRating?: number | null;
 }
 
+/** Элемент ответа POST /api/events/search/short — маркеры на карте */
+export interface IEventSearchShortItem {
+  id:         string;
+  name:       string;
+  latitude:   number;
+  longitude:  number;
+  colors:     string[];
+}
+
 // ---------- Параметры поиска ----------
 
 export interface IEventsSearchParams {
