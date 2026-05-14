@@ -56,17 +56,18 @@ export async function fetchEvents(
   return paged;
 }
 
+/** Размер выборки для карты (search/short); совпадает с телом запроса */
+export const EVENTS_MAP_SHORT_PAGE_SIZE = 500;
+
 /** Поиск для карты: компактные точки (POST /api/events/search/short) */
 export async function fetchEventsSearchShort(
   params: IEventsSearchParams = {}
 ): Promise<PagedList<IEventSearchShortItem>> {
   const body = {
-    pageIndex: 0,
-    pageSize: 500,
-    active: true,
     ...params,
-    pageSize: 500,
+    active: true,
     pageIndex: 0,
+    pageSize: EVENTS_MAP_SHORT_PAGE_SIZE,
   };
   const data = await apiClient.post<PagedList<IEventSearchShortItem>>('/api/events/search/short', body);
   const paged = data.result;
@@ -259,27 +260,31 @@ export async function fetchEventsMock(
   };
 }
 
-function mockEventToShort(ev: IEvent): IEventSearchShortItem {
+function mockMarkerColors(ev: IEvent): string[] {
   const types = ev.eventTypes ?? (ev.eventType ? [ev.eventType] : []);
-  const colors = [...new Set(types.map(t => t.eventCategory?.color).filter((c): c is string => !!c))];
-  return {
-    id: ev.id,
-    name: ev.name,
-    latitude: ev.latitude,
-    longitude: ev.longitude,
-    colors: colors.length ? colors : ['#6366f1'],
-  };
+  const colors = types
+    .map(t => t.eventCategory?.color)
+    .filter((c): c is string => !!c);
+  return colors.length ? [...new Set(colors)] : ['#6366f1'];
 }
 
-/** Мок для search/short */
+/** Мок search/short для VITE_USE_MOCK */
 export async function fetchEventsSearchShortMock(
   params: IEventsSearchParams = {}
 ): Promise<PagedList<IEventSearchShortItem>> {
-  const full = await fetchEventsMock({ ...params, pageIndex: 0, pageSize: 500 });
+  await new Promise((r) => setTimeout(r, 280));
+  const full = await fetchEventsMock({ ...params, pageIndex: 0, pageSize: EVENTS_MAP_SHORT_PAGE_SIZE });
+  const items: IEventSearchShortItem[] = (full.result ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    latitude: e.latitude,
+    longitude: e.longitude,
+    colors: mockMarkerColors(e),
+  }));
   return {
     pageIndex: 0,
-    pageSize: 500,
+    pageSize: EVENTS_MAP_SHORT_PAGE_SIZE,
     total: full.total,
-    result: full.result.map(mockEventToShort),
+    result: items,
   };
 }

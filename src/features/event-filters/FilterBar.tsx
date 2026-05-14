@@ -15,9 +15,7 @@ import { cookies } from '@/shared/lib/cookies';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './FilterBar.module.css';
 
-const DEFAULT_RADIUS_M = 25000; // 25 км — запасной радиус до первой синхронизации с картой
-/** Подпись в фильтре, когда область поиска задаётся видимой картой */
-const MAP_AREA_LABEL = 'На карте';
+const DEFAULT_RADIUS_M = 25000; // 25 км по умолчанию
 
 interface FilterBarProps {
   searchName: string;
@@ -71,7 +69,12 @@ export function FilterBar({
   type QuickDate = 'today'|'tomorrow'|'weekend'|null;
   const [quickDate,      setQuickDate]      = useState<QuickDate>(null);
 
-  // «Искать здесь» с карты (контекстное меню)
+  // Храним onSearch в ref чтобы избежать stale closure в слушателях событий
+  const onSearchRef = useRef(onSearch);
+  useEffect(() => { onSearchRef.current = onSearch; }, [onSearch]);
+  const radiusDebounce = useRef<ReturnType<typeof setTimeout>>();
+
+  // «Искать здесь» с карты
   useEffect(() => {
     if (hideCity) return;
     const handler = (e: Event) => {
@@ -86,14 +89,15 @@ export function FilterBar({
     return () => window.removeEventListener('elist:searchHere', handler);
   }, [hideCity, setFilter, setMapCenter]);
 
-  // Подпись в фильтре, когда область поиска задаётся картой (координаты пишет HomePage в стор)
+  // Подпись города при поиске по видимой области карты (название приходит с HomePage после геокодера)
   useEffect(() => {
     if (hideCity) return;
-    const handler = () => {
-      setCityName(MAP_AREA_LABEL);
+    const handler = (e: Event) => {
+      const name = (e as CustomEvent<{ name?: string }>).detail?.name;
+      if (typeof name === 'string' && name.trim()) setCityName(name.trim());
     };
-    window.addEventListener('elist:mapBoundsSearch', handler);
-    return () => window.removeEventListener('elist:mapBoundsSearch', handler);
+    window.addEventListener('elist:mapViewportLocality', handler);
+    return () => window.removeEventListener('elist:mapViewportLocality', handler);
   }, [hideCity]);
 
   // Для portal-позиции дропдауна города
@@ -167,8 +171,8 @@ export function FilterBar({
     setFilter('longitude', city.lng);
     setShowCity(false);
     // Обновляем центр карты в сторе — работает и при режиме «список»
-    setMapCenter([city.lat, city.lng]);
-    setMapZoom(12);
+    useFiltersStore.getState().setMapCenter([city.lat, city.lng]);
+    useFiltersStore.getState().setMapZoom(12);
     window.dispatchEvent(new CustomEvent('elist:centerMap', { detail: { lat: city.lat, lng: city.lng } }));
   };
 
@@ -187,7 +191,7 @@ export function FilterBar({
     onSearch();
   };
 
-  const syncDraftFiltersFromPicker = () => {
+  const handleApply = () => {
     setFilter('categories', draftCats.length  ? draftCats  : undefined);
     setFilter('types',      draftTypes.length ? draftTypes : undefined);
     setExpanded(false);
@@ -203,15 +207,15 @@ export function FilterBar({
     if (home) {
       setFilter('latitude',  home.lat);
       setFilter('longitude', home.lng);
-      setMapCenter([home.lat, home.lng]);
-      setMapZoom(12);
+      useFiltersStore.getState().setMapCenter([home.lat, home.lng]);
+      useFiltersStore.getState().setMapZoom(12);
       window.dispatchEvent(new CustomEvent('elist:centerMap', {
         detail: { lat: home.lat, lng: home.lng },
       }));
     } else {
       setFilter('latitude', undefined);
       setFilter('longitude', undefined);
-      setMapCenter(null);
+      useFiltersStore.getState().setMapCenter(null as any);
     }
     setFilter('locationRange', DEFAULT_RADIUS_M);
   };
@@ -226,8 +230,8 @@ export function FilterBar({
       setCityName(name);
       setFilter('latitude', lat);
       setFilter('longitude', lng);
-      setMapCenter([lat, lng]);
-      setMapZoom(12);
+      useFiltersStore.getState().setMapCenter([lat, lng]);
+      useFiltersStore.getState().setMapZoom(12);
       // Двигаем карту если она открыта
       window.dispatchEvent(new CustomEvent('elist:centerMap', { detail: { lat, lng } }));
     };
@@ -254,7 +258,8 @@ export function FilterBar({
   if (filters.price === 0)      chips.push({ label: 'Бесплатно', onRemove: () => setFilter('price', undefined) });
 
   const QUICK_TYPES = allTypes.slice(0, 5);
-  const hasExpandedActive = (!quickDate && !!(filters.startTime || filters.endTime)) || (!!filters.price && filters.price > 0);
+  const hasExpandedActive = (!quickDate && !!(filters.startTime || filters.endTime)) || (!!filters.price && filters.price > 0) || (!!filters.locationRange && filters.locationRange !== DEFAULT_RADIUS_M);
+  const radiusKm = filters.locationRange ? Math.round(filters.locationRange / 1000) : '';
 
   return (
     <>
@@ -264,7 +269,7 @@ export function FilterBar({
         <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input className={styles.searchInput} placeholder="Поиск..."
           value={searchName} onChange={e => onSearchChange(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && syncDraftFiltersFromPicker()} />
+          onKeyDown={e => e.key === 'Enter' && handleApply()} />
         {searchName && <button className={styles.clearBtn} onClick={() => onSearchChange('')}>✕</button>}
       </div>
       <button className={styles.mobileFilterBtn} onClick={() => setMobileSheet(true)}>
@@ -319,7 +324,7 @@ export function FilterBar({
           <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input className={styles.searchInput} placeholder="Название мероприятия..."
             value={searchName} onChange={e => onSearchChange(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && syncDraftFiltersFromPicker()} />
+            onKeyDown={e => e.key === 'Enter' && handleApply()} />
           {searchName && <button className={styles.clearBtn} onClick={() => onSearchChange('')}>✕</button>}
         </div>
         {!hideViewToggle && (
@@ -387,15 +392,13 @@ export function FilterBar({
 
         <div className={styles.sep}/>
 
-        <div className={styles.quickRowTail}>
-          <button type="button" className={styles.epReset} onClick={handleReset}>Сбросить</button>
-          <button type="button" className={`${styles.moreBtn} ${expanded ? styles.moreBtnOpen : ''} ${hasExpandedActive ? styles.moreBtnActive : ''}`}
-            onClick={() => setExpanded(v => !v)}>
-            {hasExpandedActive && <span className={styles.moreDot}/>}
-            Дополнительно
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points={expanded ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/></svg>
-          </button>
-        </div>
+        {/* Дополнительные фильтры */}
+        <button className={`${styles.moreBtn} ${expanded ? styles.moreBtnOpen : ''} ${hasExpandedActive ? styles.moreBtnActive : ''}`}
+          onClick={() => setExpanded(v => !v)}>
+          {hasExpandedActive && <span className={styles.moreDot}/>}
+          Дополнительно
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points={expanded ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/></svg>
+        </button>
       </div>
 
       {/* ── Расширенная панель ── */}
@@ -418,6 +421,22 @@ export function FilterBar({
               onFocus={e => e.currentTarget.select()}
               onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
           </div>
+          <div className={styles.epBlock} style={{ flex: '2 1 160px' }}>
+            <span className={styles.epLabel}>Радиус: {radiusKm || 25} км</span>
+            <input type="range" min={1} max={100} step={1}
+              className={styles.epSlider}
+              value={radiusKm || 25}
+              onChange={e => {
+                setFilter('locationRange', Number(e.target.value) * 1000);
+                clearTimeout(radiusDebounce.current);
+                radiusDebounce.current = setTimeout(() => onSearchRef.current(), 1200);
+              }}
+            />
+          </div>
+          <div className={styles.epFooter}>
+            <button className={styles.epReset} onClick={handleReset}>Сбросить</button>
+            <button className={styles.epApply} onClick={handleApply}>Применить</button>
+          </div>
         </div>
       )}
     </div>
@@ -435,14 +454,14 @@ export function FilterBar({
         selectedCategories={draftCats}
         selectedTypes={draftTypes}
         onChange={(cats, types) => { setDraftCats(cats); setDraftTypes(types); }}
-        onClose={() => { setPickerOpen(false); syncDraftFiltersFromPicker(); }}
+        onClose={() => { setPickerOpen(false); handleApply(); }}
       />
     )}
 
     <MobileFilterSheet
       open={mobileSheet}
       onClose={() => setMobileSheet(false)}
-      onApply={syncDraftFiltersFromPicker}
+      onApply={handleApply}
       onReset={handleReset}
       onResetCity={restoreHomeCity}
       filters={filters}

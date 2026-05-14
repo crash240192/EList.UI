@@ -11,27 +11,25 @@ import styles from './YandexMap.module.css';
 export interface MapSearchArea {
   lat: number;
   lng: number;
-  /** Радиус в метрах — по видимой области карты (центр → дальний угол) */
+  /** Радиус в метрах — по видимой области (центр → дальний угол bbox) */
   radiusM: number;
+  zoom: number;
 }
 
 interface EventMapProps {
   events: IEventSearchShortItem[];
-  /** По id подгружается полное событие на стороне страницы */
   onMarkerClick: (eventId: string) => void;
   center?: [number, number];
   zoom?: number;
   onCenterChange?: (center: [number, number]) => void;
   onZoomChange?: (zoom: number) => void;
-  /** Центр карты + радиус по текущему виду (пан/зум) — для поиска мероприятий */
+  /** Видимая область карты → поиск (центр + радиус + зум для подписи города) */
   onSearchAreaChange?: (area: MapSearchArea) => void;
-  /** Задержка перед вызовом после панорамирования/зума, мс */
   searchAreaDebounceMs?: number;
 }
 
 const DEFAULT_COLOR = '#6366f1';
 
-/** Цвета маркера из ответа search/short */
 function markerColors(item: IEventSearchShortItem): string[] {
   const c = item.colors?.filter(Boolean) ?? [];
   return c.length ? [...new Set(c)] : [DEFAULT_COLOR];
@@ -180,6 +178,7 @@ export function EventMap({
         const ymapsLocal = (window as any).ymaps;
         const m = mapRef.current;
         const c = m.getCenter() as [number, number];
+        const z = m.getZoom() as number;
         const bounds = m.getBounds?.() as [[number, number], [number, number]] | undefined;
         if (!bounds?.[0] || !bounds?.[1]) return;
         const sw = bounds[0];
@@ -196,7 +195,7 @@ export function EventMap({
           if (d > radiusM) radiusM = d;
         }
         radiusM = Math.round(Math.max(200, Math.min(radiusM, 5_000_000)));
-        cb({ lat: c[0], lng: c[1], radiusM });
+        cb({ lat: c[0], lng: c[1], radiusM, zoom: z });
       };
 
       const scheduleSearchArea = () => {
@@ -208,7 +207,6 @@ export function EventMap({
         }, searchAreaDebounceMs);
       };
 
-      // Сохраняем центр и зум при перемещении; область поиска — отдельно (debounce)
       const onViewportChange = () => {
         const c = map.getCenter() as [number, number];
         const z = map.getZoom() as number;
@@ -217,10 +215,9 @@ export function EventMap({
         onZoomChange?.(z);
         scheduleSearchArea();
       };
+
       map.events.add('actionend', onViewportChange);
       map.events.add('boundschange', onViewportChange);
-
-      // Первичная синхронизация области поиска с видимой картой
       requestAnimationFrame(() => scheduleSearchArea());
 
       // Правый клик — контекстное меню (десктоп)
@@ -286,7 +283,10 @@ export function EventMap({
 
     return () => {
       destroyed = true;
-      if (searchAreaTimer) clearTimeout(searchAreaTimer);
+      if (searchAreaTimer) {
+        clearTimeout(searchAreaTimer);
+        searchAreaTimer = null;
+      }
       if (el) {
         if (handlePointerDown)  el.removeEventListener('pointerdown',   handlePointerDown);
         if (handlePointerUp)    el.removeEventListener('pointerup',     handlePointerUp);
@@ -469,7 +469,7 @@ function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
   events: IEventSearchShortItem[];
   anchorX: number;
   anchorY: number;
-  onSelect: (id: string) => void;
+  onSelect: (eventId: string) => void;
   onClose: () => void;
 }) {
   const MODAL_W = 300;
@@ -506,16 +506,13 @@ function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
         </div>
         <div className={styles.groupList}>
           {events.map(ev => {
-            const colors = markerColors(ev);
-            const color = colors[0];
+            const color = markerColors(ev)[0];
             return (
               <button key={ev.id} className={styles.groupItem} onClick={() => onSelect(ev.id)}>
                 <div className={styles.groupDot} style={{ background: color }} />
                 <div className={styles.groupItemInfo}>
                   <span className={styles.groupItemName}>{ev.name}</span>
-                  <span className={styles.groupItemMeta}>
-                    <span>Подробнее</span>
-                  </span>
+                  <span className={styles.groupItemMeta}>Подробнее</span>
                 </div>
                 <span className={styles.groupArrow}>›</span>
               </button>

@@ -1,9 +1,10 @@
 // pages/home/HomePage.tsx
 // Главная страница: карта + список + фильтры
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef, Fragment } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { IEvent, IEventsSearchParams } from '@/entities/event';
-import { EventCard, fetchEventById } from '@/entities/event';
+import { EventCard, fetchEventById, EVENTS_MAP_SHORT_PAGE_SIZE } from '@/entities/event';
 import { useEvents } from '@/features/event-list/useEvents';
 import { useEventsMapShort } from '@/features/event-list/useEventsMapShort';
 import { useFiltersStore, useFavoritesStore } from '@/app/store';
@@ -14,6 +15,7 @@ import { EventMap } from '@/features/event-map/EventMap';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { CityConfirmDialog } from '@/shared/ui/CityConfirmDialog/CityConfirmDialog';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
+import { reverseGeocodeLocalityLabel } from '@/shared/lib/yandexMaps';
 import styles from './HomePage.module.css';
 
 // ID рекламного блока из кабинета РСЯ (partner.yandex.ru)
@@ -21,11 +23,26 @@ import styles from './HomePage.module.css';
 const AD_BLOCK_ID = import.meta.env.VITE_YANDEX_AD_BLOCK_ID ?? '';
 const AD_EVERY    = 12; // реклама каждые N карточек
 
+function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) *
+      Math.cos((b.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(Math.min(1, x)));
+}
+
 export default function HomePage() {
   const [selectedEvent, setSelectedEvent] = useState<IEvent | null>(null);
   const [searchName, setSearchName] = useState('');
+  const [mapTruncationOpen, setMapTruncationOpen] = useState(false);
 
-  const { filters, setFilter, viewMode, setViewMode, mapCenter, setMapCenter, mapZoom, setMapZoom } = useFiltersStore();
+  const navigate = useNavigate();
+  const { filters, setFilter, viewMode, setViewMode, mapCenter, setMapCenter, mapZoom, setMapZoom } =
+    useFiltersStore();
   const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const {
     coords: userCoords,
@@ -35,6 +52,14 @@ export default function HomePage() {
     keepOldCity,
     triggerCityCheck,
   } = useUserLocation();
+
+  const lastViewportRef   = useRef<{ lat: number; lng: number; zoom: number } | null>(null);
+  const geocodeTimerRef   = useRef<number | null>(null);
+  const prevMapLoadingRef = useRef(false);
+
+  useEffect(() => () => {
+    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
+  }, []);
 
   // Слушаем событие сброса города из FilterBar
   useEffect(() => {
@@ -55,15 +80,23 @@ export default function HomePage() {
   };
 
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useEvents(params, viewMode === 'list');
-  const { items: mapShortItems, isLoading: mapShortLoading, error: mapShortError } = useEventsMapShort(
-    params,
-    viewMode === 'map',
-  );
+  const { items: mapShortItems, isLoading: mapShortLoading, error: mapShortError, total: mapShortTotal } =
+    useEventsMapShort(params, viewMode === 'map');
   const sentinelRef = useInfiniteScroll(loadMore);
 
+  useEffect(() => {
+    if (viewMode !== 'map') {
+      prevMapLoadingRef.current = mapShortLoading;
+      return;
+    }
+    const finished = prevMapLoadingRef.current && !mapShortLoading;
+    prevMapLoadingRef.current = mapShortLoading;
+    if (finished && mapShortTotal > EVENTS_MAP_SHORT_PAGE_SIZE) setMapTruncationOpen(true);
+  }, [viewMode, mapShortLoading, mapShortTotal]);
+
   const handleListEventClick = useCallback((event: IEvent) => {
-    setSelectedEvent(event);
-  }, []);
+    navigate(`/event/${event.id}`);
+  }, [navigate]);
 
   const handleMapMarkerClick = useCallback(async (eventId: string) => {
     try {
@@ -74,25 +107,42 @@ export default function HomePage() {
     }
   }, []);
 
-  /** Видимая область карты → в стор уходят центр и радиус (метры); search/short подхватывает через `params`. */
-  const handleMapSearchArea = useCallback((area: { lat: number; lng: number; radiusM: number }) => {
-    setFilter('latitude', area.lat);
-    setFilter('longitude', area.lng);
-    setFilter('locationRange', area.radiusM);
-    setMapCenter([area.lat, area.lng]);
-    window.dispatchEvent(new CustomEvent('elist:mapBoundsSearch', { detail: area }));
-  }, [setFilter, setMapCenter]);
+  /** Видимая область карты → фильтры lat/lng/radius; подпись города — отдельно (геокодер, без лишних вызовов при одном зуме). */
+  const handleMapSearchArea = useCallback(
+    (area: { lat: number; lng: number; radiusM: number; zoom: number }) => {
+      setFilter('latitude', area.lat);
+      setFilter('longitude', area.lng);
+      setFilter('locationRange', area.radiusM);
+      setMapCenter([area.lat, area.lng]);
 
-  // Ручной триггер поиска (по кнопке «Искать» в фильтрах)
-  // useEvents уже реагирует на изменение params автоматически,
-  // поэтому onSearch нужен только для закрытия фильтров и сброса пагинации
+      const prev = lastViewportRef.current;
+      lastViewportRef.current = { lat: area.lat, lng: area.lng, zoom: area.zoom };
+
+      if (prev) {
+        const movedM = haversineMeters(prev, area);
+        const zoomChanged = Math.round(prev.zoom) !== Math.round(area.zoom);
+        if (zoomChanged && movedM < 700) return;
+      }
+
+      if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
+      geocodeTimerRef.current = window.setTimeout(() => {
+        geocodeTimerRef.current = null;
+        const c = lastViewportRef.current;
+        if (!c) return;
+        void reverseGeocodeLocalityLabel(c.lat, c.lng).then((name) => {
+          window.dispatchEvent(new CustomEvent('elist:mapViewportLocality', { detail: { name } }));
+        });
+      }, 480);
+    },
+    [setFilter, setMapCenter],
+  );
+
   const handleSearch = useCallback(() => {
     // params уже обновлены через store — useEvents перезагрузит автоматически
   }, []);
 
   return (
     <div className={styles.page}>
-      {/* ---- Filter bar ---- */}
       <FilterBar
         searchName={searchName}
         onSearchChange={setSearchName}
@@ -101,15 +151,13 @@ export default function HomePage() {
         onSearch={handleSearch}
       />
 
-      {/* ---- Content area ---- */}
       <div className={styles.content}>
         {viewMode === 'map' ? (
-          /* MAP VIEW */
           <div className={styles.mapPlaceholder}>
             <div className={styles.mapWrap}>
               {mapShortLoading && (
-                <div className={styles.mapLoadingOverlay} aria-busy>
-                  <span className={styles.mapLoadingText}>Загрузка точек…</span>
+                <div className={styles.mapCornerSpinner} aria-busy aria-label="Загрузка точек на карте">
+                  <span className={styles.mapCornerSpinnerRing} />
                 </div>
               )}
               {mapShortError && (
@@ -127,7 +175,6 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          /* LIST VIEW */
           <div className={styles.list}>
             {isLoading ? (
               <div className={styles.loading}>
@@ -146,24 +193,21 @@ export default function HomePage() {
             ) : (
               <div className={styles.grid}>
                 {events.map((event, idx) => (
-                  <>
+                  <Fragment key={event.id}>
                     <EventCard.Preset
-                      key={event.id}
                       event={event}
                       onClick={e => handleListEventClick(e)}
                       isFavorite={isFavorite(event.id)}
                       onFavorite={toggleFav}
                     />
-                    {/* Реклама каждые AD_EVERY карточек */}
                     {(idx + 1) % AD_EVERY === 0 && (
-                      <AdSlot key={`ad-${idx}`} blockId={AD_BLOCK_ID} />
+                      <AdSlot key={`ad-${event.id}`} blockId={AD_BLOCK_ID} />
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </div>
             )}
 
-            {/* Infinite scroll sentinel */}
             {hasMore && (
               <div ref={sentinelRef} className={styles.sentinel}>
                 {isLoadingMore && <span className={styles.loadingMore}>Загрузка...</span>}
@@ -173,9 +217,29 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* ---- Event popup modal ---- */}
       {selectedEvent && (
         <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      )}
+
+      {mapTruncationOpen && (
+        <>
+          <button
+            type="button"
+            className={styles.mapTruncBackdrop}
+            aria-label="Закрыть"
+            onClick={() => setMapTruncationOpen(false)}
+          />
+          <div className={styles.mapTruncDialog} role="dialog" aria-modal>
+            <p className={styles.mapTruncText}>
+              По текущим условиям найдено событий: <strong>{mapShortTotal}</strong>.
+              На карте отображаются не более {EVENTS_MAP_SHORT_PAGE_SIZE} — сузьте область карты или фильтры,
+              чтобы увидеть все точки.
+            </p>
+            <button type="button" className={styles.mapTruncBtn} onClick={() => setMapTruncationOpen(false)}>
+              Понятно
+            </button>
+          </div>
+        </>
       )}
 
       {showCityConfirm && (
@@ -188,8 +252,6 @@ export default function HomePage() {
     </div>
   );
 }
-
-/* ---- Skeleton ---- */
 
 function SkeletonCard() {
   return <div className={styles.skeleton} aria-hidden />;

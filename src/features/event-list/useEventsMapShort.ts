@@ -1,35 +1,34 @@
-// Загрузка компактных точек для карты (search/short, до 500 шт.).
-// В запрос уходят те же поля, что и в обычный search: в т.ч. latitude, longitude, locationRange (м) —
-// на главной их выставляет карта по видимой области.
+// Компактные точки для карты: POST /api/events/search/short (до EVENTS_MAP_SHORT_PAGE_SIZE шт.)
 
 import { useState, useEffect, useCallback } from 'react';
 import type { IEventsSearchParams, IEventSearchShortItem } from '@/entities/event';
-import { fetchEventsSearchShort, fetchEventsSearchShortMock } from '@/entities/event';
+import {
+  EVENTS_MAP_SHORT_PAGE_SIZE,
+  fetchEventsSearchShort,
+  fetchEventsSearchShortMock,
+} from '@/entities/event';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
 interface UseEventsMapShortResult {
-  items:    IEventSearchShortItem[];
+  items:     IEventSearchShortItem[];
   isLoading: boolean;
   error:     string | null;
   total:     number;
   refresh:   () => void;
 }
 
-export function useEventsMapShort(
-  params: IEventsSearchParams,
-  enabled: boolean,
-): UseEventsMapShortResult {
-  const [items, setItems]     = useState<IEventSearchShortItem[]>([]);
+export function useEventsMapShort(params: IEventsSearchParams, enabled: boolean): UseEventsMapShortResult {
+  const [items, setItems]       = useState<IEventSearchShortItem[]>([]);
   const [isLoading, setLoading] = useState(enabled);
-  const [error, setError]     = useState<string | null>(null);
-  const [total, setTotal]     = useState(0);
+  const [error, setError]       = useState<string | null>(null);
+  const [total, setTotal]       = useState(0);
   const paramsKey             = JSON.stringify(params);
 
   const load = useCallback(async () => {
     try {
       const fn = USE_MOCK ? fetchEventsSearchShortMock : fetchEventsSearchShort;
-      const paged = await fn({ ...params, pageIndex: 0, pageSize: 500 });
+      const paged = await fn({ ...params, pageIndex: 0, pageSize: EVENTS_MAP_SHORT_PAGE_SIZE });
       setItems(paged?.result ?? []);
       setTotal(paged?.total ?? 0);
     } catch (err) {

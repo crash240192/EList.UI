@@ -100,6 +100,15 @@ export interface IEventsSearchParams {
   pageSize?: number;
 }
 
+/** Компактная точка для карты (ответ POST /api/events/search/short) */
+export interface IEventSearchShortItem {
+  id:        string;
+  name:      string;
+  latitude:  number;
+  longitude: number;
+  colors:    string[];
+}
+
 // ---------- Запросы на создание/обновление ----------
 
 export interface ICreateEventRequest {

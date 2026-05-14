@@ -20,6 +20,7 @@ export {
   fetchEventsSearchShort,
   fetchEventsSearchShortMock,
   fetchEventById,
+  EVENTS_MAP_SHORT_PAGE_SIZE,
   createEvent,
   updateEvent,
   deleteEvent,
