@@ -89,3 +89,29 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     return member?.metaDataProperty?.GeocoderMetaData?.text ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   } catch { return `${lat.toFixed(5)}, ${lng.toFixed(5)}`; }
 }
+
+/** Населённый пункт по координатам (HTTP Geocoder, kind=locality) — без загрузки JS API 2.1 */
+export async function reverseGeocodeLocalityLabel(lat: number, lng: number): Promise<string> {
+  if (!YMAPS_API_KEY) return `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+  try {
+    const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${YMAPS_API_KEY}`
+      + `&geocode=${lng},${lat}&format=json&results=1&lang=ru_RU&kind=locality`;
+    const res = await fetch(url);
+    if (!res.ok) return `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+    const json   = await res.json();
+    const member = json?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
+    const comps  = member?.metaDataProperty?.GeocoderMetaData?.Address?.Components as
+      { kind: string; name: string }[] | undefined;
+    if (Array.isArray(comps)) {
+      for (let i = comps.length - 1; i >= 0; i--) {
+        const { kind, name } = comps[i];
+        if ((kind === 'locality' || kind === 'district' || kind === 'province') && name) return name;
+      }
+    }
+    const text = member?.metaDataProperty?.GeocoderMetaData?.text;
+    if (typeof text === 'string' && text.length) return text.split(',')[0].trim();
+    return `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+  } catch {
+    return `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+  }
+}

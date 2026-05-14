@@ -19,7 +19,7 @@ interface UseEventsResult {
   total: number;
 }
 
-export function useEvents(params: IEventsSearchParams): UseEventsResult {
+export function useEvents(params: IEventsSearchParams, enabled = true): UseEventsResult {
   const [events, setEvents] = useState<IEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -49,26 +49,34 @@ export function useEvents(params: IEventsSearchParams): UseEventsResult {
   );
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      setEvents([]);
+      setHasMore(false);
+      setTotal(0);
+      return;
+    }
     pageRef.current = 0;
     setIsLoading(true);
     setError(null);
     load(0, false).finally(() => setIsLoading(false));
-  }, [load]);
+  }, [load, enabled]);
 
   const loadMore = useCallback(() => {
-    if (isLoadingMore || !hasMore) return;
+    if (!enabled || isLoadingMore || !hasMore) return;
     const nextPage = pageRef.current + 1;
     pageRef.current = nextPage;
     setIsLoadingMore(true);
     load(nextPage, true).finally(() => setIsLoadingMore(false));
-  }, [isLoadingMore, hasMore, load]);
+  }, [enabled, isLoadingMore, hasMore, load]);
 
   const refresh = useCallback(() => {
+    if (!enabled) return;
     pageRef.current = 0;
     setIsLoading(true);
     setError(null);
     load(0, false).finally(() => setIsLoading(false));
-  }, [load]);
+  }, [enabled, load]);
 
   return { events, isLoading, isLoadingMore, hasMore, error, loadMore, refresh, total };
 }

@@ -12,6 +12,7 @@ import type {
   IEventType,
   IEventParameters,
   IEventsSearchParams,
+  IEventSearchShortItem,
   ICreateEventRequest,
   IEventParametersRequest,
 } from './types';
@@ -50,6 +51,33 @@ export async function fetchEvents(
       ...ev,
       eventTypes: ev.Types ?? ev.types ?? ev.eventTypes ?? [],
       eventType:  ev.eventType ?? (ev.Types ?? ev.types ?? ev.eventTypes)?.[0] ?? null,
+    }));
+  }
+  return paged;
+}
+
+/** Размер выборки для карты (search/short); совпадает с телом запроса */
+export const EVENTS_MAP_SHORT_PAGE_SIZE = 500;
+
+/** Поиск для карты: компактные точки (POST /api/events/search/short) */
+export async function fetchEventsSearchShort(
+  params: IEventsSearchParams = {}
+): Promise<PagedList<IEventSearchShortItem>> {
+  const body = {
+    ...params,
+    active: true,
+    pageIndex: 0,
+    pageSize: EVENTS_MAP_SHORT_PAGE_SIZE,
+  };
+  const data = await apiClient.post<PagedList<IEventSearchShortItem>>('/api/events/search/short', body);
+  const paged = data.result;
+  if (paged?.result) {
+    paged.result = paged.result.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      colors: Array.isArray(row.colors) ? row.colors : [],
     }));
   }
   return paged;
@@ -229,5 +257,34 @@ export async function fetchEventsMock(
     pageSize,
     total: events.length,
     result: events.slice(pageIndex * pageSize, pageIndex * pageSize + pageSize),
+  };
+}
+
+function mockMarkerColors(ev: IEvent): string[] {
+  const types = ev.eventTypes ?? (ev.eventType ? [ev.eventType] : []);
+  const colors = types
+    .map(t => t.eventCategory?.color)
+    .filter((c): c is string => !!c);
+  return colors.length ? [...new Set(colors)] : ['#6366f1'];
+}
+
+/** Мок search/short для VITE_USE_MOCK */
+export async function fetchEventsSearchShortMock(
+  params: IEventsSearchParams = {}
+): Promise<PagedList<IEventSearchShortItem>> {
+  await new Promise((r) => setTimeout(r, 280));
+  const full = await fetchEventsMock({ ...params, pageIndex: 0, pageSize: EVENTS_MAP_SHORT_PAGE_SIZE });
+  const items: IEventSearchShortItem[] = (full.result ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    latitude: e.latitude,
+    longitude: e.longitude,
+    colors: mockMarkerColors(e),
+  }));
+  return {
+    pageIndex: 0,
+    pageSize: EVENTS_MAP_SHORT_PAGE_SIZE,
+    total: full.total,
+    result: items,
   };
 }

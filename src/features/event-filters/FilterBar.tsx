@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import type { EventViewMode, IEventType } from '@/entities/event';
 import { fetchEventTypes } from '@/entities/event';
 import { useFiltersStore } from '@/app/store';
-import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';;
+import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { MobileFilterSheet } from '@/features/event-filters/MobileFilterSheet';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
@@ -46,7 +46,7 @@ export function FilterBar({
 }: FilterBarProps) {
   const storeDefault = useFiltersStore();
   const storeOverride = useStoreOverride?.();
-  const { filters, setFilter, resetFilters } = storeOverride ?? storeDefault;
+  const { filters, setFilter, resetFilters, setMapCenter, setMapZoom } = storeOverride ?? storeDefault;
   const [allTypes,       setAllTypes]       = useState<IEventType[]>([]);
   const [expanded,       setExpanded]       = useState(false);
   const [pickerOpen,     setPickerOpen]     = useState(false);
@@ -74,19 +74,31 @@ export function FilterBar({
   useEffect(() => { onSearchRef.current = onSearch; }, [onSearch]);
   const radiusDebounce = useRef<ReturnType<typeof setTimeout>>();
 
-  // Слушаем «Искать здесь» от карты
+  // «Искать здесь» с карты
   useEffect(() => {
+    if (hideCity) return;
     const handler = (e: Event) => {
       const { lat, lng, radius } = (e as CustomEvent<{ lat: number; lng: number; radius: number }>).detail;
       setCityName(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-      // Все три setFilter — Zustand обновит стор, useEvents среагирует автоматически
-      useFiltersStore.getState().setFilter('latitude',      lat);
-      useFiltersStore.getState().setFilter('longitude',     lng);
-      useFiltersStore.getState().setFilter('locationRange', radius);
+      setFilter('latitude', lat);
+      setFilter('longitude', lng);
+      setFilter('locationRange', radius);
+      setMapCenter([lat, lng]);
     };
     window.addEventListener('elist:searchHere', handler);
     return () => window.removeEventListener('elist:searchHere', handler);
-  }, []);
+  }, [hideCity, setFilter, setMapCenter]);
+
+  // Подпись города при поиске по видимой области карты (название приходит с HomePage после геокодера)
+  useEffect(() => {
+    if (hideCity) return;
+    const handler = (e: Event) => {
+      const name = (e as CustomEvent<{ name?: string }>).detail?.name;
+      if (typeof name === 'string' && name.trim()) setCityName(name.trim());
+    };
+    window.addEventListener('elist:mapViewportLocality', handler);
+    return () => window.removeEventListener('elist:mapViewportLocality', handler);
+  }, [hideCity]);
 
   // Для portal-позиции дропдауна города
   const cityBtnRef = useRef<HTMLButtonElement>(null);
