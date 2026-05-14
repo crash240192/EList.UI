@@ -144,7 +144,7 @@ interface FiltersState {
   viewMode: 'map' | 'list';
   setViewMode: (v: 'map' | 'list') => void;
   mapCenter: [number, number] | null;
-  setMapCenter: (c: [number, number]) => void;
+  setMapCenter: (c: [number, number] | null) => void;
   mapZoom: number;
   setMapZoom: (z: number) => void;
 }

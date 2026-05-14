@@ -114,14 +114,22 @@
 .quickBtnOn { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
 .quickBtnIcon { padding: 7px 9px; }
 
-/* 2 — Кнопка «Дополнительно» прижата вправо через margin-left:auto */
+/* 2 — «Дополнительно» и «Сбросить» прижаты вправо блоком quickRowTail */
+.quickRowTail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
 .moreBtn {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 7px 12px; border-radius: 20px; font-size: 13px;
   border: 1px dashed var(--border); background: none;
   cursor: pointer; color: var(--text-secondary); white-space: nowrap;
   flex-shrink: 0; transition: all .15s;
-  margin-left: auto;
 }
 .moreBtn:hover   { border-color: var(--accent); color: var(--accent); border-style: solid; }
 .moreBtnOpen     { border-style: solid; border-color: var(--accent); color: var(--accent); }
@@ -153,7 +161,6 @@
 /* DatePicker-кнопка тоже должна быть той же высоты */
 .epBlock:first-child button,
 .epBlock:nth-child(2) button { height: 34px; min-width: 140px; }
-.epFooter { display: flex; gap: 6px; align-items: flex-end; margin-left: auto; }
 .epReset {
   background: none; border: 1px solid var(--border);
   border-radius: 8px; padding: 6px 12px;
@@ -161,13 +168,6 @@
   transition: all .15s; white-space: nowrap;
 }
 .epReset:hover { border-color: var(--accent); color: var(--accent); }
-.epApply {
-  background: var(--accent); color: #fff;
-  border: none; border-radius: 8px; padding: 6px 14px;
-  font-size: 12px; font-weight: 500; cursor: pointer;
-  transition: background .15s; white-space: nowrap;
-}
-.epApply:hover { background: var(--accent-hover, #4f46e5); }
 
 /* ── Вкладки над строкой поиска ── */
 .tabsRow {

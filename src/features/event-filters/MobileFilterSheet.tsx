@@ -13,8 +13,6 @@ import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './MobileFilterSheet.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
-const DEFAULT_RADIUS_M = 25000;
-
 interface MobileFilterSheetProps {
   open: boolean;
   onClose: () => void;
@@ -51,8 +49,6 @@ export function MobileFilterSheet({
 }: MobileFilterSheetProps) {
   useModalBackButton(onClose, open);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const radiusKm = filters.locationRange ? Math.round(filters.locationRange / 1000) : '';
-
   // Блокируем прокрутку body когда шторка открыта
   useEffect(() => {
     if (open) {
@@ -179,13 +175,6 @@ export function MobileFilterSheet({
                   placeholder="Любая" value={filters.price ?? ''}
                   onFocus={e => e.currentTarget.select()}
                   onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
-              </div>
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>Радиус, км</span>
-                <input className={styles.input} type="number" min={1} max={500}
-                  placeholder="25" value={radiusKm}
-                  onFocus={e => e.currentTarget.select()}
-                  onChange={e => setFilter('locationRange', e.target.value !== '' ? Number(e.target.value) * 1000 : DEFAULT_RADIUS_M)} />
               </div>
             </div>
           </div>

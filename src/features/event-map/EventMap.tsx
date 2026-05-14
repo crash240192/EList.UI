@@ -8,6 +8,13 @@ import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
 
+export interface MapSearchArea {
+  lat: number;
+  lng: number;
+  /** Радиус в метрах — по видимой области карты (центр → дальний угол) */
+  radiusM: number;
+}
+
 interface EventMapProps {
   events: IEvent[];
   onMarkerClick: (event: IEvent) => void;
@@ -15,6 +22,10 @@ interface EventMapProps {
   zoom?: number;
   onCenterChange?: (center: [number, number]) => void;
   onZoomChange?: (zoom: number) => void;
+  /** Центр карты + радиус по текущему виду (пан/зум) — для поиска мероприятий */
+  onSearchAreaChange?: (area: MapSearchArea) => void;
+  /** Задержка перед вызовом после панорамирования/зума, мс */
+  searchAreaDebounceMs?: number;
 }
 
 const DEFAULT_COLOR = '#6366f1';
@@ -80,10 +91,21 @@ function makeMarkerPng(colors: string[], count = 1): string {
 const coordKey = (lat: number, lng: number) =>
   `${lat.toFixed(5)},${lng.toFixed(5)}`;
 
-export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], zoom = 12, onCenterChange, onZoomChange }: EventMapProps) {
+export function EventMap({
+  events,
+  onMarkerClick,
+  center = [55.7558, 37.6173],
+  zoom = 12,
+  onCenterChange,
+  onZoomChange,
+  onSearchAreaChange,
+  searchAreaDebounceMs = 400,
+}: EventMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const clusterRef   = useRef<any>(null);
+  const onSearchAreaRef = useRef(onSearchAreaChange);
+  useEffect(() => { onSearchAreaRef.current = onSearchAreaChange; }, [onSearchAreaChange]);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -142,6 +164,7 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
     let handlePointerDown: ((e: PointerEvent) => void) | null = null;
     let handlePointerUp:   (() => void) | null = null;
     let handlePointerMove: ((e: PointerEvent) => void) | null = null;
+    let searchAreaTimer: ReturnType<typeof setTimeout> | null = null;
 
     loadYandexMaps().then(() => {
       if (destroyed || !el) return;
@@ -153,16 +176,52 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
       });
       mapRef.current = map;
 
-      // Сохраняем центр и зум при перемещении — пропускаем первое срабатывание (начальная анимация загрузки)
-      let firstActionEnd = true;
+      const emitSearchArea = () => {
+        const cb = onSearchAreaRef.current;
+        if (!cb || !mapRef.current) return;
+        const ymapsLocal = (window as any).ymaps;
+        const m = mapRef.current;
+        const c = m.getCenter() as [number, number];
+        const bounds = m.getBounds?.() as [[number, number], [number, number]] | undefined;
+        if (!bounds?.[0] || !bounds?.[1]) return;
+        const sw = bounds[0];
+        const ne = bounds[1];
+        const corners: [number, number][] = [
+          [sw[0], sw[1]],
+          [sw[0], ne[1]],
+          [ne[0], sw[1]],
+          [ne[0], ne[1]],
+        ];
+        let radiusM = 0;
+        for (const q of corners) {
+          const d = ymapsLocal.coordSystem.geo.getDistance(c, q);
+          if (d > radiusM) radiusM = d;
+        }
+        radiusM = Math.round(Math.max(200, Math.min(radiusM, 5_000_000)));
+        cb({ lat: c[0], lng: c[1], radiusM });
+      };
+
+      const scheduleSearchArea = () => {
+        if (!onSearchAreaRef.current) return;
+        if (searchAreaTimer) clearTimeout(searchAreaTimer);
+        searchAreaTimer = setTimeout(() => {
+          searchAreaTimer = null;
+          emitSearchArea();
+        }, searchAreaDebounceMs);
+      };
+
+      // Сохраняем центр и зум при перемещении; область поиска — отдельно (debounce)
       map.events.add('actionend', () => {
-        if (firstActionEnd) { firstActionEnd = false; return; }
         const c = map.getCenter() as [number, number];
         const z = map.getZoom() as number;
         centerRef.current = c;
         onCenterChange?.(c);
         onZoomChange?.(z);
+        scheduleSearchArea();
       });
+
+      // Первичная синхронизация области поиска с видимой картой
+      requestAnimationFrame(() => scheduleSearchArea());
 
       // Правый клик — контекстное меню (десктоп)
       map.events.add('contextmenu', (e: any) => {
@@ -227,6 +286,7 @@ export function EventMap({ events, onMarkerClick, center = [55.7558, 37.6173], z
 
     return () => {
       destroyed = true;
+      if (searchAreaTimer) clearTimeout(searchAreaTimer);
       if (el) {
         if (handlePointerDown)  el.removeEventListener('pointerdown',   handlePointerDown);
         if (handlePointerUp)    el.removeEventListener('pointerup',     handlePointerUp);

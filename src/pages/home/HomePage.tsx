@@ -62,6 +62,11 @@ export default function HomePage() {
     setSelectedEvent(event);
   }, []);
 
+  /** Поиск по видимой области карты (центр + радиус до угла экрана) */
+  const handleMapSearchArea = useCallback((area: { lat: number; lng: number; radiusM: number }) => {
+    window.dispatchEvent(new CustomEvent('elist:mapBoundsSearch', { detail: area }));
+  }, []);
+
   // Ручной триггер поиска (по кнопке «Искать» в фильтрах)
   // useEvents уже реагирует на изменение params автоматически,
   // поэтому onSearch нужен только для закрытия фильтров и сброса пагинации
@@ -92,6 +97,7 @@ export default function HomePage() {
               zoom={mapZoom}
               onCenterChange={setMapCenter}
               onZoomChange={setMapZoom}
+              onSearchAreaChange={viewMode === 'map' ? handleMapSearchArea : undefined}
             />
           </div>
         ) : (
@@ -109,7 +115,7 @@ export default function HomePage() {
                   <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                 </svg>
                 <p>Ничего не найдено</p>
-                <p style={{ fontSize: 12 }}>Попробуйте другой город, изменить радиус или убрать некоторые фильтры</p>
+                <p style={{ fontSize: 12 }}>Попробуйте сдвинуть карту, сменить масштаб, выбрать другой город или убрать часть фильтров</p>
               </div>
             ) : (
               <div className={styles.grid}>
