@@ -15,7 +15,6 @@ import { EventMap } from '@/features/event-map/EventMap';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { CityConfirmDialog } from '@/shared/ui/CityConfirmDialog/CityConfirmDialog';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
-import { reverseGeocodeLocalityLabel } from '@/shared/lib/yandexMaps';
 import styles from './HomePage.module.css';
 
 // ID рекламного блока из кабинета РСЯ (partner.yandex.ru)
@@ -38,18 +37,6 @@ function readStoredListUi(): StoredListUi | null {
   } catch {
     return null;
   }
-}
-
-function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const R = 6371000;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const x =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((a.lat * Math.PI) / 180) *
-      Math.cos((b.lat * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(Math.min(1, x)));
 }
 
 export default function HomePage() {
@@ -79,13 +66,7 @@ export default function HomePage() {
     triggerCityCheck,
   } = useUserLocation();
 
-  const lastViewportRef   = useRef<{ lat: number; lng: number; zoom: number } | null>(null);
-  const geocodeTimerRef   = useRef<number | null>(null);
   const prevMapLoadingRef = useRef(false);
-
-  useEffect(() => () => {
-    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
-  }, []);
 
   // Слушаем событие сброса города из FilterBar
   useEffect(() => {
@@ -182,32 +163,13 @@ export default function HomePage() {
     }
   }, []);
 
-  /** Видимая область карты → фильтры lat/lng/radius; подпись города — отдельно (геокодер, без лишних вызовов при одном зуме). */
+  /** Видимая область карты → lat/lng/radius в стор для search/short; подпись города в фильтре не меняем. */
   const handleMapSearchArea = useCallback(
-    (area: { lat: number; lng: number; radiusM: number; zoom: number }) => {
+    (area: { lat: number; lng: number; radiusM: number }) => {
       setFilter('latitude', area.lat);
       setFilter('longitude', area.lng);
       setFilter('locationRange', area.radiusM);
       setMapCenter([area.lat, area.lng]);
-
-      const prev = lastViewportRef.current;
-      lastViewportRef.current = { lat: area.lat, lng: area.lng, zoom: area.zoom };
-
-      if (prev) {
-        const movedM = haversineMeters(prev, area);
-        const zoomChanged = Math.round(prev.zoom) !== Math.round(area.zoom);
-        if (zoomChanged && movedM < 700) return;
-      }
-
-      if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
-      geocodeTimerRef.current = window.setTimeout(() => {
-        geocodeTimerRef.current = null;
-        const c = lastViewportRef.current;
-        if (!c) return;
-        void reverseGeocodeLocalityLabel(c.lat, c.lng).then((name) => {
-          window.dispatchEvent(new CustomEvent('elist:mapViewportLocality', { detail: { name } }));
-        });
-      }, 480);
     },
     [setFilter, setMapCenter],
   );

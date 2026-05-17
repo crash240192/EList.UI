@@ -13,7 +13,6 @@ export interface MapSearchArea {
   lng: number;
   /** Радиус в метрах — по видимой области (центр → дальний угол bbox) */
   radiusM: number;
-  zoom: number;
 }
 
 interface EventMapProps {
@@ -195,7 +194,7 @@ export function EventMap({
           if (d > radiusM) radiusM = d;
         }
         radiusM = Math.round(Math.max(200, Math.min(radiusM, 5_000_000)));
-        cb({ lat: c[0], lng: c[1], radiusM, zoom: z });
+        cb({ lat: c[0], lng: c[1], radiusM });
       };
 
       const scheduleSearchArea = () => {

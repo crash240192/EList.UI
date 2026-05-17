@@ -89,17 +89,6 @@ export function FilterBar({
     return () => window.removeEventListener('elist:searchHere', handler);
   }, [hideCity, setFilter, setMapCenter]);
 
-  // Подпись города при поиске по видимой области карты (название приходит с HomePage после геокодера)
-  useEffect(() => {
-    if (hideCity) return;
-    const handler = (e: Event) => {
-      const name = (e as CustomEvent<{ name?: string }>).detail?.name;
-      if (typeof name === 'string' && name.trim()) setCityName(name.trim());
-    };
-    window.addEventListener('elist:mapViewportLocality', handler);
-    return () => window.removeEventListener('elist:mapViewportLocality', handler);
-  }, [hideCity]);
-
   // Для portal-позиции дропдауна города
   const cityBtnRef = useRef<HTMLButtonElement>(null);
   const [cityDropStyle, setCityDropStyle] = useState<React.CSSProperties>({});
