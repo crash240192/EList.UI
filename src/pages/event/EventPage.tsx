@@ -1,6 +1,6 @@
 // pages/event/EventPage.tsx
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent, IParticipantView, IEventOrganizator } from '@/entities/event';
 import {
@@ -52,6 +52,9 @@ export default function EventPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
   const [bwListOpen,      setBwListOpen]      = useState(false);
+  const [joinShake,       setJoinShake]       = useState(false);
+  const [limitNotice,     setLimitNotice]     = useState(false);
+  const limitNoticeTimerRef = useRef<number | null>(null);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
   const isOrganizer     = !!accountId && organizers.some(o => o.accountId === accountId);
@@ -69,6 +72,21 @@ export default function EventPage() {
       setEvent(ev); setParticipants(parts); setOrganizers(orgs);
     }).finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => () => {
+    if (limitNoticeTimerRef.current) window.clearTimeout(limitNoticeTimerRef.current);
+  }, []);
+
+  const triggerParticipantLimitFeedback = useCallback(() => {
+    setJoinShake(true);
+    setLimitNotice(true);
+    window.setTimeout(() => setJoinShake(false), 500);
+    if (limitNoticeTimerRef.current) window.clearTimeout(limitNoticeTimerRef.current);
+    limitNoticeTimerRef.current = window.setTimeout(() => {
+      setLimitNotice(false);
+      limitNoticeTimerRef.current = null;
+    }, 4000);
+  }, []);
 
   const handleParticipate = useCallback(async () => {
     if (!id || !accountId) return;
@@ -121,7 +139,21 @@ export default function EventPage() {
 
   const cost = event.parameters?.cost ?? 0;
   const maxPersons = event.parameters?.maxPersonsCount ?? null;
+  const participantCap = maxPersons != null && maxPersons > 0 ? maxPersons : null;
+  const isParticipantLimitFull =
+    participantCap != null && participants.length >= participantCap && !isParticipating;
+  const isEventActive = event.active;
+  const joinDisabled =
+    actionLoading || !accountId || isOrganizer || (!isEventActive && !isParticipating);
   const fillPct = maxPersons ? Math.round((participants.length / maxPersons) * 100) : null;
+
+  const onJoinClick = () => {
+    if (isParticipantLimitFull) {
+      triggerParticipantLimitFeedback();
+      return;
+    }
+    void handleParticipate();
+  };
 
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
@@ -214,13 +246,19 @@ export default function EventPage() {
                 Закрытое
               </span>
             )}
+            {!isEventActive && <span className={styles.tagCancelled}>Отменено</span>}
           </div>
         </div>
 
         {/* ── Action row ── */}
         <div className={styles.actionRow}>
           <h1 className={styles.actionTitle}>{event.name}</h1>
-          <RatingWidget eventId={id!} eventStartTime={event.startTime} accountId={accountId} />
+          <RatingWidget
+            eventId={id!}
+            eventStartTime={event.startTime}
+            accountId={accountId}
+            eventActive={isEventActive}
+          />
           <div className={styles.actionBtns}>
             {accountId && event?.id && (isOrganizer || (isParticipating && event.parameters?.allowUsersToInvite)) && (
               <button className={styles.btnIcon} title="Пригласить" onClick={() => setInviteModalOpen(true)}>
@@ -230,10 +268,21 @@ export default function EventPage() {
                 </svg>
               </button>
             )}
-            <button className={`${styles.btnJoin} ${isParticipating ? styles.btnLeave : ''}`}
-              onClick={handleParticipate} disabled={actionLoading || !accountId || isOrganizer}>
-              {actionLoading ? '...' : isParticipating ? 'Покинуть' : 'Участвовать'}
-            </button>
+            <div className={styles.joinBtnWrap}>
+              {limitNotice && isParticipantLimitFull && (
+                <div className={styles.joinLimitNotice} role="status">
+                  Достигнут лимит участников ({participantCap})
+                </div>
+              )}
+              <button
+                type="button"
+                className={`${styles.btnJoin} ${isParticipating ? styles.btnLeave : ''} ${joinShake ? styles.btnJoinShake : ''}`}
+                onClick={onJoinClick}
+                disabled={joinDisabled}
+              >
+                {actionLoading ? '...' : isParticipating ? 'Покинуть' : 'Участвовать'}
+              </button>
+            </div>
           </div>
         </div>
 

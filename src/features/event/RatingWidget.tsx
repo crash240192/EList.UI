@@ -10,6 +10,8 @@ interface WidgetProps {
   eventId: string;
   eventStartTime: string;
   accountId: string | null;
+  /** false — мероприятие отменено/неактивно, новые оценки запрещены */
+  eventActive?: boolean;
 }
 
 function getRatingType(startTime: string): RatingType {
@@ -108,13 +110,14 @@ interface ModalProps {
   ratingType: RatingType;
   accountId: string | null;
   initialData: IRatingPage;
+  allowVote: boolean;
   onClose: () => void;
   onDataUpdate: (d: IRatingPage) => void;
 }
 
 const PAGE_SIZE = 20;
 
-function RatingModal({ eventId, ratingType, accountId, initialData, onClose, onDataUpdate }: ModalProps) {
+function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, onClose, onDataUpdate }: ModalProps) {
   useModalBackButton(onClose);
   const label = ratingType === 'Expectation' ? 'Рейтинг ожидания' : 'Рейтинг';
 
@@ -244,7 +247,9 @@ function RatingModal({ eventId, ratingType, accountId, initialData, onClose, onD
 
         {accountId && (
           <div className={styles.modalFooter}>
-            {!showForm ? (
+            {!allowVote ? (
+              <p className={styles.voteDisabledHint}>Мероприятие отменено — новые оценки недоступны</p>
+            ) : !showForm ? (
               <button
                 className={styles.leaveReviewBtn}
                 onClick={voted ? handleEdit : () => setShowForm(true)}
@@ -286,8 +291,9 @@ function RatingModal({ eventId, ratingType, accountId, initialData, onClose, onD
 
 // ── Badge (entry point) ───────────────────────────────────────────────────────
 
-export function RatingWidget({ eventId, eventStartTime, accountId }: WidgetProps) {
+export function RatingWidget({ eventId, eventStartTime, accountId, eventActive = true }: WidgetProps) {
   const ratingType = getRatingType(eventStartTime);
+  const allowVote = eventActive;
 
   const [data,      setData]      = useState<IRatingPage | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -304,7 +310,12 @@ export function RatingWidget({ eventId, eventStartTime, accountId }: WidgetProps
 
   return (
     <>
-      <button className={styles.badge} onClick={() => setModalOpen(true)} title="Рейтинг">
+      <button
+        type="button"
+        className={`${styles.badge} ${!allowVote ? styles.badgeDisabled : ''}`}
+        onClick={() => setModalOpen(true)}
+        title={allowVote ? 'Рейтинг' : 'Мероприятие отменено — новые оценки недоступны'}
+      >
         {score > 0
           ? <>
               <GradeBadge score={score} size="sm" />
@@ -321,6 +332,7 @@ export function RatingWidget({ eventId, eventStartTime, accountId }: WidgetProps
           ratingType={ratingType}
           accountId={accountId}
           initialData={data}
+          allowVote={allowVote}
           onClose={() => setModalOpen(false)}
           onDataUpdate={setData}
         />
