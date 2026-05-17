@@ -43,6 +43,35 @@
 .btnJoin:disabled { opacity:.5; cursor:not-allowed; }
 .btnLeave { background:var(--surface-2)!important; border:1px solid var(--border)!important; color:var(--text-secondary)!important; }
 
+.joinBtnWrap { position:relative; flex-shrink:0; }
+.joinLimitNotice {
+  position:absolute; bottom:calc(100% + 8px); right:0; z-index:12;
+  max-width:min(260px, 70vw); padding:8px 12px;
+  font-size:12px; line-height:1.35; font-weight:500;
+  color:var(--text-primary); background:var(--surface);
+  border:1px solid var(--border); border-radius:10px;
+  box-shadow:0 6px 20px rgba(0,0,0,.18);
+  animation:limitNoticeIn .2s ease;
+}
+@keyframes limitNoticeIn {
+  from { opacity:0; transform:translateY(4px); }
+  to { opacity:1; transform:translateY(0); }
+}
+@keyframes joinShake {
+  0%, 100% { transform:translateX(0); }
+  18% { transform:translateX(-6px); }
+  36% { transform:translateX(6px); }
+  54% { transform:translateX(-4px); }
+  72% { transform:translateX(4px); }
+}
+.btnJoinShake { animation:joinShake .45s ease; }
+
+.tagCancelled {
+  padding:3px 10px; border-radius:20px; font-size:10px; font-weight:600;
+  backdrop-filter:blur(6px); background:rgba(239,68,68,.75); color:#fff;
+  border:.5px solid rgba(239,68,68,.5);
+}
+
 /* Main grid */
 .mainGrid { display:grid; grid-template-columns:280px 1fr; align-items:start; }
 .leftPanel { border-right:1px solid var(--border); padding:16px 14px 24px; display:flex; flex-direction:column; min-width:0; }

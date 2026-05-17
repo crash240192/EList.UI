@@ -50,6 +50,10 @@
   transition:border-color .12s, background .12s;
 }
 .badge:hover { border-color:var(--accent); background:var(--surface); }
+.badgeDisabled {
+  opacity:.55; cursor:not-allowed;
+}
+.badgeDisabled:hover { border-color:var(--border); background:var(--surface-2); }
 
 .badgeScore { font-size:13px; font-weight:600; line-height:1; }
 .badgeCount { font-size:11px; color:var(--text-muted); }
@@ -136,6 +140,14 @@
 /* ── Footer ── */
 .modalFooter {
   border-top:1px solid var(--border); padding:12px 18px; flex-shrink:0;
+}
+
+.voteDisabledHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 .leaveReviewBtn {
