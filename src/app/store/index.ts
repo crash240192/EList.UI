@@ -149,17 +149,19 @@ interface FiltersState {
   setMapZoom: (z: number) => void;
 }
 
-const DEFAULT_FILTERS: IEventsSearchParams = {
-  pageIndex: 0,
-  pageSize: 20,
-  startTime: new Date().toISOString(),
-};
+function createDefaultFilters(): IEventsSearchParams {
+  return {
+    pageIndex: 0,
+    pageSize: 20,
+    startTime: new Date().toISOString(),
+  };
+}
 
 // Стор фильтров для главной страницы поиска
 export const useFiltersStore = create<FiltersState>()((set) => ({
-  filters:      DEFAULT_FILTERS,
+  filters:      createDefaultFilters(),
   setFilter:    (key, value) => set((s) => ({ filters: { ...s.filters, [key]: value } })),
-  resetFilters: () => set({ filters: DEFAULT_FILTERS }),
+  resetFilters: () => set({ filters: createDefaultFilters() }),
   viewMode:     'map',
   setViewMode:  (v) => set({ viewMode: v }),
   mapCenter:    null,
