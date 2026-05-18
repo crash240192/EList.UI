@@ -171,6 +171,7 @@ export default function HomePage() {
       setFilter('longitude', area.lng);
       setFilter('locationRange', area.radiusM);
       setMapCenter([area.lat, area.lng]);
+      window.dispatchEvent(new CustomEvent('elist:mapBoundsSearch', { detail: area }));
     },
     [setFilter, setMapCenter],
   );
