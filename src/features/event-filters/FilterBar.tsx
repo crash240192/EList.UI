@@ -17,6 +17,19 @@ import styles from './FilterBar.module.css';
 
 const DEFAULT_RADIUS_M = 25000; // 25 км по умолчанию
 
+/** Текущий город в фильтре поиска (не путать с родным городом аккаунта). */
+function getSearchCityName(): string {
+  return cookies.get('elist_city_name') ?? '';
+}
+
+function getHomeCityName(): string {
+  return cookies.get('elist_home_city_name') ?? '';
+}
+
+function getFilterCityLabel(): string {
+  return getSearchCityName() || getHomeCityName();
+}
+
 interface FilterBarProps {
   searchName: string;
   onSearchChange: (v: string) => void;
@@ -52,18 +65,10 @@ export function FilterBar({
   const [pickerOpen,     setPickerOpen]     = useState(false);
   const [showCity,       setShowCity]       = useState(false);
   const [mobileSheet,    setMobileSheet]    = useState(false);
-  const [cityName, setCityName] = useState(() =>
-    cookies.get('elist_home_city_name') ?? cookies.get('elist_city_name') ?? ''
-  );
+  const [cityName, setCityName] = useState(getFilterCityLabel);
 
   // Подставляем координаты и радиус по умолчанию
   const storedCoords = getStoredUserCoords();
-
-  // Синхронизируем название города при смене координат (например, после входа в аккаунт)
-  useEffect(() => {
-    const savedName = cookies.get('elist_home_city_name') ?? cookies.get('elist_city_name') ?? '';
-    setCityName(savedName);
-  }, [storedCoords.lat, storedCoords.lng]);
   const [draftTypes,     setDraftTypes]     = useState<string[]>(filters.types ?? []);
   const [draftCats,      setDraftCats]      = useState<string[]>(filters.categories ?? []);
   type QuickDate = 'today'|'tomorrow'|'weekend'|null;
@@ -121,10 +126,17 @@ export function FilterBar({
       if (!filters.latitude && storedCoords.lat !== 0) {
         setFilter('latitude',  storedCoords.lat);
         setFilter('longitude', storedCoords.lng);
-        // При первом заходе всегда берём РОДНОЙ город, игнорируя предыдущий поиск
-        const homeName = cookies.get('elist_home_city_name') ?? cookies.get('elist_city_name') ?? '';
-        setCityName(homeName);
-        if (homeName) cookies.set('elist_city_name', homeName, 30);
+        // Первый заход: подставляем родной город, если поисковый ещё не задан
+        const searchName = getSearchCityName();
+        const homeName = getHomeCityName();
+        const label = searchName || homeName;
+        if (label) {
+          setCityName(label);
+          if (!searchName) cookies.set('elist_city_name', label, 30);
+        }
+      } else if (filters.latitude != null) {
+        const searchName = getSearchCityName();
+        if (searchName) setCityName(searchName);
       }
       if (!filters.locationRange) setFilter('locationRange', DEFAULT_RADIUS_M);
     }
@@ -189,9 +201,9 @@ export function FilterBar({
 
   // Вспомогательная функция — возврат к родному городу
   const restoreHomeCity = () => {
-    // Берём РОДНОЙ город из отдельной cookie (не поисковый фильтр)
-    const homeName = cookies.get('elist_home_city_name') ?? cookies.get('elist_city_name') ?? '';
+    const homeName = getHomeCityName() || getSearchCityName();
     setCityName(homeName);
+    if (homeName) cookies.set('elist_city_name', homeName, 30);
     const home = storedCoords.lat !== 0 ? storedCoords : null;
     if (home) {
       setFilter('latitude',  home.lat);
