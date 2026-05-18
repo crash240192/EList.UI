@@ -48,10 +48,12 @@ export function useLocalStorage<T>(
 
 export function useInfiniteScroll(
   callback: () => void,
-  options: { threshold?: number; rootMargin?: string } = {}
+  options: { threshold?: number; rootMargin?: string; enabled?: boolean } = {},
 ) {
-  const { threshold = 0.1, rootMargin = '200px' } = options;
+  const { threshold = 0.1, rootMargin = '200px', enabled = true } = options;
   const ref = useRef<HTMLDivElement | null>(null);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
 
   useEffect(() => {
     const el = ref.current;
@@ -59,9 +61,9 @@ export function useInfiniteScroll(
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) callback();
+        if (entries[0].isIntersecting && enabledRef.current) callback();
       },
-      { threshold, rootMargin }
+      { threshold, rootMargin },
     );
 
     observer.observe(el);

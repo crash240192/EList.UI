@@ -91,7 +91,9 @@ export default function HomePage() {
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useEvents(params, viewMode === 'list');
   const { items: mapShortItems, isLoading: mapShortLoading, error: mapShortError, total: mapShortTotal } =
     useEventsMapShort(params, viewMode === 'map');
-  const sentinelRef = useInfiniteScroll(loadMore);
+  const sentinelRef = useInfiniteScroll(loadMore, {
+    enabled: viewMode === 'list' && !isLoading && !isLoadingMore && hasMore,
+  });
 
   useEffect(() => {
     try {
@@ -167,13 +169,17 @@ export default function HomePage() {
   /** Видимая область карты → lat/lng/radius в стор для search/short; подпись города в фильтре не меняем. */
   const handleMapSearchArea = useCallback(
     (area: { lat: number; lng: number; radiusM: number }) => {
-      setFilter('latitude', area.lat);
-      setFilter('longitude', area.lng);
-      setFilter('locationRange', area.radiusM);
+      useFiltersStore.setState((s) => ({
+        filters: {
+          ...s.filters,
+          latitude: area.lat,
+          longitude: area.lng,
+          locationRange: area.radiusM,
+        },
+      }));
       setMapCenter([area.lat, area.lng]);
-      window.dispatchEvent(new CustomEvent('elist:mapBoundsSearch', { detail: area }));
     },
-    [setFilter, setMapCenter],
+    [setMapCenter],
   );
 
   const handleSearch = useCallback(() => {

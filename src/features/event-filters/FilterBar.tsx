@@ -16,8 +16,6 @@ import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './FilterBar.module.css';
 
 const DEFAULT_RADIUS_M = 25000; // запасной радиус до первой синхронизации с картой
-/** Подпись в фильтре, когда область поиска задаётся видимой картой */
-const MAP_AREA_LABEL = 'На карте';
 
 /** Текущий город в фильтре поиска (не путать с родным городом аккаунта). */
 function getSearchCityName(): string {
@@ -104,14 +102,6 @@ export function FilterBar({
     return () => window.removeEventListener('elist:searchHere', handler);
   }, [hideCity, setFilter, setMapCenter]);
 
-  // Подпись «На карте», когда область поиска задаётся видимой картой (координаты пишет HomePage)
-  useEffect(() => {
-    if (hideCity) return;
-    const handler = () => setCityName(MAP_AREA_LABEL);
-    window.addEventListener('elist:mapBoundsSearch', handler);
-    return () => window.removeEventListener('elist:mapBoundsSearch', handler);
-  }, [hideCity]);
-
   // Для portal-позиции дропдауна города
   const cityBtnRef = useRef<HTMLButtonElement>(null);
   const [cityDropStyle, setCityDropStyle] = useState<React.CSSProperties>({});
@@ -186,8 +176,9 @@ export function FilterBar({
     const name = city.shortName ?? city.name;
     setCityName(name);
     cookies.set('elist_city_name', name, 30);
-    setFilter('latitude',  city.lat);
-    setFilter('longitude', city.lng);
+    useFiltersStore.setState((s) => ({
+      filters: { ...s.filters, latitude: city.lat, longitude: city.lng },
+    }));
     setShowCity(false);
     // Обновляем центр карты в сторе — работает и при режиме «список»
     useFiltersStore.getState().setMapCenter([city.lat, city.lng]);
@@ -263,13 +254,22 @@ export function FilterBar({
   }, [setFilter]);
 
   const handleReset = () => {
+    const savedLat = filters.latitude;
+    const savedLng = filters.longitude;
+    const savedRange = filters.locationRange;
+    const savedCityLabel = cityName;
+
     resetFilters();
     onSearchChange('');
     setDraftCats([]);
     setDraftTypes([]);
     setQuickDate(null);
     setExpanded(false);
-    restoreHomeCity();
+
+    if (savedLat != null) setFilter('latitude', savedLat);
+    if (savedLng != null) setFilter('longitude', savedLng);
+    setFilter('locationRange', savedRange ?? DEFAULT_RADIUS_M);
+    if (savedCityLabel) setCityName(savedCityLabel);
   };
 
   // Чипы

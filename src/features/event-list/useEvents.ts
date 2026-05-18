@@ -8,10 +8,17 @@ import { fetchEvents, fetchEventsMock } from '@/entities/event';
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 const PAGE_SIZE = 20;
 
+function dedupeEvents(items: IEvent[]): IEvent[] {
+  const seen = new Set<string>();
+  return items.filter((e) => {
+    if (seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  });
+}
+
 function mergeUniqueEvents(prev: IEvent[], next: IEvent[]): IEvent[] {
-  const seen = new Set(prev.map((e) => e.id));
-  const unique = next.filter((e) => !seen.has(e.id));
-  return unique.length === 0 ? prev : [...prev, ...unique];
+  return dedupeEvents([...prev, ...next]);
 }
 
 interface UseEventsResult {
@@ -35,27 +42,34 @@ export function useEvents(params: IEventsSearchParams, enabled = true): UseEvent
   const pageRef = useRef(0);
   /** Увеличивается при смене фильтров / отключении — отбрасываем ответы устаревших запросов */
   const loadGenerationRef = useRef(0);
+  const activeParamsKeyRef = useRef('');
 
   const paramsKey = JSON.stringify(params);
+  activeParamsKeyRef.current = paramsKey;
+
+  const isStale = (generation: number, requestParamsKey: string) =>
+    generation !== loadGenerationRef.current || requestParamsKey !== activeParamsKeyRef.current;
 
   const load = useCallback(
-    async (pageIndex: number, append: boolean, generation: number) => {
+    async (pageIndex: number, append: boolean, generation: number, requestParamsKey: string) => {
       try {
         const fn = USE_MOCK ? fetchEventsMock : fetchEvents;
         const result = await fn({ ...params, pageIndex, pageSize: PAGE_SIZE });
 
-        if (generation !== loadGenerationRef.current) return;
+        if (isStale(generation, requestParamsKey)) return;
 
         setTotal(result.total);
         setEvents((prev) =>
-          append ? mergeUniqueEvents(prev, result.result) : result.result,
+          append
+            ? mergeUniqueEvents(prev, result.result)
+            : dedupeEvents(result.result),
         );
         setHasMore(
           result.result.length === PAGE_SIZE && (pageIndex + 1) * PAGE_SIZE < result.total,
         );
         setError(null);
       } catch (err) {
-        if (generation !== loadGenerationRef.current) return;
+        if (isStale(generation, requestParamsKey)) return;
         setError(err instanceof Error ? err.message : 'Ошибка загрузки');
       }
     },
@@ -66,6 +80,7 @@ export function useEvents(params: IEventsSearchParams, enabled = true): UseEvent
   useEffect(() => {
     loadGenerationRef.current += 1;
     const generation = loadGenerationRef.current;
+    const requestParamsKey = paramsKey;
 
     if (!enabled) {
       setIsLoading(false);
@@ -74,7 +89,9 @@ export function useEvents(params: IEventsSearchParams, enabled = true): UseEvent
       setHasMore(false);
       setTotal(0);
       setError(null);
-      return;
+      return () => {
+        loadGenerationRef.current += 1;
+      };
     }
 
     pageRef.current = 0;
@@ -84,19 +101,24 @@ export function useEvents(params: IEventsSearchParams, enabled = true): UseEvent
     setError(null);
     setHasMore(false);
 
-    void load(0, false, generation).finally(() => {
-      if (generation === loadGenerationRef.current) setIsLoading(false);
+    void load(0, false, generation, requestParamsKey).finally(() => {
+      if (!isStale(generation, requestParamsKey)) setIsLoading(false);
     });
-  }, [load, enabled]);
+
+    return () => {
+      loadGenerationRef.current += 1;
+    };
+  }, [load, enabled, paramsKey]);
 
   const loadMore = useCallback(() => {
     if (!enabled || isLoadingMore || !hasMore || isLoading) return;
     const generation = loadGenerationRef.current;
+    const requestParamsKey = activeParamsKeyRef.current;
     const nextPage = pageRef.current + 1;
     pageRef.current = nextPage;
     setIsLoadingMore(true);
-    void load(nextPage, true, generation).finally(() => {
-      if (generation === loadGenerationRef.current) setIsLoadingMore(false);
+    void load(nextPage, true, generation, requestParamsKey).finally(() => {
+      if (!isStale(generation, requestParamsKey)) setIsLoadingMore(false);
     });
   }, [enabled, isLoadingMore, hasMore, isLoading, load]);
 
@@ -104,12 +126,13 @@ export function useEvents(params: IEventsSearchParams, enabled = true): UseEvent
     if (!enabled) return;
     loadGenerationRef.current += 1;
     const generation = loadGenerationRef.current;
+    const requestParamsKey = activeParamsKeyRef.current;
     pageRef.current = 0;
     setEvents([]);
     setIsLoading(true);
     setError(null);
-    void load(0, false, generation).finally(() => {
-      if (generation === loadGenerationRef.current) setIsLoading(false);
+    void load(0, false, generation, requestParamsKey).finally(() => {
+      if (!isStale(generation, requestParamsKey)) setIsLoading(false);
     });
   }, [enabled, load]);
 
