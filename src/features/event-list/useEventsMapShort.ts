@@ -1,6 +1,6 @@
 // Компактные точки для карты: POST /api/events/search/short (до EVENTS_MAP_SHORT_PAGE_SIZE шт.)
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { IEventsSearchParams, IEventSearchShortItem } from '@/entities/event';
 import {
   EVENTS_MAP_SHORT_PAGE_SIZE,
@@ -23,15 +23,19 @@ export function useEventsMapShort(params: IEventsSearchParams, enabled: boolean)
   const [isLoading, setLoading] = useState(enabled);
   const [error, setError]       = useState<string | null>(null);
   const [total, setTotal]       = useState(0);
-  const paramsKey             = JSON.stringify(params);
+  const loadGenerationRef       = useRef(0);
+  const paramsKey               = JSON.stringify(params);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (generation: number) => {
     try {
       const fn = USE_MOCK ? fetchEventsSearchShortMock : fetchEventsSearchShort;
       const paged = await fn({ ...params, pageIndex: 0, pageSize: EVENTS_MAP_SHORT_PAGE_SIZE });
+      if (generation !== loadGenerationRef.current) return;
       setItems(paged?.result ?? []);
       setTotal(paged?.total ?? 0);
+      setError(null);
     } catch (err) {
+      if (generation !== loadGenerationRef.current) return;
       setError(err instanceof Error ? err.message : 'Ошибка загрузки');
       setItems([]);
       setTotal(0);
@@ -39,6 +43,9 @@ export function useEventsMapShort(params: IEventsSearchParams, enabled: boolean)
   }, [paramsKey]);
 
   useEffect(() => {
+    loadGenerationRef.current += 1;
+    const generation = loadGenerationRef.current;
+
     if (!enabled) {
       setLoading(false);
       setItems([]);
@@ -46,16 +53,25 @@ export function useEventsMapShort(params: IEventsSearchParams, enabled: boolean)
       setError(null);
       return;
     }
+
+    setItems([]);
     setLoading(true);
     setError(null);
-    load().finally(() => setLoading(false));
+    void load(generation).finally(() => {
+      if (generation === loadGenerationRef.current) setLoading(false);
+    });
   }, [enabled, load]);
 
   const refresh = useCallback(() => {
     if (!enabled) return;
+    loadGenerationRef.current += 1;
+    const generation = loadGenerationRef.current;
+    setItems([]);
     setLoading(true);
     setError(null);
-    load().finally(() => setLoading(false));
+    void load(generation).finally(() => {
+      if (generation === loadGenerationRef.current) setLoading(false);
+    });
   }, [enabled, load]);
 
   return { items, isLoading, error, total, refresh };

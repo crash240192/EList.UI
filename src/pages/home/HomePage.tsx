@@ -142,6 +142,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (viewMode !== 'map') {
+      setMapTruncationOpen(false);
       prevMapLoadingRef.current = mapShortLoading;
       return;
     }
@@ -212,7 +213,7 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          <div className={styles.list} ref={listElRef}>
+          <div key={`list-${paramsKey}`} className={styles.list} ref={listElRef}>
             {isLoading ? (
               <div className={styles.loading}>
                 {Array.from({ length: 6 }).map((_, i) => (
