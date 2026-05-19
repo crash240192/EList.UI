@@ -4,45 +4,65 @@ import { fetchMessageReplies } from '@/entities/conversation';
 import { MessageRow } from './MessageRow';
 import styles from './MessageReplies.module.css';
 
-const PAGE_SIZE = 15;
+const PREVIEW_SIZE = 5;
 
 interface MessageRepliesProps {
   parent: IMessage;
+  depth: number;
   conversationId: string;
   currentAccountId: string | null;
   onReply: (message: IMessage) => void;
 }
 
-export function MessageReplies({ parent, conversationId, currentAccountId, onReply }: MessageRepliesProps) {
+export function MessageReplies({
+  parent,
+  depth,
+  conversationId,
+  currentAccountId,
+  onReply,
+}: MessageRepliesProps) {
   const [items, setItems] = useState<IMessage[]>([]);
+  const [total, setTotal] = useState(0);
+  const [showAll, setShowAll] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [loadingAll, setLoadingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pageRef = useRef(0);
+  const parentIdRef = useRef(parent.id);
 
-  const load = useCallback(async (pageIndex: number, append: boolean) => {
-    const paged = await fetchMessageReplies(parent.id, pageIndex, PAGE_SIZE);
-    setItems((prev) => (append ? [...prev, ...(paged.result ?? [])] : (paged.result ?? [])));
-    setHasMore((pageIndex + 1) * PAGE_SIZE < (paged.total ?? 0));
+  const loadPreview = useCallback(async () => {
+    const paged = await fetchMessageReplies(parent.id, 0, PREVIEW_SIZE);
+    setItems(paged.result ?? []);
+    setTotal(paged.total ?? 0);
+    setShowAll((paged.total ?? 0) <= PREVIEW_SIZE);
     setError(null);
   }, [parent.id]);
 
   useEffect(() => {
-    pageRef.current = 0;
+    parentIdRef.current = parent.id;
+    setShowAll(false);
     setLoading(true);
-    void load(0, false)
+    void loadPreview()
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов'))
       .finally(() => setLoading(false));
-  }, [load, parent.id]);
+  }, [loadPreview, parent.id]);
 
-  const loadMore = () => {
-    if (loadingMore || !hasMore) return;
-    const next = pageRef.current + 1;
-    pageRef.current = next;
-    setLoadingMore(true);
-    void load(next, true).finally(() => setLoadingMore(false));
+  const loadAllReplies = async () => {
+    if (loadingAll || showAll || total <= PREVIEW_SIZE) return;
+    setLoadingAll(true);
+    try {
+      const paged = await fetchMessageReplies(parent.id, 0, total);
+      if (parentIdRef.current !== parent.id) return;
+      setItems(paged.result ?? []);
+      setShowAll(true);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов');
+    } finally {
+      setLoadingAll(false);
+    }
   };
+
+  const childDepth = depth + 1;
 
   if (loading) return <div className={styles.hint}>Загрузка ответов…</div>;
 
@@ -56,15 +76,20 @@ export function MessageReplies({ parent, conversationId, currentAccountId, onRep
         <MessageRow
           key={msg.id}
           message={msg}
-          depth={1}
+          depth={childDepth}
           currentAccountId={currentAccountId}
           conversationId={conversationId}
           onReply={onReply}
         />
       ))}
-      {hasMore && (
-        <button type="button" className={styles.moreBtn} disabled={loadingMore} onClick={loadMore}>
-          {loadingMore ? 'Загрузка…' : 'Ещё ответы'}
+      {!showAll && total > PREVIEW_SIZE && (
+        <button
+          type="button"
+          className={styles.moreBtn}
+          disabled={loadingAll}
+          onClick={() => void loadAllReplies()}
+        >
+          {loadingAll ? 'Загрузка…' : 'Показать все ответы'}
         </button>
       )}
     </div>

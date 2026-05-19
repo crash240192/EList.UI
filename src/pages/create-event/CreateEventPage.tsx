@@ -75,7 +75,7 @@ export default function CreateEventPage() {
   const navigate  = useNavigate();
   const { id }    = useParams<{ id: string }>();
   const isEditing = !!id;
-  const { accountId } = useAccountId();
+  const { accountId, loading: accountIdLoading } = useAccountId();
 
   const [form,        setForm]        = useState<FormState>(EMPTY);
   const [loading,     setLoading]     = useState(isEditing);
@@ -156,12 +156,7 @@ export default function CreateEventPage() {
       : fetchEventById(id!);
     const loadTypes = USE_MOCK ? Promise.resolve([]) : fetchEventTypesByEvent(id!);
 
-    const loadOrganizers = USE_MOCK || !accountId
-      ? Promise.resolve(false)
-      : fetchEventOrganizators(id!).then((orgs) => orgs.some((o) => o.accountId === accountId));
-
-    Promise.all([loadEvent, loadTypes, loadOrganizers]).then(([ev, evTypes, isOrg]) => {
-      setIsEventOrganizer(isOrg);
+    Promise.all([loadEvent, loadTypes]).then(([ev, evTypes]) => {
       const toDate = (s: string) => s.slice(0, 10);
       const toTime = (s: string) => s.slice(11, 16);
       setForm({
@@ -213,7 +208,37 @@ export default function CreateEventPage() {
         if (catId) setSelectedCategories([catId]);
       }
     }).finally(() => setLoading(false));
-  }, [id, isEditing, accountId]);
+  }, [id, isEditing]);
+
+  // Проверка организатора — отдельно, чтобы не перезаписывать результат гонкой с загрузкой accountId
+  useEffect(() => {
+    if (!isEditing || !id || accountIdLoading) return;
+
+    if (USE_MOCK) {
+      setIsEventOrganizer(true);
+      return;
+    }
+
+    if (!accountId) {
+      setIsEventOrganizer(false);
+      return;
+    }
+
+    let cancelled = false;
+    void fetchEventOrganizators(id)
+      .then((orgs) => {
+        if (!cancelled) {
+          setIsEventOrganizer(orgs.some((o) => o.accountId === accountId));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setIsEventOrganizer(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isEditing, accountId, accountIdLoading]);
 
   // Вспомогательные
   const set = (key: keyof FormState) =>
@@ -789,7 +814,7 @@ export default function CreateEventPage() {
           />
         </Section>
 
-        {isEditing && isEventOrganizer && id && (
+        {isEditing && id && !accountIdLoading && isEventOrganizer && (
           <Section title="Обсуждения">
             <EventDiscussionsAdmin eventId={id} />
           </Section>
