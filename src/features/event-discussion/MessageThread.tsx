@@ -5,6 +5,7 @@ import { useRootMessages } from './useRootMessages';
 import { MessageRow } from './MessageRow';
 import { MessageComposer } from './MessageComposer';
 import { messageAuthorName } from './messageUtils';
+import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import styles from './MessageThread.module.css';
 
 interface MessageThreadProps {
@@ -12,21 +13,27 @@ interface MessageThreadProps {
   currentAccountId: string | null;
 }
 
-export function MessageThread({ conversationId, currentAccountId }: MessageThreadProps) {
-  const { messages, loading, loadingMore, hasMore, error, loadMore, refresh } =
+function MessageThreadInner({ conversationId, currentAccountId }: MessageThreadProps) {
+  const { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh } =
     useRootMessages(conversationId);
+  const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
 
   const handleSubmit = async (text: string) => {
     if (!currentAccountId) return;
+    const replyToId = replyTarget?.id ?? null;
     await createMessage({
       conversationId,
       messageText: text,
       accountId: currentAccountId,
-      replyTo: replyTarget?.id ?? null,
+      replyTo: replyToId,
     });
+    if (replyToId) {
+      bump(replyToId);
+    } else {
+      refresh();
+    }
     setReplyTarget(null);
-    refresh();
   };
 
   return (
@@ -50,7 +57,7 @@ export function MessageThread({ conversationId, currentAccountId }: MessageThrea
       </div>
       {hasMore && (
         <button type="button" className={styles.moreBtn} disabled={loadingMore} onClick={loadMore}>
-          {loadingMore ? 'Загрузка…' : 'Загрузить ещё'}
+          {loadingMore ? 'Загрузка…' : `Загрузить ещё (${remainingMore})`}
         </button>
       )}
       {currentAccountId ? (
@@ -63,5 +70,13 @@ export function MessageThread({ conversationId, currentAccountId }: MessageThrea
         <p className={styles.muted}>Войдите, чтобы оставить комментарий</p>
       )}
     </div>
+  );
+}
+
+export function MessageThread(props: MessageThreadProps) {
+  return (
+    <DiscussionRefreshProvider>
+      <MessageThreadInner {...props} />
+    </DiscussionRefreshProvider>
   );
 }

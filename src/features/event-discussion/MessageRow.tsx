@@ -4,6 +4,7 @@ import { updateMessage } from '@/entities/conversation';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { messageAuthorName, messageInitials, formatMessageDate } from './messageUtils';
 import { MessageReplies } from './MessageReplies';
+import { useDiscussionRefresh } from './discussionRefreshContext';
 import styles from './MessageRow.module.css';
 
 interface MessageRowProps {
@@ -28,8 +29,9 @@ export function MessageRow({
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  const replyBump = useDiscussionRefresh(message.id);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
-  const canExpand = message.replied;
+  const hasReplies = message.replied || replyBump > 0;
   const accountId = message.accountId ?? message.account?.id ?? '';
   const initials = messageInitials(message);
 
@@ -39,8 +41,8 @@ export function MessageRow({
   }, [message.messageText]);
 
   useEffect(() => {
-    if (message.replied) setExpanded(true);
-  }, [message.replied]);
+    if (hasReplies) setExpanded(true);
+  }, [hasReplies]);
 
   const startEdit = () => {
     setEditText(displayText);
@@ -138,7 +140,7 @@ export function MessageRow({
                     Редактировать
                   </button>
                 )}
-                {canExpand && (
+                {hasReplies && (
                   <button
                     type="button"
                     className={styles.linkBtn}
@@ -153,10 +155,11 @@ export function MessageRow({
         </div>
       </article>
 
-      {canExpand && expanded && (
+      {hasReplies && expanded && (
         <MessageReplies
           parent={message}
           depth={depth}
+          refreshKey={replyBump}
           conversationId={conversationId}
           currentAccountId={currentAccountId}
           onReply={onReply}

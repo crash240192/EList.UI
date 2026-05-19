@@ -10,6 +10,7 @@ export function useRootMessages(conversationId: string | null) {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [remainingMore, setRemainingMore] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const pageRef = useRef(0);
   const generationRef = useRef(0);
@@ -20,8 +21,11 @@ export function useRootMessages(conversationId: string | null) {
     if (generation !== generationRef.current) return;
 
     const roots = filterRootMessages(paged.result ?? []);
+    const total = paged.total ?? 0;
+    const loadedThrough = (pageIndex + 1) * PAGE_SIZE;
     setMessages((prev) => (append ? [...prev, ...roots] : roots));
-    setHasMore((pageIndex + 1) * PAGE_SIZE < (paged.total ?? 0));
+    setHasMore(loadedThrough < total);
+    setRemainingMore(Math.max(0, Math.min(PAGE_SIZE, total - loadedThrough)));
     setError(null);
   }, [conversationId]);
 
@@ -79,5 +83,5 @@ export function useRootMessages(conversationId: string | null) {
       });
   }, [conversationId, loadPage]);
 
-  return { messages, loading, loadingMore, hasMore, error, loadMore, refresh };
+  return { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh };
 }
