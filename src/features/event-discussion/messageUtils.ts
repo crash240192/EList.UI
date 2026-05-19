@@ -1,5 +1,15 @@
 import type { IMessage } from '@/entities/conversation';
 
+export function messageInitials(msg: IMessage): string {
+  const first = msg.personInfo?.firstName?.trim() ?? '';
+  const last = msg.personInfo?.lastName?.trim() ?? '';
+  const login = msg.account?.login?.trim() ?? '';
+  if (first && last) return `${first[0]}${last[0]}`.toUpperCase();
+  if (first) return first[0].toUpperCase();
+  if (login) return login[0].toUpperCase();
+  return '?';
+}
+
 export function messageAuthorName(msg: IMessage): string {
   const first = msg.personInfo?.firstName?.trim() ?? '';
   const last = msg.personInfo?.lastName?.trim() ?? '';

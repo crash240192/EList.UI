@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { IMessage } from '@/entities/conversation';
 import { updateMessage } from '@/entities/conversation';
-import { messageAuthorName, formatMessageDate } from './messageUtils';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
+import { messageAuthorName, messageInitials, formatMessageDate } from './messageUtils';
 import { MessageReplies } from './MessageReplies';
 import styles from './MessageRow.module.css';
 
@@ -20,7 +21,7 @@ export function MessageRow({
   currentAccountId,
   onReply,
 }: MessageRowProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(message.replied);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.messageText);
   const [displayText, setDisplayText] = useState(message.messageText);
@@ -29,11 +30,17 @@ export function MessageRow({
 
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
   const canExpand = message.replied;
+  const accountId = message.accountId ?? message.account?.id ?? '';
+  const initials = messageInitials(message);
 
   useEffect(() => {
     setDisplayText(message.messageText);
     setEditText(message.messageText);
   }, [message.messageText]);
+
+  useEffect(() => {
+    if (message.replied) setExpanded(true);
+  }, [message.replied]);
 
   const startEdit = () => {
     setEditText(displayText);
@@ -74,64 +81,77 @@ export function MessageRow({
   };
 
   return (
-    <article className={styles.row} style={{ marginLeft: depth * 16 }}>
-      <header className={styles.head}>
-        <span className={styles.author}>{messageAuthorName(message)}</span>
-        {isMine && <span className={styles.you}>вы</span>}
-        <time className={styles.time}>{formatMessageDate(message.createDate)}</time>
-      </header>
+    <div className={styles.wrap} style={{ marginLeft: depth > 0 ? Math.min(depth * 14, 56) : 0 }}>
+      <article className={`${styles.card} ${isMine ? styles.cardMine : ''}`}>
+        <div className={styles.cardInner}>
+          {accountId ? (
+            <UserAvatar accountId={accountId} initials={initials} size={36} className={styles.avatar} />
+          ) : (
+            <div className={styles.avatarFallback} aria-hidden>
+              {initials}
+            </div>
+          )}
+          <div className={styles.content}>
+            <header className={styles.head}>
+              <span className={styles.author}>{messageAuthorName(message)}</span>
+              {isMine && <span className={styles.you}>вы</span>}
+              <time className={styles.time}>{formatMessageDate(message.createDate)}</time>
+            </header>
 
-      {editing ? (
-        <div className={styles.editBlock}>
-          <textarea
-            className={styles.editInput}
-            rows={3}
-            value={editText}
-            disabled={savingEdit}
-            onChange={(e) => setEditText(e.target.value)}
-          />
-          {editError && <p className={styles.editError}>{editError}</p>}
-          <div className={styles.editActions}>
-            <button type="button" className={styles.linkBtn} disabled={savingEdit} onClick={cancelEdit}>
-              Отмена
-            </button>
-            <button
-              type="button"
-              className={styles.saveBtn}
-              disabled={savingEdit || !editText.trim()}
-              onClick={() => void saveEdit()}
-            >
-              {savingEdit ? 'Сохранение…' : 'Сохранить'}
-            </button>
+            {editing ? (
+              <div className={styles.editBlock}>
+                <textarea
+                  className={styles.editInput}
+                  rows={3}
+                  value={editText}
+                  disabled={savingEdit}
+                  onChange={(e) => setEditText(e.target.value)}
+                />
+                {editError && <p className={styles.editError}>{editError}</p>}
+                <div className={styles.editActions}>
+                  <button type="button" className={styles.linkBtn} disabled={savingEdit} onClick={cancelEdit}>
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.saveBtn}
+                    disabled={savingEdit || !editText.trim()}
+                    onClick={() => void saveEdit()}
+                  >
+                    {savingEdit ? 'Сохранение…' : 'Сохранить'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className={styles.text}>{displayText}</p>
+            )}
+
+            {!editing && (
+              <footer className={styles.foot}>
+                {currentAccountId && (
+                  <button type="button" className={styles.linkBtn} onClick={() => onReply(message)}>
+                    Ответить
+                  </button>
+                )}
+                {isMine && (
+                  <button type="button" className={styles.linkBtn} onClick={startEdit}>
+                    Редактировать
+                  </button>
+                )}
+                {canExpand && (
+                  <button
+                    type="button"
+                    className={styles.linkBtn}
+                    onClick={() => setExpanded((v) => !v)}
+                  >
+                    {expanded ? 'Скрыть ответы' : 'Показать ответы'}
+                  </button>
+                )}
+              </footer>
+            )}
           </div>
         </div>
-      ) : (
-        <p className={styles.text}>{displayText}</p>
-      )}
-
-      {!editing && (
-        <footer className={styles.foot}>
-          {currentAccountId && (
-            <button type="button" className={styles.linkBtn} onClick={() => onReply(message)}>
-              Ответить
-            </button>
-          )}
-          {isMine && (
-            <button type="button" className={styles.linkBtn} onClick={startEdit}>
-              Редактировать
-            </button>
-          )}
-          {canExpand && (
-            <button
-              type="button"
-              className={styles.linkBtn}
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded ? 'Скрыть ответы' : 'Показать ответы'}
-            </button>
-          )}
-        </footer>
-      )}
+      </article>
 
       {canExpand && expanded && (
         <MessageReplies
@@ -142,6 +162,6 @@ export function MessageRow({
           onReply={onReply}
         />
       )}
-    </article>
+    </div>
   );
 }
