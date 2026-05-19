@@ -81,7 +81,7 @@ export function MessageRow({
   };
 
   return (
-    <div className={styles.wrap} style={{ marginLeft: depth > 0 ? Math.min(depth * 14, 56) : 0 }}>
+    <div className={styles.wrap}>
       <article className={`${styles.card} ${isMine ? styles.cardMine : ''}`}>
         <div className={styles.cardInner}>
           {accountId ? (

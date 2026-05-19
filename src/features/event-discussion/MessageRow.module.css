@@ -1,14 +1,14 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .card {
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
+  border-radius: 8px;
+  padding: 8px 10px;
   transition: border-color 0.15s;
 }
 
@@ -23,7 +23,7 @@
 .cardInner {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
 }
 
 .avatar {
@@ -49,7 +49,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .head {
@@ -89,8 +89,8 @@
 .foot {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 14px;
-  padding-top: 2px;
+  gap: 8px 12px;
+  padding-top: 0;
 }
 
 .linkBtn {
