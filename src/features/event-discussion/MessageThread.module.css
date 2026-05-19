@@ -1,0 +1,43 @@
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.muted {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--danger, #e74c3c);
+}
+
+.moreBtn {
+  align-self: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2, var(--bg-secondary));
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.moreBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.moreBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

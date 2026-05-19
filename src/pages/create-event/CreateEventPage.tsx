@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchEventById, fetchEventTypes as fetchAllEventTypes, MOCK_EVENTS, assignEventParameters } from '@/entities/event';
+import { fetchEventById, fetchEventTypes as fetchAllEventTypes, MOCK_EVENTS, assignEventParameters, fetchEventOrganizators } from '@/entities/event';
 import type { IEventType } from '@/entities/event';
 import { fetchEventTypesByEvent, getBWList, addToBWList, removeFromBWList, type BWListType, type IBWListUser } from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
@@ -20,6 +20,7 @@ import type { IAlbum } from '@/entities/media/albumApi';
 import { assignAlbumToEvent } from '@/entities/media/albumApi';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { InviteModal } from '@/features/event/InviteModal';
+import { EventDiscussionsAdmin } from '@/features/event-discussion';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
 import { WhitelistModal } from './WhitelistModal';
@@ -102,6 +103,7 @@ export default function CreateEventPage() {
   const [whitelist, setWhitelist] = useState<IWhitelistUser[]>([]);
   const [blacklist, setBlacklist] = useState<IWhitelistUser[]>([]);
   const [listModalOpen, setListModalOpen] = useState(false);
+  const [isEventOrganizer, setIsEventOrganizer] = useState(false);
 
   // Кошелёк / тариф
   const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
@@ -154,7 +156,12 @@ export default function CreateEventPage() {
       : fetchEventById(id!);
     const loadTypes = USE_MOCK ? Promise.resolve([]) : fetchEventTypesByEvent(id!);
 
-    Promise.all([loadEvent, loadTypes]).then(([ev, evTypes]) => {
+    const loadOrganizers = USE_MOCK || !accountId
+      ? Promise.resolve(false)
+      : fetchEventOrganizators(id!).then((orgs) => orgs.some((o) => o.accountId === accountId));
+
+    Promise.all([loadEvent, loadTypes, loadOrganizers]).then(([ev, evTypes, isOrg]) => {
+      setIsEventOrganizer(isOrg);
       const toDate = (s: string) => s.slice(0, 10);
       const toTime = (s: string) => s.slice(11, 16);
       setForm({
@@ -206,7 +213,7 @@ export default function CreateEventPage() {
         if (catId) setSelectedCategories([catId]);
       }
     }).finally(() => setLoading(false));
-  }, [id, isEditing]);
+  }, [id, isEditing, accountId]);
 
   // Вспомогательные
   const set = (key: keyof FormState) =>
@@ -781,6 +788,12 @@ export default function CreateEventPage() {
             eventId={isEditing ? (id ?? null) : null}
           />
         </Section>
+
+        {isEditing && isEventOrganizer && id && (
+          <Section title="Обсуждения">
+            <EventDiscussionsAdmin eventId={id} />
+          </Section>
+        )}
 
       </div>
 

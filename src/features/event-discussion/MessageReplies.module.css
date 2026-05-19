@@ -1,0 +1,40 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+  margin-left: 16px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+}
+
+.hint {
+  margin: 4px 0 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.error {
+  margin: 4px 0 0 16px;
+  font-size: 13px;
+  color: var(--danger, #e74c3c);
+}
+
+.moreBtn {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.moreBtn:hover {
+  text-decoration: underline;
+}
+
+.moreBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -21,6 +21,7 @@ import { YandexMap } from '@/features/event-map/YandexMap';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { RatingWidget } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
+import { EventDiscussionsPanel } from '@/features/event-discussion';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -425,16 +426,12 @@ export default function EventPage() {
               </div>
             )}
 
-            {/* Обсуждения — заглушка */}
-            <div>
-              <div className={styles.secLabel}>Обсуждение</div>
-              <div className={styles.discussionStub}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: .4, display: 'block', margin: '0 auto 6px' }}>
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-                Обсуждения появятся в следующем обновлении
+            {id && (
+              <div>
+                <div className={styles.secLabel}>Обсуждения</div>
+                <EventDiscussionsPanel eventId={id} currentAccountId={accountId} />
               </div>
-            </div>
+            )}
 
           </div>
         </div>{/* end mainGrid */}
