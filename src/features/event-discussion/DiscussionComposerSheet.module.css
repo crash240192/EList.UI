@@ -1,18 +1,8 @@
-.overlay {
-  position: absolute;
+.dim {
+  position: fixed;
   inset: 0;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  pointer-events: none;
-}
-
-.backdrop {
-  position: absolute;
-  inset: 0;
+  z-index: 500;
   background: rgba(0, 0, 0, 0.22);
-  pointer-events: none;
   animation: fadeIn 0.15s ease;
 }
 
@@ -22,12 +12,13 @@
 }
 
 .sheet {
-  position: relative;
-  z-index: 1;
-  width: 100%;
+  position: fixed;
+  z-index: 501;
   box-sizing: border-box;
   padding-top: 10px;
-  background: linear-gradient(to bottom, transparent 0%, var(--surface) 28%);
+  max-height: min(45vh, 360px);
+  overflow-y: auto;
+  background: linear-gradient(to bottom, transparent 0%, var(--surface) 22%);
   pointer-events: auto;
   animation: slideUp 0.22s ease;
 }

@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import type { CSSProperties, Ref, RefObject } from 'react';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { MessageComposer } from './MessageComposer';
+import type { DiscussionSlotRect } from './useDiscussionSlotRect';
 import styles from './DiscussionComposerSheet.module.css';
 
 interface DiscussionComposerSheetProps {
@@ -9,10 +12,12 @@ interface DiscussionComposerSheetProps {
   replyingTo: string | null;
   onCancelReply: () => void;
   onSubmit: (text: string) => Promise<void>;
-  sheetRef?: React.RefObject<HTMLDivElement | null>;
+  sheetRef?: RefObject<HTMLDivElement | null>;
+  /** Колонка обсуждения в viewport — форма fixed внизу экрана с этой шириной */
+  slot: DiscussionSlotRect;
 }
 
-/** Оверлей внутри блока обсуждения — та же форма, что и внизу ленты */
+/** Fixed внизу viewport, ширина как у блока обсуждения (не конец длинного списка) */
 export function DiscussionComposerSheet({
   open,
   onClose,
@@ -20,8 +25,9 @@ export function DiscussionComposerSheet({
   onCancelReply,
   onSubmit,
   sheetRef,
+  slot,
 }: DiscussionComposerSheetProps) {
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const dimRef = useRef<HTMLDivElement>(null);
   const localSheetRef = useRef<HTMLDivElement>(null);
   const resolvedSheetRef = sheetRef ?? localSheetRef;
 
@@ -33,10 +39,6 @@ export function DiscussionComposerSheet({
     const onDocumentPointerDown = (e: PointerEvent) => {
       const target = e.target as Node;
       if (resolvedSheetRef.current?.contains(target)) return;
-      if (overlayRef.current?.contains(target)) {
-        onClose();
-        return;
-      }
       onClose();
     };
 
@@ -46,16 +48,22 @@ export function DiscussionComposerSheet({
 
   if (!open) return null;
 
-  return (
-    <div ref={overlayRef} className={styles.overlay} role="presentation">
-      <div className={styles.backdrop} aria-hidden />
+  const sheetStyle: CSSProperties = {
+    left: slot.width > 0 ? Math.max(8, slot.left) : 8,
+    width: slot.width > 0 ? Math.max(200, Math.min(slot.width, window.innerWidth - 16)) : Math.min(560, window.innerWidth - 16),
+    bottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
+  };
+
+  return createPortal(
+    <>
+      <div ref={dimRef} className={styles.dim} onClick={onClose} role="presentation" aria-hidden />
       <div
-        ref={resolvedSheetRef}
+        ref={resolvedSheetRef as Ref<HTMLDivElement>}
         className={styles.sheet}
+        style={sheetStyle}
         role="dialog"
         aria-modal
         aria-label="Написать комментарий"
-        onPointerDown={(e) => e.stopPropagation()}
       >
         <MessageComposer
           autoFocus
@@ -64,6 +72,7 @@ export function DiscussionComposerSheet({
           onSubmit={onSubmit}
         />
       </div>
-    </div>
+    </>,
+    document.body,
   );
 }

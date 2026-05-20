@@ -19,10 +19,6 @@
 }
 
 .fab {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  z-index: 18;
   width: 52px;
   height: 52px;
   border-radius: 50%;

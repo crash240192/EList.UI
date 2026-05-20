@@ -4,7 +4,7 @@ export const discussionMessageDomId = (messageId: string) => `discussion-msg-${m
 
 const DEFAULT_COMPOSER_HEIGHT = 220;
 
-function findScrollParent(el: HTMLElement): HTMLElement | null {
+export function findScrollParent(el: HTMLElement): HTMLElement | null {
   let parent = el.parentElement;
   while (parent) {
     const { overflowY } = getComputedStyle(parent);

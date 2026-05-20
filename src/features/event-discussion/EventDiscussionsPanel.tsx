@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { IConversation } from '@/entities/conversation';
 import { fetchEventConversations } from '@/entities/conversation';
 import { MessageThread } from './MessageThread';
@@ -14,6 +14,7 @@ export function EventDiscussionsPanel({ eventId, currentAccountId }: EventDiscus
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const layoutBoundsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -60,11 +61,12 @@ export function EventDiscussionsPanel({ eventId, currentAccountId }: EventDiscus
           </button>
         ))}
       </div>
-      <div className={styles.body} role="tabpanel">
+      <div ref={layoutBoundsRef} className={styles.body} role="tabpanel">
         <MessageThread
           key={active.id}
           conversationId={active.id}
           currentAccountId={currentAccountId}
+          layoutBoundsRef={layoutBoundsRef}
         />
       </div>
     </div>
