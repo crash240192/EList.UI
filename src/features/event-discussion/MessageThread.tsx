@@ -6,7 +6,8 @@ import { useRootMessages } from './useRootMessages';
 import { MessageRow } from './MessageRow';
 import { MessageComposer } from './MessageComposer';
 import { DiscussionComposerSheet } from './DiscussionComposerSheet';
-import { messageAuthorName, needsReplyScrollTailSpacer, scrollMessageIntoViewForReply } from './messageUtils';
+import { messageAuthorName, needsReplyScrollTailSpacer, scrollMessageIntoViewForReply, discussionMessageDomId, findScrollParent } from './messageUtils';
+import type { HoleRect } from './discussionDimClipPath';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import { useDiscussionSlotRect } from './useDiscussionSlotRect';
 import styles from './MessageThread.module.css';
@@ -28,6 +29,7 @@ function MessageThreadInner({
   const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
   const [replyScrollTailPx, setReplyScrollTailPx] = useState(0);
+  const [replyHighlightHole, setReplyHighlightHole] = useState<HoleRect | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dockVisible, setDockVisible] = useState(true);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -51,6 +53,7 @@ function MessageThreadInner({
     setSheetOpen(false);
     setReplyTarget(null);
     setReplyScrollTailPx(0);
+    setReplyHighlightHole(null);
   }, []);
 
   const handleReply = useCallback((message: IMessage) => {
@@ -61,23 +64,57 @@ function MessageThreadInner({
   }, []);
 
   useLayoutEffect(() => {
-    if (!sheetOpen || !replyTarget) return;
+    if (!sheetOpen) {
+      setReplyHighlightHole(null);
+      return;
+    }
+
+    if (!replyTarget) {
+      setReplyHighlightHole(null);
+      return;
+    }
+
+    const mid = replyTarget.id;
+
+    const updateHole = () => {
+      const el = document.getElementById(discussionMessageDomId(mid));
+      if (!el) {
+        setReplyHighlightHole(null);
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      setReplyHighlightHole({ top: r.top, left: r.left, width: r.width, height: r.height });
+    };
 
     const scrollToReply = () => {
       const composerHeight = sheetRef.current?.offsetHeight ?? 220;
-      scrollMessageIntoViewForReply(replyTarget.id, composerHeight);
+      scrollMessageIntoViewForReply(mid, composerHeight);
+      updateHole();
     };
 
+    updateHole();
+    const anchorEl = document.getElementById(discussionMessageDomId(mid));
+    const scrollRoot = anchorEl ? findScrollParent(anchorEl) : null;
+
+    window.addEventListener('resize', updateHole);
+    window.addEventListener('scroll', updateHole, true);
+    scrollRoot?.addEventListener('scroll', updateHole, { passive: true });
+
     scrollToReply();
+    let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
       scrollToReply();
-      requestAnimationFrame(scrollToReply);
+      raf2 = requestAnimationFrame(scrollToReply);
     });
     const delayed = window.setTimeout(scrollToReply, 340);
 
     return () => {
       cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
       window.clearTimeout(delayed);
+      window.removeEventListener('resize', updateHole);
+      window.removeEventListener('scroll', updateHole, true);
+      scrollRoot?.removeEventListener('scroll', updateHole);
     };
   }, [sheetOpen, replyTarget, replyScrollTailPx]);
 
@@ -188,6 +225,7 @@ function MessageThreadInner({
         open={sheetOpen}
         sheetRef={sheetRef}
         slot={slot}
+        highlightHole={replyTarget ? replyHighlightHole : null}
         onClose={closeSheet}
         replyingTo={replyTarget ? messageAuthorName(replyTarget) : null}
         onCancelReply={() => setReplyTarget(null)}
