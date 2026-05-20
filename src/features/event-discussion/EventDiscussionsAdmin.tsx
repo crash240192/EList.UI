@@ -6,6 +6,8 @@ import {
   fetchEventConversations,
 } from '@/entities/conversation';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
+import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
+import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import styles from './EventDiscussionsAdmin.module.css';
 
 interface EventDiscussionsAdminProps {
@@ -19,6 +21,8 @@ export function EventDiscussionsAdmin({ eventId }: EventDiscussionsAdminProps) {
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const showAdminSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -73,8 +77,17 @@ export function EventDiscussionsAdmin({ eventId }: EventDiscussionsAdminProps) {
       {error && <p className={styles.error}>{error}</p>}
 
       {loading ? (
-        <div className={styles.preloadRow} role="status" aria-label="Загрузка">
-          <AppPreloader layout="inline" size="md" role="none" />
+        <div className={styles.adminSkeleton} role="status" aria-label="Загрузка">
+          <div className={styles.adminSkeletonRow}>
+            <div className={styles.adminSkeletonName} />
+            {showAdminSpinner ? (
+              <div className={styles.adminSkeletonSpinnerSlot}>
+                <AppPreloader size="sm" layout="inline" role="presentation" />
+              </div>
+            ) : (
+              <div className={styles.adminSkeletonBtnStub} aria-hidden />
+            )}
+          </div>
         </div>
       ) : conversations.length > 0 ? (
         <ul className={styles.list}>

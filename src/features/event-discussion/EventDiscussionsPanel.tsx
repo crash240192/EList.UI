@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import type { IConversation } from '@/entities/conversation';
 import { fetchEventConversations } from '@/entities/conversation';
 import { MessageThread } from './MessageThread';
-import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
+import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
+import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
+import { EventDiscussionsPanelSkeleton } from './EventDiscussionsPanelSkeleton';
 import styles from './EventDiscussionsPanel.module.css';
 
 interface EventDiscussionsPanelProps {
@@ -16,6 +18,7 @@ export function EventDiscussionsPanel({ eventId, currentAccountId }: EventDiscus
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const layoutBoundsRef = useRef<HTMLDivElement>(null);
+  const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
 
   useEffect(() => {
     setLoading(true);
@@ -34,8 +37,8 @@ export function EventDiscussionsPanel({ eventId, currentAccountId }: EventDiscus
 
   if (loading) {
     return (
-      <div className={styles.loadingWrap} role="status" aria-label="Загрузка обсуждений">
-        <AppPreloader layout="block" size="md" role="none" />
+      <div className={styles.panel} role="status" aria-label="Загрузка обсуждений">
+        <EventDiscussionsPanelSkeleton showSpinner={showPanelSpinner} />
       </div>
     );
   }

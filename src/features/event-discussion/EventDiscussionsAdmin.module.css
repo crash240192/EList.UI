@@ -11,10 +11,60 @@
   line-height: 1.5;
 }
 
-.preloadRow {
+.adminSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.adminSkeletonRow {
   display: flex;
   align-items: center;
-  min-height: 40px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2, var(--bg-secondary));
+}
+
+.adminSkeletonName {
+  flex: 1;
+  height: 14px;
+  max-width: 220px;
+  border-radius: 4px;
+  background: var(--surface);
+  animation: adminStubPulse 1.1s ease-in-out infinite;
+}
+
+.adminSkeletonBtnStub {
+  width: 76px;
+  height: 30px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: var(--surface);
+  animation: adminStubPulse 1.1s ease-in-out infinite;
+  animation-delay: 0.08s;
+}
+
+.adminSkeletonSpinnerSlot {
+  width: 76px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes adminStubPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.48;
+  }
 }
 
 .error {

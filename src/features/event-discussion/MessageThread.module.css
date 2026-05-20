@@ -49,8 +49,8 @@
   gap: 6px;
 }
 
-.threadPreload {
-  align-self: center;
+.skeletonStatus {
+  align-self: stretch;
 }
 
 .muted {

@@ -11,6 +11,9 @@ import type { HoleRect } from './discussionDimClipPath';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import { useDiscussionSlotRect } from './useDiscussionSlotRect';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
+import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
+import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
+import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import styles from './MessageThread.module.css';
 
 interface MessageThreadProps {
@@ -149,6 +152,9 @@ function MessageThreadInner({
   const trackSlot = sheetOpen || showFab;
   const slot = useDiscussionSlotRect(boundsRef, trackSlot);
 
+  const showThreadSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
+  const showMoreSpinner = useDelayedBusy(loadingMore, DISCUSSION_PRELOADER_DELAY_MS);
+
   const fabStyle: CSSProperties | undefined = showFab
     ? {
         position: 'fixed',
@@ -164,36 +170,44 @@ function MessageThreadInner({
   return (
     <div ref={threadRef} className={styles.thread}>
       {loading && (
-        <AppPreloader layout="block" size="md" aria-label="Загрузка комментариев" className={styles.threadPreload} />
+        <div className={styles.skeletonStatus} role="status" aria-label="Загрузка комментариев">
+          <DiscussionMessageSkeleton variant="thread" showSpinner={showThreadSpinner} />
+        </div>
       )}
-      {error && <p className={styles.error}>{error}</p>}
+      {!loading && error && <p className={styles.error}>{error}</p>}
       {!loading && !error && messages.length === 0 && (
         <p className={styles.muted}>Пока нет комментариев. Будьте первым!</p>
       )}
-      <div className={styles.list}>
-        {messages.map((msg) => (
-          <MessageRow
-            key={msg.id}
-            message={msg}
-            depth={0}
-            highlighted={activeReplyId === msg.id}
-            activeReplyId={activeReplyId}
-            conversationId={conversationId}
-            currentAccountId={currentAccountId}
-            onReply={handleReply}
-          />
-        ))}
-      </div>
-      {hasMore && (
+      {!loading && (
+        <div className={styles.list}>
+          {messages.map((msg) => (
+            <MessageRow
+              key={msg.id}
+              message={msg}
+              depth={0}
+              highlighted={activeReplyId === msg.id}
+              activeReplyId={activeReplyId}
+              conversationId={conversationId}
+              currentAccountId={currentAccountId}
+              onReply={handleReply}
+            />
+          ))}
+        </div>
+      )}
+      {hasMore && !loading && !error && (
         <button
           type="button"
-          className={`${styles.moreBtn} ${loadingMore ? styles.moreBtnLoading : ''}`}
+          className={`${styles.moreBtn} ${loadingMore && showMoreSpinner ? styles.moreBtnLoading : ''}`}
           disabled={loadingMore}
           onClick={loadMore}
           aria-busy={loadingMore}
           aria-label={loadingMore ? 'Загрузка' : undefined}
         >
-          {loadingMore ? <AppPreloader size="sm" layout="inline" role="none" /> : `Загрузить ещё (${remainingMore})`}
+          {loadingMore && showMoreSpinner ? (
+            <AppPreloader size="sm" layout="inline" role="none" />
+          ) : (
+            `Загрузить ещё (${remainingMore})`
+          )}
         </button>
       )}
 

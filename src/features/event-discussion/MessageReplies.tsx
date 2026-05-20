@@ -3,6 +3,9 @@ import type { IMessage } from '@/entities/conversation';
 import { fetchMessageReplies } from '@/entities/conversation';
 import { MessageRow } from './MessageRow';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
+import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
+import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
+import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import styles from './MessageReplies.module.css';
 
 const PAGE_SIZE = 5;
@@ -66,10 +69,13 @@ export function MessageReplies({
   const childDepth = depth + 1;
   const remaining = Math.max(0, total - items.length);
 
+  const showRepliesSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
+  const showMoreSpinner = useDelayedBusy(loadingMore, DISCUSSION_PRELOADER_DELAY_MS);
+
   if (loading) {
     return (
-      <div className={styles.hint}>
-        <AppPreloader layout="block" size="md" aria-label="Загрузка ответов" />
+      <div className={styles.skeletonRoot} role="status" aria-label="Загрузка ответов">
+        <DiscussionMessageSkeleton variant="replies" showSpinner={showRepliesSpinner} />
       </div>
     );
   }
@@ -99,13 +105,17 @@ export function MessageReplies({
       {hasMore && (
         <button
           type="button"
-          className={`${styles.moreBtn} ${loadingMore ? styles.moreBtnLoading : ''}`}
+          className={`${styles.moreBtn} ${loadingMore && showMoreSpinner ? styles.moreBtnLoading : ''}`}
           disabled={loadingMore}
           onClick={loadMore}
           aria-busy={loadingMore}
           aria-label={loadingMore ? 'Загрузка' : undefined}
         >
-          {loadingMore ? <AppPreloader size="sm" layout="inline" role="none" /> : `Загрузить ещё (${remaining})`}
+          {loadingMore && showMoreSpinner ? (
+            <AppPreloader size="sm" layout="inline" role="none" />
+          ) : (
+            `Загрузить ещё (${remaining})`
+          )}
         </button>
       )}
     </div>

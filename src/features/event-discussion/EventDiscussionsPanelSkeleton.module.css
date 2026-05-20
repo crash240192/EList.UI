@@ -1,0 +1,46 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tabsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabStub {
+  height: 34px;
+  width: 112px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  animation: panelTabPulse 1.1s ease-in-out infinite;
+}
+
+.tabStubNarrow {
+  height: 34px;
+  width: 80px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  animation: panelTabPulse 1.1s ease-in-out infinite;
+  animation-delay: 0.1s;
+}
+
+.body {
+  position: relative;
+  min-height: 100px;
+}
+
+@keyframes panelTabPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
