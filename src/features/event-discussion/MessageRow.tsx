@@ -88,7 +88,7 @@ export function MessageRow({
   };
 
   return (
-    <div id={discussionMessageDomId(message.id)} className={styles.wrap}>
+    <div id={discussionMessageDomId(message.id)} className={`${styles.wrap} ${highlighted ? styles.wrapReplyTarget : ''}`}>
       <article className={`${styles.card} ${isMine ? styles.cardMine : ''} ${highlighted ? styles.cardHighlight : ''}`}>
         <div className={styles.cardInner}>
           {accountId ? (

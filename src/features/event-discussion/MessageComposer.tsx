@@ -28,7 +28,9 @@ export function MessageComposer({
 
   useEffect(() => {
     if (autoFocus) {
-      const t = window.setTimeout(() => inputRef.current?.focus(), 120);
+      const t = window.setTimeout(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      }, 180);
       return () => window.clearTimeout(t);
     }
   }, [autoFocus, replyingTo]);

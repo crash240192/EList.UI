@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { IMessage } from '@/entities/conversation';
 import { createMessage } from '@/entities/conversation';
 import { useRootMessages } from './useRootMessages';
 import { MessageRow } from './MessageRow';
 import { MessageComposer } from './MessageComposer';
 import { DiscussionComposerSheet } from './DiscussionComposerSheet';
-import { discussionMessageDomId, messageAuthorName } from './messageUtils';
+import { messageAuthorName, scrollMessageIntoViewForReply } from './messageUtils';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import styles from './MessageThread.module.css';
 
@@ -22,6 +22,7 @@ function MessageThreadInner({ conversationId, currentAccountId }: MessageThreadP
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dockVisible, setDockVisible] = useState(true);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const node = anchorRef.current;
@@ -43,13 +44,25 @@ function MessageThreadInner({ conversationId, currentAccountId }: MessageThreadP
   const handleReply = useCallback((message: IMessage) => {
     setReplyTarget(message);
     setSheetOpen(true);
-    window.setTimeout(() => {
-      document.getElementById(discussionMessageDomId(message.id))?.scrollIntoView({
-        block: 'center',
-        behavior: 'smooth',
-      });
-    }, 80);
   }, []);
+
+  useLayoutEffect(() => {
+    if (!sheetOpen || !replyTarget) return;
+
+    const scrollToReply = () => {
+      const composerHeight = sheetRef.current?.offsetHeight ?? 220;
+      scrollMessageIntoViewForReply(replyTarget.id, composerHeight);
+    };
+
+    scrollToReply();
+    const frame = requestAnimationFrame(scrollToReply);
+    const delayed = window.setTimeout(scrollToReply, 280);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(delayed);
+    };
+  }, [sheetOpen, replyTarget]);
 
   const openSheetForNewComment = useCallback(() => {
     setReplyTarget(null);
@@ -135,6 +148,7 @@ function MessageThreadInner({ conversationId, currentAccountId }: MessageThreadP
 
       <DiscussionComposerSheet
         open={sheetOpen}
+        sheetRef={sheetRef}
         onClose={closeSheet}
         replyingTo={replyTarget ? messageAuthorName(replyTarget) : null}
         onCancelReply={() => setReplyTarget(null)}

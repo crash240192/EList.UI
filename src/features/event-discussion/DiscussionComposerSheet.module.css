@@ -11,12 +11,8 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  border: none;
-  padding: 0;
-  margin: 0;
   background: rgba(0, 0, 0, 0.22);
-  cursor: pointer;
-  pointer-events: auto;
+  pointer-events: none;
   animation: fadeIn 0.15s ease;
 }
 
