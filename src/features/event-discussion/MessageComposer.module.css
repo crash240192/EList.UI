@@ -9,6 +9,14 @@
   border-radius: 8px;
 }
 
+.wrapEmbedded {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
 .replyBanner {
   display: flex;
   align-items: center;

@@ -20,6 +20,11 @@
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border) 65%);
 }
 
+.cardHighlight {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
 .cardInner {
   display: flex;
   align-items: flex-start;

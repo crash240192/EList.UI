@@ -1,5 +1,7 @@
 import type { IMessage } from '@/entities/conversation';
 
+export const discussionMessageDomId = (messageId: string) => `discussion-msg-${messageId}`;
+
 export function messageInitials(msg: IMessage): string {
   const first = msg.personInfo?.firstName?.trim() ?? '';
   const last = msg.personInfo?.lastName?.trim() ?? '';

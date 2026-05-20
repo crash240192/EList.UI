@@ -10,6 +10,7 @@ interface MessageRepliesProps {
   parent: IMessage;
   depth: number;
   refreshKey: number;
+  activeReplyId?: string | null;
   conversationId: string;
   currentAccountId: string | null;
   onReply: (message: IMessage) => void;
@@ -19,6 +20,7 @@ export function MessageReplies({
   parent,
   depth,
   refreshKey,
+  activeReplyId = null,
   conversationId,
   currentAccountId,
   onReply,
@@ -82,6 +84,8 @@ export function MessageReplies({
           key={msg.id}
           message={msg}
           depth={childDepth}
+          highlighted={activeReplyId === msg.id}
+          activeReplyId={activeReplyId}
           currentAccountId={currentAccountId}
           conversationId={conversationId}
           onReply={onReply}

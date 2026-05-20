@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IMessage } from '@/entities/conversation';
 import { createMessage } from '@/entities/conversation';
 import { useRootMessages } from './useRootMessages';
 import { MessageRow } from './MessageRow';
 import { MessageComposer } from './MessageComposer';
-import { messageAuthorName } from './messageUtils';
+import { DiscussionComposerSheet } from './DiscussionComposerSheet';
+import { discussionMessageDomId, messageAuthorName } from './messageUtils';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import styles from './MessageThread.module.css';
 
@@ -18,6 +19,42 @@ function MessageThreadInner({ conversationId, currentAccountId }: MessageThreadP
     useRootMessages(conversationId);
   const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [dockVisible, setDockVisible] = useState(true);
+  const anchorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const node = anchorRef.current;
+    if (!node || !currentAccountId) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setDockVisible(entry.isIntersecting),
+      { threshold: 0, rootMargin: '0px 0px 24px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [currentAccountId, messages.length, loading]);
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    setReplyTarget(null);
+  }, []);
+
+  const handleReply = useCallback((message: IMessage) => {
+    setReplyTarget(message);
+    setSheetOpen(true);
+    window.setTimeout(() => {
+      document.getElementById(discussionMessageDomId(message.id))?.scrollIntoView({
+        block: 'center',
+        behavior: 'smooth',
+      });
+    }, 80);
+  }, []);
+
+  const openSheetForNewComment = useCallback(() => {
+    setReplyTarget(null);
+    setSheetOpen(true);
+  }, []);
 
   const handleSubmit = async (text: string) => {
     if (!currentAccountId) return;
@@ -33,8 +70,12 @@ function MessageThreadInner({ conversationId, currentAccountId }: MessageThreadP
     } else {
       refresh();
     }
-    setReplyTarget(null);
+    closeSheet();
   };
+
+  const activeReplyId = sheetOpen ? replyTarget?.id ?? null : null;
+  const showDock = !!currentAccountId && dockVisible && !sheetOpen;
+  const showFab = !!currentAccountId && !dockVisible && !sheetOpen;
 
   return (
     <div className={styles.thread}>
@@ -49,9 +90,11 @@ function MessageThreadInner({ conversationId, currentAccountId }: MessageThreadP
             key={msg.id}
             message={msg}
             depth={0}
+            highlighted={activeReplyId === msg.id}
+            activeReplyId={activeReplyId}
             conversationId={conversationId}
             currentAccountId={currentAccountId}
-            onReply={setReplyTarget}
+            onReply={handleReply}
           />
         ))}
       </div>
@@ -60,15 +103,43 @@ function MessageThreadInner({ conversationId, currentAccountId }: MessageThreadP
           {loadingMore ? 'Загрузка…' : `Загрузить ещё (${remainingMore})`}
         </button>
       )}
-      {currentAccountId ? (
-        <MessageComposer
-          replyingTo={replyTarget ? messageAuthorName(replyTarget) : null}
-          onCancelReply={() => setReplyTarget(null)}
-          onSubmit={handleSubmit}
-        />
-      ) : (
+
+      <div ref={anchorRef} className={styles.composerAnchor}>
+        {showDock && (
+          <div className={styles.composerDock}>
+            <MessageComposer
+              replyingTo={replyTarget ? messageAuthorName(replyTarget) : null}
+              onCancelReply={() => setReplyTarget(null)}
+              onSubmit={handleSubmit}
+            />
+          </div>
+        )}
+      </div>
+
+      {!currentAccountId && (
         <p className={styles.muted}>Войдите, чтобы оставить комментарий</p>
       )}
+
+      {showFab && (
+        <button
+          type="button"
+          className={styles.fab}
+          aria-label="Написать комментарий"
+          onClick={openSheetForNewComment}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+        </button>
+      )}
+
+      <DiscussionComposerSheet
+        open={sheetOpen}
+        onClose={closeSheet}
+        replyingTo={replyTarget ? messageAuthorName(replyTarget) : null}
+        onCancelReply={() => setReplyTarget(null)}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

@@ -5,11 +5,14 @@ import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { messageAuthorName, messageInitials, formatMessageDate } from './messageUtils';
 import { MessageReplies } from './MessageReplies';
 import { useDiscussionRefresh } from './discussionRefreshContext';
+import { discussionMessageDomId } from './messageUtils';
 import styles from './MessageRow.module.css';
 
 interface MessageRowProps {
   message: IMessage;
   depth: number;
+  highlighted?: boolean;
+  activeReplyId?: string | null;
   conversationId: string;
   currentAccountId: string | null;
   onReply: (message: IMessage) => void;
@@ -18,6 +21,8 @@ interface MessageRowProps {
 export function MessageRow({
   message,
   depth,
+  highlighted = false,
+  activeReplyId = null,
   conversationId,
   currentAccountId,
   onReply,
@@ -83,8 +88,8 @@ export function MessageRow({
   };
 
   return (
-    <div className={styles.wrap}>
-      <article className={`${styles.card} ${isMine ? styles.cardMine : ''}`}>
+    <div id={discussionMessageDomId(message.id)} className={styles.wrap}>
+      <article className={`${styles.card} ${isMine ? styles.cardMine : ''} ${highlighted ? styles.cardHighlight : ''}`}>
         <div className={styles.cardInner}>
           {accountId ? (
             <UserAvatar accountId={accountId} initials={initials} size={36} className={styles.avatar} />
@@ -160,6 +165,7 @@ export function MessageRow({
           parent={message}
           depth={depth}
           refreshKey={replyBump}
+          activeReplyId={activeReplyId}
           conversationId={conversationId}
           currentAccountId={currentAccountId}
           onReply={onReply}
