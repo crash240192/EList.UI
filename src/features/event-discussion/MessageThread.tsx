@@ -6,7 +6,7 @@ import { useRootMessages } from './useRootMessages';
 import { MessageRow } from './MessageRow';
 import { MessageComposer } from './MessageComposer';
 import { DiscussionComposerSheet } from './DiscussionComposerSheet';
-import { messageAuthorName, scrollMessageIntoViewForReply } from './messageUtils';
+import { messageAuthorName, needsReplyScrollTailSpacer, scrollMessageIntoViewForReply } from './messageUtils';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import { useDiscussionSlotRect } from './useDiscussionSlotRect';
 import styles from './MessageThread.module.css';
@@ -27,6 +27,7 @@ function MessageThreadInner({
     useRootMessages(conversationId);
   const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
+  const [replyScrollTailPx, setReplyScrollTailPx] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dockVisible, setDockVisible] = useState(true);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -49,9 +50,12 @@ function MessageThreadInner({
   const closeSheet = useCallback(() => {
     setSheetOpen(false);
     setReplyTarget(null);
+    setReplyScrollTailPx(0);
   }, []);
 
   const handleReply = useCallback((message: IMessage) => {
+    const reserve = 320;
+    setReplyScrollTailPx(needsReplyScrollTailSpacer(message.id, reserve) ? 340 : 0);
     setReplyTarget(message);
     setSheetOpen(true);
   }, []);
@@ -65,17 +69,21 @@ function MessageThreadInner({
     };
 
     scrollToReply();
-    const frame = requestAnimationFrame(scrollToReply);
-    const delayed = window.setTimeout(scrollToReply, 280);
+    const raf1 = requestAnimationFrame(() => {
+      scrollToReply();
+      requestAnimationFrame(scrollToReply);
+    });
+    const delayed = window.setTimeout(scrollToReply, 340);
 
     return () => {
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(raf1);
       window.clearTimeout(delayed);
     };
-  }, [sheetOpen, replyTarget]);
+  }, [sheetOpen, replyTarget, replyScrollTailPx]);
 
   const openSheetForNewComment = useCallback(() => {
     setReplyTarget(null);
+    setReplyScrollTailPx(0);
     setSheetOpen(true);
   }, []);
 
@@ -140,6 +148,10 @@ function MessageThreadInner({
         <button type="button" className={styles.moreBtn} disabled={loadingMore} onClick={loadMore}>
           {loadingMore ? 'Загрузка…' : `Загрузить ещё (${remainingMore})`}
         </button>
+      )}
+
+      {sheetOpen && replyTarget && replyScrollTailPx > 0 && (
+        <div className={styles.replyScrollTail} style={{ height: replyScrollTailPx }} aria-hidden />
       )}
 
       <div ref={anchorRef} className={styles.composerAnchor}>

@@ -16,6 +16,24 @@ export function findScrollParent(el: HTMLElement): HTMLElement | null {
   return null;
 }
 
+/** Нужен ли доп. хвост внизу ленты, чтобы можно было прокрутить комментарий выше формы */
+export function needsReplyScrollTailSpacer(messageId: string, composerReservePx = 300): boolean {
+  const el = document.getElementById(discussionMessageDomId(messageId));
+  if (!el) return true;
+  const r = el.getBoundingClientRect();
+  const threshold = window.innerHeight - composerReservePx;
+  if (r.bottom > threshold - 8 || r.top > threshold - 48) return true;
+
+  const scrollParent = findScrollParent(el);
+  if (scrollParent) {
+    const atContentBottom =
+      scrollParent.scrollTop + scrollParent.clientHeight >= scrollParent.scrollHeight - 40;
+    if (atContentBottom) return true;
+  }
+
+  return false;
+}
+
 /** Центрирует комментарий в видимой области над выезжающей формой */
 export function scrollMessageIntoViewForReply(
   messageId: string,
@@ -35,10 +53,21 @@ export function scrollMessageIntoViewForReply(
   const bandHeight = Math.max(120, parentRect.height - composerHeight);
   const targetCenterY = parentRect.top + bandHeight * 0.5;
   const elCenterY = elRect.top + elRect.height / 2;
-  const delta = elCenterY - targetCenterY;
+  let delta = elCenterY - targetCenterY;
 
   if (Math.abs(delta) < 4) return;
-  scrollParent.scrollBy({ top: delta, behavior: 'smooth' });
+
+  const maxScrollTop = scrollParent.scrollHeight - scrollParent.clientHeight;
+  const proposedTop = scrollParent.scrollTop + delta;
+  const clampedTop = Math.max(0, Math.min(maxScrollTop, proposedTop));
+  const actualDelta = clampedTop - scrollParent.scrollTop;
+
+  if (Math.abs(actualDelta) < 1 && Math.abs(delta) > 4) {
+    // Не хватает scrollHeight (ещё нет нижнего отступа) — следующий кадр после спейсера
+    return;
+  }
+
+  scrollParent.scrollBy({ top: actualDelta, behavior: 'smooth' });
 }
 
 export function messageInitials(msg: IMessage): string {

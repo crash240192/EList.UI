@@ -6,6 +6,11 @@
   padding-bottom: 8px;
 }
 
+.replyScrollTail {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
 .composerAnchor {
   min-height: 1px;
 }
