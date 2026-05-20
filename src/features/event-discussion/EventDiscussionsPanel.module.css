@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  position: relative;
 }
 
 .tabs {
@@ -36,6 +37,7 @@
 }
 
 .body {
+  position: relative;
   min-height: 120px;
 }
 

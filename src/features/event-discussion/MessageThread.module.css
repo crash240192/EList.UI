@@ -19,10 +19,10 @@
 }
 
 .fab {
-  position: fixed;
-  right: max(20px, calc(50% - 480px + 20px));
-  bottom: max(20px, env(safe-area-inset-bottom, 0px));
-  z-index: 400;
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 18;
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -40,12 +40,6 @@
 .fab:hover {
   filter: brightness(1.06);
   transform: scale(1.04);
-}
-
-@media (max-width: 1020px) {
-  .fab {
-    right: 20px;
-  }
 }
 
 .list {
