@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { IConversation } from '@/entities/conversation';
 import { fetchEventConversations } from '@/entities/conversation';
 import { MessageThread } from './MessageThread';
+import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import styles from './EventDiscussionsPanel.module.css';
 
 interface EventDiscussionsPanelProps {
@@ -32,7 +33,11 @@ export function EventDiscussionsPanel({ eventId, currentAccountId }: EventDiscus
   }, [eventId]);
 
   if (loading) {
-    return <p className={styles.loading}>Загрузка обсуждений…</p>;
+    return (
+      <div className={styles.loadingWrap} role="status" aria-label="Загрузка обсуждений">
+        <AppPreloader layout="block" size="md" role="none" />
+      </div>
+    );
   }
 
   if (error) {

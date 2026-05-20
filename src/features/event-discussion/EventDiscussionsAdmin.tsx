@@ -5,6 +5,7 @@ import {
   deleteConversation,
   fetchEventConversations,
 } from '@/entities/conversation';
+import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import styles from './EventDiscussionsAdmin.module.css';
 
 interface EventDiscussionsAdminProps {
@@ -72,7 +73,9 @@ export function EventDiscussionsAdmin({ eventId }: EventDiscussionsAdminProps) {
       {error && <p className={styles.error}>{error}</p>}
 
       {loading ? (
-        <p className={styles.hint}>Загрузка…</p>
+        <div className={styles.preloadRow} role="status" aria-label="Загрузка">
+          <AppPreloader layout="inline" size="md" role="none" />
+        </div>
       ) : conversations.length > 0 ? (
         <ul className={styles.list}>
           {conversations.map((c) => (

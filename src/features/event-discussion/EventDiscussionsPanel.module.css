@@ -48,6 +48,14 @@
   color: var(--text-secondary);
 }
 
+.loadingWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  width: 100%;
+}
+
 .error {
   margin: 0;
   font-size: 14px;

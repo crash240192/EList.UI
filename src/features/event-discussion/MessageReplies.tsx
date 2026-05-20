@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { IMessage } from '@/entities/conversation';
 import { fetchMessageReplies } from '@/entities/conversation';
 import { MessageRow } from './MessageRow';
+import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import styles from './MessageReplies.module.css';
 
 const PAGE_SIZE = 5;
@@ -66,7 +67,11 @@ export function MessageReplies({
   const remaining = Math.max(0, total - items.length);
 
   if (loading) {
-    return <div className={styles.hint}>Загрузка ответов…</div>;
+    return (
+      <div className={styles.hint}>
+        <AppPreloader layout="block" size="md" aria-label="Загрузка ответов" />
+      </div>
+    );
   }
 
   if (error) {
@@ -92,8 +97,15 @@ export function MessageReplies({
         />
       ))}
       {hasMore && (
-        <button type="button" className={styles.moreBtn} disabled={loadingMore} onClick={loadMore}>
-          {loadingMore ? 'Загрузка…' : `Загрузить ещё (${remaining})`}
+        <button
+          type="button"
+          className={`${styles.moreBtn} ${loadingMore ? styles.moreBtnLoading : ''}`}
+          disabled={loadingMore}
+          onClick={loadMore}
+          aria-busy={loadingMore}
+          aria-label={loadingMore ? 'Загрузка' : undefined}
+        >
+          {loadingMore ? <AppPreloader size="sm" layout="inline" role="none" /> : `Загрузить ещё (${remaining})`}
         </button>
       )}
     </div>

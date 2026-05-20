@@ -7,6 +7,7 @@ import { AuthGuard } from '@/features/auth/AuthGuard';
 import { setUnauthorizedHandler, setApiErrorHandler } from '@/shared/api/client';
 import { useToastStore } from '@/app/store';
 import { ToastContainer } from '@/shared/ui/Toast/Toast';
+import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 
 const HomePage        = lazy(() => import('@/pages/home/HomePage'));
 const EventPage       = lazy(() => import('@/pages/event/EventPage'));
@@ -21,8 +22,16 @@ const ActivationPage  = lazy(() => import('@/pages/auth/ActivationPage'));
 const RegisterPage    = lazy(() => import('@/pages/auth/RegisterPage'));
 
 const Loader = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100dvh', color: '#6366f1', fontSize: 14 }}>
-    Загрузка...
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100dvh',
+      width: '100%',
+    }}
+  >
+    <AppPreloader layout="block" size="md" aria-label="Загрузка страницы" />
   </div>
 );
 

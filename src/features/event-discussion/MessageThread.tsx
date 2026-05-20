@@ -10,6 +10,7 @@ import { messageAuthorName, needsReplyScrollTailSpacer, scrollMessageIntoViewFor
 import type { HoleRect } from './discussionDimClipPath';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import { useDiscussionSlotRect } from './useDiscussionSlotRect';
+import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import styles from './MessageThread.module.css';
 
 interface MessageThreadProps {
@@ -162,7 +163,9 @@ function MessageThreadInner({
 
   return (
     <div ref={threadRef} className={styles.thread}>
-      {loading && <p className={styles.muted}>Загрузка…</p>}
+      {loading && (
+        <AppPreloader layout="block" size="md" aria-label="Загрузка комментариев" className={styles.threadPreload} />
+      )}
       {error && <p className={styles.error}>{error}</p>}
       {!loading && !error && messages.length === 0 && (
         <p className={styles.muted}>Пока нет комментариев. Будьте первым!</p>
@@ -182,8 +185,15 @@ function MessageThreadInner({
         ))}
       </div>
       {hasMore && (
-        <button type="button" className={styles.moreBtn} disabled={loadingMore} onClick={loadMore}>
-          {loadingMore ? 'Загрузка…' : `Загрузить ещё (${remainingMore})`}
+        <button
+          type="button"
+          className={`${styles.moreBtn} ${loadingMore ? styles.moreBtnLoading : ''}`}
+          disabled={loadingMore}
+          onClick={loadMore}
+          aria-busy={loadingMore}
+          aria-label={loadingMore ? 'Загрузка' : undefined}
+        >
+          {loadingMore ? <AppPreloader size="sm" layout="inline" role="none" /> : `Загрузить ещё (${remainingMore})`}
         </button>
       )}
 

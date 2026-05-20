@@ -44,3 +44,9 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+.moreBtnLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

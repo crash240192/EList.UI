@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchAuthedImage } from '@/shared/api/fileStorageClient';
+import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import styles from './AuthImage.module.css';
 
 function cacheKey(fileId: string, fullSize: boolean): string {
@@ -31,10 +32,7 @@ async function getOrFetchBlob(fileId: string, fullSize: boolean): Promise<string
 function ImagePreloader() {
   return (
     <div className={styles.preloaderSlot} aria-hidden>
-      <div className={styles.preloader} role="presentation">
-        <div className={styles.preloaderRing} />
-        <div className={styles.preloaderRingInner} />
-      </div>
+      <AppPreloader variant="onDark" role="presentation" layout="inline" />
     </div>
   );
 }

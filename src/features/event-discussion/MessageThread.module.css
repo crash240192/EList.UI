@@ -49,6 +49,10 @@
   gap: 6px;
 }
 
+.threadPreload {
+  align-self: center;
+}
+
 .muted {
   margin: 0;
   font-size: 14px;
@@ -79,4 +83,12 @@
 .moreBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.moreBtnLoading {
+  min-width: 160px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
