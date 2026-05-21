@@ -55,6 +55,7 @@ export type { IEventParameters, IEventOrganizator, IAssignEventParametersRequest
 export {
   fetchEventRating,
   voteEventRating,
+  deleteEventRating,
 } from './ratingApi';
 
 export type {
