@@ -211,7 +211,7 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
     setDeleting(true);
     setSubmitError(null);
     try {
-      await deleteEventRating(eventId, myItem.id);
+      await deleteEventRating(myItem.id);
       const updated = await fetchEventRating(eventId, ratingType, 0, PAGE_SIZE);
       setData(updated);
       setPageIndex(0);
