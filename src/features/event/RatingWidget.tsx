@@ -1,7 +1,7 @@
 // features/event/RatingWidget.tsx
 
 import { useState, useEffect, useCallback } from 'react';
-import { fetchEventRating, voteEventRating } from '@/entities/event';
+import { fetchEventRating, voteEventRating, deleteEventRating } from '@/entities/event';
 import type { IRatingItem, IRatingPage, RatingType } from '@/entities/event';
 import styles from './RatingWidget.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -130,6 +130,7 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
   const [voteValue,   setVoteValue]   = useState(0);
   const [comment,     setComment]     = useState('');
   const [submitting,  setSubmitting]  = useState(false);
+  const [deleting,    setDeleting]    = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const myItem = accountId ? data.items.find(i => i.accountId === accountId) ?? null : null;
@@ -204,6 +205,29 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
     }
   }, [accountId, eventId, comment, voteValue, ratingType, editingId, onDataUpdate]);
 
+  const handleDelete = useCallback(async () => {
+    if (!myItem || deleting) return;
+    if (!window.confirm('Удалить вашу оценку? Это действие нельзя отменить.')) return;
+    setDeleting(true);
+    setSubmitError(null);
+    try {
+      await deleteEventRating(eventId, myItem.id);
+      const updated = await fetchEventRating(eventId, ratingType, 0, PAGE_SIZE);
+      setData(updated);
+      setPageIndex(0);
+      onDataUpdate(updated);
+      setShowForm(false);
+      setEditingId(null);
+      setVoteValue(0);
+      setComment('');
+    } catch (e: unknown) {
+      const err = e as { serverMessage?: string; message?: string };
+      setSubmitError(err?.serverMessage ?? err?.message ?? 'Не удалось удалить оценку');
+    } finally {
+      setDeleting(false);
+    }
+  }, [myItem, deleting, eventId, ratingType, onDataUpdate]);
+
   return (
     <>
       <div className={styles.overlay} onClick={onClose} />
@@ -247,16 +271,32 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
 
         {accountId && (
           <div className={styles.modalFooter}>
-            {!allowVote ? (
+            {!allowVote && !voted && (
               <p className={styles.voteDisabledHint}>Мероприятие отменено — новые оценки недоступны</p>
-            ) : !showForm ? (
-              <button
-                className={styles.leaveReviewBtn}
-                onClick={voted ? handleEdit : () => setShowForm(true)}
-              >
-                {voted ? 'Редактировать отзыв' : 'Оставить отзыв'}
+            )}
+            {voted && !showForm && (
+              <div className={styles.footerVotedRow}>
+                {allowVote && (
+                  <button type="button" className={styles.leaveReviewBtn} onClick={handleEdit}>
+                    Редактировать отзыв
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={styles.deleteReviewBtn}
+                  disabled={deleting}
+                  onClick={() => void handleDelete()}
+                >
+                  {deleting ? 'Удаление…' : 'Удалить оценку'}
+                </button>
+              </div>
+            )}
+            {allowVote && !voted && !showForm && (
+              <button type="button" className={styles.leaveReviewBtn} onClick={() => setShowForm(true)}>
+                Оставить отзыв
               </button>
-            ) : (
+            )}
+            {showForm && (
               <div className={styles.voteForm}>
                 <div className={styles.voteFormLabel}>{editingId ? 'Редактировать оценку' : 'Ваша оценка'}</div>
                 <GradePicker value={voteValue} onChange={setVoteValue} />
@@ -280,6 +320,9 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
                   </button>
                 </div>
               </div>
+            )}
+            {submitError && !showForm && voted && (
+              <div className={styles.voteError}>{submitError}</div>
             )}
           </div>
         )}

@@ -73,3 +73,9 @@ export async function fetchEventRating(
 export async function voteEventRating(req: IRatingVoteRequest): Promise<void> {
   await apiClient.post('/api/Rating/events/vote', req);
 }
+
+/** Удаление своей оценки (itemId — id записи из getRating) */
+export async function deleteEventRating(eventId: string, itemId: string): Promise<void> {
+  const params = new URLSearchParams({ itemId });
+  await apiClient.delete(`/api/Rating/events/delete/${eventId}?${params}`);
+}
