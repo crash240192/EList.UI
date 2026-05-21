@@ -1,4 +1,5 @@
 // Компактные точки для карты: POST /api/events/search/short (до EVENTS_MAP_SHORT_PAGE_SIZE шт.)
+// При смене области/фильтров старые точки остаются на карте до прихода нового ответа.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { IEventsSearchParams, IEventSearchShortItem } from '@/entities/event';
@@ -37,8 +38,7 @@ export function useEventsMapShort(params: IEventsSearchParams, enabled: boolean)
     } catch (err) {
       if (generation !== loadGenerationRef.current) return;
       setError(err instanceof Error ? err.message : 'Ошибка загрузки');
-      setItems([]);
-      setTotal(0);
+      // Прежние точки на карте оставляем до успешной подгрузки
     }
   }, [paramsKey]);
 
@@ -54,7 +54,6 @@ export function useEventsMapShort(params: IEventsSearchParams, enabled: boolean)
       return;
     }
 
-    setItems([]);
     setLoading(true);
     setError(null);
     void load(generation).finally(() => {
@@ -66,7 +65,6 @@ export function useEventsMapShort(params: IEventsSearchParams, enabled: boolean)
     if (!enabled) return;
     loadGenerationRef.current += 1;
     const generation = loadGenerationRef.current;
-    setItems([]);
     setLoading(true);
     setError(null);
     void load(generation).finally(() => {
