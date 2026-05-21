@@ -5,17 +5,25 @@ import { fetchEventRating, voteEventRating, deleteEventRating } from '@/entities
 import type { IRatingItem, IRatingPage, RatingType } from '@/entities/event';
 import styles from './RatingWidget.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 
 interface WidgetProps {
   eventId: string;
   eventStartTime: string;
+  eventEndTime?: string | null;
   accountId: string | null;
-  /** false — мероприятие отменено/неактивно, новые оценки запрещены */
+  /** false — мероприятие отменено, новые оценки запрещены */
   eventActive?: boolean;
 }
 
 function getRatingType(startTime: string): RatingType {
   return new Date(startTime) <= new Date() ? 'Summary' : 'Expectation';
+}
+
+/** Мероприятие уже завершилось (по endTime или по startTime, если конца нет) */
+export function isEventFinished(startTime: string, endTime?: string | null): boolean {
+  const deadline = endTime ? new Date(endTime) : new Date(startTime);
+  return deadline.getTime() <= Date.now();
 }
 
 // ── Grade system ─────────────────────────────────────────────────────────────
@@ -41,7 +49,6 @@ function getSimpleGrade(score: number): Grade {
   return                   { label: 'F', color: '#ef4444', rot: -8 };
 }
 
-// Слегка неровный круг — имитация нарисованного от руки
 const ROUGH_CIRCLE =
   'M24,6 C34,2 41,12 38,22 C36,33 26,38 14,36 C3,34 -1,26 2,17 C5,8 14,4 23,5 C28,5 34,8 31,14';
 
@@ -62,8 +69,6 @@ function GradeBadge({ score, size = 'sm', simple = false }: { score: number; siz
   );
 }
 
-// ── Grade picker (форма оценки) ───────────────────────────────────────────────
-
 function GradePicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
     <div className={styles.gradePicker}>
@@ -83,54 +88,109 @@ function GradePicker({ value, onChange }: { value: number; onChange: (v: number)
   );
 }
 
-// ── Rating item row ───────────────────────────────────────────────────────────
-
-function RatingItemRow({ item }: { item: IRatingItem }) {
-  const name = item.personInfo?.firstName
+function ratingAuthorName(item: IRatingItem): string {
+  return item.personInfo?.firstName
     ? `${item.personInfo.firstName} ${item.personInfo.lastName ?? ''}`.trim()
     : item.account.login;
-  return (
-    <div className={styles.ratingItem}>
-      <div className={styles.ratingItemHeader}>
-        <div className={styles.ratingItemAvatar}>{name[0]?.toUpperCase() ?? '?'}</div>
-        <div className={styles.ratingItemMeta}>
-          <span className={styles.ratingItemName}>{name}</span>
-          {item.value > 0 && <GradeBadge score={item.value} size="xs" simple />}
-        </div>
-      </div>
-      {item.comment && <p className={styles.ratingItemComment}>{item.comment}</p>}
-    </div>
-  );
 }
 
-// ── Modal ─────────────────────────────────────────────────────────────────────
+interface RatingItemRowProps {
+  item: IRatingItem;
+  isOwn?: boolean;
+  canDelete?: boolean;
+  deleteDisabled?: boolean;
+  onDeleteClick?: () => void;
+}
+
+function RatingItemRow({ item, isOwn, canDelete, deleteDisabled, onDeleteClick }: RatingItemRowProps) {
+  const name = ratingAuthorName(item);
+  const hasComment = !!item.comment?.trim();
+
+  return (
+    <article
+      className={`${styles.ratingItem} ${isOwn ? styles.ratingItemOwn : ''} ${hasComment ? styles.ratingItemHasComment : styles.ratingItemNoComment}`}
+    >
+      {isOwn && canDelete && (
+        <button
+          type="button"
+          className={styles.ratingDeleteChip}
+          disabled={deleteDisabled}
+          aria-label="Удалить оценку"
+          title="Удалить оценку"
+          onClick={onDeleteClick}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6M14 11v6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+        </button>
+      )}
+
+      <div className={styles.ratingItemLeft}>
+        <div className={styles.ratingItemAvatar}>{name[0]?.toUpperCase() ?? '?'}</div>
+        <div className={styles.ratingItemIdentity}>
+          <span className={styles.ratingItemName}>{name}</span>
+          {hasComment && item.value > 0 && <GradeBadge score={item.value} size="xs" simple />}
+        </div>
+      </div>
+
+      <div className={styles.ratingItemRight}>
+        {hasComment ? (
+          <p className={styles.ratingItemComment}>{item.comment}</p>
+        ) : (
+          item.value > 0 && <GradeBadge score={item.value} size="xs" simple />
+        )}
+      </div>
+    </article>
+  );
+}
 
 interface ModalProps {
   eventId: string;
   ratingType: RatingType;
+  eventStartTime: string;
+  eventEndTime?: string | null;
+  eventActive: boolean;
   accountId: string | null;
   initialData: IRatingPage;
   allowVote: boolean;
+  allowDelete: boolean;
   onClose: () => void;
   onDataUpdate: (d: IRatingPage) => void;
 }
 
 const PAGE_SIZE = 20;
 
-function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, onClose, onDataUpdate }: ModalProps) {
+function RatingModal({
+  eventId,
+  ratingType,
+  eventStartTime,
+  eventEndTime,
+  eventActive,
+  accountId,
+  initialData,
+  allowVote,
+  allowDelete,
+  onClose,
+  onDataUpdate,
+}: ModalProps) {
   useModalBackButton(onClose);
   const label = ratingType === 'Expectation' ? 'Рейтинг ожидания' : 'Рейтинг';
+  const eventFinished = isEventFinished(eventStartTime, eventEndTime);
 
-  const [data,        setData]        = useState<IRatingPage>(initialData);
-  const [pageIndex,   setPageIndex]   = useState(0);
-  const [loading,     setLoading]     = useState(true);
+  const [data, setData] = useState<IRatingPage>(initialData);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [showForm,    setShowForm]    = useState(false);
-  const [editingId,   setEditingId]   = useState<string | null>(null);
-  const [voteValue,   setVoteValue]   = useState(0);
-  const [comment,     setComment]     = useState('');
-  const [submitting,  setSubmitting]  = useState(false);
-  const [deleting,    setDeleting]    = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [voteValue, setVoteValue] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const myItem = accountId ? data.items.find(i => i.accountId === accountId) ?? null : null;
@@ -138,7 +198,6 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
   const score = data.resultRating;
   const hasMore = data.items.length < data.total;
 
-  // Загружаем первую страницу при открытии
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -150,8 +209,12 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
         onDataUpdate(page);
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [eventId, ratingType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadMore = useCallback(async () => {
@@ -164,8 +227,11 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
         items: [...prev.items, ...page.items],
       }));
       setPageIndex(next);
-    } catch {}
-    finally { setLoadingMore(false); }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingMore(false);
+    }
   }, [eventId, ratingType, pageIndex]);
 
   const handleEdit = useCallback(() => {
@@ -189,25 +255,32 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await voteEventRating({ id: editingId ?? undefined, accountId, eventId, comment, value: voteValue, ratingType });
+      await voteEventRating({
+        id: editingId ?? undefined,
+        accountId,
+        eventId,
+        comment,
+        value: voteValue,
+        ratingType,
+      });
       const updated = await fetchEventRating(eventId, ratingType, 0, PAGE_SIZE);
       setData(updated);
-      setPageIndex(1);
+      setPageIndex(0);
       onDataUpdate(updated);
       setShowForm(false);
       setEditingId(null);
       setVoteValue(0);
       setComment('');
-    } catch (e: any) {
-      setSubmitError(e?.serverMessage ?? e?.message ?? 'Ошибка при отправке');
+    } catch (e: unknown) {
+      const err = e as { serverMessage?: string; message?: string };
+      setSubmitError(err?.serverMessage ?? err?.message ?? 'Ошибка при отправке');
     } finally {
       setSubmitting(false);
     }
   }, [accountId, eventId, comment, voteValue, ratingType, editingId, onDataUpdate]);
 
-  const handleDelete = useCallback(async () => {
+  const performDelete = useCallback(async () => {
     if (!myItem || deleting) return;
-    if (!window.confirm('Удалить вашу оценку? Это действие нельзя отменить.')) return;
     setDeleting(true);
     setSubmitError(null);
     try {
@@ -220,6 +293,7 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
       setEditingId(null);
       setVoteValue(0);
       setComment('');
+      setDeleteConfirmOpen(false);
     } catch (e: unknown) {
       const err = e as { serverMessage?: string; message?: string };
       setSubmitError(err?.serverMessage ?? err?.message ?? 'Не удалось удалить оценку');
@@ -228,16 +302,21 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
     }
   }, [myItem, deleting, eventId, ratingType, onDataUpdate]);
 
+  const openDeleteConfirm = useCallback(() => {
+    if (!allowDelete || !myItem) return;
+    setDeleteConfirmOpen(true);
+  }, [allowDelete, myItem]);
+
   return (
     <>
       <div className={styles.overlay} onClick={onClose} />
       <div className={styles.modal}>
-
         <div className={styles.modalHeader}>
           <span className={styles.modalTitle}>{label}</span>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -245,11 +324,15 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
         <div className={styles.modalSummary}>
           {score > 0 && <GradeBadge score={score} size="lg" />}
           <div className={styles.summaryRight}>
-            {score > 0
-              ? <span className={styles.summaryScore}>{score.toFixed(1)}</span>
-              : <span className={styles.summaryNoScore}>Нет оценок</span>}
+            {score > 0 ? (
+              <span className={styles.summaryScore}>{score.toFixed(1)}</span>
+            ) : (
+              <span className={styles.summaryNoScore}>Нет оценок</span>
+            )}
             {data.total > 0 && (
-              <span className={styles.summaryCount}>{data.total} {pluralVotes(data.total)}</span>
+              <span className={styles.summaryCount}>
+                {data.total} {pluralVotes(data.total)}
+              </span>
             )}
           </div>
         </div>
@@ -260,10 +343,19 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
           ) : data.items.length === 0 ? (
             <div className={styles.emptyState}>Пока никто не оставил оценку</div>
           ) : (
-            data.items.map(item => <RatingItemRow key={item.id} item={item} />)
+            data.items.map(item => (
+              <RatingItemRow
+                key={item.id}
+                item={item}
+                isOwn={!!accountId && item.accountId === accountId}
+                canDelete={allowDelete && item.accountId === accountId}
+                deleteDisabled={deleting}
+                onDeleteClick={openDeleteConfirm}
+              />
+            ))
           )}
           {!loading && hasMore && (
-            <button className={styles.loadMoreBtn} onClick={loadMore} disabled={loadingMore}>
+            <button type="button" className={styles.loadMoreBtn} onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
             </button>
           )}
@@ -272,24 +364,25 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
         {accountId && (
           <div className={styles.modalFooter}>
             {!allowVote && !voted && (
-              <p className={styles.voteDisabledHint}>Мероприятие отменено — новые оценки недоступны</p>
+              <p className={styles.voteDisabledHint}>
+                {!eventActive
+                  ? 'Мероприятие отменено — новые оценки недоступны'
+                  : eventFinished
+                    ? 'Мероприятие завершено — новые оценки недоступны'
+                    : 'Оценки недоступны'}
+              </p>
             )}
-            {voted && !showForm && (
-              <div className={styles.footerVotedRow}>
-                {allowVote && (
-                  <button type="button" className={styles.leaveReviewBtn} onClick={handleEdit}>
-                    Редактировать отзыв
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className={styles.deleteReviewBtn}
-                  disabled={deleting}
-                  onClick={() => void handleDelete()}
-                >
-                  {deleting ? 'Удаление…' : 'Удалить оценку'}
-                </button>
-              </div>
+            {voted && !allowVote && !showForm && (
+              <p className={styles.voteDisabledHint}>
+                {!eventActive
+                  ? 'Мероприятие отменено — изменить оценку нельзя'
+                  : 'Мероприятие завершено — изменить или удалить оценку нельзя'}
+              </p>
+            )}
+            {allowVote && voted && !showForm && (
+              <button type="button" className={styles.leaveReviewBtn} onClick={handleEdit}>
+                Редактировать отзыв
+              </button>
             )}
             {allowVote && !voted && !showForm && (
               <button type="button" className={styles.leaveReviewBtn} onClick={() => setShowForm(true)}>
@@ -310,35 +403,55 @@ function RatingModal({ eventId, ratingType, accountId, initialData, allowVote, o
                 />
                 {submitError && <div className={styles.voteError}>{submitError}</div>}
                 <div className={styles.voteFormBtns}>
-                  <button className={styles.cancelBtn} onClick={handleCancel}>Отмена</button>
+                  <button type="button" className={styles.cancelBtn} onClick={handleCancel}>
+                    Отмена
+                  </button>
                   <button
+                    type="button"
                     className={styles.submitBtn}
                     disabled={voteValue === 0 || submitting}
-                    onClick={handleSubmit}
+                    onClick={() => void handleSubmit()}
                   >
                     {submitting ? 'Отправка...' : editingId ? 'Сохранить' : 'Отправить'}
                   </button>
                 </div>
               </div>
             )}
-            {submitError && !showForm && voted && (
+            {submitError && !showForm && (
               <div className={styles.voteError}>{submitError}</div>
             )}
           </div>
         )}
-
       </div>
+
+      {deleteConfirmOpen && (
+        <ConfirmDialog
+          title="Удалить оценку?"
+          message="Оценка и комментарий будут удалены без возможности восстановления."
+          cancelLabel="Нет"
+          confirmLabel="Да"
+          variant="danger"
+          onCancel={() => !deleting && setDeleteConfirmOpen(false)}
+          onConfirm={() => void performDelete()}
+        />
+      )}
     </>
   );
 }
 
-// ── Badge (entry point) ───────────────────────────────────────────────────────
-
-export function RatingWidget({ eventId, eventStartTime, accountId, eventActive = true }: WidgetProps) {
+export function RatingWidget({
+  eventId,
+  eventStartTime,
+  eventEndTime,
+  accountId,
+  eventActive = true,
+}: WidgetProps) {
   const ratingType = getRatingType(eventStartTime);
-  const allowVote = eventActive;
+  const eventFinished = isEventFinished(eventStartTime, eventEndTime);
+  const allowVote = eventActive && !eventFinished;
+  const allowDelete = allowVote;
 
-  const [data,      setData]      = useState<IRatingPage | null>(null);
+  const [data, setData] = useState<IRatingPage | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
@@ -350,6 +463,11 @@ export function RatingWidget({ eventId, eventStartTime, accountId, eventActive =
   if (!data) return null;
 
   const score = data.resultRating;
+  const badgeTitle = !eventActive
+    ? 'Мероприятие отменено — оценки недоступны'
+    : eventFinished
+      ? 'Мероприятие завершено — оценки недоступны'
+      : 'Рейтинг';
 
   return (
     <>
@@ -357,25 +475,30 @@ export function RatingWidget({ eventId, eventStartTime, accountId, eventActive =
         type="button"
         className={`${styles.badge} ${!allowVote ? styles.badgeDisabled : ''}`}
         onClick={() => setModalOpen(true)}
-        title={allowVote ? 'Рейтинг' : 'Мероприятие отменено — новые оценки недоступны'}
+        title={badgeTitle}
       >
-        {score > 0
-          ? <>
-              <GradeBadge score={score} size="sm" />
-              <span className={styles.badgeScore}>{score.toFixed(1)}</span>
-              {data.total > 0 && <span className={styles.badgeCount}>({data.total})</span>}
-            </>
-          : <span className={styles.badgeEmpty}>Оценить</span>
-        }
+        {score > 0 ? (
+          <>
+            <GradeBadge score={score} size="sm" />
+            <span className={styles.badgeScore}>{score.toFixed(1)}</span>
+            {data.total > 0 && <span className={styles.badgeCount}>({data.total})</span>}
+          </>
+        ) : (
+          <span className={styles.badgeEmpty}>Оценить</span>
+        )}
       </button>
 
       {modalOpen && (
         <RatingModal
           eventId={eventId}
           ratingType={ratingType}
+          eventStartTime={eventStartTime}
+          eventEndTime={eventEndTime}
+          eventActive={eventActive}
           accountId={accountId}
           initialData={data}
           allowVote={allowVote}
+          allowDelete={allowDelete}
           onClose={() => setModalOpen(false)}
           onDataUpdate={setData}
         />
@@ -385,7 +508,8 @@ export function RatingWidget({ eventId, eventStartTime, accountId, eventActive =
 }
 
 function pluralVotes(n: number): string {
-  const mod10 = n % 10, mod100 = n % 100;
+  const mod10 = n % 10;
+  const mod100 = n % 100;
   if (mod100 >= 11 && mod100 <= 14) return 'оценок';
   if (mod10 === 1) return 'оценка';
   if (mod10 >= 2 && mod10 <= 4) return 'оценки';

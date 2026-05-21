@@ -257,6 +257,7 @@ export default function EventPage() {
           <RatingWidget
             eventId={id!}
             eventStartTime={event.startTime}
+            eventEndTime={event.endTime}
             accountId={accountId}
             eventActive={isEventActive}
           />
