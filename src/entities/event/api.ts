@@ -92,6 +92,8 @@ export async function fetchEventById(id: string): Promise<IEvent> {
     ...ev,
     eventTypes: ev.Types ?? ev.types ?? ev.eventTypes ?? [],
     eventType:  ev.eventType ?? (ev.Types ?? ev.types ?? ev.eventTypes)?.[0] ?? null,
+    coverImageId: ev.coverImageId ?? ev.CoverImageId ?? null,
+    coverUrl: ev.coverUrl ?? ev.CoverUrl ?? null,
   };
 }
 
