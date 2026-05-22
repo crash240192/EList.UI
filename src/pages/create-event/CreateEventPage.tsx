@@ -14,6 +14,7 @@ import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } fr
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { AlbumSection } from './AlbumSection';
 import type { IAlbum } from '@/entities/media/albumApi';
@@ -477,7 +478,7 @@ export default function CreateEventPage() {
     { label: 'Тип мероприятия',   done: typeCount > 0 },
     { label: 'Место на карте',    done: !!form.address && lat !== null },
     { label: 'Дата и время',      done: !!form.startDate && !!form.startTime },
-    { label: 'Обложка',           done: !!coverUrl, optional: true },
+    { label: 'Обложка',           done: !!(coverUrl || coverImageId), optional: true },
   ];
 
   // Предпросмотр времени
@@ -516,10 +517,14 @@ export default function CreateEventPage() {
 
         {/* Обложка */}
         <Section title="Обложка">
-          <CoverUpload currentUrl={coverUrl} onUploaded={(url, fileId) => {
-            setCoverUrl(url);
-            setCoverImageId(fileId);
-          }} />
+          <CoverUpload
+            currentUrl={coverUrl}
+            currentFileId={coverImageId}
+            onUploaded={(url, fileId) => {
+              setCoverUrl(url);
+              setCoverImageId(fileId);
+            }}
+          />
         </Section>
 
         {/* Основное */}
@@ -828,9 +833,18 @@ export default function CreateEventPage() {
         {/* Карточка предпросмотра */}
         <div className={styles.previewCard}>
           <div className={styles.previewCover}>
-            {coverUrl
-              ? <img src={coverUrl} alt="Обложка" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
-              : <span className={styles.previewCoverEmpty}>нет обложки</span>}
+            {coverUrl ? (
+              <img src={coverUrl} alt="Обложка" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            ) : coverImageId ? (
+              <AuthImage
+                fileId={coverImageId}
+                alt="Обложка"
+                imageFit="cover"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            ) : (
+              <span className={styles.previewCoverEmpty}>нет обложки</span>
+            )}
           </div>
           <div className={styles.previewBody}>
             {/* Типы мероприятия */}

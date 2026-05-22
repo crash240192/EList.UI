@@ -145,7 +145,11 @@ export default function EventPage() {
     participantCap != null && participants.length >= participantCap && !isParticipating;
   const isEventActive = event.active;
   const joinDisabled =
-    actionLoading || !accountId || isOrganizer || (!isEventActive && !isParticipating);
+    actionLoading ||
+    !accountId ||
+    isOrganizer ||
+    (!isEventActive && !isParticipating) ||
+    isParticipantLimitFull;
   const fillPct = maxPersons ? Math.round((participants.length / maxPersons) * 100) : null;
 
   const onJoinClick = () => {
@@ -280,6 +284,11 @@ export default function EventPage() {
                 className={`${styles.btnJoin} ${isParticipating ? styles.btnLeave : ''} ${joinShake ? styles.btnJoinShake : ''}`}
                 onClick={onJoinClick}
                 disabled={joinDisabled}
+                title={
+                  isParticipantLimitFull
+                    ? `Достигнут лимит участников (${participantCap})`
+                    : undefined
+                }
               >
                 {actionLoading ? '...' : isParticipating ? 'Покинуть' : 'Участвовать'}
               </button>
