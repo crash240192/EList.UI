@@ -1,149 +1,44 @@
-/* Краска через трафарет: гранж, красный + белый 50% alpha */
+/* Прозрачный фон — только красная «краска», масштаб и поворот оболочки */
 
-.filterSvg {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
+.wrap {
+  display: inline-block;
+  line-height: 0;
   pointer-events: none;
+  background: transparent;
 }
 
-.stamp {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px 10px 12px;
-  border: 3px solid #dc2626;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.5);
-  box-shadow:
-    2px 3px 0 rgba(220, 38, 38, 0.12),
-    0 4px 18px rgba(220, 38, 38, 0.2);
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* Тень — штамп читается на размытом фоне (все размеры) */
+.wrap .svg {
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
+}
+
+/* Блоки секций */
+.wrap_sm {
+  width: min(220px, calc(100% - 12px));
+  transform: rotate(-4deg);
+}
+
+.wrap_md {
+  width: min(300px, calc(100% - 20px));
   transform: rotate(-2deg);
-  user-select: none;
-  pointer-events: none;
-  filter: var(--stamp-grunge-filter);
-  isolation: isolate;
 }
 
-/* Гранж-пятна «краски» */
-.stamp::before {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0.55;
-  mix-blend-mode: multiply;
-  background-image:
-    radial-gradient(ellipse 28% 18% at 12% 18%, rgba(220, 38, 38, 0.45) 0%, transparent 100%),
-    radial-gradient(ellipse 22% 30% at 88% 72%, rgba(220, 38, 38, 0.38) 0%, transparent 100%),
-    radial-gradient(circle at 42% 55%, rgba(220, 38, 38, 0.2) 0%, transparent 45%),
-    repeating-radial-gradient(circle at 20% 40%, transparent 0 3px, rgba(220, 38, 38, 0.08) 3px 4px);
+/* Карточка мероприятия: ~×2, поворот в другую сторону, влезает в экран */
+.wrap_lg {
+  width: min(560px, calc(100vw - 32px));
+  transform: rotate(-15deg);
 }
 
-.stamp::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  filter: var(--stamp-ink-filter);
-  opacity: 0.35;
-  border: 2px solid transparent;
-  box-shadow: inset 0 0 12px rgba(220, 38, 38, 0.08);
-}
-
-/* ── Размеры ── */
-
-.stamp_sm {
-  gap: 8px;
-  padding: 7px 10px 7px 9px;
-  border-width: 2px;
-  transform: rotate(-3deg);
-  max-width: calc(100% - 8px);
-}
-
-.stamp_md {
-  gap: 10px;
-  padding: 10px 14px 10px 12px;
-  border-width: 3px;
-  transform: rotate(-2deg);
-  max-width: calc(100% - 12px);
-}
-
-/* Карточка мероприятия: ~×2 к md, поворот 15°, влезает в экран */
-.stamp_lg {
-  --stamp-max-w: min(560px, calc(100vw - 40px));
-  gap: clamp(12px, 2.8vw, 28px);
-  padding: clamp(14px, 3.2vw, 28px) clamp(18px, 4vw, 40px) clamp(14px, 3.2vw, 28px)
-    clamp(16px, 3.5vw, 32px);
-  border-width: clamp(3px, 0.65vw, 6px);
-  max-width: var(--stamp-max-w);
-  width: fit-content;
-  transform: rotate(15deg);
-  border-radius: clamp(4px, 0.8vw, 8px);
-}
-
-.stamp_lg .icon {
-  width: clamp(56px, 18vw, 108px);
-  height: clamp(56px, 18vw, 108px);
-}
-
-.stamp_lg .line {
-  font-size: clamp(22px, 7.5vw, 56px);
-}
-
-/* ── Иконка и текст ── */
-
-.icon {
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-}
-
-.stamp_sm .icon {
-  width: 28px;
-  height: 28px;
-}
-
-.stamp_md .icon {
-  width: 36px;
-  height: 36px;
-}
-
-.text {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  line-height: 0.92;
-  font-family: Impact, 'Arial Black', Haettenschweiler, 'Franklin Gothic Heavy', sans-serif;
-  letter-spacing: 0.06em;
-  color: #dc2626;
-  text-shadow:
-    1px 0 0 rgba(220, 38, 38, 0.35),
-    -0.5px 0.5px 0 rgba(220, 38, 38, 0.2);
-}
-
-.line {
-  font-weight: 900;
-  opacity: 0.92;
-}
-
-.stamp_sm .line {
-  font-size: 15px;
-}
-
-.stamp_md .line {
-  font-size: 20px;
-}
-
-/* На очень узких экранах слегка уменьшаем поворот, чтобы не обрезало углы */
 @media (max-width: 480px) {
-  .stamp_lg {
-    transform: rotate(12deg);
-    --stamp-max-w: min(520px, calc(100vw - 28px));
+  .wrap_lg {
+    width: min(520px, calc(100vw - 24px));
+    transform: rotate(-12deg);
   }
 }
