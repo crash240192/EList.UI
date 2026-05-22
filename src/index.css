@@ -103,6 +103,18 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
   opacity: 0.5;
 }
 
+/*
+ * iOS Safari: при фокусе на input/textarea/select с font-size < 16px
+ * страница автоматически зуммируется (на Android такого нет).
+ */
+@media screen and (max-width: 768px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='button']):not([type='submit']):not([type='reset']):not([type='hidden']):not([type='image']):not([type='color']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* ── Мобиль: карточки от края до края ── */
 @media (max-width: 640px) {
   /* Страницы с одной центральной карточкой убираем боковые отступы */
