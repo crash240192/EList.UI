@@ -456,7 +456,12 @@ export default function EventPage() {
           currentAccountId={accountId} onClose={() => setParticipantsModalOpen(false)} />
       )}
       {inviteModalOpen && accountId && event?.id && (
-        <InviteModal eventId={event.id} currentAccountId={accountId} onClose={() => setInviteModalOpen(false)} />
+        <InviteModal
+          eventId={event.id}
+          currentAccountId={accountId}
+          isPrivate={!!event.parameters?.private}
+          onClose={() => setInviteModalOpen(false)}
+        />
       )}
       {addOrgModalOpen && accountId && id && (
         <AddOrganizerModal

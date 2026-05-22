@@ -960,6 +960,7 @@ export default function CreateEventPage() {
         <InviteModal
           eventId={createdEventId}
           currentAccountId={createdAccountId}
+          isPrivate={form.isPrivate}
           onClose={() => { setInviteModalOpen(false); navigate('/my-events'); }}
           onSent={() => { setInviteModalOpen(false); navigate('/my-events'); }}
         />

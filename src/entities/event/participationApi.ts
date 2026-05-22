@@ -106,6 +106,39 @@ export async function getBWList(listType: BWListType, eventId: string): Promise<
   return Array.isArray(result) ? result : result?.result ?? [];
 }
 
+/** Краткий список: только id аккаунтов (без пагинации) */
+export async function getBWListShortIds(listType: BWListType, eventId: string): Promise<string[]> {
+  const data = await apiClient.get<string[]>(`/api/participations/${listType}/${eventId}/short`);
+  const result = data?.result;
+  if (!Array.isArray(result)) return [];
+  return result.filter((id): id is string => typeof id === 'string' && id.length > 0);
+}
+
+/** Можно ли отправить приглашение подписчику с учётом Б/Ч списка */
+export function canInviteSubscriber(
+  isPrivate: boolean,
+  accountId: string,
+  blackListIds: ReadonlySet<string>,
+  whiteListIds: ReadonlySet<string>,
+): boolean {
+  if (isPrivate) {
+    if (whiteListIds.size === 0) return true;
+    return whiteListIds.has(accountId);
+  }
+  return !blackListIds.has(accountId);
+}
+
+export function inviteBlockReason(
+  isPrivate: boolean,
+  accountId: string,
+  blackListIds: ReadonlySet<string>,
+  whiteListIds: ReadonlySet<string>,
+): string | null {
+  if (canInviteSubscriber(isPrivate, accountId, blackListIds, whiteListIds)) return null;
+  if (isPrivate) return 'Не в белом списке';
+  return 'В чёрном списке';
+}
+
 export async function addToBWList(listType: BWListType, eventId: string, accountIds: string[]): Promise<void> {
   if (accountIds.length === 0) return;
   await apiClient.post(`/api/participations/${listType}/addUsers`, { eventId, accountIds });
