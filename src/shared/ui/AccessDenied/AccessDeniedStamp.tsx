@@ -3,7 +3,7 @@ import styles from './AccessDeniedStamp.module.css';
 
 export type AccessDeniedStampSize = 'sm' | 'md' | 'lg';
 
-/** Насыщенный красный «краска» — без прозрачности */
+/** Непрозрачная красная «краска» */
 const STAMP_RED = '#e53935';
 
 interface AccessDeniedStampProps {
@@ -11,47 +11,78 @@ interface AccessDeniedStampProps {
   className?: string;
 }
 
-/** Потёртости трафаретной краски: выбивание «дырок», неровные края — не зернистый шум */
+/** Неровные края трафарета — без «дырок» (feComposite out съедает всю краску). */
 function StencilGrungeFilter({ id }: { id: string }) {
   return (
     <filter
       id={id}
-      x="-6%"
-      y="-6%"
-      width="112%"
-      height="112%"
+      x="-8%"
+      y="-8%"
+      width="116%"
+      height="116%"
       colorInterpolationFilters="sRGB"
     >
       <feTurbulence
         type="fractalNoise"
-        baseFrequency="0.07 0.05"
-        numOctaves="3"
+        baseFrequency="0.055 0.04"
+        numOctaves="2"
         seed="6"
         result="edgeNoise"
       />
       <feDisplacementMap
         in="SourceGraphic"
         in2="edgeNoise"
-        scale="3"
+        scale="1.4"
         xChannelSelector="R"
         yChannelSelector="G"
-        result="roughened"
       />
-      <feTurbulence
-        type="fractalNoise"
-        baseFrequency="0.35 0.28"
-        numOctaves="4"
-        seed="19"
-        result="chipNoise"
-      />
-      <feColorMatrix
-        in="chipNoise"
-        type="matrix"
-        values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 14 -6"
-        result="chips"
-      />
-      <feComposite in="roughened" in2="chips" operator="out" />
     </filter>
+  );
+}
+
+function StampArt({ grungeId }: { grungeId: string }) {
+  return (
+    <>
+      <g fill={STAMP_RED} stroke={STAMP_RED} filter={`url(#${grungeId})`}>
+        <rect
+          x="5"
+          y="5"
+          width="410"
+          height="118"
+          rx="14"
+          ry="14"
+          fill="none"
+          strokeWidth="7"
+          strokeLinejoin="round"
+        />
+        <circle cx="62" cy="64" r="34" fill={STAMP_RED} stroke="none" />
+        <text
+          x="118"
+          y="50"
+          fill={STAMP_RED}
+          stroke="none"
+          fontSize="46"
+          fontWeight="900"
+          fontFamily="Impact, Haettenschweiler, 'Arial Black', sans-serif"
+          letterSpacing="3"
+        >
+          ACCESS
+        </text>
+        <text
+          x="118"
+          y="106"
+          fill={STAMP_RED}
+          stroke="none"
+          fontSize="46"
+          fontWeight="900"
+          fontFamily="Impact, Haettenschweiler, 'Arial Black', sans-serif"
+          letterSpacing="3"
+        >
+          DENIED
+        </text>
+      </g>
+      <rect x="38" y="58" width="48" height="12" rx="1" fill="#ffffff" />
+    </>
   );
 }
 
@@ -71,49 +102,7 @@ export function AccessDeniedStamp({ size = 'md', className }: AccessDeniedStampP
         <defs>
           <StencilGrungeFilter id={grungeId} />
         </defs>
-
-        {/* Красная «краска»: рамка, круг, текст — с потёртостями */}
-        <g fill={STAMP_RED} stroke={STAMP_RED} filter={`url(#${grungeId})`}>
-          <rect
-            x="5"
-            y="5"
-            width="410"
-            height="118"
-            rx="14"
-            ry="14"
-            fill="none"
-            strokeWidth="7"
-            strokeLinejoin="round"
-          />
-          <circle cx="62" cy="64" r="34" fill={STAMP_RED} stroke="none" />
-          <text
-            x="118"
-            y="50"
-            fill={STAMP_RED}
-            stroke="none"
-            fontSize="46"
-            fontWeight="900"
-            fontFamily="Impact, Haettenschweiler, 'Arial Black', sans-serif"
-            letterSpacing="3"
-          >
-            ACCESS
-          </text>
-          <text
-            x="118"
-            y="106"
-            fill={STAMP_RED}
-            stroke="none"
-            fontSize="46"
-            fontWeight="900"
-            fontFamily="Impact, Haettenschweiler, 'Arial Black', sans-serif"
-            letterSpacing="3"
-          >
-            DENIED
-          </text>
-        </g>
-
-        {/* Белая полоса знака — поверх красного, без «дырок» */}
-        <rect x="38" y="58" width="48" height="12" rx="1" fill="#ffffff" />
+        <StampArt grungeId={grungeId} />
       </svg>
     </div>
   );
