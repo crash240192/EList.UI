@@ -5,6 +5,8 @@ import { MessageThread } from './MessageThread';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { EventDiscussionsPanelSkeleton } from './EventDiscussionsPanelSkeleton';
+import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
+import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import styles from './EventDiscussionsPanel.module.css';
 
 interface EventDiscussionsPanelProps {
@@ -17,12 +19,14 @@ export function EventDiscussionsPanel({ eventId, currentAccountId }: EventDiscus
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const layoutBoundsRef = useRef<HTMLDivElement>(null);
   const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setAccessDenied(false);
     void fetchEventConversations(eventId)
       .then((list) => {
         setConversations(list);
@@ -31,9 +35,24 @@ export function EventDiscussionsPanel({ eventId, currentAccountId }: EventDiscus
           return list[0]?.id ?? null;
         });
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось загрузить обсуждения'))
+      .catch((e: unknown) => {
+        if (isAccessDeniedError(e)) {
+          setAccessDenied(true);
+          setConversations([]);
+        } else {
+          setError(e instanceof Error ? e.message : 'Не удалось загрузить обсуждения');
+        }
+      })
       .finally(() => setLoading(false));
   }, [eventId]);
+
+  if (accessDenied) {
+    return (
+      <AccessDeniedGate denied variant="section" className={styles.panel}>
+        <EventDiscussionsPanelSkeleton showSpinner={false} />
+      </AccessDeniedGate>
+    );
+  }
 
   if (loading) {
     return (

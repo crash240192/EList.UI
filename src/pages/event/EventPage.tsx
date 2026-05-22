@@ -22,6 +22,8 @@ import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { RatingWidget } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import { EventDiscussionsPanel } from '@/features/event-discussion';
+import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
+import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -55,6 +57,9 @@ export default function EventPage() {
   const [bwListOpen,      setBwListOpen]      = useState(false);
   const [joinShake,       setJoinShake]       = useState(false);
   const [limitNotice,     setLimitNotice]     = useState(false);
+  const [pageAccessDenied, setPageAccessDenied] = useState(false);
+  const [participantsDenied, setParticipantsDenied] = useState(false);
+  const [organizersDenied, setOrganizersDenied] = useState(false);
   const limitNoticeTimerRef = useRef<number | null>(null);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
@@ -63,15 +68,57 @@ export default function EventPage() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    Promise.all([
-      USE_MOCK ? Promise.resolve(MOCK_EVENTS.find(e => e.id === id) ?? MOCK_EVENTS[0]) : fetchEventById(id),
-      USE_MOCK ? Promise.resolve([] as IParticipantView[]) : fetchEventParticipants(id),
-      USE_MOCK ? Promise.resolve(null) : fetchEventParameters(id),
-      USE_MOCK ? Promise.resolve([] as IEventOrganizator[]) : fetchEventOrganizators(id),
-    ]).then(([ev, parts, params, orgs]) => {
-      if (params) ev = { ...ev, parameters: { ...params } };
-      setEvent(ev); setParticipants(parts); setOrganizers(orgs);
-    }).finally(() => setLoading(false));
+    setPageAccessDenied(false);
+    setParticipantsDenied(false);
+    setOrganizersDenied(false);
+    setEvent(null);
+    setParticipants([]);
+    setOrganizers([]);
+
+    if (USE_MOCK) {
+      const ev = MOCK_EVENTS.find(e => e.id === id) ?? MOCK_EVENTS[0];
+      setEvent(ev);
+      setParticipants([]);
+      setOrganizers([]);
+      setLoading(false);
+      return;
+    }
+
+    void fetchEventById(id)
+      .then(async (ev) => {
+        let merged = ev;
+        const [partsResult, paramsResult, orgsResult] = await Promise.all([
+          fetchEventParticipants(id)
+            .then(p => ({ ok: true as const, data: p }))
+            .catch(e => ({ ok: false as const, error: e })),
+          fetchEventParameters(id)
+            .then(p => ({ ok: true as const, data: p }))
+            .catch(e => ({ ok: false as const, error: e })),
+          fetchEventOrganizators(id)
+            .then(o => ({ ok: true as const, data: o }))
+            .catch(e => ({ ok: false as const, error: e })),
+        ]);
+
+        if (partsResult.ok) setParticipants(partsResult.data);
+        else if (isAccessDeniedError(partsResult.error)) setParticipantsDenied(true);
+
+        if (paramsResult.ok && paramsResult.data) {
+          merged = { ...merged, parameters: { ...paramsResult.data } };
+        }
+
+        if (orgsResult.ok) setOrganizers(orgsResult.data);
+        else if (isAccessDeniedError(orgsResult.error)) setOrganizersDenied(true);
+
+        setEvent(merged);
+      })
+      .catch((e: unknown) => {
+        if (isEventAccessDeniedError(e)) {
+          setPageAccessDenied(true);
+        } else {
+          setEvent(null);
+        }
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => () => {
@@ -126,6 +173,20 @@ export default function EventPage() {
   }, [id]);
 
   if (loading) return <PageSkeleton />;
+  if (pageAccessDenied) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <button type="button" className={styles.deniedBackBtn} onClick={() => navigate(-1)} aria-label="Назад">
+            <ChevronLeft />
+          </button>
+          <AccessDeniedGate denied variant="page">
+            <EventCardDeniedPlaceholder />
+          </AccessDeniedGate>
+        </div>
+      </div>
+    );
+  }
   if (!event) return (
     <div className={styles.page}>
       <div className={styles.card}>
@@ -354,41 +415,53 @@ export default function EventPage() {
             ) : null}
             </div>
 
-            {sortedParticipants.length > 0 && (
-              <div className={styles.partRow} onClick={() => setParticipantsModalOpen(true)}>
-                <div className={styles.avStack}>
-                  {visibleParticipants.map((p, i) => (
-                    <div key={p.accountId} className={`${styles.av} ${p.accountId === accountId ? styles.avMe : styles.avOther}`} style={{ zIndex: 3 - i }}>
-                      {(p.firstName?.[0] ?? p.login?.[0] ?? '?').toUpperCase()}
+            {(sortedParticipants.length > 0 || participantsDenied) && (
+              <AccessDeniedGate denied={participantsDenied} variant="section">
+                {participantsDenied ? (
+                  <SectionDeniedPlaceholder lines={2} />
+                ) : (
+                  <div className={styles.partRow} onClick={() => setParticipantsModalOpen(true)}>
+                    <div className={styles.avStack}>
+                      {visibleParticipants.map((p, i) => (
+                        <div key={p.accountId} className={`${styles.av} ${p.accountId === accountId ? styles.avMe : styles.avOther}`} style={{ zIndex: 3 - i }}>
+                          {(p.firstName?.[0] ?? p.login?.[0] ?? '?').toUpperCase()}
+                        </div>
+                      ))}
+                      {extraCount > 0 && <div className={`${styles.av} ${styles.avExtra}`}>+{extraCount}</div>}
                     </div>
-                  ))}
-                  {extraCount > 0 && <div className={`${styles.av} ${styles.avExtra}`}>+{extraCount}</div>}
-                </div>
-                <span className={styles.partCnt}><strong>{participants.length}</strong> участников</span>
-              </div>
+                    <span className={styles.partCnt}><strong>{participants.length}</strong> участников</span>
+                  </div>
+                )}
+              </AccessDeniedGate>
             )}
 
             {/* Альбомы */}
             <EventAlbums eventId={id!} compact />
 
             {/* Организаторы */}
-            {organizers.length > 0 && (
-              <div className={styles.orgsSection}>
-                <div className={styles.secLabel}>Организаторы</div>
-                {organizers.map(o => (
-                  <div key={o.accountId} className={styles.orgChip} onClick={() => navigate(`/user/${o.accountId}`)}>
-                    <div className={styles.orgChipAvatar}>
-                      {(o.firstName?.[0] ?? o.login?.[0] ?? '?').toUpperCase()}
-                    </div>
-                    <div>
-                      <div className={styles.orgChipName}>
-                        {o.firstName ? `${o.firstName} ${o.lastName ?? ''}`.trim() : o.login}
+            {(organizers.length > 0 || organizersDenied) && (
+              <AccessDeniedGate denied={organizersDenied} variant="section">
+                {organizersDenied ? (
+                  <SectionDeniedPlaceholder lines={3} />
+                ) : (
+                  <div className={styles.orgsSection}>
+                    <div className={styles.secLabel}>Организаторы</div>
+                    {organizers.map(o => (
+                      <div key={o.accountId} className={styles.orgChip} onClick={() => navigate(`/user/${o.accountId}`)}>
+                        <div className={styles.orgChipAvatar}>
+                          {(o.firstName?.[0] ?? o.login?.[0] ?? '?').toUpperCase()}
+                        </div>
+                        <div>
+                          <div className={styles.orgChipName}>
+                            {o.firstName ? `${o.firstName} ${o.lastName ?? ''}`.trim() : o.login}
+                          </div>
+                          <div className={styles.orgChipRole}>Организатор</div>
+                        </div>
                       </div>
-                      <div className={styles.orgChipRole}>Организатор</div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </AccessDeniedGate>
             )}
 
           </div>
@@ -420,20 +493,26 @@ export default function EventPage() {
             )}
 
             {/* Участники */}
-            {sortedParticipants.length > 0 && (
-              <div>
-                <div className={styles.secLabel} style={{ cursor: 'pointer' }} onClick={() => setParticipantsModalOpen(true)}>
-                  Участники ({sortedParticipants.length})
-                </div>
-                <div className={styles.chipsList} onClick={() => setParticipantsModalOpen(true)} style={{ cursor: 'pointer' }}>
-                  {sortedParticipants.slice(0, 12).map(p => (
-                    <UserChip key={p.accountId} user={{ accountId: p.accountId, login: p.login, firstName: p.firstName, lastName: p.lastName, isMe: p.accountId === accountId }} size="sm" />
-                  ))}
-                  {sortedParticipants.length > 12 && (
-                    <span className={styles.moreChip}>ещё {sortedParticipants.length - 12} →</span>
-                  )}
-                </div>
-              </div>
+            {(sortedParticipants.length > 0 || participantsDenied) && (
+              <AccessDeniedGate denied={participantsDenied} variant="section">
+                {participantsDenied ? (
+                  <SectionDeniedPlaceholder lines={4} />
+                ) : (
+                  <div>
+                    <div className={styles.secLabel} style={{ cursor: 'pointer' }} onClick={() => setParticipantsModalOpen(true)}>
+                      Участники ({sortedParticipants.length})
+                    </div>
+                    <div className={styles.chipsList} onClick={() => setParticipantsModalOpen(true)} style={{ cursor: 'pointer' }}>
+                      {sortedParticipants.slice(0, 12).map(p => (
+                        <UserChip key={p.accountId} user={{ accountId: p.accountId, login: p.login, firstName: p.firstName, lastName: p.lastName, isMe: p.accountId === accountId }} size="sm" />
+                      ))}
+                      {sortedParticipants.length > 12 && (
+                        <span className={styles.moreChip}>ещё {sortedParticipants.length - 12} →</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </AccessDeniedGate>
             )}
 
             {id && (
@@ -508,6 +587,30 @@ function CancelConfirmDialog({ eventName, loading, onConfirm, onClose }: {
         </div>
       </div>
     </>
+  );
+}
+
+function EventCardDeniedPlaceholder() {
+  return (
+    <div className={styles.deniedPlaceholder}>
+      <div className={styles.deniedHero} />
+      <div className={styles.deniedBody}>
+        <div className={styles.deniedLine} style={{ width: '72%', height: 22 }} />
+        <div className={styles.deniedLine} style={{ width: '48%', height: 14 }} />
+        <div className={styles.deniedLine} style={{ width: '100%', height: 48 }} />
+        <div className={styles.deniedLine} style={{ width: '88%', height: 72 }} />
+      </div>
+    </div>
+  );
+}
+
+function SectionDeniedPlaceholder({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className={styles.sectionDeniedPlaceholder}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <div key={i} className={styles.deniedLine} style={{ width: `${90 - i * 12}%` }} />
+      ))}
+    </div>
   );
 }
 

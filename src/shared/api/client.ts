@@ -1,6 +1,7 @@
 // shared/api/client.ts
 import { cookies } from '@/shared/lib/cookies';
 import type { CommandResult } from './types';
+import { isAccessDeniedApiCode } from './errorCodes';
 
 export const COOKIE_CLIENT_HASH = 'elist_client_hash';
 export const COOKIE_AUTH_TOKEN  = 'elist_auth_token';
@@ -70,9 +71,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
     if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
     const data: CommandResult<T> = await response.json();
     if (!data.success) {
+      const code = data.errorCode ?? 0;
       const msg = data.message || 'Ошибка API';
-      if (data.message) onApiError?.(data.message);
-      throw new ApiError(data.errorCode ?? 0, msg, data.message);
+      // Ошибки доступа показываем в UI блока/страницы, без тоста
+      if (data.message && !isAccessDeniedApiCode(code)) onApiError?.(data.message);
+      throw new ApiError(code, msg, data.message);
     }
     return data;
   });

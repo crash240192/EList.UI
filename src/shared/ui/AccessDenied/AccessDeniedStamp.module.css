@@ -1,0 +1,91 @@
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 10px 12px;
+  border: 3px solid #dc2626;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow:
+    0 2px 12px rgba(220, 38, 38, 0.18),
+    inset 0 0 0 1px rgba(220, 38, 38, 0.08);
+  transform: rotate(-2deg);
+  user-select: none;
+  pointer-events: none;
+}
+
+.stamp_sm {
+  gap: 8px;
+  padding: 7px 10px 7px 9px;
+  border-width: 2px;
+}
+
+.stamp_lg {
+  gap: 14px;
+  padding: 14px 20px 14px 16px;
+  border-width: 4px;
+  transform: rotate(-1.5deg);
+}
+
+.icon {
+  flex-shrink: 0;
+  color: #dc2626;
+}
+
+.stamp_sm .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.stamp_md .icon,
+.stamp:not(.stamp_sm):not(.stamp_lg) .icon {
+  width: 36px;
+  height: 36px;
+}
+
+.stamp_lg .icon {
+  width: 52px;
+  height: 52px;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  font-family: Impact, 'Arial Black', Haettenschweiler, sans-serif;
+  letter-spacing: 0.04em;
+  color: #dc2626;
+}
+
+.line {
+  font-weight: 900;
+}
+
+.stamp_sm .line {
+  font-size: 15px;
+}
+
+.stamp_md .line,
+.stamp:not(.stamp_sm):not(.stamp_lg) .line {
+  font-size: 20px;
+}
+
+.stamp_lg .line {
+  font-size: 28px;
+}
+
+/* Лёгкая «потёртость» печати */
+.stamp::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image: radial-gradient(circle at 20% 30%, transparent 0, transparent 2px, #dc2626 2px, transparent 3px),
+    radial-gradient(circle at 70% 60%, transparent 0, transparent 1px, #dc2626 1px, transparent 2px);
+}
+
+.stamp {
+  position: relative;
+}

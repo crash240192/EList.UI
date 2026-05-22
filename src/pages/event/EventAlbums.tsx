@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getEventAlbums, getAlbumFiles, type IAlbum, type IAlbumFile } from '@/entities/media/albumApi';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
+import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import styles from './EventAlbums.module.css';
 
 // ── Изображение со спиннером ─────────────────────────────────────────────────
@@ -195,6 +197,7 @@ interface EventAlbumsProps { eventId: string; compact?: boolean; }
 export function EventAlbums({ eventId, compact }: EventAlbumsProps) {
   const [albums,  setAlbums]  = useState<IAlbum[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [viewer,  setViewer]  = useState<{ album: IAlbum; files: IAlbumFile[]; idx: number } | null>(null);
 
   useEffect(() => {
@@ -202,9 +205,12 @@ export function EventAlbums({ eventId, compact }: EventAlbumsProps) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10_000);
 
+    setAccessDenied(false);
     getEventAlbums(eventId)
       .then(a => { if (!cancelled) setAlbums(a); })
-      .catch(() => {}) // если API недоступен — просто скрываем блок
+      .catch((e: unknown) => {
+        if (!cancelled && isAccessDeniedError(e)) setAccessDenied(true);
+      })
       .finally(() => { clearTimeout(timer); if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; controller.abort(); };
@@ -220,6 +226,39 @@ export function EventAlbums({ eventId, compact }: EventAlbumsProps) {
       {[0,1,2].map(i => <div key={i} className={styles.skeleton} />)}
     </div>
   );
+
+  if (accessDenied) {
+    const deniedInner = (
+      <div className={styles.loading}>
+        {[0, 1].map(i => (
+          <div key={i} className={styles.skeleton} />
+        ))}
+      </div>
+    );
+    if (compact) {
+      return (
+        <div className={styles.albumsSection}>
+          <div className={styles.header}>
+            <div className={styles.title}>Фотоальбомы</div>
+          </div>
+          <AccessDeniedGate denied variant="section">
+            {deniedInner}
+          </AccessDeniedGate>
+        </div>
+      );
+    }
+    return (
+      <div className={styles.wrap}>
+        <div className={styles.header}>
+          <h3 className={styles.title}>Фотоальбомы</h3>
+        </div>
+        <AccessDeniedGate denied variant="section">
+          {deniedInner}
+        </AccessDeniedGate>
+      </div>
+    );
+  }
+
   if (!albums.length) return null;
 
   if (compact) {
