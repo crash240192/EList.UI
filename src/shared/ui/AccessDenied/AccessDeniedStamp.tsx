@@ -1,68 +1,120 @@
-import { useId, type CSSProperties } from 'react';
+import { useId } from 'react';
 import styles from './AccessDeniedStamp.module.css';
 
 export type AccessDeniedStampSize = 'sm' | 'md' | 'lg';
 
-/** Белый «краска по трафарету» — 50% непрозрачности */
-const STAMP_WHITE = 'rgba(255, 255, 255, 0.5)';
-const STAMP_RED = '#dc2626';
+/** Насыщенный красный «краска» — без прозрачности */
+const STAMP_RED = '#e53935';
 
 interface AccessDeniedStampProps {
   size?: AccessDeniedStampSize;
   className?: string;
 }
 
-function GrungeFilters({ grungeId, inkId }: { grungeId: string; inkId: string }) {
+/** Потёртости трафаретной краски: выбивание «дырок», неровные края — не зернистый шум */
+function StencilGrungeFilter({ id }: { id: string }) {
   return (
-    <svg className={styles.filterSvg} aria-hidden width="0" height="0">
-      <defs>
-        <filter id={grungeId} x="-8%" y="-8%" width="116%" height="116%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.75 0.45" numOctaves="4" seed="8" result="noise" />
-          <feColorMatrix in="noise" type="saturate" values="0" result="mono" />
-          <feComponentTransfer in="mono" result="speckle">
-            <feFuncA type="discrete" tableValues="0 0.35 0.55 0.72 0.88 1" />
-          </feComponentTransfer>
-          <feDisplacementMap in="SourceGraphic" in2="speckle" scale="2.8" xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-        <filter id={inkId} x="-4%" y="-4%" width="108%" height="108%">
-          <feTurbulence type="fractalNoise" baseFrequency="1.2 0.9" numOctaves="3" seed="3" result="n" />
-          <feColorMatrix in="n" type="saturate" values="0" result="gn" />
-          <feBlend in="SourceGraphic" in2="gn" mode="multiply" />
-        </filter>
-      </defs>
-    </svg>
+    <filter
+      id={id}
+      x="-6%"
+      y="-6%"
+      width="112%"
+      height="112%"
+      colorInterpolationFilters="sRGB"
+    >
+      <feTurbulence
+        type="fractalNoise"
+        baseFrequency="0.07 0.05"
+        numOctaves="3"
+        seed="6"
+        result="edgeNoise"
+      />
+      <feDisplacementMap
+        in="SourceGraphic"
+        in2="edgeNoise"
+        scale="3"
+        xChannelSelector="R"
+        yChannelSelector="G"
+        result="roughened"
+      />
+      <feTurbulence
+        type="fractalNoise"
+        baseFrequency="0.35 0.28"
+        numOctaves="4"
+        seed="19"
+        result="chipNoise"
+      />
+      <feColorMatrix
+        in="chipNoise"
+        type="matrix"
+        values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 14 -6"
+        result="chips"
+      />
+      <feComposite in="roughened" in2="chips" operator="out" />
+    </filter>
   );
 }
 
 export function AccessDeniedStamp({ size = 'md', className }: AccessDeniedStampProps) {
   const uid = useId().replace(/:/g, '');
-  const grungeId = `accessDeniedGrunge-${uid}`;
-  const inkId = `accessDeniedInk-${uid}`;
-  const sizeClass = size === 'sm' ? styles.stamp_sm : size === 'lg' ? styles.stamp_lg : styles.stamp_md;
+  const grungeId = `stampStencil-${uid}`;
+  const wrapClass = size === 'sm' ? styles.wrap_sm : size === 'lg' ? styles.wrap_lg : styles.wrap_md;
 
   return (
-    <>
-      <GrungeFilters grungeId={grungeId} inkId={inkId} />
-      <div
-        className={`${styles.stamp} ${sizeClass} ${className ?? ''}`}
-        style={
-          {
-            '--stamp-grunge-filter': `url(#${grungeId})`,
-            '--stamp-ink-filter': `url(#${inkId})`,
-          } as React.CSSProperties
-        }
-        role="img"
-        aria-label="Доступ запрещён"
+    <div className={`${styles.wrap} ${wrapClass} ${className ?? ''}`} role="img" aria-label="Доступ запрещён">
+      <svg
+        className={styles.svg}
+        viewBox="0 0 420 128"
+        preserveAspectRatio="xMidYMid meet"
+        aria-hidden
       >
-        <svg className={styles.icon} viewBox="0 0 48 48" fill="none" aria-hidden>
-          <circle cx="24" cy="24" r="20" fill={STAMP_RED} />
-          <rect x="10" y="21" width="28" height="6" rx="0.5" fill={STAMP_WHITE} />
-        </svg>
-        <div className={styles.text}>
-          <span className={styles.line}>ACCESS</span>
-          <span className={styles.line}>DENIED</span>
-        </div>
-      </div>
-    </>
+        <defs>
+          <StencilGrungeFilter id={grungeId} />
+        </defs>
+
+        {/* Красная «краска»: рамка, круг, текст — с потёртостями */}
+        <g fill={STAMP_RED} stroke={STAMP_RED} filter={`url(#${grungeId})`}>
+          <rect
+            x="5"
+            y="5"
+            width="410"
+            height="118"
+            rx="14"
+            ry="14"
+            fill="none"
+            strokeWidth="7"
+            strokeLinejoin="round"
+          />
+          <circle cx="62" cy="64" r="34" fill={STAMP_RED} stroke="none" />
+          <text
+            x="118"
+            y="50"
+            fill={STAMP_RED}
+            stroke="none"
+            fontSize="46"
+            fontWeight="900"
+            fontFamily="Impact, Haettenschweiler, 'Arial Black', sans-serif"
+            letterSpacing="3"
+          >
+            ACCESS
+          </text>
+          <text
+            x="118"
+            y="106"
+            fill={STAMP_RED}
+            stroke="none"
+            fontSize="46"
+            fontWeight="900"
+            fontFamily="Impact, Haettenschweiler, 'Arial Black', sans-serif"
+            letterSpacing="3"
+          >
+            DENIED
+          </text>
+        </g>
+
+        {/* Белая полоса знака — поверх красного, без «дырок» */}
+        <rect x="38" y="58" width="48" height="12" rx="1" fill="#ffffff" />
+      </svg>
+    </div>
   );
 }
