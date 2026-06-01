@@ -13,6 +13,16 @@ export async function sendTestNotification(
   await apiClient.post(`${BASE}/send/${accountId}`, body);
 }
 
+/** GET /api/notifications/read/{notificationId} */
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  await apiClient.get(`${BASE}/read/${notificationId}`);
+}
+
+/** GET /api/notifications/read/all */
+export async function markAllNotificationsRead(): Promise<void> {
+  await apiClient.get(`${BASE}/read/all`);
+}
+
 /** GET /api/notifications/connections/stats */
 export async function fetchConnectionStats(): Promise<IConnectionStats> {
   const r = await apiClient.get<IConnectionStats>(`${BASE}/connections/stats`);

@@ -36,8 +36,12 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const [testSending, setTestSending] = useState(false);
   const [stats, setStats] = useState<string | null>(null);
 
+  const handleMarkAllRead = () => {
+    void markAllRead();
+  };
+
   const openNotification = useCallback((n: INotification) => {
-    markRead(n.id);
+    void markRead(n.id);
     if (n.eventId) {
       onClose();
       navigate(`/event/${n.eventId}`);
@@ -83,7 +87,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         <h2 className={styles.title}>Уведомления</h2>
         <div className={styles.headActions}>
           {items.some(i => !i.readAt) && (
-            <button type="button" className={styles.linkBtn} onClick={markAllRead}>
+            <button type="button" className={styles.linkBtn} onClick={handleMarkAllRead}>
               Прочитать все
             </button>
           )}

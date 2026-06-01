@@ -1,6 +1,10 @@
 // features/notifications/notificationsStore.ts
 
 import { create } from 'zustand';
+import {
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '@/entities/notification/api';
 import type { INotification, NotificationWsStatus } from '@/entities/notification/types';
 
 const MAX_ITEMS = 80;
@@ -14,8 +18,10 @@ interface NotificationsState {
   setPanelOpen: (open: boolean) => void;
   togglePanel: () => void;
   pushNotification: (n: INotification) => void;
-  markRead: (id: string) => void;
-  markAllRead: () => void;
+  applyMarkRead: (id: string, readAt?: string) => void;
+  applyMarkAllRead: (readAt?: string) => void;
+  markRead: (id: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
   clearAll: () => void;
   reset: () => void;
 }
@@ -26,7 +32,7 @@ function sortByDate(items: INotification[]): INotification[] {
   );
 }
 
-export const useNotificationsStore = create<NotificationsState>(set => ({
+export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   items: [],
   wsStatus: 'idle',
   wsError: null,
@@ -46,18 +52,43 @@ export const useNotificationsStore = create<NotificationsState>(set => ({
     });
   },
 
-  markRead: id => {
-    const now = new Date().toISOString();
+  applyMarkRead: (id, readAt) => {
+    const at = readAt ?? new Date().toISOString();
     set(s => ({
-      items: s.items.map(i => (i.id === id && !i.readAt ? { ...i, readAt: now } : i)),
+      items: s.items.map(i => (i.id === id && !i.readAt ? { ...i, readAt: at } : i)),
     }));
   },
 
-  markAllRead: () => {
-    const now = new Date().toISOString();
+  applyMarkAllRead: readAt => {
+    const at = readAt ?? new Date().toISOString();
     set(s => ({
-      items: s.items.map(i => (i.readAt ? i : { ...i, readAt: now })),
+      items: s.items.map(i => (i.readAt ? i : { ...i, readAt: at })),
     }));
+  },
+
+  markRead: async id => {
+    const item = get().items.find(i => i.id === id);
+    if (!item || item.readAt) return;
+
+    const prev = get().items;
+    get().applyMarkRead(id);
+    try {
+      await markNotificationRead(id);
+    } catch {
+      set({ items: prev });
+    }
+  },
+
+  markAllRead: async () => {
+    if (!get().items.some(i => !i.readAt)) return;
+
+    const prev = get().items;
+    get().applyMarkAllRead();
+    try {
+      await markAllNotificationsRead();
+    } catch {
+      set({ items: prev });
+    }
   },
 
   clearAll: () => set({ items: [] }),
