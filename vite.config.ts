@@ -18,6 +18,7 @@ export default defineConfig({
       '/eList': {
         target: 'http://92.118.113.6:35028',
         changeOrigin: true,
+        ws: true,
       },
       // Файлохранилище
       '/elist/filestorage': {

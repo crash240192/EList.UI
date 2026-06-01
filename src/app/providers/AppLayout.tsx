@@ -7,6 +7,7 @@ import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirm
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { NotificationBell } from '@/features/notifications/NotificationBell';
 import styles from './AppLayout.module.css';
 
 const NAV_ITEMS = [
@@ -86,6 +87,8 @@ export function AppLayout() {
             </svg>
           </button>
           {isAuthenticated() ? (
+            <>
+            <NotificationBell />
             <button className={styles.avatarBtn} onClick={() => navigate('/user/me')} aria-label="Профиль">
               {myAvatarFileId
                 ? <AuthImage fileId={myAvatarFileId} alt="Аватар" className={styles.avatarImg} />
@@ -94,6 +97,7 @@ export function AppLayout() {
                   </svg>
               }
             </button>
+            </>
           ) : (
             <button className={styles.loginBtn} onClick={() => navigate('/login')}>Войти</button>
           )}
