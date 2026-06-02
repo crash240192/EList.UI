@@ -205,6 +205,9 @@ export default function EventPage() {
   const isParticipantLimitFull =
     participantCap != null && participants.length >= participantCap && !isParticipating;
   const isEventActive = event.active;
+  const allowUsersToInvite = event.parameters?.allowUsersToInvite;
+  const canUsersInviteByEventPolicy = allowUsersToInvite === null || allowUsersToInvite === undefined || allowUsersToInvite === true;
+  const canOpenInviteModal = !!accountId && !!event?.id && (isOrganizer || (isParticipating && canUsersInviteByEventPolicy));
   const joinDisabled =
     actionLoading ||
     !accountId ||
@@ -327,7 +330,7 @@ export default function EventPage() {
             eventActive={isEventActive}
           />
           <div className={styles.actionBtns}>
-            {accountId && event?.id && (isOrganizer || (isParticipating && event.parameters?.allowUsersToInvite)) && (
+            {canOpenInviteModal && (
               <button className={styles.btnIcon} title="Пригласить" onClick={() => setInviteModalOpen(true)}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
                   <circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/>
