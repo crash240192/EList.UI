@@ -363,6 +363,8 @@ export default function CreateEventPage() {
   const [createdEventId,  setCreatedEventId]  = useState<string | null>(null);
   const [createdAccountId, setCreatedAccountId] = useState<string>('');
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [autoInviteEnabled, setAutoInviteEnabled] = useState(false);
+  const [autoInviteMode, setAutoInviteMode] = useState<'all' | 'select'>('select');
 
   const handleSubmit = async () => {
     const firstErr = validate();
@@ -424,6 +426,7 @@ export default function CreateEventPage() {
           eventTypes: selectedTypes,
           organizatorAccountIds: [accountId],
           organizatorOrganizationIds: null,
+          InviteAllSubscribers: autoInviteEnabled && autoInviteMode === 'all',
         });
         // Предлагаем пригласить подписчиков
         const newEventId = createResult?.result ?? createResult as unknown as string;
@@ -442,7 +445,7 @@ export default function CreateEventPage() {
             ).catch(() => {});
           }
         }
-        if (newEventId && accountId) {
+        if (newEventId && accountId && autoInviteEnabled && autoInviteMode === 'select') {
           setCreatedEventId(newEventId);
           setCreatedAccountId(accountId);
           setInviteModalOpen(true);
@@ -921,6 +924,40 @@ export default function CreateEventPage() {
             {saving ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Опубликовать'}
           </button>
         </div>
+        {!isEditing && (
+          <div className={styles.autoInviteBox}>
+            <label className={styles.autoInviteToggle}>
+              <input
+                type="checkbox"
+                checked={autoInviteEnabled}
+                onChange={(e) => setAutoInviteEnabled(e.target.checked)}
+              />
+              <span>Автоприглашение</span>
+            </label>
+            <div className={`${styles.autoInviteModes} ${!autoInviteEnabled ? styles.autoInviteModesDisabled : ''}`}>
+              <label className={styles.autoInviteRadio}>
+                <input
+                  type="radio"
+                  name="autoInviteMode"
+                  checked={autoInviteMode === 'all'}
+                  disabled={!autoInviteEnabled}
+                  onChange={() => setAutoInviteMode('all')}
+                />
+                Пригласить всех подписчиков
+              </label>
+              <label className={styles.autoInviteRadio}>
+                <input
+                  type="radio"
+                  name="autoInviteMode"
+                  checked={autoInviteMode === 'select'}
+                  disabled={!autoInviteEnabled}
+                  onChange={() => setAutoInviteMode('select')}
+                />
+                Выбрать подписчиков
+              </label>
+            </div>
+          </div>
+        )}
       </div>{/* end sidePanel */}
       </div>{/* end pageInner */}
 
