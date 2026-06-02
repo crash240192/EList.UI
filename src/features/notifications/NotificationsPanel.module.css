@@ -122,13 +122,20 @@
 
 .item {
   display: flex;
+  align-items: stretch;
+  width: 100%;
+  border-bottom: 1px solid var(--border);
+  background: none;
+}
+
+.itemMain {
+  display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  width: 100%;
+  flex: 1;
   padding: 12px 14px;
   border: none;
-  border-bottom: 1px solid var(--border);
   background: none;
   text-align: left;
   cursor: pointer;
@@ -136,12 +143,30 @@
   transition: background 0.12s;
 }
 
-.item:hover {
+.itemMain:hover {
   background: var(--surface-2);
 }
 
 .itemUnread {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.itemDismiss {
+  width: 34px;
+  flex-shrink: 0;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+
+.itemDismiss:hover {
+  background: var(--surface-2);
+  color: var(--danger);
 }
 
 .itemTitle {

@@ -7,6 +7,14 @@ function str(v: unknown): string | null {
   return String(v);
 }
 
+function parseType(v: unknown): string | number | null {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return v;
+  const n = Number(v);
+  if (Number.isFinite(n) && String(v).trim() !== '') return n;
+  return String(v);
+}
+
 /** Разбор JSON с WS / CommandResult (camelCase или PascalCase) */
 export function parseNotificationPayload(raw: unknown): INotification | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -31,7 +39,7 @@ export function parseNotificationPayload(raw: unknown): INotification | null {
     id: String(id),
     eventId: str(o.eventId ?? o.EventId),
     relatedAccountId: str(o.relatedAccountId ?? o.RelatedAccountId),
-    type: str(o.type ?? o.Type),
+    type: parseType(o.type ?? o.Type),
     title: str(o.title ?? o.Title),
     message: str(o.message ?? o.Message),
     createdAt: created ? String(created) : new Date().toISOString(),

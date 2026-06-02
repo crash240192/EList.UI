@@ -5,7 +5,7 @@ export interface INotification {
   id: string;
   eventId: string | null;
   relatedAccountId: string | null;
-  type: string | null;
+  type: string | number | null;
   title: string | null;
   message: string | null;
   createdAt: string;

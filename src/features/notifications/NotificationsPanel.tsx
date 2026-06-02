@@ -22,6 +22,29 @@ function formatWhen(iso: string): string {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+function notificationTypeText(type: INotification['type']): string {
+  if (type == null) return 'Уведомление';
+  switch (Number(type)) {
+    case 0: return 'Создано событие';
+    case 1: return 'Событие обновлено';
+    case 2: return 'Событие отменено';
+    case 3: return 'Событие завершено';
+    case 10: return 'Новый подписчик';
+    case 11: return 'Отписка';
+    case 12: return 'Подписка связанного пользователя';
+    case 13: return 'Отписка связанного пользователя';
+    case 20: return 'Участие подтверждено';
+    case 21: return 'Отмена участия';
+    case 31: return 'Новый ответ в обсуждении';
+    case 41: return 'Добавлен в чёрный список';
+    case 42: return 'Добавлен в белый список';
+    case 43: return 'Удалён из чёрного списка';
+    case 44: return 'Удалён из белого списка';
+    case 51: return 'Новое приглашение';
+    default: return String(type);
+  }
+}
+
 export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const navigate = useNavigate();
   const { accountId } = useAccountId();
@@ -35,6 +58,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [stats, setStats] = useState<string | null>(null);
+  const visibleItems = items.filter(i => !i.readAt);
 
   const handleMarkAllRead = () => {
     void markAllRead();
@@ -52,6 +76,10 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       navigate(`/user/${n.relatedAccountId}`);
     }
   }, [markRead, navigate, onClose]);
+
+  const closeNotification = useCallback((n: INotification) => {
+    void markRead(n.id);
+  }, [markRead]);
 
   const handleTestSend = async () => {
     if (!accountId || !testMsg.trim()) return;
@@ -86,7 +114,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       <div className={styles.head}>
         <h2 className={styles.title}>Уведомления</h2>
         <div className={styles.headActions}>
-          {items.some(i => !i.readAt) && (
+          {visibleItems.length > 0 && (
             <button type="button" className={styles.linkBtn} onClick={handleMarkAllRead}>
               Прочитать все
             </button>
@@ -112,24 +140,35 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       </div>
 
       <ul className={styles.list}>
-        {items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <li className={styles.empty}>
             Пока нет уведомлений. Новые появятся здесь по WebSocket.
           </li>
         ) : (
-          items.map(n => (
+          visibleItems.map(n => (
             <li key={n.id}>
-              <button
-                type="button"
-                className={`${styles.item} ${!n.readAt ? styles.itemUnread : ''}`}
-                onClick={() => openNotification(n)}
-              >
-                {n.title && <span className={styles.itemTitle}>{n.title}</span>}
-                <span className={styles.itemMessage}>
-                  {n.message || n.type || 'Уведомление'}
-                </span>
-                <span className={styles.itemMeta}>{formatWhen(n.createdAt)}</span>
-              </button>
+              <div className={`${styles.item} ${styles.itemUnread}`}>
+                <button
+                  type="button"
+                  className={styles.itemMain}
+                  onClick={() => openNotification(n)}
+                >
+                  {n.title && <span className={styles.itemTitle}>{n.title}</span>}
+                  <span className={styles.itemMessage}>
+                    {n.message || notificationTypeText(n.type)}
+                  </span>
+                  <span className={styles.itemMeta}>{formatWhen(n.createdAt)}</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.itemDismiss}
+                  onClick={() => closeNotification(n)}
+                  aria-label="Скрыть уведомление"
+                  title="Отметить прочитанным"
+                >
+                  ×
+                </button>
+              </div>
             </li>
           ))
         )}
@@ -154,7 +193,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         </div>
       )}
 
-      {items.length > 0 && (
+      {visibleItems.length > 0 && (
         <button type="button" className={styles.clearBtn} onClick={clearAll}>
           Очистить список
         </button>
