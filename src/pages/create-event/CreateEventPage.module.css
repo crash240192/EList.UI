@@ -360,6 +360,25 @@
   cursor: pointer;
 }
 
+.pickInviteBtn {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pickInviteBtn:hover {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: var(--accent);
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed; bottom: 24px; left: 50%;

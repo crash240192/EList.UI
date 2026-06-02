@@ -17,12 +17,20 @@ import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 const PAGE_SIZE = 20;
 
 interface InviteModalProps {
-  eventId: string;
+  /** Обязателен в режиме отправки приглашений (страница события) */
+  eventId?: string;
   currentAccountId: string;
   /** Закрытое мероприятие — белый список; открытое — чёрный */
   isPrivate?: boolean;
   onClose: () => void;
   onSent?: (count: number) => void;
+  /** Выбор подписчиков до создания события (без API invitations) */
+  pickMode?: boolean;
+  initialSelectedIds?: string[];
+  onPickConfirm?: (accountIds: string[]) => void;
+  /** Локальные Б/Ч списки при создании события — без запроса short */
+  draftBlackListIds?: string[];
+  draftWhiteListIds?: string[];
 }
 
 function getInitials(p: ISubscriptionItem): string {
@@ -37,6 +45,11 @@ export function InviteModal({
   isPrivate = false,
   onClose,
   onSent,
+  pickMode = false,
+  initialSelectedIds,
+  onPickConfirm,
+  draftBlackListIds,
+  draftWhiteListIds,
 }: InviteModalProps) {
   useModalBackButton(onClose);
 
@@ -57,6 +70,16 @@ export function InviteModal({
   const debouncedSearch = useDebounce(search, 350);
 
   useEffect(() => {
+    if (draftBlackListIds !== undefined || draftWhiteListIds !== undefined) {
+      setBlackListIds(new Set(draftBlackListIds ?? []));
+      setWhiteListIds(new Set(draftWhiteListIds ?? []));
+      return;
+    }
+    if (!eventId) {
+      setBlackListIds(new Set());
+      setWhiteListIds(new Set());
+      return;
+    }
     let cancelled = false;
     void Promise.all([
       getBWListShortIds('blackList', eventId).catch(() => [] as string[]),
@@ -69,7 +92,12 @@ export function InviteModal({
     return () => {
       cancelled = true;
     };
-  }, [eventId]);
+  }, [eventId, draftBlackListIds, draftWhiteListIds]);
+
+  useEffect(() => {
+    if (!pickMode || !initialSelectedIds?.length) return;
+    setSelected(new Set(initialSelectedIds));
+  }, [pickMode, initialSelectedIds]);
 
   const canInvite = useCallback(
     (accountId: string) => canInviteSubscriber(isPrivate, accountId, blackListIds, whiteListIds),
@@ -164,9 +192,18 @@ export function InviteModal({
 
   const clearAll = () => setSelected(new Set());
 
-  const handleSend = async () => {
+  const handleConfirm = async () => {
     const ids = [...selected].filter(id => canInvite(id));
     if (ids.length === 0) return;
+
+    if (pickMode) {
+      onPickConfirm?.(ids);
+      onClose();
+      return;
+    }
+
+    if (!eventId) return;
+
     setSending(true);
     setErr(null);
     try {
@@ -187,7 +224,7 @@ export function InviteModal({
       <div className={styles.modal} role="dialog" aria-modal aria-label="Пригласить">
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <h3 className={styles.title}>Пригласить</h3>
+            <h3 className={styles.title}>{pickMode ? 'Кого пригласить' : 'Пригласить'}</h3>
             {!loading && <span className={styles.count}>{total} подписчиков</span>}
           </div>
           <button type="button" className={styles.closeBtn} onClick={onClose}>
@@ -303,7 +340,7 @@ export function InviteModal({
 
         <div className={styles.footer}>
           {err && !loading && <span className={styles.footerErr}>{err}</span>}
-          {sent ? (
+          {sent && !pickMode ? (
             <div className={styles.sentMsg}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
@@ -318,10 +355,14 @@ export function InviteModal({
               <button
                 type="button"
                 className={styles.sendBtn}
-                onClick={() => void handleSend()}
+                onClick={() => void handleConfirm()}
                 disabled={selected.size === 0 || sending}
               >
-                {sending ? 'Отправка...' : `Пригласить${selected.size > 0 ? ` (${selected.size})` : ''}`}
+                {sending
+                  ? 'Отправка...'
+                  : pickMode
+                    ? `Сохранить${selected.size > 0 ? ` (${selected.size})` : ''}`
+                    : `Пригласить${selected.size > 0 ? ` (${selected.size})` : ''}`}
               </button>
             </>
           )}

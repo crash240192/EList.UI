@@ -1,11 +1,19 @@
 // pages/create-event/CreateEventPage.tsx
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchEventById, fetchEventTypes as fetchAllEventTypes, MOCK_EVENTS, assignEventParameters, fetchEventOrganizators } from '@/entities/event';
 import type { IEventType } from '@/entities/event';
-import { fetchEventTypesByEvent, getBWList, addToBWList, removeFromBWList, type BWListType, type IBWListUser } from '@/entities/event/participationApi';
+import {
+  fetchEventTypesByEvent,
+  getBWList,
+  addToBWList,
+  removeFromBWList,
+  canInviteSubscriber,
+  type BWListType,
+  type IBWListUser,
+} from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { useAccountId } from '@/features/auth/useAccountId';
@@ -360,11 +368,33 @@ export default function CreateEventPage() {
     if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   };
 
-  const [createdEventId,  setCreatedEventId]  = useState<string | null>(null);
-  const [createdAccountId, setCreatedAccountId] = useState<string>('');
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [invitePickerOpen, setInvitePickerOpen] = useState(false);
+  const [inviteUserIds, setInviteUserIds] = useState<string[]>([]);
   const [autoInviteEnabled, setAutoInviteEnabled] = useState(false);
   const [autoInviteMode, setAutoInviteMode] = useState<'all' | 'select'>('select');
+
+  const draftBlackListIds = useMemo(
+    () => blacklist.map(u => u.accountId),
+    [blacklist],
+  );
+  const draftWhiteListIds = useMemo(
+    () => whitelist.map(u => u.accountId),
+    [whitelist],
+  );
+
+  useEffect(() => {
+    if (!autoInviteEnabled || autoInviteMode !== 'select') return;
+    const blackSet = new Set(draftBlackListIds);
+    const whiteSet = new Set(draftWhiteListIds);
+    setInviteUserIds(prev => {
+      const next = prev.filter(id => canInviteSubscriber(form.isPrivate, id, blackSet, whiteSet));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [autoInviteEnabled, autoInviteMode, form.isPrivate, draftBlackListIds, draftWhiteListIds]);
+
+  useEffect(() => {
+    if (!autoInviteEnabled) setInviteUserIds([]);
+  }, [autoInviteEnabled]);
 
   const handleSubmit = async () => {
     const firstErr = validate();
@@ -407,7 +437,7 @@ export default function CreateEventPage() {
         navigate(`/event/${id}`);
       } else {
         const accountId = await getOrFetchAccountId();
-        const createResult = await apiClient.post<string>('/api/events/create', {
+        const createPayload: Record<string, unknown> = {
           event: {
             name: form.name, description: form.description || undefined,
             address: form.address, latitude: lat!, longitude: lng!,
@@ -426,32 +456,28 @@ export default function CreateEventPage() {
           eventTypes: selectedTypes,
           organizatorAccountIds: [accountId],
           organizatorOrganizationIds: null,
-          InviteAllSubscribers: autoInviteEnabled && autoInviteMode === 'all',
-        });
-        // Предлагаем пригласить подписчиков
+        };
+
+        if (form.isPrivate) {
+          if (draftWhiteListIds.length > 0) createPayload.WhiteList = draftWhiteListIds;
+        } else if (draftBlackListIds.length > 0) {
+          createPayload.BlackList = draftBlackListIds;
+        }
+
+        if (autoInviteEnabled) {
+          if (autoInviteMode === 'all') {
+            createPayload.InviteAllSubscribers = true;
+          } else if (inviteUserIds.length > 0) {
+            createPayload.InviteUsers = inviteUserIds;
+          }
+        }
+
+        const createResult = await apiClient.post<string>('/api/events/create', createPayload);
         const newEventId = createResult?.result ?? createResult as unknown as string;
-        // Привязываем альбомы к созданному событию
         if (newEventId && albums.length > 0) {
           await Promise.allSettled(albums.map(a => assignAlbumToEvent(newEventId, a.id)));
         }
-        // Сохраняем чёрный/белый список
-        if (newEventId) {
-          const listUsers = form.isPrivate ? whitelist : blacklist;
-          if (listUsers.length > 0) {
-            await addToBWList(
-              form.isPrivate ? 'whiteList' : 'blackList',
-              newEventId,
-              listUsers.map(u => u.accountId)
-            ).catch(() => {});
-          }
-        }
-        if (newEventId && accountId && autoInviteEnabled && autoInviteMode === 'select') {
-          setCreatedEventId(newEventId);
-          setCreatedAccountId(accountId);
-          setInviteModalOpen(true);
-        } else {
-          navigate('/my-events');
-        }
+        navigate('/my-events');
       }
     } catch (err) {
       showToast(`❌ ${err instanceof Error ? err.message : 'Ошибка сохранения'}`);
@@ -956,6 +982,17 @@ export default function CreateEventPage() {
                 Выбрать подписчиков
               </label>
             </div>
+            {autoInviteEnabled && autoInviteMode === 'select' && accountId && (
+              <button
+                type="button"
+                className={styles.pickInviteBtn}
+                onClick={() => setInvitePickerOpen(true)}
+              >
+                {inviteUserIds.length > 0
+                  ? `Выбрано подписчиков: ${inviteUserIds.length}`
+                  : 'Выбрать подписчиков…'}
+              </button>
+            )}
           </div>
         )}
       </div>{/* end sidePanel */}
@@ -992,14 +1029,16 @@ export default function CreateEventPage() {
         />
       )}
 
-      {/* Приглашения после создания события */}
-      {inviteModalOpen && createdEventId && (
+      {invitePickerOpen && accountId && (
         <InviteModal
-          eventId={createdEventId}
-          currentAccountId={createdAccountId}
+          pickMode
+          currentAccountId={accountId}
           isPrivate={form.isPrivate}
-          onClose={() => { setInviteModalOpen(false); navigate('/my-events'); }}
-          onSent={() => { setInviteModalOpen(false); navigate('/my-events'); }}
+          draftBlackListIds={draftBlackListIds}
+          draftWhiteListIds={draftWhiteListIds}
+          initialSelectedIds={inviteUserIds}
+          onPickConfirm={setInviteUserIds}
+          onClose={() => setInvitePickerOpen(false)}
         />
       )}
 
