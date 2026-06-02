@@ -360,6 +360,11 @@
   cursor: pointer;
 }
 
+.autoInviteRadioDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .pickInviteBtn {
   width: 100%;
   padding: 8px 10px;

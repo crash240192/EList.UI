@@ -382,6 +382,15 @@ export default function CreateEventPage() {
     [whitelist],
   );
 
+  /** Частное + пустой белый список: только ручной выбор; иначе доступно «пригласить всех» */
+  const canInviteAllSubscribers = !form.isPrivate || draftWhiteListIds.length > 0;
+
+  useEffect(() => {
+    if (!canInviteAllSubscribers && autoInviteMode === 'all') {
+      setAutoInviteMode('select');
+    }
+  }, [canInviteAllSubscribers, autoInviteMode]);
+
   useEffect(() => {
     if (!autoInviteEnabled || autoInviteMode !== 'select') return;
     const blackSet = new Set(draftBlackListIds);
@@ -961,15 +970,24 @@ export default function CreateEventPage() {
               <span>Автоприглашение</span>
             </label>
             <div className={`${styles.autoInviteModes} ${!autoInviteEnabled ? styles.autoInviteModesDisabled : ''}`}>
-              <label className={styles.autoInviteRadio}>
+              <label
+                className={`${styles.autoInviteRadio} ${!autoInviteEnabled || !canInviteAllSubscribers ? styles.autoInviteRadioDisabled : ''}`}
+                title={
+                  form.isPrivate && !canInviteAllSubscribers
+                    ? 'Добавьте участников в белый список, чтобы пригласить всех сразу'
+                    : undefined
+                }
+              >
                 <input
                   type="radio"
                   name="autoInviteMode"
                   checked={autoInviteMode === 'all'}
-                  disabled={!autoInviteEnabled}
+                  disabled={!autoInviteEnabled || !canInviteAllSubscribers}
                   onChange={() => setAutoInviteMode('all')}
                 />
-                Пригласить всех подписчиков
+                {form.isPrivate
+                  ? 'Пригласить всех из белого списка'
+                  : 'Пригласить всех подписчиков'}
               </label>
               <label className={styles.autoInviteRadio}>
                 <input
