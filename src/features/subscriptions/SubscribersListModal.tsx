@@ -2,12 +2,18 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { ISubscriptionItem } from '@/entities/user/subscriptionApi';
-import { fetchSubscriptions, fetchSubscribers } from '@/entities/user/subscriptionApi';
+import type { INotifySettings, ISubscriptionItem } from '@/entities/user/subscriptionApi';
+import {
+  fetchSubscriptions,
+  fetchSubscribers,
+  unsubscribe,
+  updateSubscriptionNotify,
+} from '@/entities/user/subscriptionApi';
 import { useDebounce, useInfiniteScroll } from '@/shared/hooks';
 import { UserChip } from '@/entities/user/ui/UserChip';
 import styles from './SubscribersListModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import { SubscribeModal } from './SubscribeModal';
 
 const PAGE_SIZE = 20;
 
@@ -20,7 +26,6 @@ interface Props {
 }
 
 export function SubscribersListModal({ title, accountId, listType, currentAccountId, onClose }: Props) {
-  useModalBackButton(onClose);
   const navigate = useNavigate();
 
   const [search,      setSearch]      = useState('');
@@ -30,6 +35,8 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
   const [loading,     setLoading]     = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error,       setError]       = useState<string | null>(null);
+  const [pendingUnsubscribes, setPendingUnsubscribes] = useState<Set<string>>(new Set());
+  const [settingsTarget, setSettingsTarget] = useState<ISubscriptionItem | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useDebounce(search, 350);
@@ -70,23 +77,65 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
 
   const sentinelRef = useInfiniteScroll(loadMore);
 
+  const handleClose = useCallback(async () => {
+    if (pendingUnsubscribes.size > 0) {
+      const ids = [...pendingUnsubscribes];
+      for (const id of ids) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await unsubscribe(id);
+        } catch {
+          // Игнорируем частичные ошибки, чтобы окно корректно закрылось
+        }
+      }
+    }
+    onClose();
+  }, [onClose, pendingUnsubscribes]);
+
+  const togglePendingUnsubscribe = useCallback((accountIdToToggle: string) => {
+    setPendingUnsubscribes(prev => {
+      const next = new Set(prev);
+      if (next.has(accountIdToToggle)) next.delete(accountIdToToggle);
+      else next.add(accountIdToToggle);
+      return next;
+    });
+  }, []);
+
+  const openSettings = useCallback((item: ISubscriptionItem) => {
+    setSettingsTarget(item);
+  }, []);
+
+  const saveSettings = useCallback(async (settings: INotifySettings) => {
+    if (!settingsTarget) return;
+    await updateSubscriptionNotify(settingsTarget.account.id, settings);
+    setItems(prev => prev.map(i => i.account.id === settingsTarget.account.id
+      ? { ...i, notifySettings: settings }
+      : i));
+    setSettingsTarget(null);
+  }, [settingsTarget]);
+
+  const canManageSubscriptions = listType === 'subscriptions' && accountId === currentAccountId;
+  useModalBackButton(() => { void handleClose(); });
+
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 100);
-    const fn = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') void handleClose();
+    };
     document.addEventListener('keydown', fn);
     return () => document.removeEventListener('keydown', fn);
-  }, [onClose]);
+  }, [handleClose]);
 
   return (
     <>
-      <div className={styles.backdrop} onClick={onClose} />
+      <div className={styles.backdrop} onClick={() => { void handleClose(); }} />
       <div className={styles.modal} role="dialog" aria-modal>
         <div className={styles.header}>
           <div>
             <h3 className={styles.title}>{title}</h3>
             {!loading && <span className={styles.count}>{total}</span>}
           </div>
-          <button className={styles.closeBtn} onClick={onClose}>✕</button>
+          <button className={styles.closeBtn} onClick={() => { void handleClose(); }}>✕</button>
         </div>
 
         <div className={styles.searchWrap}>
@@ -112,20 +161,44 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
           {items.map(item => (
             <div
               key={item.account.id}
-              className={styles.row}
-              onClick={() => { onClose(); navigate(`/user/${item.account.id}`); }}
+              className={`${styles.row} ${pendingUnsubscribes.has(item.account.id) ? styles.rowPending : ''}`}
             >
-              <UserChip
-                user={{
-                  accountId: item.account.id,
-                  login:     item.account.login,
-                  firstName: item.personInfo?.firstName ?? null,
-                  lastName:  item.personInfo?.lastName  ?? null,
-                  isMe:      item.account.id === currentAccountId,
-                }}
-                clickable={false}
-                size="md"
-              />
+              <button
+                type="button"
+                className={styles.rowMain}
+                onClick={() => { void handleClose(); navigate(`/user/${item.account.id}`); }}
+              >
+                <UserChip
+                  user={{
+                    accountId: item.account.id,
+                    login:     item.account.login,
+                    firstName: item.personInfo?.firstName ?? null,
+                    lastName:  item.personInfo?.lastName  ?? null,
+                    isMe:      item.account.id === currentAccountId,
+                  }}
+                  clickable={false}
+                  size="md"
+                />
+              </button>
+              {canManageSubscriptions && (
+                <div className={styles.rowActions}>
+                  <button
+                    type="button"
+                    className={styles.settingsBtn}
+                    onClick={() => openSettings(item)}
+                    disabled={pendingUnsubscribes.has(item.account.id)}
+                  >
+                    Настройки
+                  </button>
+                  <button
+                    type="button"
+                    className={pendingUnsubscribes.has(item.account.id) ? styles.undoBtn : styles.unsubscribeBtn}
+                    onClick={() => togglePendingUnsubscribe(item.account.id)}
+                  >
+                    {pendingUnsubscribes.has(item.account.id) ? 'Отменить' : 'Отписаться'}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           {!loading && items.length < total && (
@@ -135,6 +208,17 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
           )}
         </div>
       </div>
+      {settingsTarget && (
+        <SubscribeModal
+          targetLogin={settingsTarget.account.login}
+          initialSettings={settingsTarget.notifySettings ?? undefined}
+          title={`Настройки уведомлений @${settingsTarget.account.login}`}
+          subtitle="Выберите уведомления, которые хотите получать от пользователя:"
+          confirmLabel="Сохранить"
+          onConfirm={saveSettings}
+          onCancel={() => setSettingsTarget(null)}
+        />
+      )}
     </>
   );
 }

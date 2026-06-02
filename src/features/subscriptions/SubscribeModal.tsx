@@ -9,14 +9,26 @@ interface Props {
   targetLogin: string;
   onConfirm: (settings: INotifySettings) => Promise<void>;
   onCancel: () => void;
+  initialSettings?: INotifySettings;
+  title?: string;
+  subtitle?: string;
+  confirmLabel?: string;
 }
 
-export function SubscribeModal({ targetLogin, onConfirm, onCancel }: Props) {
+export function SubscribeModal({
+  targetLogin,
+  onConfirm,
+  onCancel,
+  initialSettings,
+  title,
+  subtitle,
+  confirmLabel,
+}: Props) {
   useModalBackButton(onCancel);
   const [settings, setSettings] = useState<INotifySettings>({
-    notifyParticipated: true,
-    notifyEventCreated: true,
-    notifySubscribed:   false,
+    notifyParticipated: initialSettings?.notifyParticipated ?? true,
+    notifyEventCreated: initialSettings?.notifyEventCreated ?? true,
+    notifySubscribed:   initialSettings?.notifySubscribed ?? false,
   });
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
@@ -39,8 +51,8 @@ export function SubscribeModal({ targetLogin, onConfirm, onCancel }: Props) {
     <>
       <div className={styles.backdrop} onClick={onCancel} />
       <div className={styles.modal} role="dialog" aria-modal aria-label="Подписаться">
-        <h3 className={styles.title}>Подписаться на @{targetLogin}</h3>
-        <p className={styles.subtitle}>Выберите уведомления которые хотите получать:</p>
+        <h3 className={styles.title}>{title ?? `Подписаться на @${targetLogin}`}</h3>
+        <p className={styles.subtitle}>{subtitle ?? 'Выберите уведомления которые хотите получать:'}</p>
 
         <div className={styles.options}>
           <label className={styles.option}>
@@ -76,7 +88,7 @@ export function SubscribeModal({ targetLogin, onConfirm, onCancel }: Props) {
             Отмена
           </button>
           <button className={styles.confirmBtn} onClick={handleConfirm} disabled={loading}>
-            {loading ? '...' : 'Подписаться'}
+            {loading ? '...' : (confirmLabel ?? 'Подписаться')}
           </button>
         </div>
       </div>

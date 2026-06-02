@@ -18,6 +18,7 @@ export interface ISubscriptionPersonInfo {
 export interface ISubscriptionItem {
   account: ISubscriptionAccount;
   personInfo: ISubscriptionPersonInfo | null;
+  notifySettings: INotifySettings | null;
 }
 
 export interface ISubscriptionSearchParams {
@@ -83,6 +84,23 @@ export async function fetchSubscriptions(
       items: list.map(item => ({
         account:    item.subscribedTo?.account    ?? item.account,
         personInfo: item.subscribedTo?.personInfo ?? item.personInfo ?? null,
+        notifySettings: {
+          notifyParticipated: Boolean(
+            item.notifyParticipated
+            ?? item.subscribedTo?.notifyParticipated
+            ?? item.notify?.notifyParticipated
+          ),
+          notifyEventCreated: Boolean(
+            item.notifyEventCreated
+            ?? item.subscribedTo?.notifyEventCreated
+            ?? item.notify?.notifyEventCreated
+          ),
+          notifySubscribed: Boolean(
+            item.notifySubscribed
+            ?? item.subscribedTo?.notifySubscribed
+            ?? item.notify?.notifySubscribed
+          ),
+        },
       })),
       total:     paged?.total     ?? list.length,
       pageIndex: paged?.pageIndex ?? pageIndex,
@@ -111,6 +129,7 @@ export async function fetchSubscribers(
       items: list.map(item => ({
         account:    item.subscriber?.account    ?? item.account,
         personInfo: item.subscriber?.personInfo ?? item.personInfo ?? null,
+        notifySettings: null,
       })),
       total:     paged?.total     ?? list.length,
       pageIndex: paged?.pageIndex ?? pageIndex,
@@ -122,6 +141,11 @@ export async function fetchSubscribers(
 /** Подписаться */
 export async function subscribe(accountId: string, notify: INotifySettings): Promise<void> {
   await apiClient.get(`/api/subscriptions/subscribe/${accountId}`);
+  await apiClient.put(`/api/subscriptions/update/${accountId}`, notify);
+}
+
+/** PUT /api/subscriptions/update/{accountId} */
+export async function updateSubscriptionNotify(accountId: string, notify: INotifySettings): Promise<void> {
   await apiClient.put(`/api/subscriptions/update/${accountId}`, notify);
 }
 
