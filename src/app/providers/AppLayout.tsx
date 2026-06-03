@@ -8,6 +8,10 @@ import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
+import {
+  useInvitationsNotViewedCount,
+  useInvitationsStore,
+} from '@/features/invitations/invitationsStore';
 import styles from './AppLayout.module.css';
 
 const NAV_ITEMS = [
@@ -25,12 +29,17 @@ export function AppLayout() {
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
+  const authenticated = isAuthenticated();
+  const notViewedInvitations = useInvitationsStore(s => s.notViewedCount);
+  const resetInvitationsCount = useInvitationsStore(s => s.reset);
+  useInvitationsNotViewedCount(authenticated);
   const { filters } = useFiltersStore();
   const { fileId: myAvatarFileId } = useMyAvatar();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
+    resetInvitationsCount();
     setLogoutConfirm(false);
     navigate('/login', { replace: true });
   };
@@ -114,7 +123,14 @@ export function AppLayout() {
               title={label}
               onClick={() => setSidebarExpanded(false)}
             >
-              <span className={styles.navIcon}>{icon}</span>
+              <span className={styles.navIcon}>
+                {icon}
+                {to === '/invitations' && notViewedInvitations > 0 && (
+                  <span className={styles.navCountBadge} aria-label={`Непросмотренных: ${notViewedInvitations}`}>
+                    {notViewedInvitations > 99 ? '99+' : notViewedInvitations}
+                  </span>
+                )}
+              </span>
               <span className={styles.navLabel}>{label}</span>
             </NavLink>
           ))}

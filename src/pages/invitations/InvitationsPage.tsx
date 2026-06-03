@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchUserInvitations, type IInvitation } from '@/entities/invitation/invitationsApi';
+import {
+  fetchUserInvitations,
+  markInvitationViewed,
+  type IInvitation,
+} from '@/entities/invitation/invitationsApi';
+import { isInvitationUnviewed } from '@/entities/invitation/invitationViewed';
+import { useInvitationsStore } from '@/features/invitations/invitationsStore';
 import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventModal } from '@/pages/home/EventModal';
@@ -23,6 +29,8 @@ function inviterName(inv: IInvitation): string {
 
 export default function InvitationsPage() {
   const navigate = useNavigate();
+  const refreshNotViewedCount = useInvitationsStore(s => s.refreshNotViewedCount);
+  const applyMarkedViewed = useInvitationsStore(s => s.applyMarkedViewed);
   const [items,   setItems]   = useState<IInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [err,     setErr]     = useState<string | null>(null);
@@ -34,7 +42,29 @@ export default function InvitationsPage() {
       .then(r => setItems(r.result))
       .catch(() => setErr('Не удалось загрузить приглашения'))
       .finally(() => setLoading(false));
-  }, []);
+    void refreshNotViewedCount();
+  }, [refreshNotViewedCount]);
+
+  const markViewedIfNeeded = async (inv: IInvitation) => {
+    if (!isInvitationUnviewed(inv)) return;
+    setItems(prev =>
+      prev.map(i => (i.id === inv.id ? { ...i, viewed: true } : i)),
+    );
+    applyMarkedViewed();
+    try {
+      await markInvitationViewed(inv.id);
+    } catch {
+      setItems(prev =>
+        prev.map(i => (i.id === inv.id ? { ...i, viewed: false } : i)),
+      );
+      void refreshNotViewedCount();
+    }
+  };
+
+  const handleInvitationClick = (inv: IInvitation) => {
+    void markViewedIfNeeded(inv);
+    navigate(`/event/${inv.eventId}`);
+  };
 
   const doAccept = async (inv: IInvitation) => {
     try {
@@ -98,10 +128,15 @@ export default function InvitationsPage() {
             const cost   = params?.cost ?? 0;
             const age    = params?.ageLimit;
 
+            const unviewed = isInvitationUnviewed(inv);
+
             return (
-              <div key={inv.id} className={styles.item}>
+              <div
+                key={inv.id}
+                className={`${styles.item} ${unviewed ? styles.itemUnviewed : ''}`}
+              >
                 {/* Левая часть: обложка + текст */}
-                <div className={styles.itemLeft} onClick={() => navigate(`/event/${inv.eventId}`)}>
+                <div className={styles.itemLeft} onClick={() => handleInvitationClick(inv)}>
                   <div className={styles.cover}>
                     {event.coverImageId
                       ? <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg} />
@@ -149,7 +184,11 @@ export default function InvitationsPage() {
                 {/* Правая часть: кнопки вертикально */}
                 <div className={styles.itemActions}>
                   <button className={`${styles.btn} ${styles.btnOk}`}
-                    onClick={e => { e.stopPropagation(); setPreviewInv(inv); }}>
+                    onClick={e => {
+                      e.stopPropagation();
+                      void markViewedIfNeeded(inv);
+                      setPreviewInv(inv);
+                    }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                     Принять
                   </button>

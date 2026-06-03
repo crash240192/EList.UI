@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccountId } from '@/features/auth/useAccountId';
 import type { INotification } from '@/entities/notification/types';
-import { getNotificationEventId } from '@/entities/notification/eventData';
+import { getNotificationEventId, isNewInvitationNotification } from '@/entities/notification/eventData';
 import { fetchConnectionStats, sendTestNotification } from '@/entities/notification/api';
 import { useNotificationsStore } from './notificationsStore';
 import styles from './NotificationsPanel.module.css';
@@ -79,6 +79,11 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
 
   const openNotification = useCallback((n: INotification) => {
     void markRead(n.id);
+    if (isNewInvitationNotification(n.type)) {
+      onClose();
+      navigate('/invitations');
+      return;
+    }
     const eventId = getNotificationEventId(n);
     if (eventId) {
       onClose();

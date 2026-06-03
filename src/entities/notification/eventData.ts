@@ -2,8 +2,14 @@
 
 import type { IEventSearchShortItem } from '@/entities/event/types';
 
+export const NOTIFICATION_TYPE_NEW_INVITATION = 51;
+
 /** Типы уведомлений, в data которых — краткая карточка мероприятия (как search/short) */
 export const EVENT_NOTIFICATION_TYPES = new Set([0, 1, 2, 3]);
+
+export function isNewInvitationNotification(type: string | number | null | undefined): boolean {
+  return Number(type) === NOTIFICATION_TYPE_NEW_INVITATION;
+}
 
 export function isEventNotificationType(type: string | number | null | undefined): boolean {
   if (type == null || type === '') return false;

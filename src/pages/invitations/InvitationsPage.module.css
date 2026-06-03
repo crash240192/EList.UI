@@ -57,6 +57,19 @@
 }
 .item:last-child { border-bottom: none; }
 
+.itemUnviewed {
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--accent) 65%, transparent),
+    0 0 16px 2px color-mix(in srgb, var(--accent) 35%, transparent);
+  z-index: 1;
+}
+
+.itemUnviewed:hover {
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    0 0 20px 4px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
 /* Левая часть — занимает весь элемент */
 .itemLeft {
   flex: 1; display: flex; align-items: center; gap: 12px;

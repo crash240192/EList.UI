@@ -3,7 +3,9 @@
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/app/store';
 import { parseWsNotificationMessage } from '@/entities/notification/parseNotification';
+import { isNewInvitationNotification } from '@/entities/notification/eventData';
 import { buildNotificationsWebSocketUrl } from '@/shared/lib/notificationsWsUrl';
+import { useInvitationsStore } from '@/features/invitations/invitationsStore';
 import { useNotificationsStore } from './notificationsStore';
 
 const RECONNECT_BASE_MS = 2_000;
@@ -52,6 +54,7 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       clearReconnect();
       closeSocket();
       reset();
+      useInvitationsStore.getState().reset();
       return () => {
         unmountedRef.current = true;
         clearReconnect();
@@ -103,7 +106,11 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       ws.onmessage = ev => {
         if (typeof ev.data !== 'string') return;
         const n = parseWsNotificationMessage(ev.data);
-        if (n) pushNotification(n);
+        if (!n) return;
+        pushNotification(n);
+        if (isNewInvitationNotification(n.type)) {
+          useInvitationsStore.getState().incrementNotViewedCount();
+        }
       };
 
       ws.onerror = () => {

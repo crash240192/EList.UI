@@ -185,8 +185,26 @@
 .navActive     { background: rgba(99,102,241,0.12) !important; color: var(--accent) !important; }
 
 .navIcon {
+  position: relative;
   width: 20px; display: flex; align-items: center;
   justify-content: center; flex-shrink: 0;
+}
+
+.navCountBadge {
+  position: absolute;
+  top: -5px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--surface);
 }
 
 /* Лейблы: скрыты в свёрнутом, видны в расширенном */
