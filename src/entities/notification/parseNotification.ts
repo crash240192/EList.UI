@@ -1,6 +1,7 @@
 // entities/notification/parseNotification.ts
 
 import type { INotification } from './types';
+import { isEventNotificationType, parseEventNotificationData } from './eventData';
 
 function str(v: unknown): string | null {
   if (v == null || v === '') return null;
@@ -34,17 +35,24 @@ export function parseNotificationPayload(raw: unknown): INotification | null {
 
   const created = o.createdAt ?? o.CreatedAt;
   const read = o.readAt ?? o.ReadAt;
+  const type = parseType(o.type ?? o.Type);
+  const rawData = o.data ?? o.Data ?? null;
+  const eventShort =
+    isEventNotificationType(type) && rawData != null
+      ? parseEventNotificationData(rawData)
+      : null;
 
   return {
     id: String(id),
     eventId: str(o.eventId ?? o.EventId),
     relatedAccountId: str(o.relatedAccountId ?? o.RelatedAccountId),
-    type: parseType(o.type ?? o.Type),
+    type,
     title: str(o.title ?? o.Title),
     message: str(o.message ?? o.Message),
     createdAt: created ? String(created) : new Date().toISOString(),
     readAt: read != null && read !== '' ? String(read) : null,
-    data: o.data ?? o.Data ?? null,
+    data: rawData,
+    eventShort,
   };
 }
 

@@ -4,12 +4,25 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccountId } from '@/features/auth/useAccountId';
 import type { INotification } from '@/entities/notification/types';
+import { getNotificationEventId } from '@/entities/notification/eventData';
 import { fetchConnectionStats, sendTestNotification } from '@/entities/notification/api';
 import { useNotificationsStore } from './notificationsStore';
 import styles from './NotificationsPanel.module.css';
 
 interface NotificationsPanelProps {
   onClose: () => void;
+}
+
+function formatEventStart(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function formatWhen(iso: string): string {
@@ -66,9 +79,10 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
 
   const openNotification = useCallback((n: INotification) => {
     void markRead(n.id);
-    if (n.eventId) {
+    const eventId = getNotificationEventId(n);
+    if (eventId) {
       onClose();
-      navigate(`/event/${n.eventId}`);
+      navigate(`/event/${eventId}`);
       return;
     }
     if (n.relatedAccountId) {
@@ -145,7 +159,9 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
             Пока нет уведомлений. Новые появятся здесь по WebSocket.
           </li>
         ) : (
-          visibleItems.map(n => (
+          visibleItems.map(n => {
+            const eventStart = formatEventStart(n.eventShort?.startTime);
+            return (
             <li key={n.id}>
               <div className={`${styles.item} ${styles.itemUnread}`}>
                 <button
@@ -154,9 +170,28 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                   onClick={() => openNotification(n)}
                 >
                   {n.title && <span className={styles.itemTitle}>{n.title}</span>}
+                  {n.eventShort?.name && (
+                    <span className={styles.itemEventName}>
+                      {n.eventShort.colors?.length > 0 && (
+                        <span className={styles.itemColorDots} aria-hidden>
+                          {n.eventShort.colors.slice(0, 4).map((c, i) => (
+                            <span
+                              key={`${c}-${i}`}
+                              className={styles.itemColorDot}
+                              style={{ background: c }}
+                            />
+                          ))}
+                        </span>
+                      )}
+                      {n.eventShort.name}
+                    </span>
+                  )}
                   <span className={styles.itemMessage}>
                     {n.message || notificationTypeText(n.type)}
                   </span>
+                  {eventStart && (
+                    <span className={styles.itemEventWhen}>Начало: {eventStart}</span>
+                  )}
                   <span className={styles.itemMeta}>{formatWhen(n.createdAt)}</span>
                 </button>
                 <button
@@ -170,7 +205,8 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                 </button>
               </div>
             </li>
-          ))
+          );
+          })
         )}
       </ul>
 

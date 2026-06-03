@@ -985,9 +985,7 @@ export default function CreateEventPage() {
                   disabled={!autoInviteEnabled || !canInviteAllSubscribers}
                   onChange={() => setAutoInviteMode('all')}
                 />
-                {form.isPrivate
-                  ? 'Пригласить всех из белого списка'
-                  : 'Пригласить всех подписчиков'}
+                Пригласить всех подписчиков
               </label>
               <label className={styles.autoInviteRadio}>
                 <input

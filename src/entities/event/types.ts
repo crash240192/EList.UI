@@ -72,13 +72,14 @@ export interface IEvent {
   anticipationRating?: number | null;
 }
 
-/** Элемент ответа POST /api/events/search/short — маркеры на карте */
+/** Элемент POST /api/events/search/short и data уведомлений о мероприятии (типы 0–3) */
 export interface IEventSearchShortItem {
   id:         string;
   name:       string;
   latitude:   number;
   longitude:  number;
   colors:     string[];
+  startTime?: string | null;
 }
 
 // ---------- Параметры поиска ----------
@@ -98,15 +99,6 @@ export interface IEventsSearchParams {
   allowedGender?: Gender;
   pageIndex?: number;
   pageSize?: number;
-}
-
-/** Компактная точка для карты (ответ POST /api/events/search/short) */
-export interface IEventSearchShortItem {
-  id:        string;
-  name:      string;
-  latitude:  number;
-  longitude: number;
-  colors:    string[];
 }
 
 // ---------- Запросы на создание/обновление ----------

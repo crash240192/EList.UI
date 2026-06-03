@@ -72,13 +72,18 @@ export async function fetchEventsSearchShort(
   const data = await apiClient.post<PagedList<IEventSearchShortItem>>('/api/events/search/short', body);
   const paged = data.result;
   if (paged?.result) {
-    paged.result = paged.result.map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      latitude: row.latitude,
-      longitude: row.longitude,
-      colors: Array.isArray(row.colors) ? row.colors : [],
-    }));
+    paged.result = paged.result.map((row: IEventSearchShortItem) => {
+      const r = row as IEventSearchShortItem & { StartTime?: string };
+      const start = r.startTime ?? r.StartTime;
+      return {
+        id: r.id,
+        name: r.name,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        colors: Array.isArray(r.colors) ? r.colors : [],
+        ...(start != null && start !== '' ? { startTime: String(start) } : {}),
+      };
+    });
   }
   return paged;
 }
