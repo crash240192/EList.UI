@@ -10,6 +10,7 @@ import { useNotificationsStore } from './notificationsStore';
 
 const RECONNECT_BASE_MS = 2_000;
 const RECONNECT_MAX_MS = 30_000;
+const CONNECT_TIMEOUT_MS = 20_000;
 /** Быстрый обрыв после open — увеличиваем паузу (часто гонка двух сокетов / Edge) */
 const RAPID_CLOSE_MS = 2_500;
 
@@ -26,8 +27,8 @@ export function useNotificationsWebSocket(enabled: boolean): void {
   const attemptRef = useRef(0);
   const connectionGenRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef(false);
-  const connectInFlightRef = useRef(false);
   const openedAtRef = useRef(0);
 
   useEffect(() => {
@@ -40,10 +41,17 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       }
     };
 
+    const clearConnectTimeout = () => {
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
+    };
+
     /** Закрыть сокет без переподключения (смена gen отменяет onclose) */
     const closeSocketSilently = () => {
       connectionGenRef.current += 1;
-      connectInFlightRef.current = false;
+      clearConnectTimeout();
       const ws = wsRef.current;
       wsRef.current = null;
       if (ws) {
@@ -83,7 +91,12 @@ export function useNotificationsWebSocket(enabled: boolean): void {
     };
 
     const connect = () => {
-      if (unmountedRef.current || connectInFlightRef.current) return;
+      // true только если effect размонтирован; false — connect продолжается
+      if (unmountedRef.current) return;
+
+      const existing = wsRef.current;
+      if (existing?.readyState === WebSocket.CONNECTING) return;
+      if (existing?.readyState === WebSocket.OPEN) return;
 
       const url = buildNotificationsWebSocketUrl();
       if (!url) {
@@ -94,14 +107,12 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       clearReconnect();
       closeSocketSilently();
       const myGen = connectionGenRef.current;
-      connectInFlightRef.current = true;
       setWsStatus('connecting', null);
 
       let ws: WebSocket;
       try {
         ws = new WebSocket(url);
       } catch {
-        connectInFlightRef.current = false;
         setWsStatus('error', 'Не удалось открыть WebSocket');
         scheduleReconnect();
         return;
@@ -109,9 +120,18 @@ export function useNotificationsWebSocket(enabled: boolean): void {
 
       wsRef.current = ws;
 
-      ws.onopen = () => {
+      connectTimeoutRef.current = setTimeout(() => {
         if (unmountedRef.current || myGen !== connectionGenRef.current) return;
-        connectInFlightRef.current = false;
+        if (wsRef.current !== ws) return;
+        if (ws.readyState === WebSocket.OPEN) return;
+        closeSocketSilently();
+        setWsStatus('error', 'Таймаут подключения');
+        scheduleReconnect();
+      }, CONNECT_TIMEOUT_MS);
+
+      ws.onopen = () => {
+        clearConnectTimeout();
+        if (unmountedRef.current || myGen !== connectionGenRef.current) return;
         attemptRef.current = 0;
         openedAtRef.current = Date.now();
         setWsStatus('open', null);
@@ -133,8 +153,8 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       };
 
       ws.onclose = () => {
+        clearConnectTimeout();
         if (unmountedRef.current || myGen !== connectionGenRef.current) return;
-        connectInFlightRef.current = false;
         wsRef.current = null;
         setWsStatus('closed', null);
         scheduleReconnect();
@@ -143,10 +163,8 @@ export function useNotificationsWebSocket(enabled: boolean): void {
 
     const onVisibility = () => {
       if (document.visibilityState !== 'visible') return;
-      if (connectInFlightRef.current) return;
       const state = wsRef.current?.readyState;
-      if (state === WebSocket.OPEN) return;
-      if (state === WebSocket.CONNECTING) return;
+      if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) return;
       attemptRef.current = 0;
       connect();
     };
@@ -159,7 +177,6 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       document.removeEventListener('visibilitychange', onVisibility);
       clearReconnect();
       closeSocketSilently();
-      // Не вызываем reset() — иначе при ремонте effect (Strict Mode / Edge) мигает «онлайн» ↔ «переподключение»
     };
   }, [enabled, token, setWsStatus, pushNotification, reset]);
 }
