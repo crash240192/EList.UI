@@ -16,43 +16,9 @@ export interface ISubscriptionPersonInfo {
 }
 
 export interface ISubscriptionItem {
-  /** Идентификатор записи подписки (для update/delete настроек) */
-  subscriptionId: string;
   account: ISubscriptionAccount;
   personInfo: ISubscriptionPersonInfo | null;
   notifySettings: INotifySettings | null;
-}
-
-function mapSubscriptionItem(item: Record<string, unknown>): ISubscriptionItem {
-  const subscribedTo = item.subscribedTo as Record<string, unknown> | undefined;
-  const accountRaw = (subscribedTo?.account ?? item.account) as ISubscriptionAccount;
-  const personInfo = (subscribedTo?.personInfo ?? item.personInfo ?? null) as ISubscriptionPersonInfo | null;
-  const notify = item.notify as Record<string, unknown> | undefined;
-
-  return {
-    subscriptionId: String(
-      item.id ?? item.Id ?? item.subscriptionId ?? item.SubscriptionId ?? '',
-    ),
-    account: accountRaw,
-    personInfo,
-    notifySettings: {
-      notifyParticipated: Boolean(
-        item.notifyParticipated
-        ?? subscribedTo?.notifyParticipated
-        ?? notify?.notifyParticipated,
-      ),
-      notifyEventCreated: Boolean(
-        item.notifyEventCreated
-        ?? subscribedTo?.notifyEventCreated
-        ?? notify?.notifyEventCreated,
-      ),
-      notifySubscribed: Boolean(
-        item.notifySubscribed
-        ?? subscribedTo?.notifySubscribed
-        ?? notify?.notifySubscribed,
-      ),
-    },
-  };
 }
 
 export interface ISubscriptionSearchParams {
@@ -113,9 +79,29 @@ export async function fetchSubscriptions(
       pageSize,
     });
     const paged = r?.result ?? {};
-    const list: unknown[] = paged?.result ?? [];
+    const list: any[] = paged?.result ?? [];
     return {
-      items: list.map(row => mapSubscriptionItem(row as Record<string, unknown>)),
+      items: list.map(item => ({
+        account:    item.subscribedTo?.account    ?? item.account,
+        personInfo: item.subscribedTo?.personInfo ?? item.personInfo ?? null,
+        notifySettings: {
+          notifyParticipated: Boolean(
+            item.notifyParticipated
+            ?? item.subscribedTo?.notifyParticipated
+            ?? item.notify?.notifyParticipated
+          ),
+          notifyEventCreated: Boolean(
+            item.notifyEventCreated
+            ?? item.subscribedTo?.notifyEventCreated
+            ?? item.notify?.notifyEventCreated
+          ),
+          notifySubscribed: Boolean(
+            item.notifySubscribed
+            ?? item.subscribedTo?.notifySubscribed
+            ?? item.notify?.notifySubscribed
+          ),
+        },
+      })),
       total:     paged?.total     ?? list.length,
       pageIndex: paged?.pageIndex ?? pageIndex,
       pageSize:  paged?.pageSize  ?? pageSize,
@@ -138,22 +124,13 @@ export async function fetchSubscribers(
       pageSize,
     });
     const paged = r?.result ?? {};
-    const list: unknown[] = paged?.result ?? [];
+    const list: any[] = paged?.result ?? [];
     return {
-      items: list.map(row => {
-        const item = row as Record<string, unknown>;
-        const subscriber = item.subscriber as Record<string, unknown> | undefined;
-        const accountRaw = (subscriber?.account ?? item.account) as ISubscriptionAccount;
-        const personInfo = (subscriber?.personInfo ?? item.personInfo ?? null) as ISubscriptionPersonInfo | null;
-        return {
-          subscriptionId: String(
-            item.id ?? item.Id ?? item.subscriptionId ?? item.SubscriptionId ?? '',
-          ),
-          account: accountRaw,
-          personInfo,
-          notifySettings: null,
-        };
-      }),
+      items: list.map(item => ({
+        account:    item.subscriber?.account    ?? item.account,
+        personInfo: item.subscriber?.personInfo ?? item.personInfo ?? null,
+        notifySettings: null,
+      })),
       total:     paged?.total     ?? list.length,
       pageIndex: paged?.pageIndex ?? pageIndex,
       pageSize:  paged?.pageSize  ?? pageSize,
@@ -167,9 +144,9 @@ export async function subscribe(accountId: string, notify: INotifySettings): Pro
   await apiClient.put(`/api/subscriptions/update/${accountId}`, notify);
 }
 
-/** PUT /api/subscriptions/update/{subscriptionId} */
-export async function updateSubscriptionNotify(subscriptionId: string, notify: INotifySettings): Promise<void> {
-  await apiClient.put(`/api/subscriptions/update/${subscriptionId}`, notify);
+/** PUT /api/subscriptions/update/{accountId} */
+export async function updateSubscriptionNotify(accountId: string, notify: INotifySettings): Promise<void> {
+  await apiClient.put(`/api/subscriptions/update/${accountId}`, notify);
 }
 
 /** DELETE /api/subscriptions/deleteSubscription/{accountId} */
