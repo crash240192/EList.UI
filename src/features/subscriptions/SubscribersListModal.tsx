@@ -108,9 +108,9 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
   }, []);
 
   const saveSettings = useCallback(async (settings: INotifySettings) => {
-    if (!settingsTarget) return;
-    await updateSubscriptionNotify(settingsTarget.account.id, settings);
-    setItems(prev => prev.map(i => i.account.id === settingsTarget.account.id
+    if (!settingsTarget?.subscriptionId) return;
+    await updateSubscriptionNotify(settingsTarget.subscriptionId, settings);
+    setItems(prev => prev.map(i => i.subscriptionId === settingsTarget.subscriptionId
       ? { ...i, notifySettings: settings }
       : i));
     setSettingsTarget(null);
@@ -197,7 +197,9 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
                       e.stopPropagation();
                       openSettings(item);
                     }}
-                    disabled={pendingUnsubscribes.has(item.account.id)}
+                    disabled={
+                      pendingUnsubscribes.has(item.account.id) || !item.subscriptionId
+                    }
                     aria-label="Настройки уведомлений"
                     title="Настройки уведомлений"
                   >
