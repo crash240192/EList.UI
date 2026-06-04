@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/app/store';
 import { parseWsNotificationMessage } from '@/entities/notification/parseNotification';
-import { isNewInvitationNotification } from '@/entities/notification/eventData';
+import { isNewInvitationNotification } from '@/entities/notification/notificationNavigation';
 import { buildNotificationsWebSocketUrl } from '@/shared/lib/notificationsWsUrl';
 import { useInvitationsStore } from '@/features/invitations/invitationsStore';
 import { useNotificationsStore } from './notificationsStore';

@@ -4,7 +4,11 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccountId } from '@/features/auth/useAccountId';
 import type { INotification } from '@/entities/notification/types';
-import { getNotificationEventId, isNewInvitationNotification } from '@/entities/notification/eventData';
+import { getNotificationEventId } from '@/entities/notification/eventData';
+import {
+  getNotificationNavigationTarget,
+  notificationTypeLabel,
+} from '@/entities/notification/notificationNavigation';
 import { fetchConnectionStats, sendTestNotification } from '@/entities/notification/api';
 import { useNotificationsStore } from './notificationsStore';
 import { useDebouncedWsStatus } from './useDebouncedWsStatus';
@@ -36,29 +40,6 @@ function formatWhen(iso: string): string {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-function notificationTypeText(type: INotification['type']): string {
-  if (type == null) return 'Уведомление';
-  switch (Number(type)) {
-    case 0: return 'Создано событие';
-    case 1: return 'Событие обновлено';
-    case 2: return 'Событие отменено';
-    case 3: return 'Событие завершено';
-    case 10: return 'Новый подписчик';
-    case 11: return 'Отписка';
-    case 12: return 'Подписка связанного пользователя';
-    case 13: return 'Отписка связанного пользователя';
-    case 20: return 'Участие подтверждено';
-    case 21: return 'Отмена участия';
-    case 31: return 'Новый ответ в обсуждении';
-    case 41: return 'Добавлен в чёрный список';
-    case 42: return 'Добавлен в белый список';
-    case 43: return 'Удалён из чёрного списка';
-    case 44: return 'Удалён из белого списка';
-    case 51: return 'Новое приглашение';
-    default: return String(type);
-  }
-}
-
 export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const navigate = useNavigate();
   const { accountId } = useAccountId();
@@ -80,20 +61,20 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
 
   const openNotification = useCallback((n: INotification) => {
     void markRead(n.id);
-    if (isNewInvitationNotification(n.type)) {
-      onClose();
-      navigate('/invitations');
-      return;
-    }
-    const eventId = getNotificationEventId(n);
-    if (eventId) {
-      onClose();
-      navigate(`/event/${eventId}`);
-      return;
-    }
-    if (n.relatedAccountId) {
-      onClose();
-      navigate(`/user/${n.relatedAccountId}`);
+    const target = getNotificationNavigationTarget(n);
+    if (!target) return;
+
+    onClose();
+    switch (target.kind) {
+      case 'invitations':
+        navigate('/invitations');
+        break;
+      case 'event':
+        navigate(`/event/${target.eventId}`);
+        break;
+      case 'user':
+        navigate(`/user/${target.accountId}`);
+        break;
     }
   }, [markRead, navigate, onClose]);
 
@@ -193,7 +174,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                     </span>
                   )}
                   <span className={styles.itemMessage}>
-                    {n.message || notificationTypeText(n.type)}
+                    {n.message || notificationTypeLabel(n.type)}
                   </span>
                   {eventStart && (
                     <span className={styles.itemEventWhen}>Начало: {eventStart}</span>
