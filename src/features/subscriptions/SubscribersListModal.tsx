@@ -37,6 +37,8 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
   const [error,       setError]       = useState<string | null>(null);
   const [pendingUnsubscribes, setPendingUnsubscribes] = useState<Set<string>>(new Set());
   const [settingsTarget, setSettingsTarget] = useState<ISubscriptionItem | null>(null);
+  const settingsTargetRef = useRef<ISubscriptionItem | null>(null);
+  settingsTargetRef.current = settingsTarget;
   const searchRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useDebounce(search, 350);
@@ -115,16 +117,22 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
   }, [settingsTarget]);
 
   const canManageSubscriptions = listType === 'subscriptions' && accountId === currentAccountId;
-  useModalBackButton(() => { void handleClose(); });
+
+  const handleModalBack = useCallback(() => {
+    if (settingsTargetRef.current) setSettingsTarget(null);
+    else void handleClose();
+  }, [handleClose]);
+
+  useModalBackButton(handleModalBack);
 
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 100);
     const fn = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') void handleClose();
+      if (e.key === 'Escape') handleModalBack();
     };
     document.addEventListener('keydown', fn);
     return () => document.removeEventListener('keydown', fn);
-  }, [handleClose]);
+  }, [handleModalBack]);
 
   return (
     <>
@@ -185,10 +193,15 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
                   <button
                     type="button"
                     className={styles.settingsBtn}
-                    onClick={() => openSettings(item)}
+                    onClick={e => {
+                      e.stopPropagation();
+                      openSettings(item);
+                    }}
                     disabled={pendingUnsubscribes.has(item.account.id)}
+                    aria-label="Настройки уведомлений"
+                    title="Настройки уведомлений"
                   >
-                    Настройки
+                    <SettingsGearIcon />
                   </button>
                   <button
                     type="button"
@@ -210,6 +223,7 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
       </div>
       {settingsTarget && (
         <SubscribeModal
+          stacked
           targetLogin={settingsTarget.account.login}
           initialSettings={settingsTarget.notifySettings ?? undefined}
           title={`Настройки уведомлений @${settingsTarget.account.login}`}
@@ -220,5 +234,14 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
         />
       )}
     </>
+  );
+}
+
+function SettingsGearIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
   );
 }

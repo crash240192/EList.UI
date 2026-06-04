@@ -13,6 +13,8 @@ interface Props {
   title?: string;
   subtitle?: string;
   confirmLabel?: string;
+  /** Вложенный поверх другого модального окна — выше z-index, без второго pushState */
+  stacked?: boolean;
 }
 
 export function SubscribeModal({
@@ -23,8 +25,9 @@ export function SubscribeModal({
   title,
   subtitle,
   confirmLabel,
+  stacked = false,
 }: Props) {
-  useModalBackButton(onCancel);
+  useModalBackButton(onCancel, !stacked);
   const [settings, setSettings] = useState<INotifySettings>({
     notifyParticipated: initialSettings?.notifyParticipated ?? true,
     notifyEventCreated: initialSettings?.notifyEventCreated ?? true,
@@ -41,6 +44,7 @@ export function SubscribeModal({
     setError(null);
     try {
       await onConfirm(settings);
+      onCancel();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка подписки');
       setLoading(false);
@@ -49,8 +53,16 @@ export function SubscribeModal({
 
   return (
     <>
-      <div className={styles.backdrop} onClick={onCancel} />
-      <div className={styles.modal} role="dialog" aria-modal aria-label="Подписаться">
+      <div
+        className={stacked ? styles.backdropStacked : styles.backdrop}
+        onClick={onCancel}
+      />
+      <div
+        className={stacked ? styles.modalStacked : styles.modal}
+        role="dialog"
+        aria-modal
+        aria-label="Подписаться"
+      >
         <h3 className={styles.title}>{title ?? `Подписаться на @${targetLogin}`}</h3>
         <p className={styles.subtitle}>{subtitle ?? 'Выберите уведомления которые хотите получать:'}</p>
 

@@ -5,6 +5,11 @@
   background: rgba(0,0,0,0.55); backdrop-filter: blur(2px);
   z-index: 500;
 }
+.backdropStacked {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45); backdrop-filter: blur(2px);
+  z-index: 600;
+}
 .modal {
   position: fixed; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
@@ -13,6 +18,16 @@
   border-radius: 16px; padding: 22px 20px 18px;
   z-index: 501;
   box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+  animation: pop 0.18s ease;
+}
+.modalStacked {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, 92vw);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 22px 20px 18px;
+  z-index: 601;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.5);
   animation: pop 0.18s ease;
 }
 @keyframes pop {
