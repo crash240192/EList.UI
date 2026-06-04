@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useNotificationsStore } from './notificationsStore';
+import { useDebouncedWsStatus } from './useDebouncedWsStatus';
 import { useNotificationsWebSocket } from './useNotificationsWebSocket';
 import { NotificationsPanel } from './NotificationsPanel';
 import styles from './NotificationBell.module.css';
@@ -13,7 +14,7 @@ export function NotificationBell() {
   const togglePanel = useNotificationsStore(s => s.togglePanel);
   const setPanelOpen = useNotificationsStore(s => s.setPanelOpen);
   const unread = useNotificationsStore(s => s.items.filter(i => !i.readAt).length);
-  const wsStatus = useNotificationsStore(s => s.wsStatus);
+  const wsStatus = useDebouncedWsStatus(useNotificationsStore(s => s.wsStatus));
 
   const wrapRef = useRef<HTMLDivElement>(null);
 

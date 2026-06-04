@@ -7,6 +7,7 @@ import type { INotification } from '@/entities/notification/types';
 import { getNotificationEventId, isNewInvitationNotification } from '@/entities/notification/eventData';
 import { fetchConnectionStats, sendTestNotification } from '@/entities/notification/api';
 import { useNotificationsStore } from './notificationsStore';
+import { useDebouncedWsStatus } from './useDebouncedWsStatus';
 import styles from './NotificationsPanel.module.css';
 
 interface NotificationsPanelProps {
@@ -62,7 +63,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const navigate = useNavigate();
   const { accountId } = useAccountId();
   const items = useNotificationsStore(s => s.items);
-  const wsStatus = useNotificationsStore(s => s.wsStatus);
+  const wsStatus = useDebouncedWsStatus(useNotificationsStore(s => s.wsStatus));
   const wsError = useNotificationsStore(s => s.wsError);
   const markRead = useNotificationsStore(s => s.markRead);
   const markAllRead = useNotificationsStore(s => s.markAllRead);

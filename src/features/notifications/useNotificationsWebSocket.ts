@@ -10,12 +10,13 @@ import { useNotificationsStore } from './notificationsStore';
 
 const RECONNECT_BASE_MS = 2_000;
 const RECONNECT_MAX_MS = 30_000;
+/** Быстрый обрыв после open — увеличиваем паузу (часто гонка двух сокетов / Edge) */
+const RAPID_CLOSE_MS = 2_500;
 
 /**
  * Держит WebSocket к /eList/ws/notifications пока пользователь авторизован.
  */
 export function useNotificationsWebSocket(enabled: boolean): void {
-  const isAuthenticated = useAuthStore(s => s.isAuthenticated());
   const token = useAuthStore(s => s.token);
   const setWsStatus = useNotificationsStore(s => s.setWsStatus);
   const pushNotification = useNotificationsStore(s => s.pushNotification);
@@ -23,8 +24,11 @@ export function useNotificationsWebSocket(enabled: boolean): void {
 
   const wsRef = useRef<WebSocket | null>(null);
   const attemptRef = useRef(0);
+  const connectionGenRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef(false);
+  const connectInFlightRef = useRef(false);
+  const openedAtRef = useRef(0);
 
   useEffect(() => {
     unmountedRef.current = false;
@@ -36,7 +40,10 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       }
     };
 
-    const closeSocket = () => {
+    /** Закрыть сокет без переподключения (смена gen отменяет onclose) */
+    const closeSocketSilently = () => {
+      connectionGenRef.current += 1;
+      connectInFlightRef.current = false;
       const ws = wsRef.current;
       wsRef.current = null;
       if (ws) {
@@ -50,22 +57,24 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       }
     };
 
-    if (!enabled || !isAuthenticated || !token) {
+    if (!enabled || !token) {
       clearReconnect();
-      closeSocket();
+      closeSocketSilently();
       reset();
       useInvitationsStore.getState().reset();
       return () => {
         unmountedRef.current = true;
         clearReconnect();
-        closeSocket();
+        closeSocketSilently();
       };
     }
 
     const scheduleReconnect = () => {
       if (unmountedRef.current) return;
+      const lived = Date.now() - openedAtRef.current;
+      const rapidClose = openedAtRef.current > 0 && lived < RAPID_CLOSE_MS;
       const delay = Math.min(
-        RECONNECT_BASE_MS * 2 ** attemptRef.current,
+        RECONNECT_BASE_MS * 2 ** attemptRef.current * (rapidClose ? 2 : 1),
         RECONNECT_MAX_MS,
       );
       attemptRef.current += 1;
@@ -74,7 +83,7 @@ export function useNotificationsWebSocket(enabled: boolean): void {
     };
 
     const connect = () => {
-      if (unmountedRef.current) return;
+      if (unmountedRef.current || connectInFlightRef.current) return;
 
       const url = buildNotificationsWebSocketUrl();
       if (!url) {
@@ -83,13 +92,16 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       }
 
       clearReconnect();
-      closeSocket();
+      closeSocketSilently();
+      const myGen = connectionGenRef.current;
+      connectInFlightRef.current = true;
       setWsStatus('connecting', null);
 
       let ws: WebSocket;
       try {
         ws = new WebSocket(url);
       } catch {
+        connectInFlightRef.current = false;
         setWsStatus('error', 'Не удалось открыть WebSocket');
         scheduleReconnect();
         return;
@@ -98,8 +110,10 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        if (unmountedRef.current) return;
+        if (unmountedRef.current || myGen !== connectionGenRef.current) return;
+        connectInFlightRef.current = false;
         attemptRef.current = 0;
+        openedAtRef.current = Date.now();
         setWsStatus('open', null);
       };
 
@@ -114,12 +128,13 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       };
 
       ws.onerror = () => {
-        if (unmountedRef.current) return;
+        if (unmountedRef.current || myGen !== connectionGenRef.current) return;
         setWsStatus('error', 'Ошибка соединения');
       };
 
       ws.onclose = () => {
-        if (unmountedRef.current) return;
+        if (unmountedRef.current || myGen !== connectionGenRef.current) return;
+        connectInFlightRef.current = false;
         wsRef.current = null;
         setWsStatus('closed', null);
         scheduleReconnect();
@@ -127,10 +142,13 @@ export function useNotificationsWebSocket(enabled: boolean): void {
     };
 
     const onVisibility = () => {
-      if (document.visibilityState === 'visible' && wsRef.current?.readyState !== WebSocket.OPEN) {
-        attemptRef.current = 0;
-        connect();
-      }
+      if (document.visibilityState !== 'visible') return;
+      if (connectInFlightRef.current) return;
+      const state = wsRef.current?.readyState;
+      if (state === WebSocket.OPEN) return;
+      if (state === WebSocket.CONNECTING) return;
+      attemptRef.current = 0;
+      connect();
     };
 
     connect();
@@ -140,8 +158,8 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       unmountedRef.current = true;
       document.removeEventListener('visibilitychange', onVisibility);
       clearReconnect();
-      closeSocket();
-      reset();
+      closeSocketSilently();
+      // Не вызываем reset() — иначе при ремонте effect (Strict Mode / Edge) мигает «онлайн» ↔ «переподключение»
     };
-  }, [enabled, isAuthenticated, token, setWsStatus, pushNotification, reset]);
+  }, [enabled, token, setWsStatus, pushNotification, reset]);
 }
