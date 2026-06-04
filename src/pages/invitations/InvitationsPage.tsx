@@ -71,6 +71,7 @@ export default function InvitationsPage() {
       await apiClient.get(`/api/invitations/accept?invitationId=${inv.id}`);
       setItems(prev => prev.filter(i => i.id !== inv.id));
       setPreviewInv(null);
+      void refreshNotViewedCount();
       navigate(`/event/${inv.eventId}`);
     } catch { /* ignore */ }
   };
@@ -80,6 +81,7 @@ export default function InvitationsPage() {
       await apiClient.get(`/api/invitations/decline?invitationId=${inv.id}`);
       setItems(prev => prev.filter(i => i.id !== inv.id));
       setConfirmDecl(null);
+      void refreshNotViewedCount();
     } catch { /* ignore */ }
   };
 
