@@ -1,0 +1,1 @@
+function a(t){return t?t.startsWith("data:")||t.startsWith("http")||t.startsWith("/")?t:t.length<10?null:`data:${t.startsWith("PHN")||t.startsWith("PD9")||t.startsWith("PD94")?"image/svg+xml":"image/png"};base64,${t}`:null}export{a as i};

@@ -1,0 +1,1 @@
+const n="elist_pending_person";function t(e){try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}}function s(){try{const e=sessionStorage.getItem(n);return e?JSON.parse(e):null}catch{return null}}function a(){sessionStorage.removeItem(n)}export{a as c,s as l,t as s};

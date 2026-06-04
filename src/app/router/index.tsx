@@ -17,9 +17,9 @@ const CreateEventPage = lazy(() => import('@/pages/create-event/CreateEventPage'
 const AdminPage       = lazy(() => import('@/pages/admin/AdminPage'));
 const SettingsPage    = lazy(() => import('@/pages/settings/SettingsPage'));
 const WalletPage      = lazy(() => import('@/pages/wallet/WalletPage'));
-const LoginPage       = lazy(() => import('@/pages/Auth/LoginPage'));
-const ActivationPage  = lazy(() => import('@/pages/Auth/ActivationPage'));
-const RegisterPage    = lazy(() => import('@/pages/Auth/RegisterPage'));
+const LoginPage       = lazy(() => import('@/pages/auth/LoginPage'));
+const ActivationPage  = lazy(() => import('@/pages/auth/ActivationPage'));
+const RegisterPage    = lazy(() => import('@/pages/auth/RegisterPage'));
 
 const Loader = () => (
   <div

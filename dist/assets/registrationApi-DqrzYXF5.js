@@ -1,0 +1,1 @@
+import{f as a}from"./index-geCpzPqd.js";async function c(){return(await a.get("/api/contacts/contactTypes/getAll")).result??[]}async function n(t){await a.post("/api/accounts/create",t)}async function e(t){await a.post("/api/persons/set",t)}export{n as c,c as f,e as s};

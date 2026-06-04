@@ -1,0 +1,1 @@
+import{f as a}from"./index-geCpzPqd.js";async function r(){try{return(await a.get("/api/Wallets/create")).result??null}catch{return null}}async function n(t){try{return(await a.get(`/api/Wallets/byAccount/${t}`)).result??null}catch{return null}}async function c(t,l){await a.put(`/api/Wallets/setTariff?walletId=${t}&tariffId=${l}`,{})}export{r as c,n as g,c as s};
