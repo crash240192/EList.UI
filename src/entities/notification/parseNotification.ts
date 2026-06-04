@@ -5,7 +5,8 @@ import { isEventNotificationType, parseEventNotificationData } from './eventData
 
 function str(v: unknown): string | null {
   if (v == null || v === '') return null;
-  return String(v);
+  const s = String(v).trim();
+  return s === '' ? null : s;
 }
 
 function parseType(v: unknown): string | number | null {

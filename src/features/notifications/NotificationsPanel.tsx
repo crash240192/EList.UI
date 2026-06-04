@@ -147,7 +147,9 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
           </li>
         ) : (
           visibleItems.map(n => {
-            const eventStart = formatEventStart(n.eventShort?.startTime);
+            const hasTitle = !!n.title;
+            const messageText = n.message || notificationTypeLabel(n.type);
+            const eventStart = hasTitle ? formatEventStart(n.eventShort?.startTime) : null;
             return (
             <li key={n.id}>
               <div className={`${styles.item} ${styles.itemUnread}`}>
@@ -156,28 +158,34 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                   className={styles.itemMain}
                   onClick={() => openNotification(n)}
                 >
-                  {n.title && <span className={styles.itemTitle}>{n.title}</span>}
-                  {n.eventShort?.name && (
-                    <span className={styles.itemEventName}>
-                      {n.eventShort.colors?.length > 0 && (
-                        <span className={styles.itemColorDots} aria-hidden>
-                          {n.eventShort.colors.slice(0, 4).map((c, i) => (
-                            <span
-                              key={`${c}-${i}`}
-                              className={styles.itemColorDot}
-                              style={{ background: c }}
-                            />
-                          ))}
+                  {hasTitle ? (
+                    <>
+                      <span className={styles.itemTitle}>{n.title}</span>
+                      {n.eventShort?.name && (
+                        <span className={styles.itemEventName}>
+                          {n.eventShort.colors?.length > 0 && (
+                            <span className={styles.itemColorDots} aria-hidden>
+                              {n.eventShort.colors.slice(0, 4).map((c, i) => (
+                                <span
+                                  key={`${c}-${i}`}
+                                  className={styles.itemColorDot}
+                                  style={{ background: c }}
+                                />
+                              ))}
+                            </span>
+                          )}
+                          {n.eventShort.name}
                         </span>
                       )}
-                      {n.eventShort.name}
-                    </span>
-                  )}
-                  <span className={styles.itemMessage}>
-                    {n.message || notificationTypeLabel(n.type)}
-                  </span>
-                  {eventStart && (
-                    <span className={styles.itemEventWhen}>Начало: {eventStart}</span>
+                      {n.message && (
+                        <span className={styles.itemMessage}>{n.message}</span>
+                      )}
+                      {eventStart && (
+                        <span className={styles.itemEventWhen}>Начало: {eventStart}</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className={styles.itemMessageOnly}>{messageText}</span>
                   )}
                   <span className={styles.itemMeta}>{formatWhen(n.createdAt)}</span>
                 </button>

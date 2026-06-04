@@ -209,6 +209,13 @@
   line-height: 1.4;
 }
 
+.itemMessageOnly {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
 .itemMeta {
   font-size: 11px;
   color: var(--text-muted);
