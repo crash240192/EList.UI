@@ -18,10 +18,31 @@
   width: 100%; max-width: 960px;
 }
 .cardHeader {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
   padding: 13px 16px; border-bottom: 1px solid var(--border);
 }
+.cardHeaderMain {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 0;
+}
 .cardTitle { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.markAllBtn {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: right;
+  line-height: 1.35;
+  max-width: min(220px, 100%);
+}
+.markAllBtn:hover:not(:disabled) { text-decoration: underline; }
+.markAllBtn:disabled { opacity: 0.55; cursor: not-allowed; }
 .badge {
   background: var(--accent); color: #fff;
   font-size: 10px; font-weight: 600;

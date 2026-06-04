@@ -86,3 +86,8 @@ export async function fetchNotViewedInvitationsCount(): Promise<number> {
 export async function markInvitationViewed(invitationId: string): Promise<void> {
   await apiClient.get(`/api/invitations/markViewed/${invitationId}`);
 }
+
+/** GET /api/invitations/markViewed/all */
+export async function markAllInvitationsViewed(): Promise<void> {
+  await apiClient.get('/api/invitations/markViewed/all');
+}

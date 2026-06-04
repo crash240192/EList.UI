@@ -1,10 +1,11 @@
 // pages/invitations/InvitationsPage.tsx
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   fetchUserInvitations,
   markInvitationViewed,
+  markAllInvitationsViewed,
   type IInvitation,
 } from '@/entities/invitation/invitationsApi';
 import { isInvitationUnviewed } from '@/entities/invitation/invitationViewed';
@@ -36,6 +37,12 @@ export default function InvitationsPage() {
   const [err,     setErr]     = useState<string | null>(null);
   const [previewInv,  setPreviewInv]  = useState<IInvitation | null>(null);
   const [confirmDecl, setConfirmDecl] = useState<IInvitation | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
+
+  const unviewedCount = useMemo(
+    () => items.filter(isInvitationUnviewed).length,
+    [items],
+  );
 
   useEffect(() => {
     fetchUserInvitations()
@@ -76,6 +83,20 @@ export default function InvitationsPage() {
     } catch { /* ignore */ }
   };
 
+  const markAllViewed = async () => {
+    if (unviewedCount === 0 || markingAll) return;
+    setMarkingAll(true);
+    try {
+      await markAllInvitationsViewed();
+      setItems(prev => prev.map(i => ({ ...i, viewed: true })));
+      void refreshNotViewedCount();
+    } catch {
+      /* apiClient toast */
+    } finally {
+      setMarkingAll(false);
+    }
+  };
+
   const doDecline = async (inv: IInvitation) => {
     try {
       await apiClient.get(`/api/invitations/decline?invitationId=${inv.id}`);
@@ -92,9 +113,21 @@ export default function InvitationsPage() {
         {/* Заголовок карточки */}
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <h1 className={styles.cardTitle}>Приглашения</h1>
-            {!loading && items.length > 0 && (
-              <span className={styles.badge}>{items.length}</span>
+            <div className={styles.cardHeaderMain}>
+              <h1 className={styles.cardTitle}>Приглашения</h1>
+              {!loading && items.length > 0 && (
+                <span className={styles.badge}>{items.length}</span>
+              )}
+            </div>
+            {!loading && unviewedCount > 0 && (
+              <button
+                type="button"
+                className={styles.markAllBtn}
+                onClick={() => { void markAllViewed(); }}
+                disabled={markingAll}
+              >
+                {markingAll ? 'Отмечаем…' : 'Отметить все просмотренными'}
+              </button>
             )}
           </div>
 
