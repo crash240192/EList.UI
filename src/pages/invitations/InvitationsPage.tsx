@@ -31,7 +31,6 @@ function inviterName(inv: IInvitation): string {
 export default function InvitationsPage() {
   const navigate = useNavigate();
   const refreshNotViewedCount = useInvitationsStore(s => s.refreshNotViewedCount);
-  const applyMarkedViewed = useInvitationsStore(s => s.applyMarkedViewed);
   const [items,   setItems]   = useState<IInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [err,     setErr]     = useState<string | null>(null);
@@ -57,9 +56,9 @@ export default function InvitationsPage() {
     setItems(prev =>
       prev.map(i => (i.id === inv.id ? { ...i, viewed: true } : i)),
     );
-    applyMarkedViewed();
     try {
       await markInvitationViewed(inv.id);
+      void refreshNotViewedCount();
     } catch {
       setItems(prev =>
         prev.map(i => (i.id === inv.id ? { ...i, viewed: false } : i)),

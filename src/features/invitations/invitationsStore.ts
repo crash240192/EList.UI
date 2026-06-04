@@ -8,33 +8,33 @@ interface InvitationsState {
   notViewedCount: number;
   loadingCount: boolean;
   refreshNotViewedCount: () => Promise<void>;
-  incrementNotViewedCount: () => void;
-  applyMarkedViewed: () => void;
   reset: () => void;
 }
+
+let refreshInFlight: Promise<void> | null = null;
 
 export const useInvitationsStore = create<InvitationsState>((set) => ({
   notViewedCount: 0,
   loadingCount: false,
 
   refreshNotViewedCount: async () => {
-    set({ loadingCount: true });
-    try {
-      const count = await fetchNotViewedInvitationsCount();
-      set({ notViewedCount: count });
-    } catch {
-      /* оставляем предыдущее значение */
-    } finally {
-      set({ loadingCount: false });
-    }
-  },
+    if (refreshInFlight) return refreshInFlight;
 
-  incrementNotViewedCount: () => {
-    set(s => ({ notViewedCount: s.notViewedCount + 1 }));
-  },
+    refreshInFlight = (async () => {
+      set({ loadingCount: true });
+      try {
+        const count = await fetchNotViewedInvitationsCount();
+        set({ notViewedCount: count });
+      } catch {
+        /* оставляем предыдущее значение */
+      } finally {
+        set({ loadingCount: false });
+      }
+    })().finally(() => {
+      refreshInFlight = null;
+    });
 
-  applyMarkedViewed: () => {
-    set(s => ({ notViewedCount: Math.max(0, s.notViewedCount - 1) }));
+    return refreshInFlight;
   },
 
   reset: () => set({ notViewedCount: 0, loadingCount: false }),

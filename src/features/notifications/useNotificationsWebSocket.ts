@@ -143,7 +143,7 @@ export function useNotificationsWebSocket(enabled: boolean): void {
         if (!n) return;
         pushNotification(n);
         if (isNewInvitationNotification(n.type)) {
-          useInvitationsStore.getState().incrementNotViewedCount();
+          void useInvitationsStore.getState().refreshNotViewedCount();
         }
       };
 
