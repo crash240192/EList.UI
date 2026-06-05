@@ -77,11 +77,6 @@ export function buildYandexMapsPointUrl(lat: number, lng: number, zoom = 16): st
   return `https://yandex.ru/maps/?pt=${lng},${lat}&z=${zoom}&l=map`;
 }
 
-/** Ссылка «Как добраться» — маршрут до точки в Яндекс Картах */
-export function buildYandexMapsRouteUrl(lat: number, lng: number): string {
-  return `https://yandex.ru/maps/?rtext=~${lat},${lng}&rtt=auto`;
-}
-
 export interface GeocodedPlace { lat: number; lng: number; address: string; }
 
 export async function geocodeAddress(query: string): Promise<GeocodedPlace | null> {

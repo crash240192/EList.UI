@@ -1,7 +1,7 @@
 // features/event-map/YandexMap.tsx — просмотровая карта
 
 import { useEffect, useRef, useState } from 'react';
-import { loadYandexMaps, addCompactZoomControl, buildYandexMapsPointUrl, buildYandexMapsRouteUrl } from '@/shared/lib/yandexMaps';
+import { loadYandexMaps, addCompactZoomControl, buildYandexMapsPointUrl } from '@/shared/lib/yandexMaps';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
 
@@ -50,15 +50,6 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
         />
       </div>
       <div className={styles.mapActions}>
-        <a
-          className={styles.mapActionLink}
-          href={buildYandexMapsRouteUrl(lat, lng)}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
-        >
-          Как добраться
-        </a>
         <a
           className={styles.mapActionLink}
           href={buildYandexMapsPointUrl(lat, lng, zoom)}
