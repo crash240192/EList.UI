@@ -1,6 +1,6 @@
 // shared/ui/DatePicker/DatePicker.tsx
 
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './DatePicker.module.css';
 
@@ -20,8 +20,11 @@ interface DatePickerProps {
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
                  'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
+const DATE_DIGITS = 8;
+const TIME_DIGITS = 4;
+
 function nextFiveMinuteSlot(now: Date): { h: string; m: string } {
-  const totalMins = now.getHours() * 60 + now.getMinutes() + 1; // +1 гарантирует будущее
+  const totalMins = now.getHours() * 60 + now.getMinutes() + 1;
   const rounded = Math.ceil(totalMins / 5) * 5;
   return {
     h: String(Math.floor(rounded / 60) % 24).padStart(2, '0'),
@@ -38,16 +41,6 @@ function parseValue(value: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function formatDisplay(date: Date, withTime: boolean): string {
-  const day = date.getDate();
-  const month = MONTHS[date.getMonth()];
-  const year = date.getFullYear();
-  if (!withTime) return `${day} ${month} ${year}`;
-  const hh = String(date.getHours()).padStart(2, '0');
-  const mm = String(date.getMinutes()).padStart(2, '0');
-  return `${day} ${month} ${year}, ${hh}:${mm}`;
-}
-
 function toISO(date: Date, withTime: boolean): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const yy = date.getFullYear();
@@ -57,6 +50,93 @@ function toISO(date: Date, withTime: boolean): string {
   const hh = pad(date.getHours());
   const mi = pad(date.getMinutes());
   return `${yy}-${mm}-${dd}T${hh}:${mi}:00`;
+}
+
+function maxDigits(withTime: boolean): number {
+  return withTime ? DATE_DIGITS + TIME_DIGITS : DATE_DIGITS;
+}
+
+function digitsOnly(raw: string, withTime: boolean): string {
+  return raw.replace(/\D/g, '').slice(0, maxDigits(withTime));
+}
+
+function formatMaskedFromDigits(digits: string, withTime: boolean): string {
+  const datePart = digits.slice(0, DATE_DIGITS);
+  let out = '';
+  if (datePart.length > 0) out += datePart.slice(0, 2);
+  if (datePart.length > 2) out += '.' + datePart.slice(2, 4);
+  if (datePart.length > 4) out += '.' + datePart.slice(4, 8);
+  if (withTime && digits.length > DATE_DIGITS) {
+    const timePart = digits.slice(DATE_DIGITS, DATE_DIGITS + TIME_DIGITS);
+    out += ' ' + timePart.slice(0, 2);
+    if (timePart.length > 2) out += ':' + timePart.slice(2, 4);
+  }
+  return out;
+}
+
+function isoToMasked(iso: string, withTime: boolean): string {
+  const d = parseValue(iso);
+  if (!d) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const base = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+  if (!withTime) return base;
+  return `${base} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function maskedToIso(masked: string, withTime: boolean): string | null {
+  const pattern = withTime
+    ? /^(\d{2})\.(\d{2})\.(\d{4})\s(\d{2}):(\d{2})$/
+    : /^(\d{2})\.(\d{2})\.(\d{4})$/;
+  const m = masked.match(pattern);
+  if (!m) return null;
+  const day = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);
+  const year = parseInt(m[3], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+  if (withTime) {
+    const h = parseInt(m[4], 10);
+    const mi = parseInt(m[5], 10);
+    if (h > 23 || mi > 59) return null;
+    d.setHours(h, mi, 0, 0);
+    return toISO(d, true);
+  }
+  return toISO(d, false);
+}
+
+function isInRange(iso: string, withTime: boolean, min?: string, max?: string): boolean {
+  const d = parseValue(iso);
+  if (!d) return false;
+  if (min) {
+    const minD = parseValue(min);
+    if (minD) {
+      if (withTime) {
+        if (d < minD) return false;
+      } else {
+        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const minDay = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate());
+        if (dDay < minDay) return false;
+      }
+    }
+  }
+  if (max) {
+    const maxD = parseValue(max);
+    if (maxD) {
+      if (withTime) {
+        if (d > maxD) return false;
+      } else {
+        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const maxDay = new Date(maxD.getFullYear(), maxD.getMonth(), maxD.getDate());
+        if (dDay > maxDay) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function defaultPlaceholder(withTime: boolean): string {
+  return withTime ? 'дд.мм.гггг чч:мм' : 'дд.мм.гггг';
 }
 
 // Колесо прокрутки для выбора часов/минут
@@ -76,13 +156,11 @@ function TimeWheel({ items, selected, onSelect, open }: {
   useEffect(() => {
     const i = Math.max(0, items.indexOf(selected));
     setIdx(i);
-    // rAF гарантирует, что display:block уже применён до установки scrollTop
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
       if (listRef.current) listRef.current.scrollTop = i * ITEM_H;
     });
     return () => cancelAnimationFrame(rafRef.current);
-  // open в deps: при открытии попапа эффект пересчитывается даже если selected не менялся
   }, [selected, items, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollToIdx = useCallback((i: number) => {
@@ -103,7 +181,6 @@ function TimeWheel({ items, selected, onSelect, open }: {
       const clamped = Math.max(0, Math.min(items.length - 1, i));
       setIdx(clamped);
       onSelect(items[clamped]);
-      // Снэп к ячейке после остановки
       listRef.current.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
     }, 80);
   }, [items, onSelect]);
@@ -135,12 +212,12 @@ function TimeWheel({ items, selected, onSelect, open }: {
 export function DatePicker({ value, onChange, withTime = false, placeholder, min, max, minTime, className, hasError }: DatePickerProps) {
   const [open, setOpen]       = useState(false);
   const wrapRef               = useRef<HTMLDivElement>(null);
-  const fieldRef              = useRef<HTMLButtonElement>(null);
+  const fieldRef              = useRef<HTMLDivElement>(null);
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
   const [isMobile, setIsMobile] = useState(false);
+  const [inputText, setInputText] = useState(() => isoToMasked(value, withTime));
 
   const parsed = parseValue(value);
-  // Дефолт для selDate — текущие дата/время если не выбрано (кнопка сразу активна)
   const nowDefault = new Date();
   const [viewYear,  setViewYear]  = useState(() => {
     if (parsed) return parsed.getFullYear();
@@ -158,10 +235,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return nextFiveMinuteSlot(nowDefault).m;
   });
 
-  // Свайп месяцев
   const swipeStartX = useRef<number | null>(null);
 
   useEffect(() => {
+    setInputText(isoToMasked(value, withTime));
     const d = parseValue(value);
     setSelDate(d);
     if (d) {
@@ -170,7 +247,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       setTimeH(String(d.getHours()).padStart(2, '0'));
       setTimeM(String(Math.round(d.getMinutes() / 5) * 5).padStart(2, '0'));
     }
-  }, [value]);
+  }, [value, withTime]);
 
   useEffect(() => {
     const fn = (e: MouseEvent) => {
@@ -187,8 +264,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
 
   const popupRef = useRef<HTMLDivElement>(null);
 
-  // Позиционирование в стиле flatpickr: попап всегда в DOM,
-  // показываем/скрываем через display, позиционируем синхронно
   useEffect(() => {
     const popup = popupRef.current;
     if (!popup) return;
@@ -202,7 +277,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     }
 
     if (mobile) {
-      // Мобиль: по центру экрана
       const viewW = window.innerWidth;
       const viewH = window.innerHeight;
       const W = Math.min(320, viewW - 16);
@@ -215,7 +289,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       return;
     }
 
-    // Десктоп: flatpickr-стиль
     if (!fieldRef.current) return;
     const rect  = fieldRef.current.getBoundingClientRect();
     const viewH = window.innerHeight;
@@ -223,7 +296,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     const W     = 296;
     const left  = Math.max(4, Math.min(rect.left, viewW - W - 8));
 
-    // Сначала рендерим за экраном чтобы измерить реальную высоту
     popup.style.display  = 'block';
     popup.style.position = 'fixed';
     popup.style.width    = W + 'px';
@@ -231,7 +303,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     popup.style.top      = '-9999px';
     popup.style.zIndex   = '9999';
 
-    // offsetHeight теперь реальный (элемент в DOM с заданной шириной)
     const popupH = popup.offsetHeight;
     const SAFE   = 8;
 
@@ -241,6 +312,41 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
 
     popup.style.top = top + 'px';
   }, [open]);
+
+  const commitMasked = useCallback((masked: string) => {
+    if (!masked) {
+      onChange('');
+      return true;
+    }
+    const iso = maskedToIso(masked, withTime);
+    if (!iso || !isInRange(iso, withTime, min, max)) return false;
+    onChange(iso);
+    setInputText(isoToMasked(iso, withTime));
+    return true;
+  }, [withTime, min, max, onChange]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = digitsOnly(e.target.value, withTime);
+    const masked = formatMaskedFromDigits(digits, withTime);
+    setInputText(masked);
+    if (digits.length === 0) {
+      onChange('');
+      return;
+    }
+    if (digits.length === maxDigits(withTime)) {
+      commitMasked(masked);
+    }
+  };
+
+  const handleInputBlur = () => {
+    if (!inputText) {
+      onChange('');
+      return;
+    }
+    if (!commitMasked(inputText)) {
+      setInputText(isoToMasked(value, withTime));
+    }
+  };
 
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
@@ -263,25 +369,28 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     setSelDate(d);
     if (!withTime) {
       onChange(toISO(d, false));
+      setInputText(isoToMasked(toISO(d, false), false));
       setOpen(false);
     }
   };
 
   const handleConfirm = () => {
-    const base = selDate ?? nowDefault; // если дата не кликнута — берём текущую
+    const base = selDate ?? nowDefault;
     const d = new Date(base);
     d.setHours(parseInt(timeH, 10) || 0, parseInt(timeM, 10) || 0, 0, 0);
-    onChange(toISO(d, true));
+    const iso = toISO(d, true);
+    onChange(iso);
     setSelDate(d);
+    setInputText(isoToMasked(iso, true));
     setOpen(false);
   };
 
   const handleClear = () => {
     setSelDate(null);
+    setInputText('');
     onChange('');
   };
 
-  // Строим ячейки календаря
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const offset   = firstDay === 0 ? 6 : firstDay - 1;
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -299,10 +408,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     ? d === effectiveSel.getDate() && viewMonth === effectiveSel.getMonth() && viewYear === effectiveSel.getFullYear()
     : false;
   const isDisabled = (d: number) => {
-    const dt = new Date(viewYear, viewMonth, d); // локальное время
+    const dt = new Date(viewYear, viewMonth, d);
     if (min) {
       const [my, mm, md] = min.split('-').map(Number);
-      const minDt = new Date(my, mm - 1, md); // тоже локальное
+      const minDt = new Date(my, mm - 1, md);
       if (dt < minDt) return true;
     }
     if (max) {
@@ -313,12 +422,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return false;
   };
 
-  // Если выбранная дата совпадает с min — ограничиваем время
   const currentYear = new Date().getFullYear();
   const isSameDayAsMin = selDate && min
     ? (() => { const [y,m,d] = min.split('-').map(Number); return selDate.getFullYear()===y && selDate.getMonth()===m-1 && selDate.getDate()===d; })()
     : false;
-  // Автоматически ограничиваем время текущим моментом, если выбран сегодняшний день и min = сегодня
   const todayIso = toISO(today, false);
   const effectiveMinTime = minTime ?? (
     isSameDayAsMin && min === todayIso
@@ -333,7 +440,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const yearRange: number[] = [];
   for (let y = minYear; y <= maxYear; y++) yearRange.push(y);
 
-  // Скроллим к выбранному году при открытии
   const yearListRef = useRef<HTMLDivElement>(null);
 
   const scrollToActiveYear = useCallback(() => {
@@ -342,7 +448,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     if (btn) btn.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, []);
 
-  // Центрируем год при открытии
   useEffect(() => {
     if (!open) return;
     requestAnimationFrame(() => {
@@ -356,7 +461,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     });
   }, [open]);
 
-  // Центрируем год при каждом его изменении (стрелки, клик)
   useEffect(() => {
     if (!open) return;
     requestAnimationFrame(scrollToActiveYear);
@@ -369,7 +473,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       className={`${styles.popup} ${isMobile ? styles.popupModal : ''}`}
       style={isMobile ? undefined : popupStyle}>
 
-      {/* Шапка с навигацией */}
       <div className={styles.header}
         onTouchStart={handleSwipeTouchStart}
         onTouchEnd={handleSwipeTouchEnd}>
@@ -382,7 +485,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
         </button>
       </div>
 
-      {/* Быстрый выбор года со стрелками */}
       <div className={styles.yearBar}>
         <button type="button" className={styles.yearNavBtn}
           onClick={() => setViewYear(y => Math.max(minYear, y - 1))}
@@ -406,12 +508,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
         </button>
       </div>
 
-      {/* Дни недели */}
       <div className={styles.weekRow}>
         {WEEKDAYS.map(w => <div key={w} className={styles.weekCell}>{w}</div>)}
       </div>
 
-      {/* Сетка дней — свайп */}
       <div className={styles.grid}
         onTouchStart={handleSwipeTouchStart}
         onTouchEnd={handleSwipeTouchEnd}>
@@ -430,7 +530,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
         ))}
       </div>
 
-      {/* Колёса времени */}
       {withTime && (
         <div className={styles.timePicker}>
           <span className={styles.timeLabel}>Время</span>
@@ -442,7 +541,6 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
         </div>
       )}
 
-      {/* Кнопки подтверждения */}
       <div className={styles.footer}>
         <button type="button" className={styles.cancelBtn} onClick={() => setOpen(false)}>Отмена</button>
         <button type="button" className={styles.okBtn} onClick={withTime ? handleConfirm : () => setOpen(false)} disabled={!withTime && !selDate}>
@@ -452,20 +550,34 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     </div>
   );
 
+  const fieldPlaceholder = placeholder ?? defaultPlaceholder(withTime);
+
   return (
     <div ref={wrapRef} className={`${styles.wrap} ${className ?? ''}`}>
-      <button ref={fieldRef} type="button"
-        className={`${styles.field} ${open ? styles.fieldOpen : ''} ${hasError ? styles.fieldError : ''}`}
-        onClick={() => setOpen(v => !v)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.icon}>
-          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-        </svg>
-        <span className={selDate ? styles.fieldValue : styles.fieldPlaceholder}>
-          {selDate ? formatDisplay(selDate, withTime) : (placeholder ?? 'Выберите дату')}
-        </span>
-        {selDate && <span className={styles.clearBtn} onClick={e => { e.stopPropagation(); handleClear(); }}>×</span>}
-      </button>
+      <div ref={fieldRef}
+        className={`${styles.field} ${open ? styles.fieldOpen : ''} ${hasError ? styles.fieldError : ''}`}>
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          className={styles.input}
+          value={inputText}
+          placeholder={fieldPlaceholder}
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+        />
+        {inputText && (
+          <button type="button" className={styles.clearBtn} aria-label="Очистить"
+            onClick={handleClear}>×</button>
+        )}
+        <button type="button" className={styles.calendarBtn} aria-label="Открыть календарь"
+          onClick={() => setOpen(v => !v)}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.icon}>
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </button>
+      </div>
 
       {createPortal(
         <>

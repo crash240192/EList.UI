@@ -16,6 +16,7 @@ import { AvatarUpload } from '@/shared/ui/AvatarUpload/AvatarUpload';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
 import { Select } from '@/shared/ui/Select/Select';
+import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { useFiltersStore } from '@/app/store';
 import styles from './SettingsPage.module.css';
@@ -141,9 +142,13 @@ function PersonSection() {
         />
       </Row>
       <Row label="Дата рождения">
-        <input className={styles.input} type="date" value={form.birthDate}
-          onChange={set('birthDate')} 
-                  onFocus={e => (e.target as HTMLInputElement).select()} />
+        <DatePicker
+          value={form.birthDate}
+          onChange={iso => setForm(f => ({ ...f, birthDate: iso }))}
+          placeholder="дд.мм.гггг"
+          min="1900-01-01"
+          max={new Date().toISOString().slice(0, 10)}
+        />
       </Row>
       <SaveRow msg={msg} saving={saving} onSave={handleSave} />
     </SectionCard>

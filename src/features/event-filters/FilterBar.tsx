@@ -432,12 +432,12 @@ export function FilterBar({
         <div className={styles.expandPanel}>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Дата от</span>
-            <DatePicker withTime value={filters.startTime ?? ''} placeholder="Любая"
+            <DatePicker className={styles.epDatePicker} withTime value={filters.startTime ?? ''} placeholder="Любая"
               onChange={iso => { setFilter('startTime', iso || undefined); setQuickDate(null); }} />
           </div>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Дата до</span>
-            <DatePicker withTime value={filters.endTime ?? ''} placeholder="Любая"
+            <DatePicker className={styles.epDatePicker} withTime value={filters.endTime ?? ''} placeholder="Любая"
               onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
           </div>
           <div className={styles.epBlock}>
