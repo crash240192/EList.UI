@@ -75,9 +75,10 @@ interface DurationPickerProps {
   onChangeHours: (h: number) => void;
   onChangeMinutes: (m: number) => void;
   className?: string;
+  hasError?: boolean;
 }
 
-export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes, className }: DurationPickerProps) {
+export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes, className, hasError }: DurationPickerProps) {
   const [open, setOpen] = useState(false);
   const [timeDigits, setTimeDigits] = useState(() => toDigits(hours, minutes));
   const [draftH, setDraftH] = useState(hours);
@@ -147,7 +148,7 @@ export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes,
 
   return (
     <>
-      <div className={`${fieldStyles.field} ${open ? fieldStyles.fieldOpen : ''} ${className ?? ''}`}>
+      <div className={`${fieldStyles.field} ${open ? fieldStyles.fieldOpen : ''} ${hasError ? fieldStyles.fieldError : ''} ${className ?? ''}`}>
         <TimeMaskField
           digits={timeDigits}
           onDigitsChange={handleDigitsChange}

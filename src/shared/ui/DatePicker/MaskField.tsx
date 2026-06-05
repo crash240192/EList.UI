@@ -14,12 +14,21 @@ const SEG_CLASS: Record<MaskSegment['type'], string> = {
   sep:    styles.maskSep,
 };
 
-function MaskVisual({ segments }: { segments: MaskSegment[] }) {
+function MaskVisual({ segments, focused }: { segments: MaskSegment[]; focused?: boolean }) {
+  let caretPlaced = false;
   return (
     <div className={styles.maskVisual} aria-hidden="true">
-      {segments.map((seg, i) => (
-        <span key={i} className={SEG_CLASS[seg.type]}>{seg.text}</span>
-      ))}
+      {segments.map((seg, i) => {
+        const placeCaret = Boolean(focused) && !caretPlaced && seg.type === 'ghost';
+        if (placeCaret) caretPlaced = true;
+        return (
+          <span key={i}>
+            {placeCaret && <span className={styles.maskCaret} />}
+            <span className={SEG_CLASS[seg.type]}>{seg.text}</span>
+          </span>
+        );
+      })}
+      {focused && !caretPlaced && <span className={styles.maskCaret} />}
     </div>
   );
 }
@@ -103,7 +112,7 @@ export function DateTimeMaskField({
     <div className={`${styles.maskField} ${className ?? ''}`}>
       {showEmptyLabel
         ? <span className={styles.maskEmptyLabel}>{emptyLabel}</span>
-        : <MaskVisual segments={buildDateTimeMaskSegments(digits, withTime)} />
+        : <MaskVisual segments={buildDateTimeMaskSegments(digits, withTime)} focused={focused} />
       }
       <MaskCapture
         digits={digits}
@@ -128,15 +137,18 @@ export function TimeMaskField({
 }: MaskFieldBaseProps & {
   processRaw: (raw: string) => string;
 }) {
+  const [focused, setFocused] = useState(false);
+
   return (
     <div className={`${styles.maskField} ${styles.maskFieldTime} ${className ?? ''}`}>
-      <MaskVisual segments={buildTimeMaskSegments(digits)} />
+      <MaskVisual segments={buildTimeMaskSegments(digits)} focused={focused} />
       <MaskCapture
         digits={digits}
         ariaLabel={ariaLabel}
         processRaw={processRaw}
         onDigitsChange={onDigitsChange}
-        onBlur={onBlur}
+        onFocus={() => setFocused(true)}
+        onBlur={() => { setFocused(false); onBlur?.(); }}
       />
     </div>
   );

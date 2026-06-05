@@ -36,12 +36,26 @@
 .maskGhost  { color: var(--text-muted); opacity: 0.38; }
 .maskSep    { color: var(--text-secondary); opacity: 0.65; }
 .maskEmptyLabel { font-size: 13px; color: var(--text-muted); }
+.maskCaret {
+  display: inline-block;
+  width: 1px;
+  height: 1.1em;
+  background: var(--accent);
+  margin: 0 1px;
+  vertical-align: -2px;
+  animation: maskCaretBlink 1s step-end infinite;
+}
+@keyframes maskCaretBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
 .maskCapture {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0;
+  color: transparent;
+  caret-color: transparent;
   border: none;
   background: transparent;
   cursor: text;

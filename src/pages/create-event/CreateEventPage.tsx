@@ -63,7 +63,7 @@ const EMPTY: FormState = {
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
 };
 
-type FieldError = 'name' | 'type' | 'location' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | 'cost' | 'maxPersons' | 'ageLimit';
+type FieldError = 'name' | 'type' | 'location' | 'startDate' | 'startTime' | 'duration' | 'endDate' | 'endTime' | 'cost' | 'maxPersons' | 'ageLimit';
 
 // ---- Helpers ----
 
@@ -129,6 +129,7 @@ export default function CreateEventPage() {
   const startTimeRef     = useRef<HTMLInputElement>(null);
   const endDateRef       = useRef<HTMLInputElement>(null);
   const endTimeRef       = useRef<HTMLInputElement>(null);
+  const durationRef      = useRef<HTMLDivElement>(null);
   const loadedBWListsRef = useRef<Set<BWListType>>(new Set());
 
   // Загрузка кошелька и тарифа
@@ -339,6 +340,11 @@ export default function CreateEventPage() {
     if (!form.address.trim() || lat === null || lng === null) errs.add('location');
     if (!form.startDate)   errs.add('startDate');
     if (!form.startTime)   errs.add('startTime');
+    if (endMode === 'duration') {
+      const dh = parseInt(durationH) || 0;
+      const dm = parseInt(durationM) || 0;
+      if (dh === 0 && dm === 0) errs.add('duration');
+    }
     if (endMode === 'multiday') {
       if (!form.endDate) errs.add('endDate');
       if (!form.endTime) errs.add('endTime');
@@ -354,7 +360,7 @@ export default function CreateEventPage() {
 
     setFieldErrors(errs);
     if (!errs.size) return null;
-    return (['name','type','location','startDate','startTime','endDate','endTime','cost','maxPersons','ageLimit'] as FieldError[])
+    return (['name','type','location','startDate','startTime','duration','endDate','endTime','cost','maxPersons','ageLimit'] as FieldError[])
       .find(f => errs.has(f)) ?? null;
   };
 
@@ -362,6 +368,7 @@ export default function CreateEventPage() {
     const map: Partial<Record<FieldError, React.RefObject<HTMLElement | null>>> = {
       name: nameRef, type: typeRef, location: locationRef,
       startDate: startDateRef, startTime: startTimeRef,
+      duration: durationRef,
       endDate: endDateRef, endTime: endTimeRef,
     };
     const el = map[err]?.current;
@@ -410,8 +417,8 @@ export default function CreateEventPage() {
     if (firstErr) {
       showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
         location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
-        startTime:'⚠️ Укажите время начала', endDate:'⚠️ Укажите дату окончания',
-        endTime:'⚠️ Укажите время окончания',
+        startTime:'⚠️ Укажите время начала', duration:'⚠️ Укажите длительность',
+        endDate:'⚠️ Укажите дату окончания', endTime:'⚠️ Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? '⚠️ Количество участников не может быть отрицательным' : `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
         ageLimit: parseInt(form.ageLimit) < 0 ? '⚠️ Возрастное ограничение не может быть отрицательным' : `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
@@ -501,8 +508,8 @@ export default function CreateEventPage() {
     if (firstErr) {
       showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
         location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
-        startTime:'⚠️ Укажите время начала', endDate:'⚠️ Укажите дату окончания',
-        endTime:'⚠️ Укажите время окончания',
+        startTime:'⚠️ Укажите время начала', duration:'⚠️ Укажите длительность',
+        endDate:'⚠️ Укажите дату окончания', endTime:'⚠️ Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? '⚠️ Количество участников не может быть отрицательным' : `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
         ageLimit: parseInt(form.ageLimit) < 0 ? '⚠️ Возрастное ограничение не может быть отрицательным' : `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
@@ -670,13 +677,22 @@ export default function CreateEventPage() {
 
             {/* Правая — длительность или дата окончания */}
             {endMode === 'duration' ? (
-              <Field label="Длительность">
-                <DurationPicker
-                  hours={parseInt(durationH) || 0}
-                  minutes={parseInt(durationM) || 0}
-                  onChangeHours={h => setDurationH(String(h))}
-                  onChangeMinutes={m => setDurationM(String(m))}
-                />
+              <Field label="Длительность *" error={hasErr('duration') ? 'Укажите длительность' : undefined}>
+                <div ref={durationRef}>
+                  <DurationPicker
+                    hours={parseInt(durationH) || 0}
+                    minutes={parseInt(durationM) || 0}
+                    hasError={hasErr('duration')}
+                    onChangeHours={h => {
+                      setDurationH(String(h));
+                      setFieldErrors(p => { const n = new Set(p); n.delete('duration'); return n; });
+                    }}
+                    onChangeMinutes={m => {
+                      setDurationM(String(m));
+                      setFieldErrors(p => { const n = new Set(p); n.delete('duration'); return n; });
+                    }}
+                  />
+                </div>
               </Field>
             ) : (
               <Field label="Окончание *" error={hasErr('endDate') || hasErr('endTime') ? 'Укажите дату и время' : undefined}>
