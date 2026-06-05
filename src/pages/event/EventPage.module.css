@@ -70,7 +70,7 @@
   pointer-events:none;
 }
 .heroTop {
-  position:absolute; top:14px; left:14px; right:14px; z-index:4;
+  position:absolute; top:14px; left:14px; right:14px; z-index:10;
   display:flex; justify-content:space-between; align-items:center;
 }
 .heroTopRight { display:flex; gap:8px; }
@@ -237,13 +237,14 @@
 .tagPrivate { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); background:rgba(0,0,0,.35); color:#fff; border:.5px solid rgba(255,255,255,.2); display:inline-flex; align-items:center; gap:4px; }
 
 /* Dots menu (organizer controls) */
-.mobileMenuWrap { position:relative; }
+.mobileMenuWrap { position:relative; z-index:11; }
 .mobileMenuBackdrop { position:fixed; inset:0; z-index:200; }
 .mobileMenu {
   position:absolute; top:calc(100% + 8px); right:0;
   background:var(--surface); border:1px solid var(--border); border-radius:12px;
   box-shadow:0 8px 24px rgba(0,0,0,.25); min-width:200px; z-index:201;
   overflow:hidden;
+  isolation:isolate;
 }
 .mobileMenuItem { display:block; width:100%; text-align:left; padding:11px 14px; background:none; border:none; border-bottom:1px solid var(--border); font-size:13px; color:var(--text-primary); cursor:pointer; font-family:inherit; }
 .mobileMenuItem:last-child { border-bottom:none; }

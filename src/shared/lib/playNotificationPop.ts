@@ -9,7 +9,7 @@ function getAudio(): HTMLAudioElement {
   if (!audio) {
     audio = new Audio(SOUND_URL);
     audio.preload = 'auto';
-    audio.volume = 0.7;
+    audio.volume = 0.35;
   }
   return audio;
 }
