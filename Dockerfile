@@ -14,12 +14,12 @@ WORKDIR /app
 # если package.json не менялся, npm ci пропускается
 COPY package.json package-lock.json* ./
 
-# Если package-lock.json есть — используем ci для воспроизводимой сборки,
-# иначе обычный install
+# devDependencies (typescript, vite) нужны для npm run build.
+# --include=dev: даже если в CI задан NODE_ENV=production
 RUN if [ -f package-lock.json ]; then \
-      npm ci --prefer-offline; \
+      npm ci --prefer-offline --include=dev; \
     else \
-      npm install; \
+      npm install --include=dev; \
     fi
 
 # Копируем исходники
