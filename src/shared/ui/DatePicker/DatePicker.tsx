@@ -6,12 +6,13 @@ import {
   maxDigits,
   sanitizeDateTimeDigits,
   sanitizeTimeDigits,
-  formatMaskedFromDigits,
-  formatTimeMasked,
+  isoToDigits,
+  digitsToIso,
   timeDigitsToHM,
   hmToTimeDigits,
   isTimeAtOrAfter,
 } from '@/shared/lib/dateTimeMask';
+import { DateTimeMaskField, TimeMaskField } from './MaskField';
 import styles from './DatePicker.module.css';
 
 interface DatePickerProps {
@@ -55,37 +56,6 @@ function toISO(date: Date, withTime: boolean): string {
   const hh = pad(date.getHours());
   const mi = pad(date.getMinutes());
   return `${yy}-${mm}-${dd}T${hh}:${mi}:00`;
-}
-
-function isoToMasked(iso: string, withTime: boolean): string {
-  const d = parseValue(iso);
-  if (!d) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const base = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
-  if (!withTime) return base;
-  return `${base} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function maskedToIso(masked: string, withTime: boolean): string | null {
-  const pattern = withTime
-    ? /^(\d{2})\.(\d{2})\.(\d{4})\s(\d{2}):(\d{2})$/
-    : /^(\d{2})\.(\d{2})\.(\d{4})$/;
-  const m = masked.match(pattern);
-  if (!m) return null;
-  const day = parseInt(m[1], 10);
-  const month = parseInt(m[2], 10);
-  const year = parseInt(m[3], 10);
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-  const d = new Date(year, month - 1, day);
-  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
-  if (withTime) {
-    const h = parseInt(m[4], 10);
-    const mi = parseInt(m[5], 10);
-    if (h > 23 || mi > 59) return null;
-    d.setHours(h, mi, 0, 0);
-    return toISO(d, true);
-  }
-  return toISO(d, false);
 }
 
 function effectiveMinTimeFor(isoDate: string, min?: string, minTime?: string): string | undefined {
@@ -142,9 +112,7 @@ function isInRange(iso: string, withTime: boolean, min?: string, max?: string): 
   return true;
 }
 
-function defaultPlaceholder(withTime: boolean): string {
-  return withTime ? 'дд.мм.гггг чч:мм' : 'дд.мм.гггг';
-}
+const MASK_EMPTY_LABELS = new Set(['Любая']);
 
 export function DatePicker({ value, onChange, withTime = false, placeholder, min, max, minTime, className, hasError }: DatePickerProps) {
   const [open, setOpen]       = useState(false);
@@ -152,7 +120,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const fieldRef              = useRef<HTMLDivElement>(null);
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
   const [isMobile, setIsMobile] = useState(false);
-  const [inputText, setInputText] = useState(() => isoToMasked(value, withTime));
+  const [inputDigits, setInputDigits] = useState(() => isoToDigits(value, withTime));
 
   const parsed = parseValue(value);
   const nowDefault = new Date();
@@ -171,14 +139,15 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     if (parsed) return String(parsed.getMinutes()).padStart(2, '0');
     return nextFiveMinuteSlot(nowDefault).m;
   });
-  const [timeInputText, setTimeInputText] = useState(() => {
+  const [timeDigits, setTimeDigits] = useState(() => {
     if (parsed) {
-      return formatTimeMasked(
-        `${String(parsed.getHours()).padStart(2, '0')}${String(parsed.getMinutes()).padStart(2, '0')}`,
+      return hmToTimeDigits(
+        String(parsed.getHours()).padStart(2, '0'),
+        String(parsed.getMinutes()).padStart(2, '0'),
       );
     }
     const slot = nextFiveMinuteSlot(nowDefault);
-    return formatTimeMasked(slot.h + slot.m);
+    return slot.h + slot.m;
   });
 
   const swipeStartX = useRef<number | null>(null);
@@ -186,11 +155,11 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const syncTimeFromHM = useCallback((h: string, m: string) => {
     setTimeH(h);
     setTimeM(m);
-    setTimeInputText(formatTimeMasked(hmToTimeDigits(h, m)));
+    setTimeDigits(hmToTimeDigits(h, m));
   }, []);
 
   useEffect(() => {
-    setInputText(isoToMasked(value, withTime));
+    setInputDigits(isoToDigits(value, withTime));
     const d = parseValue(value);
     setSelDate(d);
     if (d) {
@@ -266,38 +235,43 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     popup.style.top = top + 'px';
   }, [open]);
 
-  const commitMasked = useCallback((masked: string) => {
-    if (!masked) {
+  const processDateTimeRaw = useCallback(
+    (raw: string) => sanitizeDateTimeDigits(raw, withTime, min, max),
+    [withTime, min, max],
+  );
+
+  const commitDigits = useCallback((digits: string) => {
+    if (!digits) {
       onChange('');
       return true;
     }
-    const iso = maskedToIso(masked, withTime);
+    const iso = digitsToIso(digits, withTime);
     if (!iso || !isInRange(iso, withTime, min, max) || !satisfiesMinTime(iso, withTime, min, minTime)) return false;
     onChange(iso);
-    setInputText(isoToMasked(iso, withTime));
+    setInputDigits(isoToDigits(iso, withTime));
     return true;
   }, [withTime, min, max, minTime, onChange]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = sanitizeDateTimeDigits(e.target.value, withTime, min, max);
-    const masked = formatMaskedFromDigits(digits, withTime);
-    setInputText(masked);
+  const handleDigitsChange = (digits: string) => {
+    setInputDigits(digits);
     if (digits.length === 0) {
       onChange('');
       return;
     }
     if (digits.length === maxDigits(withTime)) {
-      commitMasked(masked);
+      commitDigits(digits);
     }
   };
 
-  const handleInputBlur = () => {
-    if (!inputText) {
+  const handleDigitsBlur = () => {
+    if (!inputDigits) {
       onChange('');
       return;
     }
-    if (!commitMasked(inputText)) {
-      setInputText(isoToMasked(value, withTime));
+    if (inputDigits.length === maxDigits(withTime)) {
+      if (!commitDigits(inputDigits)) setInputDigits(isoToDigits(value, withTime));
+    } else {
+      setInputDigits(isoToDigits(value, withTime));
     }
   };
 
@@ -322,7 +296,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     setSelDate(d);
     if (!withTime) {
       onChange(toISO(d, false));
-      setInputText(isoToMasked(toISO(d, false), false));
+      setInputDigits(isoToDigits(toISO(d, false), false));
       setOpen(false);
     }
   };
@@ -335,13 +309,13 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     if (!isInRange(iso, true, min, max) || !satisfiesMinTime(iso, true, min, minTime)) return;
     onChange(iso);
     setSelDate(d);
-    setInputText(isoToMasked(iso, true));
+    setInputDigits(isoToDigits(iso, true));
     setOpen(false);
   };
 
   const handleClear = () => {
     setSelDate(null);
-    setInputText('');
+    setInputDigits('');
     onChange('');
   };
 
@@ -393,20 +367,20 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return true;
   }, [isSameDayAsMin, minH, minM, syncTimeFromHM]);
 
-  const handleTimeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = sanitizeTimeDigits(e.target.value);
-    setTimeInputText(formatTimeMasked(digits));
+  const handleTimeDigitsChange = (digits: string) => {
+    setTimeDigits(digits);
     if (digits.length === 4) commitPopupTime(digits);
   };
 
-  const handleTimeInputBlur = () => {
-    const digits = sanitizeTimeDigits(timeInputText);
-    if (!digits) {
+  const handleTimeDigitsBlur = () => {
+    if (!timeDigits) {
       syncTimeFromHM(timeH, timeM);
       return;
     }
-    if (!commitPopupTime(digits)) {
-      setTimeInputText(formatTimeMasked(hmToTimeDigits(timeH, timeM)));
+    if (timeDigits.length === 4) {
+      if (!commitPopupTime(timeDigits)) setTimeDigits(hmToTimeDigits(timeH, timeM));
+    } else {
+      setTimeDigits(hmToTimeDigits(timeH, timeM));
     }
   };
 
@@ -508,16 +482,15 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       {withTime && (
         <div className={styles.timePicker}>
           <span className={styles.timeLabel}>Время</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            className={styles.timeInputMasked}
-            value={timeInputText}
-            placeholder="чч:мм"
-            onChange={handleTimeInputChange}
-            onBlur={handleTimeInputBlur}
-          />
+          <div className={styles.timeMaskWrap}>
+            <TimeMaskField
+              digits={timeDigits}
+              onDigitsChange={handleTimeDigitsChange}
+              onBlur={handleTimeDigitsBlur}
+              processRaw={sanitizeTimeDigits}
+              ariaLabel="чч:мм"
+            />
+          </div>
         </div>
       )}
 
@@ -530,23 +503,23 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     </div>
   );
 
-  const fieldPlaceholder = placeholder ?? defaultPlaceholder(withTime);
+  const emptyLabel = placeholder && MASK_EMPTY_LABELS.has(placeholder) ? placeholder : undefined;
+  const ariaLabel = placeholder ?? (withTime ? 'дд.мм.гггг чч:мм' : 'дд.мм.гггг');
 
   return (
     <div ref={wrapRef} className={`${styles.wrap} ${className ?? ''}`}>
       <div ref={fieldRef}
         className={`${styles.field} ${open ? styles.fieldOpen : ''} ${hasError ? styles.fieldError : ''}`}>
-        <input
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          className={styles.input}
-          value={inputText}
-          placeholder={fieldPlaceholder}
-          onChange={handleInputChange}
-          onBlur={handleInputBlur}
+        <DateTimeMaskField
+          digits={inputDigits}
+          onDigitsChange={handleDigitsChange}
+          onBlur={handleDigitsBlur}
+          withTime={withTime}
+          emptyLabel={emptyLabel}
+          ariaLabel={ariaLabel}
+          processRaw={processDateTimeRaw}
         />
-        {inputText && (
+        {inputDigits.length > 0 && (
           <button type="button" className={styles.clearBtn} aria-label="Очистить"
             onClick={handleClear}>×</button>
         )}

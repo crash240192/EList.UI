@@ -125,6 +125,57 @@ export function sanitizeTimeDigits(raw: string): string {
   return result;
 }
 
+export type MaskSegmentType = 'filled' | 'ghost' | 'sep';
+
+export interface MaskSegment {
+  text: string;
+  type: MaskSegmentType;
+}
+
+function slotChar(digits: string, index: number): MaskSegment {
+  return digits[index] != null
+    ? { text: digits[index], type: 'filled' }
+    : { text: '_', type: 'ghost' };
+}
+
+/** Сегменты дд.мм.гггг [ чч:мм] — разделители всегда на месте */
+export function buildDateTimeMaskSegments(digits: string, withTime: boolean): MaskSegment[] {
+  const segs: MaskSegment[] = [];
+  segs.push(slotChar(digits, 0), slotChar(digits, 1));
+  segs.push({ text: '.', type: 'sep' });
+  segs.push(slotChar(digits, 2), slotChar(digits, 3));
+  segs.push({ text: '.', type: 'sep' });
+  segs.push(slotChar(digits, 4), slotChar(digits, 5), slotChar(digits, 6), slotChar(digits, 7));
+  if (withTime) {
+    segs.push({ text: ' ', type: 'sep' });
+    segs.push(slotChar(digits, 8), slotChar(digits, 9));
+    segs.push({ text: ':', type: 'sep' });
+    segs.push(slotChar(digits, 10), slotChar(digits, 11));
+  }
+  return segs;
+}
+
+/** Сегменты чч:мм */
+export function buildTimeMaskSegments(digits: string): MaskSegment[] {
+  return [
+    slotChar(digits, 0),
+    slotChar(digits, 1),
+    { text: ':', type: 'sep' },
+    slotChar(digits, 2),
+    slotChar(digits, 3),
+  ];
+}
+
+export function isoToDigits(iso: string, withTime: boolean): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const base = `${pad(d.getDate())}${pad(d.getMonth() + 1)}${d.getFullYear()}`;
+  if (!withTime) return base;
+  return `${base}${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+
 export function formatMaskedFromDigits(digits: string, withTime: boolean): string {
   const datePart = digits.slice(0, DATE_DIGITS);
   let out = '';
@@ -153,6 +204,32 @@ export function timeDigitsToHM(digits: string): { h: string; m: string } | null 
 
 export function hmToTimeDigits(h: string, m: string): string {
   return `${h}${m}`.replace(/\D/g, '').slice(0, TIME_DIGITS);
+}
+
+export function digitsToIso(digits: string, withTime: boolean): string | null {
+  const need = maxDigits(withTime);
+  if (digits.length !== need) return null;
+  const masked = formatMaskedFromDigits(digits, withTime);
+  const pattern = withTime
+    ? /^(\d{2})\.(\d{2})\.(\d{4})\s(\d{2}):(\d{2})$/
+    : /^(\d{2})\.(\d{2})\.(\d{4})$/;
+  const m = masked.match(pattern);
+  if (!m) return null;
+  const day = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);
+  const year = parseInt(m[3], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+  if (withTime) {
+    const h = parseInt(m[4], 10);
+    const mi = parseInt(m[5], 10);
+    if (h > 23 || mi > 59) return null;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${year}-${pad(month)}-${pad(day)}T${pad(h)}:${pad(mi)}:00`;
+  }
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${year}-${pad(month)}-${pad(day)}`;
 }
 
 export function isTimeAtOrAfter(h: string, m: string, minH: number, minM: number): boolean {
