@@ -4,6 +4,7 @@
   right: 0;
   z-index: 400;
   width: min(360px, calc(100vw - 24px));
+  max-width: min(360px, calc(100dvw - 24px));
   max-height: min(70vh, 520px);
   display: flex;
   flex-direction: column;
@@ -12,6 +13,19 @@
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   overflow: hidden;
+}
+
+/* На узком экране панель от viewport, не от кнопки — иначе обрезается слева */
+@media (max-width: 680px) {
+  .panel {
+    position: fixed;
+    top: calc(var(--header-h, 56px) + 6px);
+    right: max(10px, env(safe-area-inset-right, 0px));
+    left: max(10px, env(safe-area-inset-left, 0px));
+    width: auto;
+    max-width: none;
+    max-height: min(72vh, 520px);
+  }
 }
 
 .head {
