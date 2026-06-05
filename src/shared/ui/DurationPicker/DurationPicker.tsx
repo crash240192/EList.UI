@@ -15,6 +15,8 @@ const HOURS_LIST   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, 
 const MINUTES_LIST = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
 
 function toDigits(hours: number, minutes: number): string {
+  // 0:0 — «не задано», показываем пустую маску __:__
+  if (hours === 0 && minutes === 0) return '';
   return hmToTimeDigits(
     String(hours).padStart(2, '0'),
     String(Math.round(minutes / 5) * 5).padStart(2, '0'),
@@ -135,7 +137,11 @@ export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes,
     setOpen(false);
   };
 
-  const handleClear = () => applyHM(0, 0);
+  const handleClear = () => {
+    onChangeHours(0);
+    onChangeMinutes(0);
+    setTimeDigits('');
+  };
 
   const hasValue = hours > 0 || minutes > 0;
 
