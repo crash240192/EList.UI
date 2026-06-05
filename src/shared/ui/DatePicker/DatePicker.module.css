@@ -10,6 +10,7 @@
   border-radius: 9px; padding: 0 4px 0 12px;
   transition: border-color 0.15s;
 }
+.field:focus-within, .fieldOpen { border-color: var(--accent); }
 .fieldError { border-color: var(--danger) !important; }
 
 /* ── Маскированный ввод ── */
@@ -56,9 +57,17 @@
   color: transparent;
   caret-color: transparent;
   border: none;
+  outline: none;
+  box-shadow: none;
   background: transparent;
   cursor: text;
   font-size: 16px; /* предотвращает зум на iOS */
+}
+.maskCapture:focus,
+.maskCapture:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: none;
 }
 
 .clearBtnSlot {
@@ -73,6 +82,11 @@
   padding: 0;
 }
 .clearBtn:hover { background: var(--danger); color: #fff; }
+.clearBtn:focus,
+.clearBtn:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
 
 .calendarBtn {
   flex-shrink: 0; width: 32px; height: 32px;
@@ -82,6 +96,11 @@
   transition: background 0.15s, color 0.15s;
 }
 .calendarBtn:hover { background: var(--surface); color: var(--accent); }
+.calendarBtn:focus,
+.calendarBtn:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
 .fieldOpen .calendarBtn { color: var(--accent); }
 
 .icon { flex-shrink: 0; opacity: 0.85; }

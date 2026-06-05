@@ -549,11 +549,11 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
         />
         <span className={styles.clearBtnSlot}>
           {inputDigits.length > 0 && (
-            <button type="button" className={styles.clearBtn} aria-label="Очистить"
+            <button type="button" tabIndex={-1} className={styles.clearBtn} aria-label="Очистить"
               onClick={handleClear}>×</button>
           )}
         </span>
-        <button type="button" className={styles.calendarBtn} aria-label="Открыть календарь"
+        <button type="button" tabIndex={-1} className={styles.calendarBtn} aria-label="Открыть календарь"
           onClick={() => setOpen(v => !v)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.icon}>
             <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>

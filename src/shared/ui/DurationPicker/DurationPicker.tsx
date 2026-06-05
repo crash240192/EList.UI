@@ -156,11 +156,11 @@ export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes,
         />
         <span className={fieldStyles.clearBtnSlot}>
           {hasValue && (
-            <button type="button" className={fieldStyles.clearBtn} aria-label="Очистить"
+            <button type="button" tabIndex={-1} className={fieldStyles.clearBtn} aria-label="Очистить"
               onClick={handleClear}>×</button>
           )}
         </span>
-        <button type="button" className={fieldStyles.calendarBtn} aria-label="Открыть выбор длительности"
+        <button type="button" tabIndex={-1} className={fieldStyles.calendarBtn} aria-label="Открыть выбор длительности"
           onClick={() => setOpen(v => !v)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={fieldStyles.icon}>
             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
