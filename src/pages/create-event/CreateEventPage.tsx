@@ -355,6 +355,17 @@ export default function CreateEventPage() {
     return 'Дата и время начала не могут быть в прошлом';
   })();
 
+  const endDateTimeFieldError = ((): string | undefined => {
+    if (!hasErr('endDate') && !hasErr('endTime')) return undefined;
+    if (!form.endDate || !form.endTime) return 'Укажите дату и время';
+    return 'Дата и время окончания не могут быть раньше начала';
+  })();
+
+  const endDateTimeToast = ((): string => {
+    if (!form.endDate || !form.endTime) return '⚠️ Укажите дату и время окончания';
+    return '⚠️ Дата и время окончания не могут быть раньше начала';
+  })();
+
   // Проверки тарифа
   // Нет тарифа → только бесплатные, без лимита по людям, только 0+
   const tv = tariffValidator;
@@ -392,6 +403,13 @@ export default function CreateEventPage() {
     if (endMode === 'multiday') {
       if (!form.endDate) errs.add('endDate');
       if (!form.endTime) errs.add('endTime');
+      if (form.startDate && form.startTime && form.endDate && form.endTime) {
+        const start = new Date(`${form.startDate}T${form.startTime}`);
+        const end   = new Date(`${form.endDate}T${form.endTime}`);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end.getTime() < start.getTime()) {
+          errs.add('endDate');
+        }
+      }
     }
     // Проверяем отрицательные значения
     if (form.cost && parseFloat(form.cost) < 0)                                           errs.add('cost');
@@ -465,7 +483,7 @@ export default function CreateEventPage() {
           ? '⚠️ Укажите дату и время начала'
           : '⚠️ Дата и время начала не могут быть в прошлом',
         startTime:'⚠️ Укажите время начала', duration:'⚠️ Укажите длительность',
-        endDate:'⚠️ Укажите дату окончания', endTime:'⚠️ Укажите время окончания',
+        endDate: endDateTimeToast, endTime:'⚠️ Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? '⚠️ Количество участников не может быть отрицательным' : `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
         ageLimit: parseInt(form.ageLimit) < 0 ? '⚠️ Возрастное ограничение не может быть отрицательным' : `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
@@ -559,7 +577,7 @@ export default function CreateEventPage() {
           ? '⚠️ Укажите дату и время начала'
           : '⚠️ Дата и время начала не могут быть в прошлом',
         startTime:'⚠️ Укажите время начала', duration:'⚠️ Укажите длительность',
-        endDate:'⚠️ Укажите дату окончания', endTime:'⚠️ Укажите время окончания',
+        endDate: endDateTimeToast, endTime:'⚠️ Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? '⚠️ Количество участников не может быть отрицательным' : `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
         ageLimit: parseInt(form.ageLimit) < 0 ? '⚠️ Возрастное ограничение не может быть отрицательным' : `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
@@ -748,7 +766,7 @@ export default function CreateEventPage() {
                 </div>
               </Field>
             ) : (
-              <Field label="Окончание *" error={hasErr('endDate') || hasErr('endTime') ? 'Укажите дату и время' : undefined}>
+              <Field label="Окончание *" error={endDateTimeFieldError}>
                 <div ref={endDateRef as any}>
                   <DatePicker
                     withTime
