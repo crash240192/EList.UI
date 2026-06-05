@@ -1,5 +1,11 @@
 /* DurationPicker.module.css */
 
+.fieldFixed {
+  width: 132px;
+  max-width: 132px;
+  flex-shrink: 0;
+}
+
 .modalBackdrop {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.5); z-index: 10000;

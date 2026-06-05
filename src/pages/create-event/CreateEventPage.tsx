@@ -340,6 +340,10 @@ export default function CreateEventPage() {
     if (!form.address.trim() || lat === null || lng === null) errs.add('location');
     if (!form.startDate)   errs.add('startDate');
     if (!form.startTime)   errs.add('startTime');
+    if (!isEditing && form.startDate && form.startTime) {
+      const start = new Date(`${form.startDate}T${form.startTime}`);
+      if (!isNaN(start.getTime()) && start.getTime() < Date.now()) errs.add('startDate');
+    }
     if (endMode === 'duration') {
       const dh = parseInt(durationH) || 0;
       const dm = parseInt(durationM) || 0;
@@ -416,7 +420,10 @@ export default function CreateEventPage() {
     const firstErr = validate();
     if (firstErr) {
       showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
-        location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
+        location:'⚠️ Укажите адрес на карте',
+        startDate: !form.startDate || !form.startTime
+          ? '⚠️ Укажите дату и время начала'
+          : '⚠️ Дата и время начала не могут быть в прошлом',
         startTime:'⚠️ Укажите время начала', duration:'⚠️ Укажите длительность',
         endDate:'⚠️ Укажите дату окончания', endTime:'⚠️ Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
@@ -507,7 +514,10 @@ export default function CreateEventPage() {
     const firstErr = validate();
     if (firstErr) {
       showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
-        location:'⚠️ Укажите адрес на карте', startDate:'⚠️ Укажите дату начала',
+        location:'⚠️ Укажите адрес на карте',
+        startDate: !form.startDate || !form.startTime
+          ? '⚠️ Укажите дату и время начала'
+          : '⚠️ Дата и время начала не могут быть в прошлом',
         startTime:'⚠️ Укажите время начала', duration:'⚠️ Укажите длительность',
         endDate:'⚠️ Укажите дату окончания', endTime:'⚠️ Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,

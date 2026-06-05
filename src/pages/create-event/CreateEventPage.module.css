@@ -447,7 +447,7 @@
 
 /* Двухколоночная строка дата+длительность */
 .dateRow {
-  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;
+  display: grid; grid-template-columns: 1fr 132px; gap: 12px; align-items: start;
 }
 /* Для многодневного — одинаковые колонки */
 .dateRowEqual {

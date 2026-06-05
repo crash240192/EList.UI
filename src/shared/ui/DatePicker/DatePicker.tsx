@@ -294,8 +294,8 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   }, [open]);
 
   const processDateTimeRaw = useCallback(
-    (raw: string) => sanitizeDateTimeDigits(raw, withTime, min, max),
-    [withTime, min, max],
+    (raw: string) => sanitizeDateTimeDigits(raw, withTime),
+    [withTime],
   );
 
   const commitDigits = useCallback((digits: string) => {
@@ -304,11 +304,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       return true;
     }
     const iso = digitsToIso(digits, withTime);
-    if (!iso || !isInRange(iso, withTime, min, max) || !satisfiesMinTime(iso, withTime, min, minTime)) return false;
+    if (!iso) return false;
     onChange(iso);
-    setInputDigits(isoToDigits(iso, withTime));
     return true;
-  }, [withTime, min, max, minTime, onChange]);
+  }, [withTime, onChange]);
 
   const handleDigitsChange = (digits: string) => {
     setInputDigits(digits);
@@ -327,9 +326,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       return;
     }
     if (inputDigits.length === maxDigits(withTime)) {
-      if (!commitDigits(inputDigits)) setInputDigits(isoToDigits(value, withTime));
-    } else {
-      setInputDigits(isoToDigits(value, withTime));
+      commitDigits(inputDigits);
     }
   };
 
@@ -550,10 +547,12 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
           ariaLabel={ariaLabel}
           processRaw={processDateTimeRaw}
         />
-        {inputDigits.length > 0 && (
-          <button type="button" className={styles.clearBtn} aria-label="Очистить"
-            onClick={handleClear}>×</button>
-        )}
+        <span className={styles.clearBtnSlot}>
+          {inputDigits.length > 0 && (
+            <button type="button" className={styles.clearBtn} aria-label="Очистить"
+              onClick={handleClear}>×</button>
+          )}
+        </span>
         <button type="button" className={styles.calendarBtn} aria-label="Открыть календарь"
           onClick={() => setOpen(v => !v)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.icon}>

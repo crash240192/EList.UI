@@ -121,9 +121,7 @@ export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes,
       return;
     }
     if (timeDigits.length === 4) {
-      if (!commitDigits(timeDigits)) setTimeDigits(toDigits(hours, minutes));
-    } else {
-      setTimeDigits(toDigits(hours, minutes));
+      commitDigits(timeDigits);
     }
   };
 
@@ -148,7 +146,7 @@ export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes,
 
   return (
     <>
-      <div className={`${fieldStyles.field} ${open ? fieldStyles.fieldOpen : ''} ${hasError ? fieldStyles.fieldError : ''} ${className ?? ''}`}>
+      <div className={`${fieldStyles.field} ${styles.fieldFixed} ${open ? fieldStyles.fieldOpen : ''} ${hasError ? fieldStyles.fieldError : ''} ${className ?? ''}`}>
         <TimeMaskField
           digits={timeDigits}
           onDigitsChange={handleDigitsChange}
@@ -156,10 +154,12 @@ export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes,
           processRaw={sanitizeTimeDigits}
           ariaLabel="чч:мм"
         />
-        {hasValue && (
-          <button type="button" className={fieldStyles.clearBtn} aria-label="Очистить"
-            onClick={handleClear}>×</button>
-        )}
+        <span className={fieldStyles.clearBtnSlot}>
+          {hasValue && (
+            <button type="button" className={fieldStyles.clearBtn} aria-label="Очистить"
+              onClick={handleClear}>×</button>
+          )}
+        </span>
         <button type="button" className={fieldStyles.calendarBtn} aria-label="Открыть выбор длительности"
           onClick={() => setOpen(v => !v)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={fieldStyles.icon}>

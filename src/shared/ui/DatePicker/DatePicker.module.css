@@ -10,7 +10,6 @@
   border-radius: 9px; padding: 0 4px 0 12px;
   transition: border-color 0.15s;
 }
-.field:focus-within, .fieldOpen { border-color: var(--accent); }
 .fieldError { border-color: var(--danger) !important; }
 
 /* ── Маскированный ввод ── */
@@ -62,6 +61,10 @@
   font-size: 16px; /* предотвращает зум на iOS */
 }
 
+.clearBtnSlot {
+  flex-shrink: 0; width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+}
 .clearBtn {
   flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
   background: var(--border); color: var(--text-secondary);
