@@ -3,9 +3,16 @@
 /* ---- Просмотровая карта (EventPage) ---- */
 
 .mapViewWrap {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
+}
+
+.mapCanvas {
+  flex: 1;
+  min-height: 0;
+  position: relative;
 }
 
 .map {
@@ -14,23 +21,25 @@
   border-radius: inherit;
 }
 
-.yandexMapsLink {
-  position: absolute;
-  left: 8px;
-  bottom: 6px;
-  z-index: 2;
-  font-size: 11px;
-  line-height: 1.3;
-  color: #fff;
-  text-decoration: none;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
-  background: rgba(0, 0, 0, 0.4);
-  padding: 3px 7px;
-  border-radius: 4px;
-  pointer-events: auto;
+.mapActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
-.yandexMapsLink:hover { text-decoration: underline; }
+.mapActionLink {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mapActionLink:hover { text-decoration: underline; }
 
 /* ---- Пикер карты (CreateEventPage) ---- */
 
