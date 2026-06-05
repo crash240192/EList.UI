@@ -72,6 +72,11 @@ export function addCompactZoomControl(map: { controls: { add: (name: string, opt
   map.controls.add('zoomControl', YMAP_ZOOM_CONTROL_LAYOUT);
 }
 
+/** Ссылка «Открыть в Яндекс Картах» с меткой в указанной точке (pt = lon,lat) */
+export function buildYandexMapsPointUrl(lat: number, lng: number, zoom = 16): string {
+  return `https://yandex.ru/maps/?pt=${lng},${lat}&z=${zoom}&l=map`;
+}
+
 export interface GeocodedPlace { lat: number; lng: number; address: string; }
 
 export async function geocodeAddress(query: string): Promise<GeocodedPlace | null> {

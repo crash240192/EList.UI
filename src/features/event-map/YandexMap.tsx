@@ -1,7 +1,7 @@
 // features/event-map/YandexMap.tsx — просмотровая карта
 
 import { useEffect, useRef, useState } from 'react';
-import { loadYandexMaps, addCompactZoomControl } from '@/shared/lib/yandexMaps';
+import { loadYandexMaps, addCompactZoomControl, buildYandexMapsPointUrl } from '@/shared/lib/yandexMaps';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
 
@@ -23,7 +23,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
         controls: [],
         type: 'yandex#map',
         behaviors: draggable ? ['default'] : ['scrollZoom'],
-      });
+      }, { suppressMapOpenBlock: true });
       addCompactZoomControl(map);
       if (!draggable) {
         map.behaviors.disable('drag');
@@ -41,10 +41,21 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
   if (error) return <div className={styles.errorBox}>⚠️ {error}</div>;
 
   return (
-    <div
-      ref={ref}
-      className={styles.map}
-      style={theme === 'dark' ? { filter: 'invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9)' } : undefined}
-    />
+    <div className={styles.mapViewWrap}>
+      <div
+        ref={ref}
+        className={styles.map}
+        style={theme === 'dark' ? { filter: 'invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9)' } : undefined}
+      />
+      <a
+        className={styles.yandexMapsLink}
+        href={buildYandexMapsPointUrl(lat, lng, zoom)}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={e => e.stopPropagation()}
+      >
+        Яндекс Карты
+      </a>
+    </div>
   );
 }
