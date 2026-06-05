@@ -5,14 +5,11 @@ import { createPortal } from 'react-dom';
 import {
   maxDigits,
   sanitizeDateTimeDigits,
-  sanitizeTimeDigits,
   isoToDigits,
   digitsToIso,
-  timeDigitsToHM,
-  hmToTimeDigits,
   isTimeAtOrAfter,
 } from '@/shared/lib/dateTimeMask';
-import { DateTimeMaskField, TimeMaskField } from './MaskField';
+import { DateTimeMaskField } from './MaskField';
 import styles from './DatePicker.module.css';
 
 interface DatePickerProps {
@@ -40,6 +37,78 @@ function nextFiveMinuteSlot(now: Date): { h: string; m: string } {
   };
 }
 const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+
+// Колесо прокрутки для выбора часов/минут в попапе календаря
+function TimeWheel({ items, selected, onSelect, open }: {
+  items: string[];
+  selected: string;
+  onSelect: (v: string) => void;
+  open?: boolean;
+}) {
+  const ITEM_H = 36;
+  const VISIBLE = 5;
+  const listRef = useRef<HTMLDivElement>(null);
+  const settleTimer = useRef<ReturnType<typeof setTimeout>>();
+  const rafRef = useRef<number>(0);
+  const [idx, setIdx] = useState(() => Math.max(0, items.indexOf(selected)));
+
+  useEffect(() => {
+    const i = Math.max(0, items.indexOf(selected));
+    setIdx(i);
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      if (listRef.current) listRef.current.scrollTop = i * ITEM_H;
+    });
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [selected, items, open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const scrollToIdx = useCallback((i: number) => {
+    const clamped = Math.max(0, Math.min(items.length - 1, i));
+    setIdx(clamped);
+    onSelect(items[clamped]);
+    if (listRef.current) {
+      listRef.current.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
+    }
+  }, [items, onSelect]);
+
+  const handleScroll = useCallback(() => {
+    if (!listRef.current) return;
+    clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      if (!listRef.current) return;
+      const i = Math.round(listRef.current.scrollTop / ITEM_H);
+      const clamped = Math.max(0, Math.min(items.length - 1, i));
+      setIdx(clamped);
+      onSelect(items[clamped]);
+      listRef.current.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
+    }, 80);
+  }, [items, onSelect]);
+
+  return (
+    <div className={styles.wheel} style={{ height: ITEM_H * VISIBLE }}>
+      <div className={styles.wheelHighlight} style={{ top: ITEM_H * Math.floor(VISIBLE / 2) }} />
+      <div
+        ref={listRef}
+        className={styles.wheelList}
+        onScroll={handleScroll}
+        style={{ height: ITEM_H * VISIBLE }}
+      >
+        <div style={{ height: ITEM_H * Math.floor(VISIBLE / 2) }} />
+        {items.map((v, i) => (
+          <div key={v}
+            className={`${styles.wheelItem} ${i === idx ? styles.wheelItemActive : ''}`}
+            style={{ height: ITEM_H }}
+            onClick={() => scrollToIdx(i)}>
+            {v}
+          </div>
+        ))}
+        <div style={{ height: ITEM_H * Math.floor(VISIBLE / 2) }} />
+      </div>
+    </div>
+  );
+}
 
 function parseValue(value: string): Date | null {
   if (!value) return null;
@@ -136,26 +205,15 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return nextFiveMinuteSlot(nowDefault).h;
   });
   const [timeM, setTimeM] = useState(() => {
-    if (parsed) return String(parsed.getMinutes()).padStart(2, '0');
+    if (parsed) return String(Math.round(parsed.getMinutes() / 5) * 5).padStart(2, '0');
     return nextFiveMinuteSlot(nowDefault).m;
-  });
-  const [timeDigits, setTimeDigits] = useState(() => {
-    if (parsed) {
-      return hmToTimeDigits(
-        String(parsed.getHours()).padStart(2, '0'),
-        String(parsed.getMinutes()).padStart(2, '0'),
-      );
-    }
-    const slot = nextFiveMinuteSlot(nowDefault);
-    return slot.h + slot.m;
   });
 
   const swipeStartX = useRef<number | null>(null);
 
   const syncTimeFromHM = useCallback((h: string, m: string) => {
     setTimeH(h);
-    setTimeM(m);
-    setTimeDigits(hmToTimeDigits(h, m));
+    setTimeM(String(Math.round(parseInt(m, 10) / 5) * 5).padStart(2, '0'));
   }, []);
 
   useEffect(() => {
@@ -358,31 +416,8 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     ? effectiveMinTimeFor(toISO(selDate, false), min, minTime)
     : undefined;
   const [minH, minM] = (isSameDayAsMin && effectiveMinTime) ? effectiveMinTime.split(':').map(Number) : [0, 0];
-
-  const commitPopupTime = useCallback((digits: string): boolean => {
-    const hm = timeDigitsToHM(digits);
-    if (!hm) return false;
-    if (isSameDayAsMin && !isTimeAtOrAfter(hm.h, hm.m, minH, minM)) return false;
-    syncTimeFromHM(hm.h, hm.m);
-    return true;
-  }, [isSameDayAsMin, minH, minM, syncTimeFromHM]);
-
-  const handleTimeDigitsChange = (digits: string) => {
-    setTimeDigits(digits);
-    if (digits.length === 4) commitPopupTime(digits);
-  };
-
-  const handleTimeDigitsBlur = () => {
-    if (!timeDigits) {
-      syncTimeFromHM(timeH, timeM);
-      return;
-    }
-    if (timeDigits.length === 4) {
-      if (!commitPopupTime(timeDigits)) setTimeDigits(hmToTimeDigits(timeH, timeM));
-    } else {
-      setTimeDigits(hmToTimeDigits(timeH, timeM));
-    }
-  };
+  const availableHours   = HOURS.filter(h => !isSameDayAsMin || parseInt(h) >= minH);
+  const availableMinutes = MINUTES.filter(m2 => !isSameDayAsMin || parseInt(timeH) > minH || parseInt(m2) >= minM);
 
   const minYear = min ? parseInt(min.slice(0, 4)) : 1900;
   const maxYear = max ? parseInt(max.slice(0, 4)) : currentYear + 10;
@@ -482,14 +517,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       {withTime && (
         <div className={styles.timePicker}>
           <span className={styles.timeLabel}>Время</span>
-          <div className={styles.timeMaskWrap}>
-            <TimeMaskField
-              digits={timeDigits}
-              onDigitsChange={handleTimeDigitsChange}
-              onBlur={handleTimeDigitsBlur}
-              processRaw={sanitizeTimeDigits}
-              ariaLabel="чч:мм"
-            />
+          <div className={styles.timeWheels}>
+            <TimeWheel items={availableHours}   selected={timeH} onSelect={setTimeH} open={open} />
+            <span className={styles.timeSep}>:</span>
+            <TimeWheel items={availableMinutes} selected={timeM} onSelect={setTimeM} open={open} />
           </div>
         </div>
       )}
