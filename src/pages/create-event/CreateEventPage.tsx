@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchEventById, fetchEventTypes as fetchAllEventTypes, MOCK_EVENTS, assignEventParameters, fetchEventOrganizators } from '@/entities/event';
+import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, fetchEventOrganizators } from '@/entities/event';
 import type { IEventType } from '@/entities/event';
 import {
   fetchEventTypesByEvent,
@@ -151,10 +151,18 @@ export default function CreateEventPage() {
     }).catch(() => setHasWallet(false));
   }, []);
 
-  // Загрузка всех типов для чипов
+  // Загрузка всех типов и категорий для чипов (цвета категорий)
   useEffect(() => {
     if (USE_MOCK) return;
-    fetchAllEventTypes().then(setAllTypes).catch(() => {});
+    Promise.all([fetchAllEventTypes(), fetchEventCategories()])
+      .then(([types, categories]) => {
+        const catMap = new Map(categories.map(c => [c.id, c]));
+        setAllTypes(types.map(t => ({
+          ...t,
+          eventCategory: catMap.get(t.eventCategoryId) ?? t.eventCategory ?? null,
+        })));
+      })
+      .catch(() => {});
   }, []);
 
   // Загрузка события для редактирования
@@ -312,8 +320,40 @@ export default function CreateEventPage() {
     setCurrentList(prev => prev.filter(x => x.accountId !== accountId));
   };
 
-  // Чипы выбранных типов
-  const selectedTypeObjects = allTypes.filter(t => selectedTypes.includes(t.id));
+  // Чипы выбранных типов (включая все типы выбранных категорий)
+  const selectedTypeObjects = useMemo(() => allTypes.filter(t =>
+    selectedTypes.includes(t.id) || selectedCategories.includes(t.eventCategoryId),
+  ), [allTypes, selectedTypes, selectedCategories]);
+
+  const resolvedTypeIds = useMemo(() => [
+    ...new Set([
+      ...allTypes.filter(t => selectedCategories.includes(t.eventCategoryId)).map(t => t.id),
+      ...selectedTypes,
+    ]),
+  ], [allTypes, selectedCategories, selectedTypes]);
+
+  const getTypeColor = (t: IEventType) => t.eventCategory?.color ?? '#6366f1';
+
+  const handleRemoveTypeChip = (typeId: string) => {
+    if (selectedTypes.includes(typeId)) {
+      setSelectedTypes(p => p.filter(x => x !== typeId));
+      return;
+    }
+    const type = allTypes.find(t => t.id === typeId);
+    if (!type || !selectedCategories.includes(type.eventCategoryId)) return;
+    const catId = type.eventCategoryId;
+    setSelectedCategories(p => p.filter(x => x !== catId));
+    const otherTypeIds = allTypes
+      .filter(t => t.eventCategoryId === catId && t.id !== typeId)
+      .map(t => t.id);
+    setSelectedTypes(p => [...new Set([...p, ...otherTypeIds])]);
+  };
+
+  const startDateTimeFieldError = ((): string | undefined => {
+    if (!hasErr('startDate') && !hasErr('startTime')) return undefined;
+    if (!form.startDate || !form.startTime) return 'Укажите дату и время';
+    return 'Дата и время начала не могут быть в прошлом';
+  })();
 
   // Проверки тарифа
   // Нет тарифа → только бесплатные, без лимита по людям, только 0+
@@ -476,7 +516,7 @@ export default function CreateEventPage() {
             allowedGender:      form.allowedGender || undefined,
             allowUsersToInvite: form.allowUsersToInvite,
           },
-          eventTypes: selectedTypes,
+          eventTypes: resolvedTypeIds,
           organizatorAccountIds: [accountId],
           organizatorOrganizationIds: null,
         };
@@ -609,15 +649,18 @@ export default function CreateEventPage() {
             </button>
             {selectedTypeObjects.length > 0 && (
               <div className={styles.typeChips}>
-                {selectedTypeObjects.map(t => (
-                  <div key={t.id} className={styles.typeChip}>
-                    {t.ico && <img src={t.ico} alt="" width={14} height={14} style={{borderRadius:2}} />}
-                    {t.name}
-                    <button className={styles.typeChipRemove} onClick={() => {
-                      setSelectedTypes(p => p.filter(x => x !== t.id));
-                    }}>×</button>
-                  </div>
-                ))}
+                {selectedTypeObjects.map(t => {
+                  const color = getTypeColor(t);
+                  return (
+                    <div key={t.id} className={styles.typeChip}
+                      style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
+                      {t.ico && <img src={icoToUrl(t.ico) ?? t.ico} alt="" width={14} height={14} style={{ borderRadius: 2, objectFit: 'contain' }} />}
+                      {t.name}
+                      <button className={styles.typeChipRemove} style={{ color }}
+                        onClick={() => handleRemoveTypeChip(t.id)}>×</button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -661,7 +704,7 @@ export default function CreateEventPage() {
           {/* Две колонки */}
           <div className={endMode === 'duration' ? styles.dateRow : styles.dateRowEqual}>
             {/* Левая — всегда дата начала */}
-            <Field label="Начало *" error={hasErr('startDate') || hasErr('startTime') ? 'Укажите дату и время' : undefined}>
+            <Field label="Начало *" error={startDateTimeFieldError}>
               <div ref={startDateRef as any}>
                 <DatePicker
                   withTime
@@ -913,7 +956,7 @@ export default function CreateEventPage() {
             {selectedTypeObjects.length > 0 && (
               <div className={styles.previewTypes}>
                 {selectedTypeObjects.slice(0, 3).map(t => {
-                  const color = t.eventCategory?.color ?? '#6366f1';
+                  const color = getTypeColor(t);
                   return (
                     <span key={t.id} className={styles.previewTypeChip}
                       style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
