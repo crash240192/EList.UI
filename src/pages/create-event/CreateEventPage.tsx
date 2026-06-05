@@ -654,7 +654,7 @@ export default function CreateEventPage() {
                   return (
                     <div key={t.id} className={styles.typeChip}
                       style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
-                      {t.ico && <img src={icoToUrl(t.ico) ?? t.ico} alt="" width={14} height={14} style={{ borderRadius: 2, objectFit: 'contain' }} />}
+                      {t.ico && <img src={icoToUrl(t.ico) ?? t.ico} alt="" width={14} height={14} className="event-type-ico" style={{ borderRadius: 2, objectFit: 'contain' }} />}
                       {t.name}
                       <button className={styles.typeChipRemove} style={{ color }}
                         onClick={() => handleRemoveTypeChip(t.id)}>×</button>

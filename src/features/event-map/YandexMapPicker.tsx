@@ -1,7 +1,7 @@
 // features/event-map/YandexMapPicker.tsx — единое поле адреса + карта с темой
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { loadYandexMaps, geocodeAddress, reverseGeocode } from '@/shared/lib/yandexMaps';
+import { loadYandexMaps, geocodeAddress, reverseGeocode, YMAP_DISABLE_POI_OPTIONS, addCompactZoomControl } from '@/shared/lib/yandexMaps';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
 
@@ -36,9 +36,10 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
 
       const map = new ymaps.Map(ref.current, {
         center, zoom: lat !== null ? 15 : 10,
-        controls: ['zoomControl'],
+        controls: [],
         type: 'yandex#map',
-      });
+      }, YMAP_DISABLE_POI_OPTIONS);
+      addCompactZoomControl(map);
 
       async function placeOrMove(coords: [number, number], doGeocode: boolean) {
         if (markerRef.current) {

@@ -55,6 +55,23 @@ export function loadYandexMaps(): Promise<void> {
   return loadPromise;
 }
 
+/** Клик по POI на подложке не перехватывает размещение точки */
+export const YMAP_DISABLE_POI_OPTIONS = {
+  yandexMapDisablePoiInteractivity: true,
+  suppressMapOpenBlock: true,
+};
+
+/** Компактные кнопки +/- вверху — на низких контейнерах не обрезаются снизу */
+export const YMAP_ZOOM_CONTROL_LAYOUT = {
+  float: 'none',
+  position: { top: 8, right: 8 },
+  size: 'small',
+} as const;
+
+export function addCompactZoomControl(map: { controls: { add: (name: string, opts: object) => void } }): void {
+  map.controls.add('zoomControl', YMAP_ZOOM_CONTROL_LAYOUT);
+}
+
 export interface GeocodedPlace { lat: number; lng: number; address: string; }
 
 export async function geocodeAddress(query: string): Promise<GeocodedPlace | null> {

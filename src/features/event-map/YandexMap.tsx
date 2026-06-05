@@ -1,7 +1,7 @@
 // features/event-map/YandexMap.tsx — просмотровая карта
 
 import { useEffect, useRef, useState } from 'react';
-import { loadYandexMaps } from '@/shared/lib/yandexMaps';
+import { loadYandexMaps, addCompactZoomControl } from '@/shared/lib/yandexMaps';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
 
@@ -20,10 +20,11 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
       const ymaps = (window as any).ymaps;
       const map = new ymaps.Map(ref.current, {
         center: [lat, lng], zoom,
-        controls: ['zoomControl'],
+        controls: [],
         type: 'yandex#map',
         behaviors: draggable ? ['default'] : ['scrollZoom'],
       });
+      addCompactZoomControl(map);
       if (!draggable) {
         map.behaviors.disable('drag');
         map.behaviors.disable('multiTouch');
