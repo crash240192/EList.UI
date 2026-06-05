@@ -1,0 +1,89 @@
+/* DurationPicker.module.css */
+
+.modalBackdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 10000;
+}
+
+.modal {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10001; width: min(220px, 90vw);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+
+.modalTitle {
+  padding: 12px 16px 8px;
+  font-size: 13px; font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.wheelLabels {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 8px 16px 0;
+}
+.wheelLabel {
+  width: 64px; text-align: center;
+  font-size: 11px; font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.wheelLabelGap { width: 16px; }
+
+.wheelsRow {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 6px 16px 12px;
+}
+
+.wheelWrap {
+  position: relative; width: 64px;
+  background: var(--surface-2); border-radius: 10px;
+  border: 1px solid var(--border); overflow: hidden; flex-shrink: 0;
+}
+.wheelHighlight {
+  position: absolute; left: 4px; right: 4;
+  height: 36px; background: rgba(99,102,241,.15);
+  border-radius: 8px; pointer-events: none; z-index: 1;
+}
+.wheelList {
+  height: 100%; overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+.wheelList::-webkit-scrollbar { display: none; }
+.wheelItem {
+  height: 36px; display: flex; align-items: center; justify-content: center;
+  scroll-snap-align: center; cursor: pointer;
+  transition: font-size .1s, color .1s; user-select: none;
+  font-size: 16px; font-weight: 400; color: var(--text-muted);
+}
+.wheelItemActive {
+  font-size: 22px; font-weight: 600; color: var(--text-primary);
+}
+
+.wheelSep {
+  font-size: 22px; font-weight: 600;
+  color: var(--text-secondary); line-height: 1;
+}
+
+.modalFooter {
+  display: flex; gap: 8px;
+  padding: 10px 16px; border-top: 1px solid var(--border);
+}
+.modalCancel {
+  flex: 1; background: none; border: 1px solid var(--border);
+  border-radius: 9px; padding: 9px;
+  font-size: 13px; color: var(--text-secondary); cursor: pointer;
+  font-family: inherit;
+}
+.modalOk {
+  flex: 2; background: var(--accent); border: none;
+  border-radius: 9px; padding: 9px;
+  font-size: 13px; font-weight: 600; color: #fff; cursor: pointer;
+  font-family: inherit;
+}

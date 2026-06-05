@@ -1,7 +1,6 @@
 // pages/create-event/CreateEventPage.tsx
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchEventById, fetchEventTypes as fetchAllEventTypes, MOCK_EVENTS, assignEventParameters, fetchEventOrganizators } from '@/entities/event';
 import type { IEventType } from '@/entities/event';
@@ -24,6 +23,7 @@ import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
+import { DurationPicker } from '@/shared/ui/DurationPicker/DurationPicker';
 import { AlbumSection } from './AlbumSection';
 import type { IAlbum } from '@/entities/media/albumApi';
 import { assignAlbumToEvent } from '@/entities/media/albumApi';
@@ -671,14 +671,12 @@ export default function CreateEventPage() {
             {/* Правая — длительность или дата окончания */}
             {endMode === 'duration' ? (
               <Field label="Длительность">
-                <div className={styles.durationWheelWrap}>
-                  <DurationPicker
-                    hours={parseInt(durationH) || 0}
-                    minutes={parseInt(durationM) || 0}
-                    onChangeHours={h => setDurationH(String(h))}
-                    onChangeMinutes={m => setDurationM(String(m))}
-                  />
-                </div>
+                <DurationPicker
+                  hours={parseInt(durationH) || 0}
+                  minutes={parseInt(durationM) || 0}
+                  onChangeHours={h => setDurationH(String(h))}
+                  onChangeMinutes={m => setDurationM(String(m))}
+                />
               </Field>
             ) : (
               <Field label="Окончание *" error={hasErr('endDate') || hasErr('endTime') ? 'Укажите дату и время' : undefined}>
@@ -1130,164 +1128,6 @@ function Toggle({ label, checked, locked, onChange, lockedHint }: {
         <div className={styles.switchDot} />
       </div>
       {locked && lockedHint && <span className={styles.toggleHint}>{lockedHint}</span>}
-    </div>
-  );
-}
-
-// ── Пикер длительности: кнопка → модальные колёса ─────────────────────────
-const HOURS_LIST   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-const MINUTES_LIST = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
-
-function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes }: {
-  hours: number; minutes: number;
-  onChangeHours: (h: number) => void;
-  onChangeMinutes: (m: number) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [draftH, setDraftH] = useState(hours);
-  const [draftM, setDraftM] = useState(Math.round(minutes / 5) * 5);
-
-  const handleOpen = () => {
-    setDraftH(hours);
-    setDraftM(Math.round(minutes / 5) * 5);
-    setOpen(true);
-  };
-
-  const handleConfirm = () => {
-    onChangeHours(draftH);
-    onChangeMinutes(draftM);
-    setOpen(false);
-  };
-
-  const hh = String(hours).padStart(2, '0');
-  const mm = String(Math.round(minutes / 5) * 5).padStart(2, '0');
-
-  return (
-    <>
-      {/* Кнопка-поле — одна строка в стиле DatePicker */}
-      <button type="button" onClick={handleOpen} style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        width: '100%', padding: '8px 12px',
-        background: 'var(--surface-2)', border: '1px solid var(--border)',
-        borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit',
-        fontSize: 13, color: (hours === 0 && minutes === 0) ? 'var(--text-muted)' : 'var(--text-primary)',
-        transition: 'border-color .15s',
-      }}
-        onMouseOver={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
-        onMouseOut={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-        {(hours === 0 && minutes === 0)
-          ? 'Выберите длительность'
-          : `${hh} ч ${mm} мин`}
-      </button>
-
-      {/* Модальный пикер */}
-      {open && createPortal(
-        <>
-          <div onClick={() => setOpen(false)} style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000,
-          }} />
-          <div style={{
-            position: 'fixed', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 10001, width: 'min(220px, 90vw)',
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 16, overflow: 'hidden',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
-          }}>
-            <div style={{ padding: '12px 16px 8px', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
-              Длительность
-            </div>
-            {/* Лейблы над колёсами */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 16px 0' }}>
-              <div style={{ width: 64, textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Ч</div>
-              <div style={{ width: 16 }} />
-              <div style={{ width: 64, textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>М</div>
-            </div>
-            {/* Колёса */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '6px 16px 12px' }}>
-              <DurationWheel items={HOURS_LIST}   selected={String(draftH).padStart(2,'0')} onSelect={v => setDraftH(parseInt(v,10))} />
-              <span style={{ fontSize: 22, fontWeight: 600, color: 'var(--text-secondary)', lineHeight: 1 }}>:</span>
-              <DurationWheel items={MINUTES_LIST} selected={String(draftM).padStart(2,'0')} onSelect={v => setDraftM(parseInt(v,10))} />
-            </div>
-            <div style={{ display: 'flex', gap: 8, padding: '10px 16px', borderTop: '1px solid var(--border)' }}>
-              <button type="button" onClick={() => setOpen(false)} style={{
-                flex: 1, background: 'none', border: '1px solid var(--border)',
-                borderRadius: 9, padding: '9px', fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer',
-              }}>Отмена</button>
-              <button type="button" onClick={handleConfirm} style={{
-                flex: 2, background: 'var(--accent)', border: 'none',
-                borderRadius: 9, padding: '9px', fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer',
-              }}>Выбрать</button>
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
-    </>
-  );
-}
-
-function DurationWheel({ items, selected, onSelect }: {
-  items: string[];
-  selected: string;
-  onSelect: (v: string) => void;
-}) {
-  const ITEM_H  = 36;
-  const VISIBLE = 5;
-  const listRef = useRef<HTMLDivElement>(null);
-  const [idx, setIdx] = useState(() => Math.max(0, items.indexOf(selected)));
-
-  useEffect(() => {
-    const i = Math.max(0, items.indexOf(selected));
-    setIdx(i);
-    if (listRef.current) listRef.current.scrollTop = i * ITEM_H;
-  }, [selected, items]);
-
-  const handleScroll = () => {
-    if (!listRef.current) return;
-    const i = Math.round(listRef.current.scrollTop / ITEM_H);
-    const clamped = Math.min(i, items.length - 1);
-    if (clamped !== idx) { setIdx(clamped); onSelect(items[clamped]); }
-  };
-
-  const scrollToIdx = (i: number) => {
-    const clamped = Math.max(0, Math.min(items.length - 1, i));
-    setIdx(clamped);
-    onSelect(items[clamped]);
-    listRef.current?.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
-  };
-
-  return (
-    <div style={{
-      position: 'relative', width: 64, height: ITEM_H * VISIBLE,
-      background: 'var(--surface-2)', borderRadius: 10,
-      border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0,
-    }}>
-      <div style={{
-        position: 'absolute', left: 4, right: 4,
-        top: ITEM_H * Math.floor(VISIBLE / 2),
-        height: ITEM_H, background: 'rgba(99,102,241,.15)',
-        borderRadius: 8, pointerEvents: 'none', zIndex: 1,
-      }} />
-      <div ref={listRef} onScroll={handleScroll} style={{
-        height: '100%', overflowY: 'scroll',
-        scrollSnapType: 'y mandatory', scrollbarWidth: 'none',
-      }}>
-        <div style={{ height: ITEM_H * Math.floor(VISIBLE / 2) }} />
-        {items.map((v, i) => (
-          <div key={v} onClick={() => scrollToIdx(i)} style={{
-            height: ITEM_H, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: i === idx ? 22 : 16, fontWeight: i === idx ? 600 : 400,
-            color: i === idx ? 'var(--text-primary)' : 'var(--text-muted)',
-            scrollSnapAlign: 'center', cursor: 'pointer',
-            transition: 'font-size .1s, color .1s', userSelect: 'none',
-          }}>{v}</div>
-        ))}
-        <div style={{ height: ITEM_H * Math.floor(VISIBLE / 2) }} />
-      </div>
     </div>
   );
 }

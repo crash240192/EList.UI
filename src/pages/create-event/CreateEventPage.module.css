@@ -455,10 +455,6 @@
 }
 @media (max-width: 480px) { .dateRowEqual { grid-template-columns: 1fr; } }
 
-/* Обёртка колеса длительности — выравнивание по высоте поля */
-.durationWheelWrap {
-  display: flex; align-items: center; padding: 4px 0;
-}
 .fieldHintErr { font-size: 11px; color: var(--danger); margin-top: 3px; }
 
 .previewTypes { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
