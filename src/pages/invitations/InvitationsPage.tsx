@@ -11,6 +11,8 @@ import {
 import { isInvitationUnviewed } from '@/entities/invitation/invitationViewed';
 import { useInvitationsStore } from '@/features/invitations/invitationsStore';
 import { apiClient } from '@/shared/api/client';
+import { isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
+import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventModal } from '@/pages/home/EventModal';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
@@ -79,7 +81,12 @@ export default function InvitationsPage() {
       setPreviewInv(null);
       void refreshNotViewedCount();
       navigate(`/event/${inv.eventId}`);
-    } catch { /* ignore */ }
+    } catch (e) {
+      // AccessError / EventAccessDenied: apiClient не показывает тост (для inline UI на других страницах)
+      if (isApiError(e) && isAccessDeniedError(e)) {
+        useToastStore.getState().add(e.serverMessage || e.message);
+      }
+    }
   };
 
   const markAllViewed = async () => {
