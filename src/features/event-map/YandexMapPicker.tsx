@@ -126,6 +126,7 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
           placeholder="Введите адрес и нажмите Enter или кликните по карте"
           value={address}
           onChange={e => onAddressChange(e.target.value)}
+          onFocus={e => e.target.select()}
           onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleGeocode())}
         />
         <button className={styles.searchBtn} type="button" onClick={handleGeocode} disabled={geocoding}>
