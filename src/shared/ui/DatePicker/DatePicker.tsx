@@ -2,6 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  maxDigits,
+  sanitizeDateTimeDigits,
+  sanitizeTimeDigits,
+  formatMaskedFromDigits,
+  formatTimeMasked,
+  timeDigitsToHM,
+  hmToTimeDigits,
+  isTimeAtOrAfter,
+} from '@/shared/lib/dateTimeMask';
 import styles from './DatePicker.module.css';
 
 interface DatePickerProps {
@@ -20,9 +30,6 @@ interface DatePickerProps {
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
                  'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
-const DATE_DIGITS = 8;
-const TIME_DIGITS = 4;
-
 function nextFiveMinuteSlot(now: Date): { h: string; m: string } {
   const totalMins = now.getHours() * 60 + now.getMinutes() + 1;
   const rounded = Math.ceil(totalMins / 5) * 5;
@@ -32,8 +39,6 @@ function nextFiveMinuteSlot(now: Date): { h: string; m: string } {
   };
 }
 const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
 
 function parseValue(value: string): Date | null {
   if (!value) return null;
@@ -50,28 +55,6 @@ function toISO(date: Date, withTime: boolean): string {
   const hh = pad(date.getHours());
   const mi = pad(date.getMinutes());
   return `${yy}-${mm}-${dd}T${hh}:${mi}:00`;
-}
-
-function maxDigits(withTime: boolean): number {
-  return withTime ? DATE_DIGITS + TIME_DIGITS : DATE_DIGITS;
-}
-
-function digitsOnly(raw: string, withTime: boolean): string {
-  return raw.replace(/\D/g, '').slice(0, maxDigits(withTime));
-}
-
-function formatMaskedFromDigits(digits: string, withTime: boolean): string {
-  const datePart = digits.slice(0, DATE_DIGITS);
-  let out = '';
-  if (datePart.length > 0) out += datePart.slice(0, 2);
-  if (datePart.length > 2) out += '.' + datePart.slice(2, 4);
-  if (datePart.length > 4) out += '.' + datePart.slice(4, 8);
-  if (withTime && digits.length > DATE_DIGITS) {
-    const timePart = digits.slice(DATE_DIGITS, DATE_DIGITS + TIME_DIGITS);
-    out += ' ' + timePart.slice(0, 2);
-    if (timePart.length > 2) out += ':' + timePart.slice(2, 4);
-  }
-  return out;
 }
 
 function isoToMasked(iso: string, withTime: boolean): string {
@@ -103,6 +86,30 @@ function maskedToIso(masked: string, withTime: boolean): string | null {
     return toISO(d, true);
   }
   return toISO(d, false);
+}
+
+function effectiveMinTimeFor(isoDate: string, min?: string, minTime?: string): string | undefined {
+  if (!min) return minTime;
+  if (isoDate !== min.slice(0, 10)) return minTime;
+  if (minTime) return minTime;
+  const today = new Date();
+  const todayIso = toISO(today, false);
+  if (min === todayIso) {
+    return `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+  }
+  return undefined;
+}
+
+function satisfiesMinTime(iso: string, withTime: boolean, min?: string, minTime?: string): boolean {
+  if (!withTime || !min) return true;
+  const d = parseValue(iso);
+  if (!d) return false;
+  const eff = effectiveMinTimeFor(iso.slice(0, 10), min, minTime);
+  if (!eff) return true;
+  const [minH, minM] = eff.split(':').map(Number);
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return isTimeAtOrAfter(h, m, minH, minM);
 }
 
 function isInRange(iso: string, withTime: boolean, min?: string, max?: string): boolean {
@@ -139,76 +146,6 @@ function defaultPlaceholder(withTime: boolean): string {
   return withTime ? 'дд.мм.гггг чч:мм' : 'дд.мм.гггг';
 }
 
-// Колесо прокрутки для выбора часов/минут
-function TimeWheel({ items, selected, onSelect, open }: {
-  items: string[];
-  selected: string;
-  onSelect: (v: string) => void;
-  open?: boolean;
-}) {
-  const ITEM_H = 36;
-  const VISIBLE = 5;
-  const listRef = useRef<HTMLDivElement>(null);
-  const settleTimer = useRef<ReturnType<typeof setTimeout>>();
-  const rafRef = useRef<number>(0);
-  const [idx, setIdx] = useState(() => Math.max(0, items.indexOf(selected)));
-
-  useEffect(() => {
-    const i = Math.max(0, items.indexOf(selected));
-    setIdx(i);
-    cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      if (listRef.current) listRef.current.scrollTop = i * ITEM_H;
-    });
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [selected, items, open]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const scrollToIdx = useCallback((i: number) => {
-    const clamped = Math.max(0, Math.min(items.length - 1, i));
-    setIdx(clamped);
-    onSelect(items[clamped]);
-    if (listRef.current) {
-      listRef.current.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
-    }
-  }, [items, onSelect]);
-
-  const handleScroll = useCallback(() => {
-    if (!listRef.current) return;
-    clearTimeout(settleTimer.current);
-    settleTimer.current = setTimeout(() => {
-      if (!listRef.current) return;
-      const i = Math.round(listRef.current.scrollTop / ITEM_H);
-      const clamped = Math.max(0, Math.min(items.length - 1, i));
-      setIdx(clamped);
-      onSelect(items[clamped]);
-      listRef.current.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
-    }, 80);
-  }, [items, onSelect]);
-
-  return (
-    <div className={styles.wheel} style={{ height: ITEM_H * VISIBLE }}>
-      <div className={styles.wheelHighlight} style={{ top: ITEM_H * Math.floor(VISIBLE / 2) }} />
-      <div
-        ref={listRef}
-        className={styles.wheelList}
-        onScroll={handleScroll}
-        style={{ height: ITEM_H * VISIBLE }}
-      >
-        <div style={{ height: ITEM_H * Math.floor(VISIBLE / 2) }} />
-        {items.map((v, i) => (
-          <div key={v}
-            className={`${styles.wheelItem} ${i === idx ? styles.wheelItemActive : ''}`}
-            style={{ height: ITEM_H }}
-            onClick={() => scrollToIdx(i)}>
-            {v}
-          </div>
-        ))}
-        <div style={{ height: ITEM_H * Math.floor(VISIBLE / 2) }} />
-      </div>
-    </div>
-  );
-}
-
 export function DatePicker({ value, onChange, withTime = false, placeholder, min, max, minTime, className, hasError }: DatePickerProps) {
   const [open, setOpen]       = useState(false);
   const wrapRef               = useRef<HTMLDivElement>(null);
@@ -231,11 +168,26 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     return nextFiveMinuteSlot(nowDefault).h;
   });
   const [timeM, setTimeM] = useState(() => {
-    if (parsed) return String(Math.round(parsed.getMinutes() / 5) * 5 % 60).padStart(2, '0');
+    if (parsed) return String(parsed.getMinutes()).padStart(2, '0');
     return nextFiveMinuteSlot(nowDefault).m;
+  });
+  const [timeInputText, setTimeInputText] = useState(() => {
+    if (parsed) {
+      return formatTimeMasked(
+        `${String(parsed.getHours()).padStart(2, '0')}${String(parsed.getMinutes()).padStart(2, '0')}`,
+      );
+    }
+    const slot = nextFiveMinuteSlot(nowDefault);
+    return formatTimeMasked(slot.h + slot.m);
   });
 
   const swipeStartX = useRef<number | null>(null);
+
+  const syncTimeFromHM = useCallback((h: string, m: string) => {
+    setTimeH(h);
+    setTimeM(m);
+    setTimeInputText(formatTimeMasked(hmToTimeDigits(h, m)));
+  }, []);
 
   useEffect(() => {
     setInputText(isoToMasked(value, withTime));
@@ -244,10 +196,11 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     if (d) {
       setViewYear(d.getFullYear());
       setViewMonth(d.getMonth());
-      setTimeH(String(d.getHours()).padStart(2, '0'));
-      setTimeM(String(Math.round(d.getMinutes() / 5) * 5).padStart(2, '0'));
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      syncTimeFromHM(h, m);
     }
-  }, [value, withTime]);
+  }, [value, withTime, syncTimeFromHM]);
 
   useEffect(() => {
     const fn = (e: MouseEvent) => {
@@ -319,14 +272,14 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       return true;
     }
     const iso = maskedToIso(masked, withTime);
-    if (!iso || !isInRange(iso, withTime, min, max)) return false;
+    if (!iso || !isInRange(iso, withTime, min, max) || !satisfiesMinTime(iso, withTime, min, minTime)) return false;
     onChange(iso);
     setInputText(isoToMasked(iso, withTime));
     return true;
-  }, [withTime, min, max, onChange]);
+  }, [withTime, min, max, minTime, onChange]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = digitsOnly(e.target.value, withTime);
+    const digits = sanitizeDateTimeDigits(e.target.value, withTime, min, max);
     const masked = formatMaskedFromDigits(digits, withTime);
     setInputText(masked);
     if (digits.length === 0) {
@@ -379,6 +332,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     const d = new Date(base);
     d.setHours(parseInt(timeH, 10) || 0, parseInt(timeM, 10) || 0, 0, 0);
     const iso = toISO(d, true);
+    if (!isInRange(iso, true, min, max) || !satisfiesMinTime(iso, true, min, minTime)) return;
     onChange(iso);
     setSelDate(d);
     setInputText(isoToMasked(iso, true));
@@ -426,15 +380,36 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const isSameDayAsMin = selDate && min
     ? (() => { const [y,m,d] = min.split('-').map(Number); return selDate.getFullYear()===y && selDate.getMonth()===m-1 && selDate.getDate()===d; })()
     : false;
-  const todayIso = toISO(today, false);
-  const effectiveMinTime = minTime ?? (
-    isSameDayAsMin && min === todayIso
-      ? `${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')}`
-      : undefined
-  );
+  const effectiveMinTime = selDate && min
+    ? effectiveMinTimeFor(toISO(selDate, false), min, minTime)
+    : undefined;
   const [minH, minM] = (isSameDayAsMin && effectiveMinTime) ? effectiveMinTime.split(':').map(Number) : [0, 0];
-  const availableHours   = HOURS.filter(h => !isSameDayAsMin || parseInt(h) >= minH);
-  const availableMinutes = MINUTES.filter(m2 => !isSameDayAsMin || parseInt(timeH) > minH || parseInt(m2) >= minM);
+
+  const commitPopupTime = useCallback((digits: string): boolean => {
+    const hm = timeDigitsToHM(digits);
+    if (!hm) return false;
+    if (isSameDayAsMin && !isTimeAtOrAfter(hm.h, hm.m, minH, minM)) return false;
+    syncTimeFromHM(hm.h, hm.m);
+    return true;
+  }, [isSameDayAsMin, minH, minM, syncTimeFromHM]);
+
+  const handleTimeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = sanitizeTimeDigits(e.target.value);
+    setTimeInputText(formatTimeMasked(digits));
+    if (digits.length === 4) commitPopupTime(digits);
+  };
+
+  const handleTimeInputBlur = () => {
+    const digits = sanitizeTimeDigits(timeInputText);
+    if (!digits) {
+      syncTimeFromHM(timeH, timeM);
+      return;
+    }
+    if (!commitPopupTime(digits)) {
+      setTimeInputText(formatTimeMasked(hmToTimeDigits(timeH, timeM)));
+    }
+  };
+
   const minYear = min ? parseInt(min.slice(0, 4)) : 1900;
   const maxYear = max ? parseInt(max.slice(0, 4)) : currentYear + 10;
   const yearRange: number[] = [];
@@ -533,11 +508,16 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       {withTime && (
         <div className={styles.timePicker}>
           <span className={styles.timeLabel}>Время</span>
-          <div className={styles.timeWheels}>
-            <TimeWheel items={availableHours}   selected={timeH} onSelect={setTimeH} open={open} />
-            <span className={styles.timeSep}>:</span>
-            <TimeWheel items={availableMinutes} selected={timeM} onSelect={setTimeM} open={open} />
-          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            className={styles.timeInputMasked}
+            value={timeInputText}
+            placeholder="чч:мм"
+            onChange={handleTimeInputChange}
+            onBlur={handleTimeInputBlur}
+          />
         </div>
       )}
 
