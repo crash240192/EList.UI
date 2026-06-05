@@ -1,6 +1,7 @@
 // features/notifications/NotificationBell.tsx
 
 import { useEffect, useRef } from 'react';
+import { ensureNotificationSoundUnlocked } from '@/shared/lib/playNotificationPop';
 import { useNotificationsStore } from './notificationsStore';
 import { useDebouncedWsStatus } from './useDebouncedWsStatus';
 import { useNotificationsWebSocket } from './useNotificationsWebSocket';
@@ -9,6 +10,7 @@ import styles from './NotificationBell.module.css';
 
 export function NotificationBell() {
   useNotificationsWebSocket(true);
+  ensureNotificationSoundUnlocked();
 
   const panelOpen = useNotificationsStore(s => s.panelOpen);
   const togglePanel = useNotificationsStore(s => s.togglePanel);

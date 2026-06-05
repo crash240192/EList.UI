@@ -5,6 +5,7 @@ import { useAuthStore } from '@/app/store';
 import { parseWsNotificationMessage } from '@/entities/notification/parseNotification';
 import { isNewInvitationNotification } from '@/entities/notification/notificationNavigation';
 import { buildNotificationsWebSocketUrl } from '@/shared/lib/notificationsWsUrl';
+import { playNotificationPop } from '@/shared/lib/playNotificationPop';
 import { useInvitationsStore } from '@/features/invitations/invitationsStore';
 import { useNotificationsStore } from './notificationsStore';
 
@@ -142,6 +143,7 @@ export function useNotificationsWebSocket(enabled: boolean): void {
         const n = parseWsNotificationMessage(ev.data);
         if (!n) return;
         pushNotification(n);
+        playNotificationPop();
         if (isNewInvitationNotification(n.type)) {
           void useInvitationsStore.getState().refreshNotViewedCount();
         }
