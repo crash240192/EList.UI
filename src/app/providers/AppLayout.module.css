@@ -19,13 +19,13 @@
   --transition:     0.22s ease;
 }
 :global(.light-theme) {
-  --bg:             #f0f0f0;
-  --surface:        #ffffff;
-  --surface-2:      #f8f8f8;
-  --border:         #e0e0e0;
-  --text-primary:   #111827;
-  --text-secondary: #6b7280;
-  --text-muted:     #9ca3af;
+  --bg:             #dfe3ea;
+  --surface:        #f0f2f6;
+  --surface-2:      #e6e9f0;
+  --border:         #ccd2dc;
+  --text-primary:   #1a1f2e;
+  --text-secondary: #5c6370;
+  --text-muted:     #8a919d;
 }
 
 /* ---- Root ---- */
