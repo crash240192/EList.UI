@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "flatpickr": "^4.6.13",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.1",
@@ -19,6 +20,7 @@
   "devDependencies": {
     "@types/flatpickr": "^3.0.2",
     "@types/node": "^25.6.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
