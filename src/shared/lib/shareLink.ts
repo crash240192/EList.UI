@@ -12,24 +12,19 @@ export function buildEventShareUrl(eventId: string): string {
   return `${window.location.origin}/event/${eventId}`;
 }
 
-/** Web Share API на мобиле, иначе копирование ссылки в буфер */
-export async function shareLink({ title, text, url }: ShareLinkOptions): Promise<ShareLinkResult> {
-  if (navigator.share) {
-    try {
-      await navigator.share({ title, text, url });
-      return 'shared';
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') throw err;
-    }
-  }
+/** Телефоны/планшеты — нативный share; десктоп — копирование в буфер */
+function prefersNativeShare(): boolean {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
 
+async function copyToClipboard(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(url);
-    return 'copied';
+    await navigator.clipboard.writeText(text);
+    return;
   }
 
   const textarea = document.createElement('textarea');
-  textarea.value = url;
+  textarea.value = text;
   textarea.setAttribute('readonly', '');
   textarea.style.position = 'fixed';
   textarea.style.left = '-9999px';
@@ -38,6 +33,46 @@ export async function shareLink({ title, text, url }: ShareLinkOptions): Promise
   const ok = document.execCommand('copy');
   document.body.removeChild(textarea);
   if (!ok) throw new Error('copy failed');
+}
 
+function canShareData(data: ShareData): boolean {
+  if (!navigator.canShare) return true;
+  try {
+    return navigator.canShare(data);
+  } catch {
+    return false;
+  }
+}
+
+async function tryNativeShare({ title, text, url }: ShareLinkOptions): Promise<boolean> {
+  if (!navigator.share) return false;
+
+  const payloads: ShareData[] = [
+    { title, text, url },
+    { title, url },
+    { text: text || title, url },
+    { url },
+  ];
+
+  for (const data of payloads) {
+    if (!canShareData(data)) continue;
+    try {
+      await navigator.share(data);
+      return true;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    }
+  }
+
+  return false;
+}
+
+export async function shareLink(options: ShareLinkOptions): Promise<ShareLinkResult> {
+  if (prefersNativeShare()) {
+    const shared = await tryNativeShare(options);
+    if (shared) return 'shared';
+  }
+
+  await copyToClipboard(options.url);
   return 'copied';
 }
