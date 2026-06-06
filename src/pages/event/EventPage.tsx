@@ -8,7 +8,7 @@ import {
   fetchEventParticipants, fetchEventParameters,
   fetchEventOrganizators, MOCK_EVENTS,
 } from '@/entities/event';
-import { useFavoritesStore } from '@/app/store';
+import { useFavoritesStore, useToastStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
@@ -26,6 +26,7 @@ import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { buildEventShareUrl, shareLink } from '@/shared/lib/shareLink';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -175,6 +176,28 @@ export default function EventPage() {
     } finally { setActionLoading(false); }
   }, [id]);
 
+  const handleShare = useCallback(async () => {
+    if (!event?.id) return;
+
+    const url = buildEventShareUrl(event.id);
+    const shareText = [
+      event.name,
+      event.address,
+      formatDateFull(event.startTime, event.endTime),
+    ].filter(Boolean).join(' · ');
+
+    try {
+      const result = await shareLink({ title: event.name, text: shareText, url });
+      useToastStore.getState().add(
+        result === 'shared' ? 'Ссылка отправлена' : 'Ссылка скопирована в буфер обмена',
+        'success',
+      );
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      useToastStore.getState().add('Не удалось поделиться ссылкой', 'error');
+    }
+  }, [event]);
+
   if (loading) return <PageSkeleton />;
   if (pageAccessDenied) {
     return (
@@ -258,7 +281,9 @@ export default function EventPage() {
                 onClick={() => toggleFav(event.id)} aria-label="В избранное">
                 <HeartIcon filled={isFavorite(event.id)} />
               </button>
-              <button className={styles.heroBtn} aria-label="Поделиться"><ShareIcon /></button>
+              <button className={styles.heroBtn} onClick={() => void handleShare()} aria-label="Поделиться" title="Поделиться">
+                <ShareIcon />
+              </button>
               {/* Мобильное меню управления — только для организатора */}
               {isOrganizer && (
                 <div className={styles.mobileMenuWrap}>
