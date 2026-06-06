@@ -205,7 +205,18 @@
 .detailVal { font-size:12px; font-weight:500; color:var(--text-primary); margin-top:2px; }
 
 /* Map */
-.mapBlock { border-radius:10px; overflow:hidden; border:1px solid var(--border); height:312px; cursor:pointer; }
+.mapBlock { position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--border); height:312px; }
+.mapExpandBtn {
+  position:absolute; bottom:10px; left:10px; z-index:2;
+  display:flex; align-items:center; gap:5px;
+  padding:6px 10px; border-radius:8px;
+  border:1px solid var(--border); background:var(--surface);
+  color:var(--text-secondary); font-size:11px; font-weight:500;
+  cursor:pointer; font-family:inherit;
+  box-shadow:0 2px 8px rgba(0,0,0,0.12);
+  transition:background .15s, color .15s;
+}
+.mapExpandBtn:hover { background:var(--surface-2); color:var(--text-primary); }
 
 /* Discussion stub */
 .discussionStub { border:1px dashed var(--border); border-radius:10px; padding:20px; text-align:center; color:var(--text-muted); font-size:12px; line-height:1.6; }
