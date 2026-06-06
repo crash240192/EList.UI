@@ -4,6 +4,7 @@ import React, { createContext, useContext } from 'react';
 import type { IEvent } from '../types';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import styles from './EventCard.module.css';
 
 interface EventCardContextValue { event: IEvent; }
@@ -20,15 +21,6 @@ function formatDate(iso: string) {
 function formatPrice(cost: number) {
   return cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`;
 }
-function categoryGradient(p?: string | null) {
-  if (!p) return 'linear-gradient(135deg,#6366f1,#8b5cf6)';
-  if (p.startsWith('music'))  return 'linear-gradient(135deg,#6366f1,#8b5cf6)';
-  if (p.startsWith('sport'))  return 'linear-gradient(135deg,#10b981,#3b82f6)';
-  if (p.startsWith('art'))    return 'linear-gradient(135deg,#f59e0b,#ef4444)';
-  if (p.startsWith('food'))   return 'linear-gradient(135deg,#f97316,#fbbf24)';
-  return 'linear-gradient(135deg,#6366f1,#8b5cf6)';
-}
-
 // ---- Root ----
 interface EventCardProps { event: IEvent; onClick?: (e: IEvent) => void; className?: string; children: React.ReactNode; }
 function EventCard({ event, onClick, className = '', children }: EventCardProps) {
@@ -49,7 +41,7 @@ function EventCard({ event, onClick, className = '', children }: EventCardProps)
 // ---- Cover ----
 function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
   const { event } = useEventCard();
-  const gradient = fallbackGradient ?? categoryGradient(event.eventType?.eventCategory?.namePath);
+  const gradient = fallbackGradient ?? getEventCoverBackground(event);
   const hasCover = !!(event.coverImageId || event.coverUrl);
 
   return (

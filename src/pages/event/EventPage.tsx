@@ -24,6 +24,7 @@ import { EventAlbums } from './EventAlbums';
 import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
+import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -238,7 +239,7 @@ export default function EventPage() {
 
         {/* ── Hero ── */}
         <div className={styles.hero} style={!(event.coverImageId || event.coverUrl) ? {
-          background: 'linear-gradient(135deg, #4338ca 0%, #7c3aed 100%)',
+          background: getEventCoverBackground(event),
         } : undefined}>
           {event.coverImageId ? (
             <AuthImage fileId={event.coverImageId} fullSize imageFit="cover" alt={event.name} className={styles.heroImg}

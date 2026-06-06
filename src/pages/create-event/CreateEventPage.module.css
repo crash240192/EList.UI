@@ -255,7 +255,10 @@
   height: 110px; background: var(--surface-2);
   display: flex; align-items: center; justify-content: center;
 }
-.previewCoverEmpty { font-size: 11px; color: var(--text-muted); }
+.previewCoverEmpty {
+  font-size: 11px; color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
 .previewBody { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
 .previewName { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .previewBadges { display: flex; gap: 5px; flex-wrap: wrap; }
