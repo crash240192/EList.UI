@@ -12,17 +12,36 @@ export function buildEventShareUrl(eventId: string): string {
   return `${window.location.origin}/event/${eventId}`;
 }
 
-function buildSharePayloads({ title, text, url }: ShareLinkOptions): ShareData[] {
-  const payloads: ShareData[] = [{ url }];
-
-  if (title) payloads.push({ title, url });
-  if (text) payloads.push({ text, url });
-  if (title && text) payloads.push({ title, text, url });
-
-  return payloads;
+export function buildUserProfileUrl(accountId: string): string {
+  return `${window.location.origin}/user/${accountId}`;
 }
 
-async function copyToClipboard(text: string): Promise<void> {
+function isAndroid(): boolean {
+  return /Android/i.test(navigator.userAgent);
+}
+
+function buildSharePayloads({ title, text, url }: ShareLinkOptions): ShareData[] {
+  const line = [title, text].filter(Boolean).join('\n');
+  const textWithUrl = line ? `${line}\n${url}` : url;
+
+  if (isAndroid()) {
+    return [
+      { text: textWithUrl },
+      { url },
+      { title, url },
+      { title, text, url },
+    ];
+  }
+
+  return [
+    { url },
+    { title, url },
+    { text: textWithUrl },
+    { title, text, url },
+  ];
+}
+
+export async function copyText(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
     return;
@@ -40,42 +59,71 @@ async function copyToClipboard(text: string): Promise<void> {
   if (!ok) throw new Error('copy failed');
 }
 
-/**
- * navigator.share нужно вызвать синхронно из обработчика клика (user activation).
- * На Android цепочка async/await до вызова share часто приводит к fallback в буфер.
- */
+async function copyToClipboard(text: string): Promise<void> {
+  return copyText(text);
+}
+
+/** Первый вызов share — синхронно из обработчика клика (user activation). */
 function startNativeShare(options: ShareLinkOptions): Promise<void> | null {
   if (typeof navigator.share !== 'function') return null;
+  if (!window.isSecureContext) return null;
 
   const payloads = buildSharePayloads(options);
-  let lastError: unknown;
 
   for (const data of payloads) {
     try {
       return navigator.share(data);
     } catch (err) {
-      lastError = err;
       if (err instanceof DOMException && err.name === 'AbortError') throw err;
     }
   }
 
-  if (lastError instanceof DOMException && lastError.name === 'AbortError') throw lastError;
   return null;
 }
 
-/** Web Share API на любой платформе, если доступен; иначе — копирование в буфер */
-export function shareLink(options: ShareLinkOptions): Promise<ShareLinkResult> {
-  const sharePromise = startNativeShare(options);
+function tryRemainingShares(payloads: ShareData[], fromIndex: number): Promise<void> {
+  if (fromIndex >= payloads.length) {
+    return Promise.reject(new Error('share failed'));
+  }
 
-  if (sharePromise) {
-    return sharePromise
+  const data = payloads[fromIndex];
+  let promise: Promise<void>;
+  try {
+    promise = navigator.share!(data);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    return tryRemainingShares(payloads, fromIndex + 1);
+  }
+
+  return promise.catch((err) => {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    return tryRemainingShares(payloads, fromIndex + 1);
+  });
+}
+
+/** Web Share API, если доступен; иначе — копирование в буфер */
+export function shareLink(options: ShareLinkOptions): Promise<ShareLinkResult> {
+  const payloads = buildSharePayloads(options);
+  const first = startNativeShare(options);
+
+  if (first) {
+    return first
       .then(() => 'shared' as const)
-      .catch(async (err) => {
+      .catch((err) => {
         if (err instanceof DOMException && err.name === 'AbortError') throw err;
-        await copyToClipboard(options.url);
-        return 'copied' as const;
+        return tryRemainingShares(payloads, 1)
+          .then(() => 'shared' as const)
+          .catch(async (retryErr) => {
+            if (retryErr instanceof DOMException && retryErr.name === 'AbortError') throw retryErr;
+            await copyToClipboard(options.url);
+            return 'copied' as const;
+          });
       });
   }
 
   return copyToClipboard(options.url).then(() => 'copied' as const);
+}
+
+export function canUseNativeShare(): boolean {
+  return typeof navigator.share === 'function' && window.isSecureContext;
 }

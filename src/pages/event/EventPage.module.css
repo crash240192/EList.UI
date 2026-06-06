@@ -206,7 +206,7 @@
 .mapBlock { position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--border); height:312px; }
 .mapExpandBtn {
   position:absolute; top:10px; left:10px; z-index:2;
-  display:flex; align-items:center; gap:5px;
+  display:none; align-items:center; gap:5px;
   padding:6px 10px; border-radius:8px;
   border:1px solid var(--border); background:var(--surface);
   color:var(--text-secondary); font-size:11px; font-weight:500;
@@ -267,6 +267,10 @@
   .priceAndFill { flex-direction:row; align-items:flex-start; gap:12px; }
   .priceAndFill > * { flex:1; }
   .mapBlock { height:228px; }
+}
+
+@media (min-width:681px) {
+  .mapExpandBtn { display:flex; }
 }
 
 /* Цена на всю ширину если нет вместимости */
