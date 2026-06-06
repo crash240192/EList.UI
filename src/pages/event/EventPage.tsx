@@ -328,9 +328,6 @@ export default function EventPage() {
                 </span>
               );
             })}
-            {(event.eventTypes?.[0] ?? event.eventType)?.eventCategory?.name && (
-              <span className={styles.tagCat}>{(event.eventTypes?.[0] ?? event.eventType)!.eventCategory!.name}</span>
-            )}
             {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
             {event.parameters?.ageLimit && (
               <span className={styles.tagAge}>{event.parameters.ageLimit}+</span>
