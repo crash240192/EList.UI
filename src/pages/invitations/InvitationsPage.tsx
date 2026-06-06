@@ -16,6 +16,7 @@ import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventModal } from '@/pages/home/EventModal';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import styles from './InvitationsPage.module.css';
 
 function formatDate(iso: string) {
@@ -181,7 +182,7 @@ export default function InvitationsPage() {
                   <div className={styles.cover}>
                     {event.coverImageId
                       ? <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg} />
-                      : <div className={styles.coverPlaceholder} />}
+                      : <div className={styles.coverPlaceholder} style={{ background: getEventCoverBackground(event) }} />}
                   </div>
                   <div className={styles.content}>
                     <div className={styles.who}>

@@ -34,6 +34,7 @@ import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
 import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
+import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import styles from './CreateEventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -333,6 +334,14 @@ export default function CreateEventPage() {
   ], [allTypes, selectedCategories, selectedTypes]);
 
   const getTypeColor = (t: IEventType) => t.eventCategory?.color ?? '#6366f1';
+
+  const previewCoverBg = useMemo(
+    () => buildEventCoverBackground(
+      'create-preview',
+      [...new Set(selectedTypeObjects.map(t => getTypeColor(t)))],
+    ),
+    [selectedTypeObjects],
+  );
 
   const handleRemoveTypeChip = (typeId: string) => {
     if (selectedTypes.includes(typeId)) {
@@ -937,7 +946,10 @@ export default function CreateEventPage() {
 
         {/* Карточка предпросмотра */}
         <div className={styles.previewCard}>
-          <div className={styles.previewCover}>
+          <div
+            className={styles.previewCover}
+            style={!coverUrl && !coverImageId ? { background: previewCoverBg } : undefined}
+          >
             {coverUrl ? (
               <img src={coverUrl} alt="Обложка" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             ) : coverImageId ? (

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import styles from './EventModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
@@ -15,14 +16,6 @@ function contrastColor(hex: string): string {
   const g = parseInt(c.slice(2, 4), 16);
   const b = parseInt(c.slice(4, 6), 16);
   return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? '#1a1a2e' : '#ffffff';
-}
-
-function categoryGradient(p?: string | null) {
-  if (!p) return 'linear-gradient(135deg,#4f46e5,#7c3aed)';
-  if (p.startsWith('sport')) return 'linear-gradient(135deg,#10b981,#3b82f6)';
-  if (p.startsWith('art'))   return 'linear-gradient(135deg,#f59e0b,#ef4444)';
-  if (p.startsWith('food'))  return 'linear-gradient(135deg,#f97316,#fbbf24)';
-  return 'linear-gradient(135deg,#4f46e5,#7c3aed)';
 }
 
 interface EventModalProps { event: IEvent; onClose: () => void; children?: React.ReactNode; }
@@ -53,7 +46,7 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
 
         {/* Cover */}
         <div className={styles.cover}
-          style={{ background: hasCover ? '#111' : categoryGradient(event.eventType?.eventCategory?.namePath) }}>
+          style={{ background: hasCover ? '#111' : getEventCoverBackground(event) }}>
           {event.coverImageId ? (
             <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg}
               fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} /> : undefined} />
