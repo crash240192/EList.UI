@@ -18,6 +18,7 @@ import { InviteModal } from '@/features/event/InviteModal';
 import { AddOrganizerModal } from '@/features/event/AddOrganizerModal';
 import { BWListModal } from '@/features/event/BWListModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
+import { EventMapModal } from '@/features/event-map/EventMapModal';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { RatingWidget } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
@@ -56,6 +57,7 @@ export default function EventPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
   const [bwListOpen,      setBwListOpen]      = useState(false);
+  const [mapModalOpen,    setMapModalOpen]    = useState(false);
   const [joinShake,       setJoinShake]       = useState(false);
   const [limitNotice,     setLimitNotice]     = useState(false);
   const [pageAccessDenied, setPageAccessDenied] = useState(false);
@@ -491,6 +493,17 @@ export default function EventPage() {
               <div>
                 <div className={styles.secLabel}>Место проведения</div>
                 <div className={styles.mapBlock}>
+                  <button
+                    type="button"
+                    className={styles.mapExpandBtn}
+                    onClick={() => setMapModalOpen(true)}
+                    aria-label="Развернуть карту"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" />
+                    </svg>
+                    Развернуть
+                  </button>
                   <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} draggable={false} />
                 </div>
               </div>
@@ -560,6 +573,15 @@ export default function EventPage() {
           eventId={id}
           listType={event.parameters?.private ? 'whiteList' : 'blackList'}
           onClose={() => setBwListOpen(false)}
+        />
+      )}
+      {mapModalOpen && event.latitude != null && event.longitude != null && (
+        <EventMapModal
+          lat={event.latitude}
+          lng={event.longitude}
+          label={event.name}
+          address={event.address}
+          onClose={() => setMapModalOpen(false)}
         />
       )}
     </div>
