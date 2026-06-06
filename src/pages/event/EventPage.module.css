@@ -207,7 +207,7 @@
 /* Map */
 .mapBlock { position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--border); height:312px; }
 .mapExpandBtn {
-  position:absolute; bottom:10px; left:10px; z-index:2;
+  position:absolute; top:10px; left:10px; z-index:2;
   display:flex; align-items:center; gap:5px;
   padding:6px 10px; border-radius:8px;
   border:1px solid var(--border); background:var(--surface);

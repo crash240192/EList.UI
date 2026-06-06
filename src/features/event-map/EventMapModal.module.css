@@ -18,8 +18,8 @@
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 401;
-  width: min(720px, 94vw);
-  max-height: 88dvh;
+  width: min(1260px, 96vw);
+  max-height: 90dvh;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -81,8 +81,8 @@
 .closeBtn:hover { background: var(--surface-2); }
 
 .mapWrap {
-  height: min(560px, 65dvh);
-  min-height: 280px;
+  height: min(700px, 75dvh);
+  min-height: 320px;
   flex-shrink: 0;
 }
 
