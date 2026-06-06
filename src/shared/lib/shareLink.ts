@@ -12,11 +12,6 @@ export function buildEventShareUrl(eventId: string): string {
   return `${window.location.origin}/event/${eventId}`;
 }
 
-/** Телефоны/планшеты — нативный share; десктоп — копирование в буфер */
-function prefersNativeShare(): boolean {
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
 async function copyToClipboard(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -67,11 +62,10 @@ async function tryNativeShare({ title, text, url }: ShareLinkOptions): Promise<b
   return false;
 }
 
+/** Web Share API на любой платформе, если доступен; иначе — копирование в буфер */
 export async function shareLink(options: ShareLinkOptions): Promise<ShareLinkResult> {
-  if (prefersNativeShare()) {
-    const shared = await tryNativeShare(options);
-    if (shared) return 'shared';
-  }
+  const shared = await tryNativeShare(options);
+  if (shared) return 'shared';
 
   await copyToClipboard(options.url);
   return 'copied';
