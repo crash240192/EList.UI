@@ -463,6 +463,9 @@ export function RatingWidget({
   if (!data) return null;
 
   const score = data.resultRating;
+  const hasRatings = score > 0 || data.total > 0;
+  if (eventFinished && !hasRatings) return null;
+
   const badgeTitle = !eventActive
     ? 'Мероприятие отменено — оценки недоступны'
     : eventFinished

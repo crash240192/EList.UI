@@ -20,13 +20,13 @@ import { BWListModal } from '@/features/event/BWListModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import { EventMapModal } from '@/features/event-map/EventMapModal';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
-import { RatingWidget } from '@/features/event/RatingWidget';
+import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
-import { buildEventShareUrl, shareLink } from '@/shared/lib/shareLink';
+import { buildEventShareUrl, canUseNativeShare, shareLink } from '@/shared/lib/shareLink';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -176,7 +176,7 @@ export default function EventPage() {
     } finally { setActionLoading(false); }
   }, [id]);
 
-  const handleShare = useCallback(async () => {
+  const handleShare = useCallback(() => {
     if (!event?.id) return;
 
     const url = buildEventShareUrl(event.id);
@@ -186,16 +186,20 @@ export default function EventPage() {
       formatDateFull(event.startTime, event.endTime),
     ].filter(Boolean).join(' · ');
 
-    try {
-      const result = await shareLink({ title: event.name, text: shareText, url });
-      useToastStore.getState().add(
-        result === 'shared' ? 'Ссылка отправлена' : 'Ссылка скопирована в буфер обмена',
-        'success',
-      );
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      useToastStore.getState().add('Не удалось поделиться ссылкой', 'error');
-    }
+    void shareLink({ title: event.name, text: shareText, url })
+      .then((result) => {
+        const copiedMsg = canUseNativeShare()
+          ? 'Ссылка скопирована в буфер обмена'
+          : 'Ссылка скопирована (нужен HTTPS для системного шаринга)';
+        useToastStore.getState().add(
+          result === 'shared' ? 'Ссылка отправлена' : copiedMsg,
+          'success',
+        );
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        useToastStore.getState().add('Не удалось поделиться ссылкой', 'error');
+      });
   }, [event]);
 
   if (loading) return <PageSkeleton />;
@@ -231,9 +235,11 @@ export default function EventPage() {
   const isParticipantLimitFull =
     participantCap != null && participants.length >= participantCap && !isParticipating;
   const isEventActive = event.active;
+  const eventFinished = isEventFinished(event.startTime, event.endTime);
   const allowUsersToInvite = event.parameters?.allowUsersToInvite;
   const canUsersInviteByEventPolicy = allowUsersToInvite === null || allowUsersToInvite === undefined || allowUsersToInvite === true;
-  const canOpenInviteModal = !!accountId && !!event?.id && (isOrganizer || (isParticipating && canUsersInviteByEventPolicy));
+  const canOpenInviteModal = !eventFinished && !!accountId && !!event?.id
+    && (isOrganizer || (isParticipating && canUsersInviteByEventPolicy));
   const joinDisabled =
     actionLoading ||
     !accountId ||
@@ -363,26 +369,28 @@ export default function EventPage() {
                 </svg>
               </button>
             )}
-            <div className={styles.joinBtnWrap}>
-              {limitNotice && isParticipantLimitFull && (
-                <div className={styles.joinLimitNotice} role="status">
-                  Достигнут лимит участников ({participantCap})
-                </div>
-              )}
-              <button
-                type="button"
-                className={`${styles.btnJoin} ${isParticipating ? styles.btnLeave : ''} ${joinShake ? styles.btnJoinShake : ''}`}
-                onClick={onJoinClick}
-                disabled={joinDisabled}
-                title={
-                  isParticipantLimitFull
-                    ? `Достигнут лимит участников (${participantCap})`
-                    : undefined
-                }
-              >
-                {actionLoading ? '...' : isParticipating ? 'Покинуть' : 'Участвовать'}
-              </button>
-            </div>
+            {!eventFinished && (
+              <div className={styles.joinBtnWrap}>
+                {limitNotice && isParticipantLimitFull && (
+                  <div className={styles.joinLimitNotice} role="status">
+                    Достигнут лимит участников ({participantCap})
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className={`${styles.btnJoin} ${isParticipating ? styles.btnLeave : ''} ${joinShake ? styles.btnJoinShake : ''}`}
+                  onClick={onJoinClick}
+                  disabled={joinDisabled}
+                  title={
+                    isParticipantLimitFull
+                      ? `Достигнут лимит участников (${participantCap})`
+                      : undefined
+                  }
+                >
+                  {actionLoading ? '...' : isParticipating ? 'Покинуть' : 'Участвовать'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
