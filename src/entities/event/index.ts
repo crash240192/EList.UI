@@ -46,6 +46,7 @@ export type { IParticipant, IParticipantView, IParticipantAccount, IParticipantP
 export {
   fetchEventParameters,
   assignEventParameters,
+  assignEventTypes,
   assignEventOrganizators,
   fetchEventOrganizators,
 } from './eventExtrasApi';

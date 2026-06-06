@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, fetchEventOrganizators } from '@/entities/event';
+import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, assignEventTypes, fetchEventOrganizators } from '@/entities/event';
 import type { IEventType } from '@/entities/event';
 import {
   fetchEventTypesByEvent,
@@ -524,6 +524,7 @@ export default function CreateEventPage() {
           allowedGender:      form.allowedGender || null,
           allowUsersToInvite: form.allowUsersToInvite,
         });
+        await assignEventTypes(id!, resolvedTypeIds);
         navigate(`/event/${id}`);
       } else {
         const accountId = await getOrFetchAccountId();

@@ -36,6 +36,14 @@ export async function assignEventParameters(
 }
 
 /**
+ * POST /api/events/eventTypes/assignToEvent/{eventId}
+ */
+export async function assignEventTypes(eventId: string, eventTypeIds: string[]): Promise<void> {
+  if (eventTypeIds.length === 0) return;
+  await apiClient.post(`/api/events/eventTypes/assignToEvent/${eventId}`, eventTypeIds);
+}
+
+/**
  * POST /api/EventOrganizators/assign/{eventId}
  */
 export async function assignEventOrganizators(eventId: string, accountIds: string[]): Promise<void> {
