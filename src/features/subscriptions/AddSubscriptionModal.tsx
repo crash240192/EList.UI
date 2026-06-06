@@ -57,7 +57,9 @@ export function AddSubscriptionModal({ onClose, onBeforeNavigate }: Props) {
       <div className={styles.modalStacked} role="dialog" aria-modal aria-label="Добавить подписку">
         <h3 className={styles.title}>Добавить подписку</h3>
         <p className={styles.subtitle}>
-          Вставьте идентификатор пользователя или отсканируйте QR-код
+          {showScanner
+            ? 'Вставьте идентификатор пользователя или отсканируйте QR-код'
+            : 'Вставьте идентификатор пользователя'}
         </p>
 
         {scanning ? (

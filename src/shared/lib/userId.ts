@@ -24,8 +24,9 @@ export function parseUserIdFromText(raw: string): string | null {
   return inline?.[0] && isUserId(inline[0]) ? inline[0] : null;
 }
 
+/** Камера доступна в secure context — достаточно для html5-qrcode. */
 export function canUseQrScanner(): boolean {
   return typeof window !== 'undefined'
-    && typeof navigator.mediaDevices?.getUserMedia === 'function'
-    && typeof (window as Window & { BarcodeDetector?: new (opts: { formats: string[] }) => unknown }).BarcodeDetector === 'function';
+    && window.isSecureContext
+    && typeof navigator.mediaDevices?.getUserMedia === 'function';
 }
