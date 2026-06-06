@@ -72,6 +72,58 @@ export function addCompactZoomControl(map: { controls: { add: (name: string, opt
   map.controls.add('zoomControl', YMAP_ZOOM_CONTROL_LAYOUT);
 }
 
+/** Ссылка «Открыть в Яндекс Картах» с меткой в указанной точке (pt = lon,lat) */
+export function buildYandexMapsPointUrl(lat: number, lng: number, zoom = 16): string {
+  return `https://yandex.ru/maps/?pt=${lng},${lat}&z=${zoom}&l=map`;
+}
+
+const YANDEX_MAPS_LINK_SELECTOR = 'a[href*="yandex.ru/maps"], a[href*="yandex.com/maps"]';
+
+/** Блоки API с собственной ссылкой (маршрут, «открыть в картах») — не трогаем */
+function isYmapsPromoLink(el: Element, root: HTMLElement): boolean {
+  let node: Element | null = el;
+  while (node && node !== root) {
+    const cls = typeof node.className === 'string' ? node.className : '';
+    if (
+      cls.includes('promo')
+      || cls.includes('gotoymaps')
+      || cls.includes('open-block')
+      || cls.includes('route')
+    ) return true;
+    node = node.parentElement;
+  }
+  return false;
+}
+
+/**
+ * Подменяет href у копирайт-ссылки «Яндекс Карты» (правый нижний угол),
+ * чтобы открывалась карта с меткой в точке мероприятия.
+ */
+export function attachYandexCopyrightPointLink(
+  container: HTMLElement,
+  lat: number,
+  lng: number,
+  zoom: number,
+): () => void {
+  const url = buildYandexMapsPointUrl(lat, lng, zoom);
+
+  const patch = () => {
+    container.querySelectorAll(YANDEX_MAPS_LINK_SELECTOR).forEach(el => {
+      if (!(el instanceof HTMLAnchorElement)) return;
+      if (isYmapsPromoLink(el, container)) return;
+      if (el.href === url) return;
+      el.href = url;
+      el.target = '_blank';
+      el.rel = 'noopener noreferrer';
+    });
+  };
+
+  patch();
+  const observer = new MutationObserver(patch);
+  observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] });
+  return () => observer.disconnect();
+}
+
 export interface GeocodedPlace { lat: number; lng: number; address: string; }
 
 export async function geocodeAddress(query: string): Promise<GeocodedPlace | null> {
