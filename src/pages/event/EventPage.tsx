@@ -176,7 +176,7 @@ export default function EventPage() {
     } finally { setActionLoading(false); }
   }, [id]);
 
-  const handleShare = useCallback(async () => {
+  const handleShare = useCallback(() => {
     if (!event?.id) return;
 
     const url = buildEventShareUrl(event.id);
@@ -186,16 +186,17 @@ export default function EventPage() {
       formatDateFull(event.startTime, event.endTime),
     ].filter(Boolean).join(' · ');
 
-    try {
-      const result = await shareLink({ title: event.name, text: shareText, url });
-      useToastStore.getState().add(
-        result === 'shared' ? 'Ссылка отправлена' : 'Ссылка скопирована в буфер обмена',
-        'success',
-      );
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      useToastStore.getState().add('Не удалось поделиться ссылкой', 'error');
-    }
+    void shareLink({ title: event.name, text: shareText, url })
+      .then((result) => {
+        useToastStore.getState().add(
+          result === 'shared' ? 'Ссылка отправлена' : 'Ссылка скопирована в буфер обмена',
+          'success',
+        );
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        useToastStore.getState().add('Не удалось поделиться ссылкой', 'error');
+      });
   }, [event]);
 
   if (loading) return <PageSkeleton />;

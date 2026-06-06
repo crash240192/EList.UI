@@ -12,6 +12,16 @@ export function buildEventShareUrl(eventId: string): string {
   return `${window.location.origin}/event/${eventId}`;
 }
 
+function buildSharePayloads({ title, text, url }: ShareLinkOptions): ShareData[] {
+  const payloads: ShareData[] = [{ url }];
+
+  if (title) payloads.push({ title, url });
+  if (text) payloads.push({ text, url });
+  if (title && text) payloads.push({ title, text, url });
+
+  return payloads;
+}
+
 async function copyToClipboard(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -30,43 +40,42 @@ async function copyToClipboard(text: string): Promise<void> {
   if (!ok) throw new Error('copy failed');
 }
 
-function canShareData(data: ShareData): boolean {
-  if (!navigator.canShare) return true;
-  try {
-    return navigator.canShare(data);
-  } catch {
-    return false;
-  }
-}
+/**
+ * navigator.share нужно вызвать синхронно из обработчика клика (user activation).
+ * На Android цепочка async/await до вызова share часто приводит к fallback в буфер.
+ */
+function startNativeShare(options: ShareLinkOptions): Promise<void> | null {
+  if (typeof navigator.share !== 'function') return null;
 
-async function tryNativeShare({ title, text, url }: ShareLinkOptions): Promise<boolean> {
-  if (!navigator.share) return false;
-
-  const payloads: ShareData[] = [
-    { title, text, url },
-    { title, url },
-    { text: text || title, url },
-    { url },
-  ];
+  const payloads = buildSharePayloads(options);
+  let lastError: unknown;
 
   for (const data of payloads) {
-    if (!canShareData(data)) continue;
     try {
-      await navigator.share(data);
-      return true;
+      return navigator.share(data);
     } catch (err) {
+      lastError = err;
       if (err instanceof DOMException && err.name === 'AbortError') throw err;
     }
   }
 
-  return false;
+  if (lastError instanceof DOMException && lastError.name === 'AbortError') throw lastError;
+  return null;
 }
 
 /** Web Share API на любой платформе, если доступен; иначе — копирование в буфер */
-export async function shareLink(options: ShareLinkOptions): Promise<ShareLinkResult> {
-  const shared = await tryNativeShare(options);
-  if (shared) return 'shared';
+export function shareLink(options: ShareLinkOptions): Promise<ShareLinkResult> {
+  const sharePromise = startNativeShare(options);
 
-  await copyToClipboard(options.url);
-  return 'copied';
+  if (sharePromise) {
+    return sharePromise
+      .then(() => 'shared' as const)
+      .catch(async (err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') throw err;
+        await copyToClipboard(options.url);
+        return 'copied' as const;
+      });
+  }
+
+  return copyToClipboard(options.url).then(() => 'copied' as const);
 }
