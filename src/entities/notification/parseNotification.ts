@@ -1,7 +1,12 @@
 // entities/notification/parseNotification.ts
 
 import type { INotification } from './types';
-import { isEventNotificationType, parseEventNotificationData } from './eventData';
+import {
+  isEventShortDataType,
+  isRatingNotificationType,
+  parseEventNotificationData,
+  parseRatingNotificationData,
+} from './eventData';
 
 function str(v: unknown): string | null {
   if (v == null || v === '') return null;
@@ -39,13 +44,23 @@ export function parseNotificationPayload(raw: unknown): INotification | null {
   const type = parseType(o.type ?? o.Type);
   const rawData = o.data ?? o.Data ?? null;
   const eventShort =
-    isEventNotificationType(type) && rawData != null
+    isEventShortDataType(type) && rawData != null
       ? parseEventNotificationData(rawData)
       : null;
+  const ratingData =
+    isRatingNotificationType(type) && rawData != null
+      ? parseRatingNotificationData(rawData)
+      : null;
+
+  const eventId =
+    str(o.eventId ?? o.EventId)
+    ?? eventShort?.id
+    ?? ratingData?.eventId
+    ?? null;
 
   return {
     id: String(id),
-    eventId: str(o.eventId ?? o.EventId),
+    eventId,
     relatedAccountId: str(o.relatedAccountId ?? o.RelatedAccountId),
     type,
     title: str(o.title ?? o.Title),
@@ -54,6 +69,7 @@ export function parseNotificationPayload(raw: unknown): INotification | null {
     readAt: read != null && read !== '' ? String(read) : null,
     data: rawData,
     eventShort,
+    ratingData,
   };
 }
 

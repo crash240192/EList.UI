@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccountId } from '@/features/auth/useAccountId';
 import type { INotification } from '@/entities/notification/types';
-import { getNotificationEventId } from '@/entities/notification/eventData';
+import { isEventPageNotificationType } from '@/entities/notification/eventData';
 import {
   getNotificationNavigationTarget,
   notificationTypeLabel,
@@ -149,7 +149,11 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
           visibleItems.map(n => {
             const hasTitle = !!n.title;
             const messageText = n.message || notificationTypeLabel(n.type);
-            const eventStart = hasTitle ? formatEventStart(n.eventShort?.startTime) : null;
+            const eventStart = formatEventStart(n.eventShort?.startTime);
+            const ratingHint = n.ratingData
+              ? `Оценка: ${n.ratingData.value}${n.ratingData.comment ? ` · ${n.ratingData.comment}` : ''}`
+              : null;
+            const showEventName = !!n.eventShort?.name && (hasTitle || isEventPageNotificationType(n.type));
             return (
             <li key={n.id}>
               <div className={`${styles.item} ${styles.itemUnread}`}>
@@ -161,11 +165,11 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                   {hasTitle ? (
                     <>
                       <span className={styles.itemTitle}>{n.title}</span>
-                      {n.eventShort?.name && (
+                      {showEventName && (
                         <span className={styles.itemEventName}>
-                          {n.eventShort.colors?.length > 0 && (
+                          {n.eventShort!.colors?.length > 0 && (
                             <span className={styles.itemColorDots} aria-hidden>
-                              {n.eventShort.colors.slice(0, 4).map((c, i) => (
+                              {n.eventShort!.colors.slice(0, 4).map((c, i) => (
                                 <span
                                   key={`${c}-${i}`}
                                   className={styles.itemColorDot}
@@ -174,18 +178,45 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                               ))}
                             </span>
                           )}
-                          {n.eventShort.name}
+                          {n.eventShort!.name}
                         </span>
                       )}
                       {n.message && (
                         <span className={styles.itemMessage}>{n.message}</span>
+                      )}
+                      {ratingHint && (
+                        <span className={styles.itemMessage}>{ratingHint}</span>
                       )}
                       {eventStart && (
                         <span className={styles.itemEventWhen}>Начало: {eventStart}</span>
                       )}
                     </>
                   ) : (
-                    <span className={styles.itemMessageOnly}>{messageText}</span>
+                    <>
+                      <span className={styles.itemMessageOnly}>{messageText}</span>
+                      {showEventName && (
+                        <span className={styles.itemEventName}>
+                          {n.eventShort!.colors?.length > 0 && (
+                            <span className={styles.itemColorDots} aria-hidden>
+                              {n.eventShort!.colors.slice(0, 4).map((c, i) => (
+                                <span
+                                  key={`${c}-${i}`}
+                                  className={styles.itemColorDot}
+                                  style={{ background: c }}
+                                />
+                              ))}
+                            </span>
+                          )}
+                          {n.eventShort!.name}
+                        </span>
+                      )}
+                      {ratingHint && (
+                        <span className={styles.itemMessage}>{ratingHint}</span>
+                      )}
+                      {eventStart && (
+                        <span className={styles.itemEventWhen}>Начало: {eventStart}</span>
+                      )}
+                    </>
                   )}
                   <span className={styles.itemMeta}>{formatWhen(n.createdAt)}</span>
                 </button>

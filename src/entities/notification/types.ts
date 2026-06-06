@@ -12,10 +12,21 @@ export interface INotification {
   message: string | null;
   createdAt: string;
   readAt: string | null;
-  /** Произвольный payload; для типов 0–3 — краткая карточка мероприятия */
+  /** Произвольный payload; для типов 0–3, 41–45 — краткая карточка мероприятия; для 60–62 — оценка */
   data: unknown;
-  /** Распознанный data для EventCreated / Updated / Cancelled / Finished */
+  /** Распознанный data для типов с карточкой мероприятия в payload */
   eventShort?: IEventSearchShortItem | null;
+  /** Распознанный data для NewEventRating / EventRatingChanged / EventRatingDeleted */
+  ratingData?: INotificationRatingData | null;
+}
+
+/** data для уведомлений об оценке мероприятия (типы 60–62) */
+export interface INotificationRatingData {
+  id: string;
+  accountId: string;
+  eventId: string;
+  comment: string | null;
+  value: number;
 }
 
 export interface IConnectionStats {

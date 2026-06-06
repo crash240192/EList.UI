@@ -3,7 +3,7 @@
 import type { INotification } from './types';
 import {
   getNotificationEventId,
-  isEventNotificationType,
+  isEventPageNotificationType,
   isNewInvitationNotification,
   NOTIFICATION_TYPE_NEW_INVITATION,
 } from './eventData';
@@ -63,6 +63,10 @@ export function notificationTypeLabel(type: INotification['type']): string {
     case 42: return 'Добавлен в белый список';
     case 43: return 'Удалён из чёрного списка';
     case 44: return 'Удалён из белого списка';
+    case 45: return 'Нет в белом списке';
+    case 60: return 'Новая оценка мероприятия';
+    case 61: return 'Оценка изменена';
+    case 62: return 'Оценка удалена';
     case NOTIFICATION_TYPE_NEW_INVITATION: return 'Новое приглашение';
     default: return String(type);
   }
@@ -82,7 +86,7 @@ export function getNotificationNavigationTarget(
     return { kind: 'user', accountId: n.relatedAccountId };
   }
 
-  if (EVENT_PAGE_TYPES.has(typeNum) || isEventNotificationType(n.type)) {
+  if (EVENT_PAGE_TYPES.has(typeNum) || isEventPageNotificationType(n.type)) {
     const eventId = getNotificationEventId(n);
     if (eventId) return { kind: 'event', eventId };
   }
