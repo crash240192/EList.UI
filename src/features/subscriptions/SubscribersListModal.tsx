@@ -14,6 +14,7 @@ import { UserChip } from '@/entities/user/ui/UserChip';
 import styles from './SubscribersListModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { SubscribeModal } from './SubscribeModal';
+import { AddSubscriptionModal } from './AddSubscriptionModal';
 
 const PAGE_SIZE = 20;
 
@@ -37,6 +38,7 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
   const [error,       setError]       = useState<string | null>(null);
   const [pendingUnsubscribes, setPendingUnsubscribes] = useState<Set<string>>(new Set());
   const [settingsTarget, setSettingsTarget] = useState<ISubscriptionItem | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const settingsTargetRef = useRef<ISubscriptionItem | null>(null);
   settingsTargetRef.current = settingsTarget;
   const searchRef = useRef<HTMLInputElement>(null);
@@ -118,15 +120,18 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
 
   const canManageSubscriptions = listType === 'subscriptions' && accountId === currentAccountId;
 
+  const addModalOpenRef = useRef(false);
+  addModalOpenRef.current = showAddModal;
+
   const handleModalBack = useCallback(() => {
     if (settingsTargetRef.current) setSettingsTarget(null);
+    else if (addModalOpenRef.current) setShowAddModal(false);
     else void handleClose();
   }, [handleClose]);
 
   useModalBackButton(handleModalBack);
 
   useEffect(() => {
-    setTimeout(() => searchRef.current?.focus(), 100);
     const fn = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleModalBack();
     };
@@ -143,7 +148,18 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
             <h3 className={styles.title}>{title}</h3>
             {!loading && <span className={styles.count}>{total}</span>}
           </div>
-          <button className={styles.closeBtn} onClick={() => { void handleClose(); }}>✕</button>
+          <div className={styles.headerActions}>
+            {canManageSubscriptions && (
+              <button
+                type="button"
+                className={styles.addBtn}
+                onClick={() => setShowAddModal(true)}
+              >
+                Добавить
+              </button>
+            )}
+            <button className={styles.closeBtn} onClick={() => { void handleClose(); }}>✕</button>
+          </div>
         </div>
 
         <div className={styles.searchWrap}>
@@ -231,6 +247,12 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
           confirmLabel="Сохранить"
           onConfirm={saveSettings}
           onCancel={() => setSettingsTarget(null)}
+        />
+      )}
+      {showAddModal && (
+        <AddSubscriptionModal
+          onClose={() => setShowAddModal(false)}
+          onBeforeNavigate={handleClose}
         />
       )}
     </>

@@ -41,6 +41,25 @@
   flex-shrink: 0;
 }
 .title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.addBtn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.addBtn:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+}
 .closeBtn {
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 50%; width: 28px; height: 28px;

@@ -17,6 +17,7 @@ import {
 } from '@/entities/user/subscriptionApi';
 import { SubscribeModal } from '@/features/subscriptions/SubscribeModal';
 import { SubscribersListModal } from '@/features/subscriptions/SubscribersListModal';
+import { UserShareMenu } from '@/features/user/UserShareMenu';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
@@ -146,6 +147,7 @@ export default function UserPage() {
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [isSubscribed,  setIsSubscribed]  = useState(false);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -216,9 +218,18 @@ export default function UserPage() {
           <button className={styles.bannerBack} onClick={() => navigate(-1)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          {!isOwnProfile && (
-            <div className={styles.bannerActions}>
-              {isSubscribed ? (
+          <div className={styles.bannerActions}>
+            <button
+              type="button"
+              className={styles.bannerIconBtn}
+              onClick={() => setShareOpen(true)}
+              aria-label="Поделиться"
+              title="Поделиться"
+            >
+              <ShareIcon />
+            </button>
+            {!isOwnProfile && (
+              isSubscribed ? (
                 <button className={`${styles.bannerBtn} ${styles.bannerBtnSub}`} onClick={handleUnsubscribe}>
                   Отписаться
                 </button>
@@ -226,9 +237,9 @@ export default function UserPage() {
                 <button className={styles.bannerBtn} onClick={() => setShowSubscribe(true)}>
                   Подписаться
                 </button>
-              )}
-            </div>
-          )}
+              )
+            )}
+          </div>
         </div>
 
         {/* ── Шапка профиля ── */}
@@ -305,49 +316,28 @@ export default function UserPage() {
           </div>
         )}
 
-        {/* ── Двухколонная часть ── */}
-        <div className={styles.twoCol}>
-
-          {/* Левая: контакты + мероприятия */}
-          <div className={styles.leftCol}>
-
-            {/* Контакты */}
-            {visibleContacts.length > 0 && (
-              <div className={styles.contactsSection}>
-                <div className={styles.secLabel}>Контакты</div>
-                <ContactsList contacts={visibleContacts} />
-              </div>
-            )}
-
-            {/* Мероприятия */}
-            <div className={styles.eventsSection}>
-              <div className={styles.secLabel}>Мероприятия</div>
-              <div className={styles.tabsRow}>
-                <button
-                  className={`${styles.tab} ${activeTab === 'participating' ? styles.tabActive : ''}`}
-                  onClick={() => setActiveTab('participating')}
-                >Участвует</button>
-                <button
-                  className={`${styles.tab} ${activeTab === 'created' ? styles.tabActive : ''}`}
-                  onClick={() => setActiveTab('created')}
-                >Организует</button>
-              </div>
-              {profileAccountId ? <UserEventList accountId={profileAccountId} tab={activeTab} /> : null}
+        {/* ── Контент ── */}
+        <div className={styles.contentCol}>
+          {visibleContacts.length > 0 && (
+            <div className={styles.contactsSection}>
+              <div className={styles.secLabel}>Контакты</div>
+              <ContactsList contacts={visibleContacts} />
             </div>
-          </div>
+          )}
 
-          {/* Правая: карточка с мета */}
-          <div className={styles.rightCol}>
-            <div className={styles.secLabel}>Подробнее</div>
-            <div className={styles.infoCard}>
-              {account.id && (
-                <InfoRow icon={<IdIcon />} label="ID аккаунта" value={account.id.slice(0, 8) + '...'} />
-              )}
-              {person?.birthDate && (
-                <InfoRow icon={<CalIcon />} label="Дата рождения"
-                  value={new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(person.birthDate))} />
-              )}
+          <div className={styles.eventsSection}>
+            <div className={styles.secLabel}>Мероприятия</div>
+            <div className={styles.tabsRow}>
+              <button
+                className={`${styles.tab} ${activeTab === 'participating' ? styles.tabActive : ''}`}
+                onClick={() => setActiveTab('participating')}
+              >Участвует</button>
+              <button
+                className={`${styles.tab} ${activeTab === 'created' ? styles.tabActive : ''}`}
+                onClick={() => setActiveTab('created')}
+              >Организует</button>
             </div>
+            {profileAccountId ? <UserEventList accountId={profileAccountId} tab={activeTab} /> : null}
           </div>
         </div>
 
@@ -375,23 +365,18 @@ export default function UserPage() {
           onClose={() => setLightboxFileIds(null)}
         />
       )}
+      {shareOpen && account.id && (
+        <UserShareMenu
+          accountId={account.id}
+          login={account.login}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
 // ---- Вспомогательные компоненты ----
-
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className={styles.infoRow}>
-      <div className={styles.infoIcon}>{icon}</div>
-      <div>
-        <div className={styles.infoKey}>{label}</div>
-        <div className={styles.infoVal}>{value}</div>
-      </div>
-    </div>
-  );
-}
 
 function ContactsList({ contacts }: { contacts: IContactDataItem[] }) {
   const groups = contacts.reduce<Record<string, { label: string; items: IContactDataItem[] }>>(
@@ -432,5 +417,11 @@ function Skeleton() {
   );
 }
 
-function IdIcon() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/></svg>; }
-function CalIcon(){ return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>; }
+function ShareIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  );
+}

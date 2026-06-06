@@ -36,8 +36,16 @@
 }
 .bannerBack:hover { background: rgba(255,255,255,0.3); }
 .bannerActions {
-  position: absolute; top: 14px; right: 14px; display: flex; gap: 8px;
+  position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 8px;
 }
+.bannerIconBtn {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(255,255,255,0.18); backdrop-filter: blur(6px);
+  border: 0.5px solid rgba(255,255,255,0.25); color: #fff;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.bannerIconBtn:hover { background: rgba(255,255,255,0.3); }
 .bannerBtn {
   height: 32px; padding: 0 16px; border-radius: 20px;
   border: none;
@@ -143,12 +151,6 @@
 }
 .metaChip svg { opacity: .7; flex-shrink: 0; }
 
-/* ── Двухколонная часть ── */
-.twoCol {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) 260px;
-  gap: 0;
-}
 @media (max-width: 680px) {
   .page {
     padding: 0;
@@ -159,15 +161,14 @@
     border-right: none;
     max-width: 100%;
   }
-  .twoCol { grid-template-columns: 1fr; }
-  .rightCol { border-top: 1px solid var(--border); border-left: none !important; }
-  /* padding moved above */
 }
 
-/* ── Левая колонка ── */
-.leftCol {
-  padding: 20px 24px; min-width: 0;
-  display: flex; flex-direction: column; gap: 24px;
+.contentCol {
+  padding: 20px 24px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 /* Контакты */
@@ -236,29 +237,6 @@
   background: var(--surface-2); animation: shimmer 1.4s ease infinite;
 }
 .placeholder { font-size: 13px; color: var(--text-muted); padding: 12px 0; }
-
-/* ── Правая колонка ── */
-.rightCol {
-  padding: 20px; min-width: 0;
-  border-left: 1px solid var(--border);
-}
-.infoCard {
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 12px; padding: 12px;
-}
-.infoRow {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 7px 0; border-bottom: 1px solid var(--border);
-}
-.infoRow:first-child { padding-top: 0; }
-.infoRow:last-child  { border-bottom: none; padding-bottom: 0; }
-.infoIcon {
-  width: 26px; height: 26px; border-radius: 7px;
-  background: var(--surface); border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.infoKey { font-size: 10px; color: var(--text-secondary); margin-bottom: 1px; }
-.infoVal { font-size: 13px; font-weight: 500; color: var(--text-primary); }
 
 /* ── Состояния ── */
 @keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:0.45} }
