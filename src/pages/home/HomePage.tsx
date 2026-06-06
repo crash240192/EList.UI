@@ -15,12 +15,8 @@ import { EventMap } from '@/features/event-map/EventMap';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { CityConfirmDialog } from '@/shared/ui/CityConfirmDialog/CityConfirmDialog';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
+import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
 import styles from './HomePage.module.css';
-
-// ID рекламного блока из кабинета РСЯ (partner.yandex.ru)
-// Формат: R-A-XXXXXXX-X
-const AD_BLOCK_ID = import.meta.env.VITE_YANDEX_AD_BLOCK_ID ?? '';
-const AD_EVERY    = 12; // реклама каждые N карточек
 
 const HOME_LIST_UI_KEY = 'elist_home_list_ui_v1';
 const HOME_SEARCH_KEY  = 'elist_home_list_search_v1';
@@ -245,8 +241,8 @@ export default function HomePage() {
                       isFavorite={isFavorite(event.id)}
                       onFavorite={toggleFav}
                     />
-                    {(idx + 1) % AD_EVERY === 0 && (
-                      <AdSlot key={`ad-${event.id}`} blockId={AD_BLOCK_ID} />
+                    {shouldInsertAdAfterIndex(idx) && (
+                      <AdSlot key={`ad-${event.id}`} />
                     )}
                   </Fragment>
                 ))}

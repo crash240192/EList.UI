@@ -1,6 +1,6 @@
 // pages/my-events/MyEventsPage.tsx
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EventCard } from '@/entities/event';
 import { useMyEvents, type OwnerFilter } from '@/features/event-list/useMyEvents';
@@ -9,6 +9,8 @@ import { useMyEventsFiltersStore, useFavoritesStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
 import type { IEventsSearchParams, EventViewMode } from '@/entities/event';
+import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
+import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
 import styles from './MyEventsPage.module.css';
 
 type Tab = 'active' | 'archive';
@@ -229,19 +231,24 @@ export default function MyEventsPage() {
           </div>
         ) : (
           <div className={styles.grid}>
-            {events.map(event => (
-              <div key={event.id} className={styles.cardWrap}>
-                {event.isOrganizer && (
-                  <span className={styles.organizerTag}>Организатор</span>
+            {events.map((event, idx) => (
+              <Fragment key={event.id}>
+                <div className={styles.cardWrap}>
+                  {event.isOrganizer && (
+                    <span className={styles.organizerTag}>Организатор</span>
+                  )}
+                  <EventCard.Preset
+                    event={event}
+                    onClick={() => navigate(`/event/${event.id}`)}
+                    isFavorite={isFavorite(event.id)}
+                    onFavorite={toggleFav}
+                    className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                  />
+                </div>
+                {shouldInsertAdAfterIndex(idx) && (
+                  <AdSlot key={`ad-${event.id}`} />
                 )}
-                <EventCard.Preset
-                  event={event}
-                  onClick={() => navigate(`/event/${event.id}`)}
-                  isFavorite={isFavorite(event.id)}
-                  onFavorite={toggleFav}
-                  className={event.isOrganizer ? styles.cardOrganizer : undefined}
-                />
-              </div>
+              </Fragment>
             ))}
           </div>
         )}

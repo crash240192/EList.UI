@@ -12,6 +12,7 @@ import {
   useInvitationsNotViewedCount,
   useInvitationsStore,
 } from '@/features/invitations/invitationsStore';
+import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import styles from './AppLayout.module.css';
 
 const NAV_ITEMS = [
@@ -135,6 +136,12 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
+
+        {sidebarExpanded && (
+          <div className={styles.sidebarAd}>
+            <AdSlot variant="sidebar" />
+          </div>
+        )}
 
         {isAuthenticated() && (
           <button className={styles.logoutBtn} onClick={() => setLogoutConfirm(true)} title="Выйти">

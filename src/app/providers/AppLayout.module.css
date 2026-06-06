@@ -216,6 +216,12 @@
   opacity: 1; max-width: 200px;
 }
 
+/* ---- Sidebar ad (только в развёрнутом меню) ---- */
+.sidebarAd {
+  flex-shrink: 0;
+  margin: 0 0 10px;
+}
+
 /* ---- Logout ---- */
 .logoutBtn {
   display: flex; align-items: center; gap: 12px;
