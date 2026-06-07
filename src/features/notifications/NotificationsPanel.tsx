@@ -47,17 +47,12 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const wsStatus = useDebouncedWsStatus(useNotificationsStore(s => s.wsStatus));
   const wsError = useNotificationsStore(s => s.wsError);
   const markRead = useNotificationsStore(s => s.markRead);
-  const markAllRead = useNotificationsStore(s => s.markAllRead);
   const clearAll = useNotificationsStore(s => s.clearAll);
 
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [stats, setStats] = useState<string | null>(null);
   const visibleItems = items.filter(i => !i.readAt);
-
-  const handleMarkAllRead = () => {
-    void markAllRead();
-  };
 
   const openNotification = useCallback((n: INotification) => {
     void markRead(n.id);
@@ -115,11 +110,6 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       <div className={styles.head}>
         <h2 className={styles.title}>Уведомления</h2>
         <div className={styles.headActions}>
-          {visibleItems.length > 0 && (
-            <button type="button" className={styles.linkBtn} onClick={handleMarkAllRead}>
-              Прочитать все
-            </button>
-          )}
           <button type="button" className={styles.iconClose} onClick={onClose} aria-label="Закрыть">
             ×
           </button>
@@ -256,8 +246,8 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       )}
 
       {visibleItems.length > 0 && (
-        <button type="button" className={styles.clearBtn} onClick={clearAll}>
-          Очистить список
+        <button type="button" className={styles.clearBtn} onClick={() => { void clearAll(); }}>
+          Очистить
         </button>
       )}
     </div>
