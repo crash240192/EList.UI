@@ -21,8 +21,7 @@ interface NotificationsState {
   applyMarkRead: (id: string, readAt?: string) => void;
   applyMarkAllRead: (readAt?: string) => void;
   markRead: (id: string) => Promise<void>;
-  markAllRead: () => Promise<void>;
-  clearAll: () => void;
+  clearAll: () => Promise<void>;
   reset: () => void;
 }
 
@@ -79,7 +78,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
     }
   },
 
-  markAllRead: async () => {
+  clearAll: async () => {
     if (!get().items.some(i => !i.readAt)) return;
 
     const prev = get().items;
@@ -90,8 +89,6 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       set({ items: prev });
     }
   },
-
-  clearAll: () => set({ items: [] }),
 
   reset: () => set({ items: [], wsStatus: 'idle', wsError: null, panelOpen: false }),
 }));
