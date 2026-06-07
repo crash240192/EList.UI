@@ -6,11 +6,19 @@
   min-height: 220px;
 }
 
-.video {
+.reader {
+  width: 100%;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.reader video {
   display: block;
   width: 100%;
   max-height: 280px;
   object-fit: cover;
+  border-radius: 12px;
 }
 
 .hint,

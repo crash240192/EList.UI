@@ -1,6 +1,6 @@
 // features/user/UserShareMenu.tsx
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useToastStore } from '@/app/store';
 import {
   buildUserProfileUrl,
@@ -22,6 +22,8 @@ type View = 'menu' | 'qr';
 
 export function UserShareMenu({ accountId, login, onClose }: Props) {
   const [view, setView] = useState<View>('menu');
+  const profileUrl = useMemo(() => buildUserProfileUrl(accountId), [accountId]);
+
   const handleBack = useCallback(() => {
     if (view === 'qr') setView('menu');
     else onClose();
@@ -29,32 +31,34 @@ export function UserShareMenu({ accountId, login, onClose }: Props) {
 
   useModalBackButton(handleBack);
 
-  const handleCopyId = () => {
+  const handleCopyCode = () => {
     void copyText(accountId)
       .then(() => {
-        useToastStore.getState().add('Идентификатор скопирован', 'success');
+        useToastStore.getState().add('Код скопирован', 'success');
         onClose();
       })
       .catch(() => useToastStore.getState().add('Не удалось скопировать', 'error'));
   };
 
-  const handleNativeShare = () => {
-    const url = buildUserProfileUrl(accountId);
+  const handleShareLink = () => {
     void shareLink({
       title: `Профиль @${login}`,
-      text: accountId,
-      url,
+      text: `Профиль @${login}`,
+      url: profileUrl,
     })
       .then((result) => {
+        const copiedMsg = canUseNativeShare()
+          ? 'Ссылка скопирована в буфер обмена'
+          : 'Ссылка скопирована (нужен HTTPS для системного шаринга)';
         useToastStore.getState().add(
-          result === 'shared' ? 'Идентификатор отправлен' : 'Идентификатор скопирован',
+          result === 'shared' ? 'Ссылка отправлена' : copiedMsg,
           'success',
         );
         onClose();
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === 'AbortError') return;
-        useToastStore.getState().add('Не удалось поделиться', 'error');
+        useToastStore.getState().add('Не удалось поделиться ссылкой', 'error');
       });
   };
 
@@ -69,9 +73,9 @@ export function UserShareMenu({ accountId, login, onClose }: Props) {
           </div>
           <p className={styles.subtitle}>Отсканируйте камерой, чтобы открыть профиль @{login}</p>
           <div className={styles.qrWrap}>
-            <QrCodeImage value={accountId} />
+            <QrCodeImage value={profileUrl} />
           </div>
-          <p className={styles.idHint}>{accountId}</p>
+          <p className={styles.idHint}>{profileUrl}</p>
         </div>
       </>
     );
@@ -85,18 +89,16 @@ export function UserShareMenu({ accountId, login, onClose }: Props) {
           <h3 className={styles.title}>Поделиться</h3>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">✕</button>
         </div>
-        <p className={styles.subtitle}>Выберите способ передачи идентификатора @{login}</p>
+        <p className={styles.subtitle}>Выберите способ передачи профиля @{login}</p>
         <div className={styles.options}>
-          <button type="button" className={styles.optionBtn} onClick={handleCopyId}>
+          <button type="button" className={styles.optionBtn} onClick={handleCopyCode}>
             <CopyIcon />
-            <span>Скопировать идентификатор</span>
+            <span>Скопировать код</span>
           </button>
-          {canUseNativeShare() && (
-            <button type="button" className={styles.optionBtn} onClick={handleNativeShare}>
-              <ShareIcon />
-              <span>Поделиться</span>
-            </button>
-          )}
+          <button type="button" className={styles.optionBtn} onClick={handleShareLink}>
+            <ShareIcon />
+            <span>Поделиться ссылкой</span>
+          </button>
           <button type="button" className={styles.optionBtn} onClick={() => setView('qr')}>
             <QrIcon />
             <span>Показать QR-код</span>
