@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { canUseQrScanner, isUserId, parseUserIdFromText } from '@/shared/lib/userId';
+import { canUseQrScanner, parseUserIdFromText } from '@/shared/lib/userId';
 import { QrScanner } from '@/shared/ui/QrScanner/QrScanner';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import styles from './AddSubscriptionModal.module.css';
@@ -26,12 +26,12 @@ export function AddSubscriptionModal({ onClose, onBeforeNavigate }: Props) {
 
   useModalBackButton(handleBack, false);
 
-  const normalizedId = parseUserIdFromText(value) ?? (isUserId(value) ? value.trim() : null);
+  const normalizedId = parseUserIdFromText(value);
 
   const goToProfile = async () => {
     const userId = normalizedId;
     if (!userId) {
-      setError('Введите корректный идентификатор пользователя');
+      setError('Введите корректный код или ссылку на профиль');
       return;
     }
 
@@ -58,8 +58,8 @@ export function AddSubscriptionModal({ onClose, onBeforeNavigate }: Props) {
         <h3 className={styles.title}>Добавить подписку</h3>
         <p className={styles.subtitle}>
           {showScanner
-            ? 'Вставьте идентификатор пользователя или отсканируйте QR-код'
-            : 'Вставьте идентификатор пользователя'}
+            ? 'Вставьте код, ссылку на профиль или отсканируйте QR-код'
+            : 'Вставьте код или ссылку на профиль'}
         </p>
 
         {scanning ? (
@@ -68,7 +68,7 @@ export function AddSubscriptionModal({ onClose, onBeforeNavigate }: Props) {
           <>
             <input
               className={styles.input}
-              placeholder="Идентификатор пользователя"
+              placeholder="Код или ссылка на профиль"
               value={value}
               onChange={(e) => {
                 setValue(e.target.value);
