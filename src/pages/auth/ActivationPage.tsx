@@ -21,6 +21,14 @@ function formatAuthContact(contact: IAuthorizationContact): string {
   return `${typeName}: ${contact.value}`;
 }
 
+function readActivationSendMessage(result: unknown): string | null {
+  if (typeof result === 'string') {
+    const text = result.trim();
+    return text || null;
+  }
+  return null;
+}
+
 export default function ActivationPage() {
   const navigate = useNavigate();
   const { confirmActivation, logout } = useAuthStore();
@@ -56,8 +64,11 @@ export default function ActivationPage() {
   const handleResend = async () => {
     setResending(true); setResendMsg(null);
     try {
-      await apiClient.get('/api/authorization/sendActivationCode');
-      setResendMsg('Код отправлен повторно');
+      const data = await apiClient.get<string>('/api/authorization/sendActivationCode');
+      setResendMsg(
+        readActivationSendMessage(data.result)
+        ?? (data.message?.trim() || 'Код отправлен повторно'),
+      );
       // Перезапускаем таймер
       setResendTimer(RESEND_TIMEOUT);
       clearInterval(timerRef.current);
