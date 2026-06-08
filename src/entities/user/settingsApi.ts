@@ -62,3 +62,23 @@ export async function getMyContacts(): Promise<any[]> {
     return r.result ?? [];
   } catch { return []; }
 }
+
+export interface IAuthorizationContact {
+  id: string;
+  value: string;
+  contactType?: {
+    id: string;
+    name?: string | null;
+    localizedName?: string | null;
+  } | null;
+}
+
+/** GET /api/contacts/getAuthorizationContact — контакт, на который уходит код активации */
+export async function getAuthorizationContact(): Promise<IAuthorizationContact | null> {
+  try {
+    const r = await apiClient.get<IAuthorizationContact>('/api/contacts/getAuthorizationContact');
+    return r.result ?? null;
+  } catch {
+    return null;
+  }
+}
