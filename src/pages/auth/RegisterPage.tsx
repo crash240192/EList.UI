@@ -13,6 +13,7 @@ import {
   type IContactType,
 } from '@/features/auth/registrationApi';
 import { login } from '@/features/auth/api';
+import { storeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
 import { useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { savePendingPersonData } from '@/features/auth/pendingPersonData';
@@ -220,6 +221,9 @@ export default function RegisterPage() {
       if (authResult.activationRequired) {
         if (hasPersonData && personPayload) {
           savePendingPersonData(personPayload);
+        }
+        if (authResult.message) {
+          storeActivationNotice(authResult.message);
         }
         navigate('/activate', { replace: true });
         return;

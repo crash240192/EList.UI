@@ -32,8 +32,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
       }
 
       if (needsActivation) {
-        // Есть токен, но нужна активация — только на /activate
-        if (location.pathname !== '/activate') navigate('/activate', { replace: true });
+        // На /login остаёмся — LoginPage покажет уведомление и сам перейдёт на /activate
+        if (location.pathname !== '/activate' && location.pathname !== '/login') {
+          navigate('/activate', { replace: true });
+        }
         return;
       }
 

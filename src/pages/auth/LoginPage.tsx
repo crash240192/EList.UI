@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '@/features/auth/api';
+import { storeActivationNotice, takeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import styles from './AuthPage.module.css';
@@ -30,6 +31,7 @@ export default function LoginPage() {
       setAuth(r.token, r.activationRequired);
       if (r.activationRequired) {
         if (r.message) {
+          storeActivationNotice(r.message);
           setActivationNotice(r.message);
           return;
         }
@@ -111,6 +113,7 @@ export default function LoginPage() {
         hideCancel
         variant="accent"
         onConfirm={() => {
+          takeActivationNotice();
           setActivationNotice(null);
           navigate('/activate', { replace: true });
         }}
