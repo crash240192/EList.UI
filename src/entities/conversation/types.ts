@@ -9,6 +9,7 @@ export interface IConversation {
 export interface IConversationAccount {
   id: string;
   login?: string | null;
+  avatarId?: string | null;
 }
 
 export interface IConversationPersonInfo {

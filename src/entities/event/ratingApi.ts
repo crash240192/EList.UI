@@ -17,6 +17,7 @@ export interface IRatingAccount {
   id: string;
   active: boolean;
   login: string;
+  avatarId?: string | null;
 }
 
 export interface IRatingPersonInfo {

@@ -1,5 +1,5 @@
 // entities/user/ui/UserAvatar/UserAvatar.tsx
-// Аватар пользователя — загружает fileId через API и показывает через AuthImage
+// Аватар пользователя — fileId из avatarId аккаунта, без отдельного запроса
 
 import { useAvatar } from '@/features/auth/useAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
@@ -8,12 +8,13 @@ import styles from './UserAvatar.module.css';
 interface UserAvatarProps {
   accountId: string;
   initials:  string;
+  avatarId?: string | null;
   size?:     number;
   className?: string;
 }
 
-export function UserAvatar({ accountId, initials, size = 32, className }: UserAvatarProps) {
-  const fileId = useAvatar(accountId);
+export function UserAvatar({ accountId, initials, avatarId, size = 32, className }: UserAvatarProps) {
+  const fileId = useAvatar(accountId, avatarId);
 
   const style = {
     width:    size,

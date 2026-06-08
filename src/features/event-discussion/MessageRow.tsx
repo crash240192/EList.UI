@@ -95,7 +95,13 @@ export function MessageRow({
       >
         <div className={styles.cardInner}>
           {accountId ? (
-            <UserAvatar accountId={accountId} initials={initials} size={36} className={styles.avatar} />
+            <UserAvatar
+              accountId={accountId}
+              avatarId={message.account?.avatarId ?? null}
+              initials={initials}
+              size={36}
+              className={styles.avatar}
+            />
           ) : (
             <div className={styles.avatarFallback} aria-hidden>
               {initials}

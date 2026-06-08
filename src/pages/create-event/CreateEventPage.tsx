@@ -280,7 +280,7 @@ export default function CreateEventPage() {
       login:        item.account.login,
       firstName:    item.personInfo?.firstName ?? null,
       lastName:     item.personInfo?.lastName  ?? null,
-      avatarFileId: null,
+      avatarId: item.account.avatarId ?? null,
     }));
 
   const ensureBWListLoaded = useCallback(async (listType: BWListType) => {

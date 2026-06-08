@@ -5,6 +5,7 @@ import { apiClient } from '@/shared/api/client';
 export interface IParticipantAccount {
   id: string;
   login: string;
+  avatarId?: string | null;
   active: boolean;
   latitude: number | null;
   longitude: number | null;
@@ -35,6 +36,7 @@ export interface IParticipantView {
   login: string;
   firstName: string | null;
   lastName: string | null;
+  avatarId?: string | null;
 }
 
 export interface IParticipantsSearchRequest {
@@ -64,6 +66,7 @@ export async function fetchEventParticipantsPage(req: IParticipantsSearchRequest
     login:     p.account.login,
     firstName: p.personInfo?.firstName ?? null,
     lastName:  p.personInfo?.lastName  ?? null,
+    avatarId:  p.account.avatarId ?? null,
   }));
   return {
     items,
@@ -95,7 +98,7 @@ export interface IBWListUser {
   id: string;
   eventId: string;
   accountId: string;
-  account: { id: string; login: string; active: boolean };
+  account: { id: string; login: string; active: boolean; avatarId?: string | null };
   personInfo: { firstName: string | null; lastName: string | null } | null;
 }
 

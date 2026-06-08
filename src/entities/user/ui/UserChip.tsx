@@ -10,7 +10,7 @@ export interface IUserChipData {
   login: string;
   firstName?: string | null;
   lastName?: string | null;
-  avatarUrl?: string | null;
+  avatarId?: string | null;
   organizerRating?: number | null;
   visitorRating?: number | null;
   /** true если это текущий пользователь */
@@ -60,6 +60,7 @@ export function UserChip({ user, clickable = true, size = 'md' }: UserChipProps)
       <div className={styles.avatarWrap}>
         <UserAvatar
           accountId={user.accountId}
+          avatarId={user.avatarId}
           initials={initials}
           size={size === 'sm' ? 24 : 32}
           className={styles.avatar}

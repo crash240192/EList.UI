@@ -15,7 +15,7 @@ export interface IWhitelistUser {
   login: string;
   firstName?: string | null;
   lastName?: string | null;
-  avatarFileId?: string | null;
+  avatarId?: string | null;
 }
 
 interface Props {
@@ -107,7 +107,7 @@ export function WhitelistModal({ myAccountId, current, listType, onAdd, onClose 
         login:        s.account.login,
         firstName:    s.personInfo?.firstName ?? null,
         lastName:     s.personInfo?.lastName  ?? null,
-        avatarFileId: null,
+        avatarId: s.account.avatarId ?? null,
       }));
     onAdd(picked);
     onClose();
@@ -183,7 +183,7 @@ export function WhitelistModal({ myAccountId, current, listType, onAdd, onClose 
                     )}
                   </div>
                   <div className={styles.ava}>
-                    <UserAvatar accountId={s.account.id} initials={getInitials(s)} size={34} />
+                    <UserAvatar accountId={s.account.id} avatarId={s.account.avatarId ?? null} initials={getInitials(s)} size={34} />
                   </div>
                   <div className={styles.info}>
                     <div className={styles.name}>

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { uploadFile } from '@/shared/api/fileStorageClient';
 import { setAvatar } from '@/entities/user/avatarApi';
-import { invalidateAvatarCache } from '@/features/auth/useAvatar';
+import { seedAvatarCache } from '@/features/auth/useAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './AvatarUpload.module.css';
 
@@ -28,8 +28,7 @@ export function AvatarUpload({ initials, accountId, fileId: initialFileId, size 
       const uploaded = await uploadFile(file);
       // 2. Назначаем новый аватар через основной API
       await setAvatar(uploaded.id);
-      // 3. Инвалидируем кэш и обновляем локальный state
-      invalidateAvatarCache(accountId);
+      seedAvatarCache(accountId, uploaded.id);
       setFileId(uploaded.id);
       onChanged?.(uploaded.id);
     } catch (e) {

@@ -7,6 +7,7 @@ import { apiClient } from '@/shared/api/client';
 export interface ISubscriptionAccount {
   id: string;
   login: string;
+  avatarId?: string | null;
 }
 
 export interface ISubscriptionPersonInfo {

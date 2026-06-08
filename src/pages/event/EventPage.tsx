@@ -13,6 +13,7 @@ import { useAccountId } from '@/features/auth/useAccountId';
 import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserChip } from '@/entities/user/ui/UserChip';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ParticipantsModal } from '@/features/event/ParticipantsModal';
 import { InviteModal } from '@/features/event/InviteModal';
 import { AddOrganizerModal } from '@/features/event/AddOrganizerModal';
@@ -484,9 +485,13 @@ export default function EventPage() {
                     <div className={styles.secLabel}>Организаторы</div>
                     {organizers.map(o => (
                       <div key={o.accountId} className={styles.orgChip} onClick={() => navigate(`/user/${o.accountId}`)}>
-                        <div className={styles.orgChipAvatar}>
-                          {(o.firstName?.[0] ?? o.login?.[0] ?? '?').toUpperCase()}
-                        </div>
+                        <UserAvatar
+                          accountId={o.accountId}
+                          avatarId={o.avatarId ?? null}
+                          initials={(o.firstName?.[0] ?? o.login?.[0] ?? '?').toUpperCase()}
+                          size={36}
+                          className={styles.orgChipAvatar}
+                        />
                         <div>
                           <div className={styles.orgChipName}>
                             {o.firstName ? `${o.firstName} ${o.lastName ?? ''}`.trim() : o.login}
@@ -551,7 +556,7 @@ export default function EventPage() {
                     </div>
                     <div className={styles.chipsList} onClick={() => setParticipantsModalOpen(true)} style={{ cursor: 'pointer' }}>
                       {sortedParticipants.slice(0, 12).map(p => (
-                        <UserChip key={p.accountId} user={{ accountId: p.accountId, login: p.login, firstName: p.firstName, lastName: p.lastName, isMe: p.accountId === accountId }} size="sm" />
+                        <UserChip key={p.accountId} user={{ accountId: p.accountId, login: p.login, avatarId: p.avatarId ?? null, firstName: p.firstName, lastName: p.lastName, isMe: p.accountId === accountId }} size="sm" />
                       ))}
                       {sortedParticipants.length > 12 && (
                         <span className={styles.moreChip}>ещё {sortedParticipants.length - 12} →</span>

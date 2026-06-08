@@ -172,7 +172,7 @@ export function AddOrganizerModal({ eventId, currentAccountId, existingOrganizer
                       ) : null}
                     </div>
                     <div className={styles.ava}>
-                      <UserAvatar accountId={s.account.id} initials={getInitials(s)} size={34} />
+                      <UserAvatar accountId={s.account.id} avatarId={s.account.avatarId ?? null} initials={getInitials(s)} size={34} />
                     </div>
                     <div className={styles.info}>
                       <div className={styles.name}>

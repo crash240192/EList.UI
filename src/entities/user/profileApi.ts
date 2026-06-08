@@ -7,6 +7,7 @@ import type { Gender } from '@/shared/api/types';
 export interface IAccountData {
   id: string;
   login: string;
+  avatarId?: string | null;
 }
 
 export interface IContactType {

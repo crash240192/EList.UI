@@ -70,6 +70,7 @@ export async function fetchEventParameters(eventId: string): Promise<IEventParam
 interface IOrganizatorAccount {
   id: string;
   login: string;
+  avatarId?: string | null;
   latitude?: number | null;
   longitude?: number | null;
 }
@@ -98,6 +99,7 @@ export interface IEventOrganizator {
   login: string;
   firstName: string | null;
   lastName: string | null;
+  avatarId?: string | null;
 }
 
 /**
@@ -113,6 +115,7 @@ export async function fetchEventOrganizators(eventId: string): Promise<IEventOrg
       login:     o.account.login,
       firstName: o.personInfo?.firstName ?? null,
       lastName:  o.personInfo?.lastName  ?? null,
+      avatarId:  o.account.avatarId ?? null,
     }));
   } catch {
     return [];

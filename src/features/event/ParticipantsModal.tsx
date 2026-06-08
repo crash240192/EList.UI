@@ -176,7 +176,7 @@ export function ParticipantsModal({
                 return (
                   <div key={p.accountId} className={styles.item} onClick={() => handleItemClick(p)}>
                     <div className={styles.avaWrap} style={{ background: avaColor(p.accountId) }}>
-                      <UserAvatar accountId={p.accountId} initials={getInitials(p)} size={34} />
+                      <UserAvatar accountId={p.accountId} avatarId={p.avatarId ?? null} initials={getInitials(p)} size={34} />
                     </div>
                     <div className={styles.info}>
                       <div className={styles.name}>{name}</div>

@@ -255,6 +255,7 @@ export default function UserPage() {
           >
             <UserAvatar
               accountId={profileAccountId}
+              avatarId={account.avatarId ?? null}
               initials={initials}
               size={80}
               className={styles.avatar}

@@ -16,7 +16,9 @@ export interface IAccount {
   id: string;
   login: string;          // nickname
   personInfo?: IPersonInfo | null;
-  /** URL аватара */
+  /** Идентификатор файла аватара */
+  avatarId?: string | null;
+  /** @deprecated используйте avatarId */
   avatarUrl?: string | null;
   /** Рейтинг как организатора */
   organizerRating?: number | null;

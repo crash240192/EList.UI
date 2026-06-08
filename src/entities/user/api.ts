@@ -10,12 +10,13 @@ const COOKIE_ACCOUNT_ID = 'elist_account_id';
 interface AccountData {
   id: string;
   login: string;
+  avatarId?: string | null;
 }
 
 interface AccountDataResult {
   id: string;
   login: string;
-  // другие поля аккаунта при необходимости
+  avatarId?: string | null;
 }
 
 // ---- Cookie helpers ----

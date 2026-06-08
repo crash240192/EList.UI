@@ -92,7 +92,7 @@ export function BWListModal({ eventId, listType, onClose }: Props) {
               <div key={u.accountId} className={`${styles.item} ${styles.itemDisabled}`}
                 style={{ cursor: 'default' }}>
                 <div className={styles.ava}>
-                  <UserAvatar accountId={u.accountId} initials={getInitials(u)} size={34} />
+                  <UserAvatar accountId={u.accountId} avatarId={u.account.avatarId ?? null} initials={getInitials(u)} size={34} />
                 </div>
                 <div className={styles.info}>
                   <div className={styles.name}>{getDisplayName(u)}</div>
