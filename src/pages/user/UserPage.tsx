@@ -276,15 +276,24 @@ export default function UserPage() {
 
           {/* Счётчики + рейтинг */}
           <div className={styles.statsRow}>
-            <button className={styles.statBtn} onClick={() => setListModal('subscriptions')}>
-              <span className={styles.statNum}>{subsCount}</span>
-              <span className={styles.statLabel}>подписки</span>
-            </button>
-            <div className={styles.statDivider} />
-            <button className={styles.statBtn} onClick={() => setListModal('subscribers')}>
-              <span className={styles.statNum}>{subscrCount}</span>
-              <span className={styles.statLabel}>подписчики</span>
-            </button>
+            <div className={styles.statsGroup}>
+              <button
+                type="button"
+                className={`${styles.statBtn} ${listModal === 'subscriptions' ? styles.statBtnActive : ''}`}
+                onClick={() => setListModal('subscriptions')}
+              >
+                <span className={styles.statNum}>{subsCount}</span>
+                <span className={styles.statLabel}>подписки</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.statBtn} ${listModal === 'subscribers' ? styles.statBtnActive : ''}`}
+                onClick={() => setListModal('subscribers')}
+              >
+                <span className={styles.statNum}>{subscrCount}</span>
+                <span className={styles.statLabel}>подписчики</span>
+              </button>
+            </div>
 
             {rating !== null && (
               <>
