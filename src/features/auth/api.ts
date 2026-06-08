@@ -39,6 +39,14 @@ export function setActivationRequired(value: boolean): void {
 // POST /api/authorization
 // Заголовок authorization-jwt уже добавляет apiClient автоматически
 
+function readAuthResultMessage(result: AuthResponse | null | undefined): string | null {
+  if (!result || typeof result !== 'object') return null;
+  const r = result as unknown as Record<string, unknown>;
+  const nested = r.message ?? r.Message;
+  if (typeof nested === 'string' && nested.trim()) return nested.trim();
+  return null;
+}
+
 export async function login(payload: LoginPayload): Promise<LoginResult> {
   const data = await apiClient.post<AuthResponse>('/api/authorization', payload);
   const { token, activationRequired } = data.result;
@@ -48,7 +56,7 @@ export async function login(payload: LoginPayload): Promise<LoginResult> {
 
   return {
     ...data.result,
-    message: data.message?.trim() || null,
+    message: data.message?.trim() || readAuthResultMessage(data.result) || null,
   };
 }
 

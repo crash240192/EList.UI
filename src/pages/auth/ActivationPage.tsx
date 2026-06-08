@@ -6,7 +6,10 @@ import { activateAccount } from '@/features/auth/api';
 import { apiClient } from '@/shared/api/client';
 import { setPersonInfo } from '@/features/auth/registrationApi';
 import { loadPendingPersonData, clearPendingPersonData } from '@/features/auth/pendingPersonData';
+import { getAuthorizationContact, type IAuthorizationContact } from '@/entities/user/settingsApi';
+import { takeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import styles from './AuthPage.module.css';
 import actStyles from './ActivationPage.module.css';
 
@@ -32,6 +35,8 @@ export default function ActivationPage() {
   const [resendTimer, setResendTimer] = useState(RESEND_TIMEOUT);
   const [resending, setResending]     = useState(false);
   const [resendMsg, setResendMsg]     = useState<string | null>(null);
+  const [entryNotice, setEntryNotice] = useState<string | null>(() => takeActivationNotice());
+  const [authContact, setAuthContact] = useState<IAuthorizationContact | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const timerRef  = useRef<ReturnType<typeof setInterval>>();
 
@@ -120,6 +125,7 @@ export default function ActivationPage() {
   );
 
   return (
+    <>
     <div className={styles.page}>
       <div className={styles.card}>
 
@@ -186,5 +192,18 @@ export default function ActivationPage() {
         </div>
       </div>
     </div>
+
+    {entryNotice && (
+      <ConfirmDialog
+        title="Подтверждение аккаунта"
+        message={entryNotice}
+        confirmLabel="Понятно"
+        hideCancel
+        variant="accent"
+        onConfirm={() => setEntryNotice(null)}
+        onCancel={() => {}}
+      />
+    )}
+    </>
   );
 }
