@@ -1,5 +1,11 @@
 // shared/api/client.ts
-import { isActivationApiPath } from '@/shared/auth/unauthorized';
+import {
+  handleSessionUnauthorized,
+} from '@/shared/auth/sessionUnauthorized';
+import {
+  isUnauthorizedApiErrorCode,
+  shouldForceLogoutForApi,
+} from '@/shared/auth/unauthorized';
 import { cookies } from '@/shared/lib/cookies';
 import type { CommandResult } from './types';
 import { isAccessDeniedApiCode } from './errorCodes';
@@ -35,12 +41,9 @@ export function setAuthToken(token: string): void { cookies.set(COOKIE_AUTH_TOKE
 export function clearAuthToken(): void { cookies.delete(COOKIE_AUTH_TOKEN); }
 export function isAuthenticated(): boolean { return !!getAuthToken(); }
 
-let onUnauthorized: (() => void) | null = null;
-export function setUnauthorizedHandler(fn: () => void): void { onUnauthorized = fn; }
-
 /** Сброс сессии и редирект на /login (кроме публичных auth-страниц) */
 export function notifyUnauthorized(): void {
-  onUnauthorized?.();
+  handleSessionUnauthorized();
 }
 
 let onApiError: ((message: string) => void) | null = null;
@@ -70,7 +73,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
 
   const fetchPromise = fetch(`${BASE_URL}${path}`, { ...options, headers }).then(async response => {
     if (response.status === 401) {
-      if (!isActivationApiPath(path)) notifyUnauthorized();
+      if (shouldForceLogoutForApi(path)) notifyUnauthorized();
       throw new ApiError(401, 'Необходима авторизация');
     }
     if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
@@ -78,6 +81,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
     if (!data.success) {
       const code = data.errorCode ?? 0;
       const msg = data.message || 'Ошибка API';
+      if (shouldForceLogoutForApi(path) && isUnauthorizedApiErrorCode(code)) {
+        notifyUnauthorized();
+      }
       // Ошибки доступа показываем в UI блока/страницы, без тоста
       if (data.message && !isAccessDeniedApiCode(code)) onApiError?.(data.message);
       throw new ApiError(code, msg, data.message);
