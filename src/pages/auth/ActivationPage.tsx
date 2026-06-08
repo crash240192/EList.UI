@@ -6,20 +6,12 @@ import { activateAccount } from '@/features/auth/api';
 import { apiClient } from '@/shared/api/client';
 import { setPersonInfo } from '@/features/auth/registrationApi';
 import { loadPendingPersonData, clearPendingPersonData } from '@/features/auth/pendingPersonData';
-import { getAuthorizationContact, type IAuthorizationContact } from '@/entities/user/settingsApi';
 import { useAuthStore } from '@/app/store';
 import styles from './AuthPage.module.css';
 import actStyles from './ActivationPage.module.css';
 
 const CODE_LENGTH = 6;
 const RESEND_TIMEOUT = 15;
-
-function formatAuthContact(contact: IAuthorizationContact): string {
-  const typeName = contact.contactType?.localizedName
-    ?? contact.contactType?.name
-    ?? 'контакт';
-  return `${typeName}: ${contact.value}`;
-}
 
 function readActivationSendMessage(result: unknown): string | null {
   if (typeof result === 'string') {
@@ -40,15 +32,10 @@ export default function ActivationPage() {
   const [resendTimer, setResendTimer] = useState(RESEND_TIMEOUT);
   const [resending, setResending]     = useState(false);
   const [resendMsg, setResendMsg]     = useState<string | null>(null);
-  const [authContact, setAuthContact] = useState<IAuthorizationContact | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const timerRef  = useRef<ReturnType<typeof setInterval>>();
 
   const code = digits.join('');
-
-  useEffect(() => {
-    void getAuthorizationContact().then(setAuthContact);
-  }, []);
 
   // Запускаем таймер при монтировании
   useEffect(() => {
@@ -143,9 +130,7 @@ export default function ActivationPage() {
 
         <h1 className={styles.heading}>Подтверждение</h1>
         <p className={styles.subheading}>
-          {authContact
-            ? <>Код подтверждения отправлен на <strong className={actStyles.contactHint}>{formatAuthContact(authContact)}</strong>. Введите его ниже.</>
-            : 'На ваш контакт отправлен код подтверждения. Введите его ниже.'}
+          На ваш контакт отправлен код подтверждения. Введите его ниже.
         </p>
 
         <div className={actStyles.codeRow} onPaste={handlePaste}>
