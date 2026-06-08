@@ -5,7 +5,8 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
 import { setUnauthorizedHandler, setApiErrorHandler } from '@/shared/api/client';
-import { useToastStore } from '@/app/store';
+import { isPublicAuthRoute } from '@/shared/auth/unauthorized';
+import { useAuthStore, useToastStore } from '@/app/store';
 import { ToastContainer } from '@/shared/ui/Toast/Toast';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 
@@ -65,9 +66,12 @@ const router = createBrowserRouter([
   },
 ]);
 
-// Регистрируем обработчик 401 — при истечении токена редиректим на /login
+// 401 от API / WebSocket — сброс токена и редирект (кроме /login, /activate, /register)
 setUnauthorizedHandler(() => {
-  router.navigate('/login', { replace: true });
+  useAuthStore.getState().logout();
+  if (!isPublicAuthRoute()) {
+    router.navigate('/login', { replace: true });
+  }
 });
 
 // Регистрируем обработчик API-ошибок (success === false с непустым message)

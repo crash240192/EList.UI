@@ -4,6 +4,11 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/app/store';
 import { parseWsNotificationMessage } from '@/entities/notification/parseNotification';
 import { isNewInvitationNotification } from '@/entities/notification/notificationNavigation';
+import {
+  isWebSocketUnauthorizedClose,
+  isWebSocketUnauthorizedMessage,
+} from '@/shared/auth/unauthorized';
+import { notifyUnauthorized } from '@/shared/api/client';
 import { buildNotificationsWebSocketUrl } from '@/shared/lib/notificationsWsUrl';
 import { playNotificationPop } from '@/shared/lib/playNotificationPop';
 import { useInvitationsStore } from '@/features/invitations/invitationsStore';
@@ -31,6 +36,7 @@ export function useNotificationsWebSocket(enabled: boolean): void {
   const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef(false);
   const openedAtRef = useRef(0);
+  const unauthorizedRef = useRef(false);
 
   useEffect(() => {
     unmountedRef.current = false;
@@ -67,6 +73,7 @@ export function useNotificationsWebSocket(enabled: boolean): void {
     };
 
     if (!enabled || !token) {
+      unauthorizedRef.current = false;
       clearReconnect();
       closeSocketSilently();
       reset();
@@ -78,8 +85,18 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       };
     }
 
+    const handleUnauthorized = () => {
+      if (unauthorizedRef.current) return;
+      unauthorizedRef.current = true;
+      clearReconnect();
+      closeSocketSilently();
+      reset();
+      useInvitationsStore.getState().reset();
+      notifyUnauthorized();
+    };
+
     const scheduleReconnect = () => {
-      if (unmountedRef.current) return;
+      if (unmountedRef.current || unauthorizedRef.current) return;
       const lived = Date.now() - openedAtRef.current;
       const rapidClose = openedAtRef.current > 0 && lived < RAPID_CLOSE_MS;
       const delay = Math.min(
@@ -140,6 +157,10 @@ export function useNotificationsWebSocket(enabled: boolean): void {
 
       ws.onmessage = ev => {
         if (typeof ev.data !== 'string') return;
+        if (isWebSocketUnauthorizedMessage(ev.data)) {
+          handleUnauthorized();
+          return;
+        }
         const n = parseWsNotificationMessage(ev.data);
         if (!n) return;
         pushNotification(n);
@@ -154,16 +175,25 @@ export function useNotificationsWebSocket(enabled: boolean): void {
         setWsStatus('error', 'Ошибка соединения');
       };
 
-      ws.onclose = () => {
+      ws.onclose = ev => {
         clearConnectTimeout();
         if (unmountedRef.current || myGen !== connectionGenRef.current) return;
         wsRef.current = null;
+
+        if (isWebSocketUnauthorizedClose(ev.code, ev.reason)) {
+          handleUnauthorized();
+          return;
+        }
+
         setWsStatus('closed', null);
         scheduleReconnect();
       };
     };
 
+    unauthorizedRef.current = false;
+
     const onVisibility = () => {
+      if (unauthorizedRef.current) return;
       if (document.visibilityState !== 'visible') return;
       const state = wsRef.current?.readyState;
       if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) return;
