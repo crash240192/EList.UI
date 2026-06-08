@@ -3,14 +3,15 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/app/store';
-import { getOrCreateClientHash } from '@/shared/api/client';
+import { getOrCreateClientHash, isAuthenticated as hasAuthToken } from '@/shared/api/client';
 
 interface AuthGuardProps {
   children: React.ReactNode;
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
-  const { isAuthenticated, needsActivation } = useAuthStore();
+  const token = useAuthStore(s => s.token);
+  const needsActivation = useAuthStore(s => s.activationRequired);
   const navigate = useNavigate();
   const location = useLocation();
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -25,12 +26,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
       const publicPaths = ['/login', '/activate', '/register'];
       const isPublic    = publicPaths.some(p => location.pathname.startsWith(p));
 
-      if (!isAuthenticated()) {
+      if (!hasAuthToken()) {
         if (!isPublic) navigate('/login', { replace: true, state: { from: location.pathname } });
         return;
       }
 
-      if (needsActivation()) {
+      if (needsActivation) {
         // Есть токен, но нужна активация — только на /activate
         if (location.pathname !== '/activate') navigate('/activate', { replace: true });
         return;
@@ -44,7 +45,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }, 50);
 
     return () => clearTimeout(timerRef.current);
-  }, [isAuthenticated, needsActivation, location.pathname, navigate]);
+  }, [token, needsActivation, location.pathname, navigate]);
 
   return <>{children}</>;
 }

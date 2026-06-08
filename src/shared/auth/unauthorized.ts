@@ -1,16 +1,38 @@
 // shared/auth/unauthorized.ts
 
+import { ApiErrorCode } from '@/shared/api/errorCodes';
+
 export const PUBLIC_AUTH_ROUTES = ['/login', '/activate', '/register'] as const;
 
 export function isPublicAuthRoute(pathname = window.location.pathname): boolean {
   return PUBLIC_AUTH_ROUTES.some(route => pathname.startsWith(route));
 }
 
-const ACTIVATION_API_MARKERS = ['activation', 'activate'] as const;
-
-/** API активации/авторизации на публичных страницах — без принудительного выхода */
+/** API активации — без принудительного выхода (страницы /login, /activate, /register) */
 export function isActivationApiPath(path: string): boolean {
-  return ACTIVATION_API_MARKERS.some(marker => path.includes(marker));
+  const p = path.toLowerCase();
+  return (
+    p.includes('/authorization/activate')
+    || p.includes('sendactivationcode')
+    || /\/activate(?:\?|$|\/)/.test(p)
+    || /\/activation(?:\?|$|\/)/.test(p)
+  );
+}
+
+/** Нужно ли при 401 сбрасывать сессию для этого запроса */
+export function shouldForceLogoutForApi(path: string): boolean {
+  if (isPublicAuthRoute()) return false;
+  if (isActivationApiPath(path)) return false;
+  return true;
+}
+
+/** CommandResult.errorCode — истёкший/невалидный токен (HTTP может быть 200) */
+export function isUnauthorizedApiErrorCode(code: number): boolean {
+  return (
+    code === 401
+    || code === ApiErrorCode.AuthenticationError
+    || code === ApiErrorCode.AuthorizationDataNotFound
+  );
 }
 
 export function isWebSocketUnauthorizedClose(code: number, reason?: string): boolean {
