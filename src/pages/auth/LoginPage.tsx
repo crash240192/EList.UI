@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '@/features/auth/api';
 import { useAuthStore } from '@/app/store';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import styles from './AuthPage.module.css';
 
 export default function LoginPage() {
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [loading, setLoad]  = useState(false);
   const [error, setError]   = useState<string | null>(null);
   const [showPass, setShow] = useState(false);
+  const [activationNotice, setActivationNotice] = useState<string | null>(null);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(f => ({ ...f, [k]: e.target.value }));
@@ -26,7 +28,15 @@ export default function LoginPage() {
     try {
       const r = await login({ login: form.login, password: form.password });
       setAuth(r.token, r.activationRequired);
-      navigate(r.activationRequired ? '/activate' : '/', { replace: true });
+      if (r.activationRequired) {
+        if (r.message) {
+          setActivationNotice(r.message);
+          return;
+        }
+        navigate('/activate', { replace: true });
+        return;
+      }
+      navigate('/', { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Неверный логин или пароль');
     } finally { setLoad(false); }
@@ -35,6 +45,7 @@ export default function LoginPage() {
   const onKey = (e: React.KeyboardEvent) => e.key === 'Enter' && handleSubmit();
 
   return (
+    <>
     <div className={styles.page}>
       <div className={styles.card}>
 
@@ -91,5 +102,21 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+
+    {activationNotice && (
+      <ConfirmDialog
+        title="Подтверждение аккаунта"
+        message={activationNotice}
+        confirmLabel="Понятно"
+        hideCancel
+        variant="accent"
+        onConfirm={() => {
+          setActivationNotice(null);
+          navigate('/activate', { replace: true });
+        }}
+        onCancel={() => {}}
+      />
+    )}
+    </>
   );
 }

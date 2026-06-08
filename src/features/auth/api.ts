@@ -12,6 +12,11 @@ export interface AuthResponse {
   activationRequired: boolean;
 }
 
+export interface LoginResult extends AuthResponse {
+  /** CommandResult.message — куда отправлен код активации */
+  message: string | null;
+}
+
 export interface LoginPayload {
   login: string;
   password: string;
@@ -34,14 +39,17 @@ export function setActivationRequired(value: boolean): void {
 // POST /api/authorization
 // Заголовок authorization-jwt уже добавляет apiClient автоматически
 
-export async function login(payload: LoginPayload): Promise<AuthResponse> {
+export async function login(payload: LoginPayload): Promise<LoginResult> {
   const data = await apiClient.post<AuthResponse>('/api/authorization', payload);
   const { token, activationRequired } = data.result;
 
   setAuthToken(token);
   setActivationRequired(activationRequired);
 
-  return data.result;
+  return {
+    ...data.result,
+    message: data.message?.trim() || null,
+  };
 }
 
 // ---- Активация аккаунта ----
