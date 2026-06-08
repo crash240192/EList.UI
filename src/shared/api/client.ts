@@ -1,4 +1,5 @@
 // shared/api/client.ts
+import { isActivationApiPath } from '@/shared/auth/unauthorized';
 import { cookies } from '@/shared/lib/cookies';
 import type { CommandResult } from './types';
 import { isAccessDeniedApiCode } from './errorCodes';
@@ -37,6 +38,11 @@ export function isAuthenticated(): boolean { return !!getAuthToken(); }
 let onUnauthorized: (() => void) | null = null;
 export function setUnauthorizedHandler(fn: () => void): void { onUnauthorized = fn; }
 
+/** Сброс сессии и редирект на /login (кроме публичных auth-страниц) */
+export function notifyUnauthorized(): void {
+  onUnauthorized?.();
+}
+
 let onApiError: ((message: string) => void) | null = null;
 export function setApiErrorHandler(fn: (message: string) => void): void { onApiError = fn; }
 
@@ -64,8 +70,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
 
   const fetchPromise = fetch(`${BASE_URL}${path}`, { ...options, headers }).then(async response => {
     if (response.status === 401) {
-      const isActivation = path.includes('activation') || path.includes('activate');
-      if (!isActivation) { clearAuthToken(); onUnauthorized?.(); }
+      if (!isActivationApiPath(path)) notifyUnauthorized();
       throw new ApiError(401, 'Необходима авторизация');
     }
     if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
