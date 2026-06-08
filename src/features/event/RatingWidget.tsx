@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchEventRating, voteEventRating, deleteEventRating } from '@/entities/event';
 import type { IRatingItem, IRatingPage, RatingType } from '@/entities/event';
+import { getEventRatingGrade } from '@/shared/lib/eventRatingGrade';
+import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import styles from './RatingWidget.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
@@ -26,49 +28,6 @@ export function isEventFinished(startTime: string, endTime?: string | null): boo
   return deadline.getTime() <= Date.now();
 }
 
-// ── Grade system ─────────────────────────────────────────────────────────────
-
-type Grade = { label: string; color: string; rot: number };
-
-function getGrade(score: number): Grade {
-  if (score >= 4.99) return { label: 'A++', color: '#16a34a', rot: -7 };
-  if (score >= 4.95) return { label: 'A+',  color: '#22c55e', rot: -5 };
-  if (score >= 4.7)  return { label: 'A',   color: '#4ade80', rot: -3 };
-  if (score >= 4.0)  return { label: 'B',   color: '#3b82f6', rot:  4 };
-  if (score >= 3.0)  return { label: 'C',   color: '#f59e0b', rot: -6 };
-  if (score >= 2.0)  return { label: 'D',   color: '#f97316', rot:  3 };
-  if (score >= 1.0)  return { label: 'F',   color: '#ef4444', rot: -8 };
-  return               { label: 'F−', color: '#dc2626', rot:  5 };
-}
-
-function getSimpleGrade(score: number): Grade {
-  if (score >= 5)  return { label: 'A', color: '#4ade80', rot: -3 };
-  if (score >= 4)  return { label: 'B', color: '#3b82f6', rot:  4 };
-  if (score >= 3)  return { label: 'C', color: '#f59e0b', rot: -6 };
-  if (score >= 2)  return { label: 'D', color: '#f97316', rot:  3 };
-  return                   { label: 'F', color: '#ef4444', rot: -8 };
-}
-
-const ROUGH_CIRCLE =
-  'M24,6 C34,2 41,12 38,22 C36,33 26,38 14,36 C3,34 -1,26 2,17 C5,8 14,4 23,5 C28,5 34,8 31,14';
-
-function GradeBadge({ score, size = 'sm', simple = false }: { score: number; size?: 'xs' | 'sm' | 'lg'; simple?: boolean }) {
-  const { label, color, rot } = simple ? getSimpleGrade(score) : getGrade(score);
-  const long = label.length > 1;
-  return (
-    <span
-      className={`${styles.gb} ${styles[`gb_${size}`]}`}
-      style={{ color, transform: `rotate(${rot}deg)` }}
-      aria-label={label}
-    >
-      <svg viewBox="0 0 40 40" fill="none" className={styles.gbRing} aria-hidden>
-        <path d={ROUGH_CIRCLE} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-      </svg>
-      <span className={`${styles.gbLabel} ${long ? styles.gbLabelLong : ''}`}>{label}</span>
-    </span>
-  );
-}
-
 function GradePicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
     <div className={styles.gradePicker}>
@@ -78,7 +37,7 @@ function GradePicker({ value, onChange }: { value: number; onChange: (v: number)
           type="button"
           className={`${styles.gpItem} ${value === v ? styles.gpSelected : ''}`}
           onClick={() => onChange(value === v ? 0 : v)}
-          title={getGrade(v).label}
+          title={getEventRatingGrade(v).label}
         >
           <GradeBadge score={v} size="sm" simple />
           <span className={styles.gpNum}>{v}</span>

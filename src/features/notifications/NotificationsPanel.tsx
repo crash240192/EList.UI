@@ -12,6 +12,7 @@ import {
 import { fetchConnectionStats, sendTestNotification } from '@/entities/notification/api';
 import { useNotificationsStore } from './notificationsStore';
 import { useDebouncedWsStatus } from './useDebouncedWsStatus';
+import { NotificationRatingPreview } from './NotificationRatingPreview';
 import styles from './NotificationsPanel.module.css';
 
 interface NotificationsPanelProps {
@@ -140,9 +141,9 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
             const hasTitle = !!n.title;
             const messageText = n.message || notificationTypeLabel(n.type);
             const eventStart = formatEventStart(n.eventShort?.startTime);
-            const ratingHint = n.ratingData
-              ? `Оценка: ${n.ratingData.value}${n.ratingData.comment ? ` · ${n.ratingData.comment}` : ''}`
-              : null;
+            const ratingPreview = n.ratingData ? (
+              <NotificationRatingPreview rating={n.ratingData} />
+            ) : null;
             const showEventName = !!n.eventShort?.name && (hasTitle || isEventPageNotificationType(n.type));
             return (
             <li key={n.id}>
@@ -174,9 +175,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                       {n.message && (
                         <span className={styles.itemMessage}>{n.message}</span>
                       )}
-                      {ratingHint && (
-                        <span className={styles.itemMessage}>{ratingHint}</span>
-                      )}
+                      {ratingPreview}
                       {eventStart && (
                         <span className={styles.itemEventWhen}>Начало: {eventStart}</span>
                       )}
@@ -200,9 +199,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                           {n.eventShort!.name}
                         </span>
                       )}
-                      {ratingHint && (
-                        <span className={styles.itemMessage}>{ratingHint}</span>
-                      )}
+                      {ratingPreview}
                       {eventStart && (
                         <span className={styles.itemEventWhen}>Начало: {eventStart}</span>
                       )}
