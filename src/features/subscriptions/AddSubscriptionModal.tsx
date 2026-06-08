@@ -28,7 +28,7 @@ export function AddSubscriptionModal({ onClose, onBeforeNavigate }: Props) {
 
   const normalizedId = parseUserIdFromText(value);
 
-  const goToProfile = async () => {
+  const goToProfile = () => {
     const userId = normalizedId;
     if (!userId) {
       setError('Введите корректный код или ссылку на профиль');
@@ -36,13 +36,11 @@ export function AddSubscriptionModal({ onClose, onBeforeNavigate }: Props) {
     }
 
     setError(null);
-    try {
-      await onBeforeNavigate?.();
-    } catch {
-      return;
-    }
-    onClose();
+    // Сначала navigate — иначе useModalBackButton при закрытии модалки
+    // вызовет history.back() и отменит переход (особенно с /user/me).
     navigate(`/user/${userId}`);
+    onClose();
+    void onBeforeNavigate?.();
   };
 
   const handleDetected = (userId: string) => {

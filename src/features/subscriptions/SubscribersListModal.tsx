@@ -190,7 +190,10 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
               <button
                 type="button"
                 className={styles.rowMain}
-                onClick={() => { void handleClose(); navigate(`/user/${item.account.id}`); }}
+                onClick={() => {
+                  navigate(`/user/${item.account.id}`);
+                  void handleClose();
+                }}
               >
                 <UserChip
                   user={{
