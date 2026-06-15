@@ -13,6 +13,7 @@ import { fetchConnectionStats, sendTestNotification } from '@/entities/notificat
 import { useNotificationsStore } from './notificationsStore';
 import { useDebouncedWsStatus } from './useDebouncedWsStatus';
 import { NotificationRatingPreview } from './NotificationRatingPreview';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import styles from './NotificationsPanel.module.css';
 
 interface NotificationsPanelProps {
@@ -145,9 +146,15 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
               <NotificationRatingPreview rating={n.ratingData} />
             ) : null;
             const showEventName = !!n.eventShort?.name && (hasTitle || isEventPageNotificationType(n.type));
+            const actorAccountId = n.relatedAccountId ?? n.ratingData?.accountId ?? null;
             return (
             <li key={n.id}>
               <div className={`${styles.item} ${styles.itemUnread}`}>
+                {actorAccountId && (
+                  <div className={styles.itemAvatarCol}>
+                    <UserAvatar accountId={actorAccountId} initials="?" size={32} />
+                  </div>
+                )}
                 <button
                   type="button"
                   className={styles.itemMain}

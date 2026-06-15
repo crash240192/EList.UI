@@ -245,6 +245,8 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
         <SubscribeModal
           stacked
           targetLogin={settingsTarget.account.login}
+          targetAccountId={settingsTarget.account.id}
+          targetAvatarId={settingsTarget.account.avatarId ?? null}
           initialSettings={settingsTarget.notifySettings ?? undefined}
           title={`Настройки уведомлений @${settingsTarget.account.login}`}
           subtitle="Выберите уведомления, которые хотите получать от пользователя:"

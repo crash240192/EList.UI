@@ -5,6 +5,7 @@ import { fetchEventRating, voteEventRating, deleteEventRating } from '@/entities
 import type { IRatingItem, IRatingPage, RatingType } from '@/entities/event';
 import { getEventRatingGrade } from '@/shared/lib/eventRatingGrade';
 import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import styles from './RatingWidget.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
@@ -53,6 +54,12 @@ function ratingAuthorName(item: IRatingItem): string {
     : item.account.login;
 }
 
+function ratingAuthorInitials(item: IRatingItem): string {
+  const pi = item.personInfo;
+  if (pi?.firstName) return `${pi.firstName[0]}${pi.lastName?.[0] ?? ''}`.toUpperCase();
+  return item.account.login[0]?.toUpperCase() ?? '?';
+}
+
 interface RatingItemRowProps {
   item: IRatingItem;
   isOwn?: boolean;
@@ -68,9 +75,13 @@ function RatingItemRow({ item, isOwn, canDelete, deleteDisabled, onDeleteClick }
   return (
     <article className={`${styles.ratingItem} ${isOwn ? styles.ratingItemOwn : ''}`}>
       <div className={styles.ratingItemHeader}>
-        <div className={styles.ratingItemAvatar} aria-hidden>
-          {name[0]?.toUpperCase() ?? '?'}
-        </div>
+        <UserAvatar
+          accountId={item.accountId}
+          avatarId={item.account.avatarId ?? null}
+          initials={ratingAuthorInitials(item)}
+          size={30}
+          className={styles.ratingItemAvatar}
+        />
 
         <div className={styles.ratingItemMeta}>
           <span className={styles.ratingItemName}>{name}</span>

@@ -22,6 +22,7 @@ import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker'
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { DurationPicker } from '@/shared/ui/DurationPicker/DurationPicker';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
@@ -890,8 +891,17 @@ export default function CreateEventPage() {
                   <div className={styles.whitelistList}>
                     {currentList.map(u => {
                       const name = u.firstName ? `${u.firstName} ${u.lastName ?? ''}`.trim() : u.login;
+                      const initials = u.firstName
+                        ? `${u.firstName[0]}${u.lastName?.[0] ?? ''}`.toUpperCase()
+                        : u.login[0]?.toUpperCase() ?? '?';
                       return (
                         <div key={u.accountId} className={styles.whitelistChip}>
+                          <UserAvatar
+                            accountId={u.accountId}
+                            avatarId={u.avatarId ?? null}
+                            initials={initials}
+                            size={22}
+                          />
                           <span className={styles.whitelistChipName}>{name}</span>
                           <span className={styles.whitelistChipLogin}>@{u.login}</span>
                           <button className={styles.whitelistChipRemove}

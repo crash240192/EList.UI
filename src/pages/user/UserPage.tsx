@@ -355,7 +355,7 @@ export default function UserPage() {
 
       {/* Модалы */}
       {showSubscribe && (
-        <SubscribeModal targetLogin={account.login} onConfirm={handleSubscribe} onCancel={() => setShowSubscribe(false)} />
+        <SubscribeModal targetLogin={account.login} targetAccountId={account.id} targetAvatarId={account.avatarId ?? null} onConfirm={handleSubscribe} onCancel={() => setShowSubscribe(false)} />
       )}
       {listModal === 'subscriptions' && (
         <SubscribersListModal title="Подписки"

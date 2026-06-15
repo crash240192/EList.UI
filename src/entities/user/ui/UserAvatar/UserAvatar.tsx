@@ -11,9 +11,10 @@ interface UserAvatarProps {
   avatarId?: string | null;
   size?:     number;
   className?: string;
+  style?:    React.CSSProperties;
 }
 
-export function UserAvatar({ accountId, initials, avatarId, size = 32, className }: UserAvatarProps) {
+export function UserAvatar({ accountId, initials, avatarId, size = 32, className, style: styleProp }: UserAvatarProps) {
   const fileId = useAvatar(accountId, avatarId);
 
   const style = {
@@ -21,6 +22,7 @@ export function UserAvatar({ accountId, initials, avatarId, size = 32, className
     height:   size,
     fontSize: size * 0.38,
     borderRadius: '50%',
+    ...styleProp,
   };
 
   return (

@@ -2,11 +2,14 @@
 
 import { useState } from 'react';
 import type { INotifySettings } from '@/entities/user/subscriptionApi';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import styles from './SubscribeModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
 interface Props {
   targetLogin: string;
+  targetAccountId?: string;
+  targetAvatarId?: string | null;
   onConfirm: (settings: INotifySettings) => Promise<void>;
   onCancel: () => void;
   initialSettings?: INotifySettings;
@@ -19,6 +22,8 @@ interface Props {
 
 export function SubscribeModal({
   targetLogin,
+  targetAccountId,
+  targetAvatarId,
   onConfirm,
   onCancel,
   initialSettings,
@@ -51,6 +56,10 @@ export function SubscribeModal({
     }
   };
 
+  const displayTitle = title ?? `Подписаться на @${targetLogin}`;
+  const displaySubtitle = subtitle ?? 'Выберите уведомления которые хотите получать:';
+  const initials = targetLogin.slice(0, 2).toUpperCase() || '?';
+
   return (
     <>
       <div
@@ -63,8 +72,25 @@ export function SubscribeModal({
         aria-modal
         aria-label="Подписаться"
       >
-        <h3 className={styles.title}>{title ?? `Подписаться на @${targetLogin}`}</h3>
-        <p className={styles.subtitle}>{subtitle ?? 'Выберите уведомления которые хотите получать:'}</p>
+        {targetAccountId ? (
+          <div className={styles.userRow}>
+            <UserAvatar
+              accountId={targetAccountId}
+              avatarId={targetAvatarId}
+              initials={initials}
+              size={40}
+            />
+            <div className={styles.userRowText}>
+              <h3 className={styles.title}>{displayTitle}</h3>
+              <p className={styles.subtitle}>{displaySubtitle}</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <h3 className={styles.title}>{displayTitle}</h3>
+            <p className={styles.subtitle}>{displaySubtitle}</p>
+          </>
+        )}
 
         <div className={styles.options}>
           <label className={styles.option}>
