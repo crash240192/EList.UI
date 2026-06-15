@@ -80,7 +80,6 @@
 }
 .heroBtn { width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,.18); backdrop-filter:blur(8px); border:.5px solid rgba(255,255,255,.25); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s; }
 .heroBtn:hover { background:rgba(255,255,255,.3); }
-.heroBtnFav { background:rgba(239,68,68,.5)!important; }
 .tagType,.tagFree { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); display:inline-flex; align-items:center; gap:4px; }
 .tagFree { background:rgba(16,185,129,.65); color:#fff; border:.5px solid rgba(16,185,129,.4); }
 

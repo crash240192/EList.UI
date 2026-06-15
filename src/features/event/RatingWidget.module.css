@@ -29,7 +29,13 @@
 
 .badgeScore { font-size:13px; font-weight:600; line-height:1; }
 .badgeCount { font-size:11px; color:var(--text-muted); }
-.badgeEmpty { font-size:12px; color:var(--text-muted); }
+.badgeEmpty {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #ef4444;
+}
 
 /* ── Stars ── */
 .stars { display:inline-flex; align-items:center; gap:1px; }

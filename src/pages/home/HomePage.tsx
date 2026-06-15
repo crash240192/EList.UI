@@ -7,7 +7,7 @@ import type { IEvent, IEventsSearchParams } from '@/entities/event';
 import { EventCard, fetchEventById, EVENTS_MAP_SHORT_PAGE_SIZE } from '@/entities/event';
 import { useEvents } from '@/features/event-list/useEvents';
 import { useEventsMapShort } from '@/features/event-list/useEventsMapShort';
-import { useFiltersStore, useFavoritesStore } from '@/app/store';
+import { useFiltersStore } from '@/app/store';
 import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
 import { EventModal } from './EventModal';
 import { FilterBar } from '@/features/event-filters/FilterBar';
@@ -52,7 +52,6 @@ export default function HomePage() {
   const prevParamsKeyRef = useRef<string | null>(null);
   const { filters, setFilter, viewMode, setViewMode, mapCenter, setMapCenter, mapZoom, setMapZoom } =
     useFiltersStore();
-  const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const {
     coords: userCoords,
     showCityConfirm,
@@ -238,8 +237,6 @@ export default function HomePage() {
                     <EventCard.Preset
                       event={event}
                       onClick={e => handleListEventClick(e)}
-                      isFavorite={isFavorite(event.id)}
-                      onFavorite={toggleFav}
                     />
                     {shouldInsertAdAfterIndex(idx) && (
                       <AdSlot key={`ad-${event.id}`} />

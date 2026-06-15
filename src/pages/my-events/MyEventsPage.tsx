@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { EventCard } from '@/entities/event';
 import { useMyEvents, type OwnerFilter } from '@/features/event-list/useMyEvents';
 import { FilterBar } from '@/features/event-filters/FilterBar';
-import { useMyEventsFiltersStore, useFavoritesStore } from '@/app/store';
+import { useMyEventsFiltersStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
 import type { IEventsSearchParams, EventViewMode } from '@/entities/event';
@@ -53,7 +53,6 @@ const OWNER_TABS = [
 
 export default function MyEventsPage() {
   const navigate = useNavigate();
-  const { toggle: toggleFav, isFavorite } = useFavoritesStore();
   const { accountId, loading: accountLoading } = useAccountId();
   const { filters, setFilter, resetFilters } = useMyEventsFiltersStore();
 
@@ -240,8 +239,6 @@ export default function MyEventsPage() {
                   <EventCard.Preset
                     event={event}
                     onClick={() => navigate(`/event/${event.id}`)}
-                    isFavorite={isFavorite(event.id)}
-                    onFavorite={toggleFav}
                     className={event.isOrganizer ? styles.cardOrganizer : undefined}
                   />
                 </div>

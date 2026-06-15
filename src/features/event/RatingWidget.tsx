@@ -462,7 +462,10 @@ export function RatingWidget({
             {data.total > 0 && <span className={styles.badgeCount}>({data.total})</span>}
           </>
         ) : (
-          <span className={styles.badgeEmpty}>Оценить</span>
+          <span className={styles.badgeEmpty}>
+            <HeartIcon />
+            Оценить
+          </span>
         )}
       </button>
 
@@ -492,4 +495,12 @@ function pluralVotes(n: number): string {
   if (mod10 === 1) return 'оценка';
   if (mod10 >= 2 && mod10 <= 4) return 'оценки';
   return 'оценок';
+}
+
+function HeartIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  );
 }

@@ -8,7 +8,6 @@ import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
 import { useEvents } from '@/features/event-list/useEvents';
-import { useFavoritesStore } from '@/app/store';
 import {
   fetchSubscriptionsCount, fetchSubscribersCount,
   fetchSubscriptions,
