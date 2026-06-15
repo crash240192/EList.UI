@@ -248,7 +248,7 @@
   .participantsChipsRow {
     flex-wrap: wrap;
     align-content: flex-start;
-    max-height: 62px;
+    max-height: 66px;
     overflow: hidden;
   }
 }

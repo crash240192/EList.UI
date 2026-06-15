@@ -62,7 +62,7 @@ export function UserChip({ user, clickable = true, size = 'md' }: UserChipProps)
           accountId={user.accountId}
           avatarId={user.avatarId}
           initials={initials}
-          size={size === 'sm' ? 28 : 36}
+          size={size === 'sm' ? 26 : 34}
           className={styles.avatar}
         />
         {user.isMe && <span className={styles.meDot} title="Это вы" />}

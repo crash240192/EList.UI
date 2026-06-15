@@ -35,8 +35,8 @@
 
 /* ---- Sizes ---- */
 
-.sm { padding: 0 8px 0 0; gap: 6px; }
-.md { padding: 0 10px 0 0; }
+.sm { padding: 2px 8px 2px 2px; gap: 6px; }
+.md { padding: 3px 10px 3px 3px; }
 
 /* ---- Avatar ---- */
 
@@ -49,10 +49,10 @@
 }
 
 .avatar { border-radius: 50%; }
-.sm .avatarWrap { width: 28px; height: 28px; }
-.md .avatarWrap { width: 36px; height: 36px; }
-.sm .avatar { width: 28px; height: 28px; }
-.md .avatar { width: 36px; height: 36px; }
+.sm .avatarWrap { width: 26px; height: 26px; }
+.md .avatarWrap { width: 34px; height: 34px; }
+.sm .avatar { width: 26px; height: 26px; }
+.md .avatar { width: 34px; height: 34px; }
 
 .avatarImg,
 .avatarInitials {
