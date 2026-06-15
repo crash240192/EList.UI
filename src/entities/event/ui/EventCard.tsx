@@ -82,7 +82,7 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
   );
 }
 
-// ---- Body / Title / Meta / Footer / Price / Participants / FavoriteButton / Rating ----
+// ---- Body / Title / Meta / Footer / Price / Participants / Rating ----
 
 function Body({ children }: { children: React.ReactNode }) { return <div className={styles.body}>{children}</div>; }
 function Title() { const { event } = useEventCard(); return <h3 className={styles.title}>{event.name}</h3>; }
@@ -128,22 +128,6 @@ function Participants() {
   );
 }
 
-interface FavoriteButtonProps { isFavorite: boolean; onToggle: (id: string, cur: boolean) => void; }
-function FavoriteButton({ isFavorite, onToggle }: FavoriteButtonProps) {
-  const { event } = useEventCard();
-  return (
-    <button
-      className={`${styles.favBtn} ${isFavorite ? styles.favActive : ''}`}
-      onClick={(e) => { e.stopPropagation(); onToggle(event.id, isFavorite); }}
-      aria-label={isFavorite ? 'Убрать из избранного' : 'В избранное'}
-    >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-      </svg>
-    </button>
-  );
-}
-
 function Rating() {
   const { event } = useEventCard();
   if (!event.anticipationRating) return null;
@@ -156,8 +140,8 @@ function Rating() {
 }
 
 // ---- Preset ----
-interface PresetProps { event: IEvent; onClick?: (e: IEvent) => void; onFavorite?: (id: string, cur: boolean) => void; isFavorite?: boolean; className?: string; }
-function Preset({ event, onClick, onFavorite, isFavorite = false, className }: PresetProps) {
+interface PresetProps { event: IEvent; onClick?: (e: IEvent) => void; className?: string; }
+function Preset({ event, onClick, className }: PresetProps) {
   return (
     <EventCard event={event} onClick={onClick} className={className}>
       <Cover />
@@ -166,7 +150,6 @@ function Preset({ event, onClick, onFavorite, isFavorite = false, className }: P
         <Meta />
         <Footer>
           <div className={styles.footerLeft}><Price /><Rating /><Participants /></div>
-          {onFavorite && <FavoriteButton isFavorite={isFavorite} onToggle={onFavorite} />}
         </Footer>
       </Body>
     </EventCard>
@@ -181,8 +164,7 @@ EventCard.Footer = Footer;
 EventCard.Price = Price;
 EventCard.Rating = Rating;
 EventCard.Participants = Participants;
-EventCard.FavoriteButton = FavoriteButton;
 EventCard.Preset = Preset;
 
 export { EventCard };
-export type { EventCardProps, FavoriteButtonProps, PresetProps };
+export type { EventCardProps, PresetProps };

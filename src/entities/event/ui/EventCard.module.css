@@ -92,15 +92,6 @@
   font-size: 11px; color: var(--text-muted);
 }
 
-.favBtn {
-  background: none; border: none; cursor: pointer;
-  color: var(--text-secondary); padding: 4px; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  transition: color 0.15s, background 0.15s; flex-shrink: 0;
-}
-.favBtn:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
-.favActive { color: #ef4444 !important; }
-
 @keyframes pulse {
   0%,100% { box-shadow: 0 0 0 2px rgba(34,197,94,.3); }
   50%      { box-shadow: 0 0 0 5px rgba(34,197,94,.1); }
