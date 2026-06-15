@@ -197,11 +197,10 @@
   margin-bottom: 8px;
 }
 .participantsBlockTitle {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: color-mix(in srgb, var(--text-muted) 72%, transparent);
+  letter-spacing: .02em;
+  color: var(--text-primary);
 }
 .participantsBlockCap {
   font-size: 11px;
@@ -215,42 +214,6 @@
   border-radius: 2px;
   overflow: hidden;
   margin-bottom: 8px;
-}
-.participantsChipsFade {
-  position: relative;
-  overflow: hidden;
-}
-.participantsChipsFadeActive::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 40px;
-  background: linear-gradient(to right, transparent, var(--participants-fade, var(--surface-2)));
-  pointer-events: none;
-}
-.participantsChipsFadeActive {
-  mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
-}
-.participantsChipsRow {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 6px;
-  align-items: center;
-}
-.participantsChipsRow > * {
-  flex-shrink: 0;
-}
-
-@media (min-width: 681px) {
-  .participantsChipsRow {
-    flex-wrap: wrap;
-    align-content: flex-start;
-    max-height: 66px;
-    overflow: hidden;
-  }
 }
 
 /* Albums in left */

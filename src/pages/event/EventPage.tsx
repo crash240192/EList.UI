@@ -1,6 +1,6 @@
 // pages/event/EventPage.tsx
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent, IParticipantView } from '@/entities/event';
 import {
@@ -13,7 +13,7 @@ import { useToastStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { UserChip } from '@/entities/user/ui/UserChip';
+import { ParticipantsChipPreview } from '@/features/event/ParticipantsChipPreview';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ParticipantsModal } from '@/features/event/ParticipantsModal';
 import { InviteModal } from '@/features/event/InviteModal';
@@ -261,6 +261,18 @@ export default function EventPage() {
   const showParticipantsBlock =
     participantsDenied || sortedParticipants.length > 0 || maxPersons != null;
 
+  const participantChips = useMemo(
+    () => sortedParticipants.map(p => ({
+      accountId: p.accountId,
+      login: p.login,
+      avatarId: p.avatarId ?? null,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      isMe: p.accountId === accountId,
+    })),
+    [sortedParticipants, accountId],
+  );
+
   return (
     <div className={styles.page}>
       <div className={styles.card}>
@@ -473,27 +485,7 @@ export default function EventPage() {
                     )}
 
                     {sortedParticipants.length > 0 && (
-                      <div
-                        className={`${styles.participantsChipsFade} ${sortedParticipants.length > 2 ? styles.participantsChipsFadeActive : ''}`}
-                      >
-                        <div className={styles.participantsChipsRow}>
-                          {sortedParticipants.map(p => (
-                            <UserChip
-                              key={p.accountId}
-                              user={{
-                                accountId: p.accountId,
-                                login: p.login,
-                                avatarId: p.avatarId ?? null,
-                                firstName: p.firstName,
-                                lastName: p.lastName,
-                                isMe: p.accountId === accountId,
-                              }}
-                              size="sm"
-                              clickable={false}
-                            />
-                          ))}
-                        </div>
-                      </div>
+                      <ParticipantsChipPreview participants={participantChips} />
                     )}
                   </button>
                 )}
