@@ -5,12 +5,11 @@
 /* Базовая ширина плитки альбома (левая панель ~280px → 2 колонки по 120px) */
 :root {
   --album-card-w: 120px;
-  --album-card-w-max: 180px; /* +50% для адаптивной мобильной сетки */
 }
 
 /* ── Основной блок ── */
 .wrap { padding: 0 0 24px; min-width: 0; max-width: 100%; }
-.albumsSection { margin-top: 14px; min-width: 0; max-width: 100%; overflow: hidden; }
+.albumsSection { margin-top: 14px; min-width: 0; max-width: 100%; }
 .header {
   display: flex; align-items: center; gap: 8px;
   margin-bottom: 14px;
@@ -31,19 +30,21 @@
   max-width: 100%;
 }
 
-/* Compact: левая панель EventPage — фиксированные колонки на десктопе */
+/* Compact: левая панель EventPage — две равные колонки по ширине контейнера */
 .gridCompact {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, var(--album-card-w));
-  justify-content: start;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
   max-width: 100%;
 }
 
 @media (max-width: 680px) {
   .grid,
   .gridCompact {
-    grid-template-columns: repeat(auto-fill, minmax(var(--album-card-w), var(--album-card-w-max)));
+    gap: 10px;
+    /* Плитки растягиваются на ширину колонки; при нехватке места — новая колонка */
+    grid-template-columns: repeat(auto-fill, minmax(var(--album-card-w), 1fr));
   }
 }
 
@@ -76,19 +77,45 @@
   text-align: left;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px dashed var(--border); background: var(--surface);
-  cursor: pointer; transition: transform .15s, border-color .15s, background .15s;
+  border: 2px dashed rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.06);
+  cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s;
   font-family: inherit;
+  box-shadow: none;
 }
 .addAlbumCard:hover {
-  transform: translateY(-2px);
   border-color: var(--accent);
-  background: rgba(99,102,241,.04);
+  background: rgba(99, 102, 241, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.12);
+  transform: none;
+}
+.addAlbumCover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
 }
 .addAlbumIcon {
-  width: 100%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px dashed rgba(99, 102, 241, 0.55);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--accent);
+  flex-shrink: 0;
+}
+.addAlbumCard .albumName {
+  color: var(--accent);
+  font-weight: 600;
+  text-align: center;
+  font-size: 12px;
+}
+.addAlbumCard .albumMeta {
+  background: rgba(99, 102, 241, 0.04);
 }
 
 .albumMenuWrap { position: absolute; top: 6px; right: 6px; z-index: 2; }
