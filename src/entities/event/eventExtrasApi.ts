@@ -106,18 +106,14 @@ export interface IEventOrganizator {
  * GET /api/EventOrganizators/getByEventId/{eventId}
  */
 export async function fetchEventOrganizators(eventId: string): Promise<IEventOrganizator[]> {
-  try {
-    const data = await apiClient.get<IRawOrganizator[]>(
-      `/api/EventOrganizators/getByEventId/${eventId}`
-    );
-    return (data.result ?? []).map(o => ({
-      accountId: o.account.id,
-      login:     o.account.login,
-      firstName: o.personInfo?.firstName ?? null,
-      lastName:  o.personInfo?.lastName  ?? null,
-      avatarId:  o.account.avatarId ?? null,
-    }));
-  } catch {
-    return [];
-  }
+  const data = await apiClient.get<IRawOrganizator[]>(
+    `/api/EventOrganizators/getByEventId/${eventId}`
+  );
+  return (data.result ?? []).map(o => ({
+    accountId: o.account.id,
+    login:     o.account.login,
+    firstName: o.personInfo?.firstName ?? null,
+    lastName:  o.personInfo?.lastName  ?? null,
+    avatarId:  o.account.avatarId ?? null,
+  }));
 }

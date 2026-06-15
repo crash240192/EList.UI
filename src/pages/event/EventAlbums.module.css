@@ -2,8 +2,14 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Базовая ширина плитки альбома (левая панель ~280px → 2 колонки по 120px) */
+:root {
+  --album-card-w: 120px;
+}
+
 /* ── Основной блок ── */
-.wrap { padding: 0 0 24px; }
+.wrap { padding: 0 0 24px; min-width: 0; max-width: 100%; }
+.albumsSection { margin-top: 14px; min-width: 0; max-width: 100%; }
 .header {
   display: flex; align-items: center; gap: 8px;
   margin-bottom: 14px;
@@ -15,20 +21,152 @@
   font-size: 12px; color: var(--text-muted);
 }
 
-/* Сетка альбомов */
+/* Сетка альбомов — полная ширина (не compact) */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 12px;
+  grid-template-columns: repeat(auto-fill, 160px);
+  justify-content: start;
+  max-width: 100%;
+}
+
+/* Compact: левая панель EventPage — две равные колонки по ширине контейнера */
+.gridCompact {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 680px) {
+  .grid,
+  .gridCompact {
+    gap: 10px;
+    /* Плитки растягиваются на ширину колонки; при нехватке места — новая колонка */
+    grid-template-columns: repeat(auto-fill, minmax(var(--album-card-w), 1fr));
+  }
 }
 
 /* ── Карточка альбома ── */
 .albumCard {
-  border-radius: 12px; overflow: hidden;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 12px;
+  overflow: visible;
   border: 1px solid var(--border); background: var(--surface);
-  cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s;
+  transition: transform .15s, border-color .15s, box-shadow .15s;
 }
 .albumCard:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 0 10px 2px rgba(99,102,241,0.25); }
+
+.albumCardBody {
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.addAlbumCard {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px dashed rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.06);
+  cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+  font-family: inherit;
+  box-shadow: none;
+}
+.addAlbumCard:hover {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.12);
+  transform: none;
+}
+.addAlbumCover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
+}
+.addAlbumIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px dashed rgba(99, 102, 241, 0.55);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.addAlbumCard .albumName {
+  color: var(--accent);
+  font-weight: 600;
+  text-align: center;
+  font-size: 12px;
+}
+.addAlbumCard .albumMeta {
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.albumMenuWrap { position: absolute; top: 6px; right: 6px; z-index: 2; }
+.albumMenuBtn {
+  width: 26px; height: 26px; border-radius: 7px;
+  border: none; background: rgba(0,0,0,.45); color: #fff;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px); transition: background .12s;
+}
+.albumMenuBtn:hover { background: rgba(0,0,0,.65); }
+.albumMenu {
+  position: absolute; top: calc(100% + 4px); right: 0;
+  min-width: 140px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.2); overflow: hidden;
+}
+.albumMenuItem {
+  display: block; width: 100%; text-align: left;
+  padding: 9px 12px; background: none; border: none;
+  font-size: 12px; color: var(--text-primary); cursor: pointer; font-family: inherit;
+}
+.albumMenuItem:hover { background: var(--surface-2); }
+.albumMenuItemDanger { color: #dc2626; }
+.albumMenuItemDanger:hover { background: rgba(239,68,68,.08); }
+
+/* Диалог удаления */
+.dialogBackdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1100; }
+.dialog {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 1101; width: min(340px, 90vw);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.dialogTitle { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+.dialogText { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px; }
+.dialogBtns { display: flex; gap: 10px; justify-content: flex-end; }
+.dialogCancel {
+  background: none; border: 1px solid var(--border);
+  border-radius: 9px; padding: 8px 16px; font-size: 13px;
+  color: var(--text-secondary); cursor: pointer;
+}
+.dialogCancel:hover { background: var(--surface-2); }
+.dialogDelete {
+  background: rgba(239,68,68,.1); color: #dc2626;
+  border: 1px solid rgba(239,68,68,.25);
+  border-radius: 9px; padding: 8px 16px; font-size: 13px; font-weight: 500;
+  cursor: pointer;
+}
+.dialogDelete:hover:not(:disabled) { background: rgba(239,68,68,.2); }
+.dialogDelete:disabled { opacity: .6; cursor: not-allowed; }
 
 .albumCover {
   height: 120px; position: relative;
@@ -42,15 +180,26 @@
 }
 
 .privateBadge {
-  position: absolute; top: 6px; right: 6px;
+  position: absolute; top: 6px; left: 6px;
   background: rgba(0,0,0,0.55); color: #fff;
   border-radius: 6px; padding: 3px 5px;
   display: flex; align-items: center;
 }
 
-.albumMeta { padding: 8px 10px; }
-.albumName { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.albumDesc { font-size: 11px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.albumMeta { padding: 8px 10px; min-width: 0; overflow: hidden; }
+.albumName {
+  font-size: 13px; font-weight: 500; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.albumDesc {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.35;
+  word-break: break-word;
+}
 
 /* ── Спиннер картинки ── */
 .imgWrap { width: 100%; height: 100%; position: relative; }

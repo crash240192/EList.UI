@@ -66,42 +66,47 @@ function RatingItemRow({ item, isOwn, canDelete, deleteDisabled, onDeleteClick }
   const hasComment = !!item.comment?.trim();
 
   return (
-    <article
-      className={`${styles.ratingItem} ${isOwn ? styles.ratingItemOwn : ''} ${hasComment ? styles.ratingItemHasComment : styles.ratingItemNoComment}`}
-    >
-      {isOwn && canDelete && (
-        <button
-          type="button"
-          className={styles.ratingDeleteChip}
-          disabled={deleteDisabled}
-          aria-label="Удалить оценку"
-          title="Удалить оценку"
-          onClick={onDeleteClick}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-            <path d="M10 11v6M14 11v6" />
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-          </svg>
-        </button>
-      )}
+    <article className={`${styles.ratingItem} ${isOwn ? styles.ratingItemOwn : ''}`}>
+      <div className={styles.ratingItemHeader}>
+        <div className={styles.ratingItemAvatar} aria-hidden>
+          {name[0]?.toUpperCase() ?? '?'}
+        </div>
 
-      <div className={styles.ratingItemLeft}>
-        <div className={styles.ratingItemAvatar}>{name[0]?.toUpperCase() ?? '?'}</div>
-        <div className={styles.ratingItemIdentity}>
+        <div className={styles.ratingItemMeta}>
           <span className={styles.ratingItemName}>{name}</span>
-          {hasComment && item.value > 0 && <GradeBadge score={item.value} size="xs" simple />}
+          {isOwn && <span className={styles.ratingItemYou}>Вы</span>}
+        </div>
+
+        <div className={styles.ratingItemGrade}>
+          {item.value > 0 && <GradeBadge score={item.value} size="xs" simple />}
+        </div>
+
+        <div className={styles.ratingItemActions}>
+          {isOwn && canDelete ? (
+            <button
+              type="button"
+              className={styles.ratingDeleteBtn}
+              disabled={deleteDisabled}
+              aria-label="Удалить оценку"
+              title="Удалить оценку"
+              onClick={onDeleteClick}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
+          ) : (
+            <span className={styles.ratingItemActionsSpacer} aria-hidden />
+          )}
         </div>
       </div>
 
-      <div className={styles.ratingItemRight}>
-        {hasComment ? (
-          <p className={styles.ratingItemComment}>{item.comment}</p>
-        ) : (
-          item.value > 0 && <GradeBadge score={item.value} size="xs" simple />
-        )}
-      </div>
+      {hasComment && (
+        <p className={styles.ratingItemComment}>{item.comment}</p>
+      )}
     </article>
   );
 }

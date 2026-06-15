@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, assignEventTypes, fetchEventOrganizators } from '@/entities/event';
+import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, assignEventTypes } from '@/entities/event';
 import type { IEventType } from '@/entities/event';
 import {
   fetchEventTypesByEvent,
@@ -24,12 +24,10 @@ import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { DurationPicker } from '@/shared/ui/DurationPicker/DurationPicker';
-import { AlbumSection } from './AlbumSection';
-import type { IAlbum } from '@/entities/media/albumApi';
-import { assignAlbumToEvent } from '@/entities/media/albumApi';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { InviteModal } from '@/features/event/InviteModal';
 import { EventDiscussionsAdmin } from '@/features/event-discussion';
+import { useEventOrganizers } from '@/features/event/useEventOrganizers';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
 import { WhitelistModal } from './WhitelistModal';
@@ -86,6 +84,10 @@ export default function CreateEventPage() {
   const { id }    = useParams<{ id: string }>();
   const isEditing = !!id;
   const { accountId, loading: accountIdLoading } = useAccountId();
+  const { isOrganizer: isEventOrganizer } = useEventOrganizers(id, accountId, {
+    enabled: isEditing,
+    mockAsOrganizer: isEditing,
+  });
 
   const [form,        setForm]        = useState<FormState>(EMPTY);
   const [loading,     setLoading]     = useState(isEditing);
@@ -109,11 +111,9 @@ export default function CreateEventPage() {
   const [endMode,   setEndMode]   = useState<'duration' | 'multiday'>('duration');
   const [durationH, setDurationH] = useState('2');
   const [durationM, setDurationM] = useState('0');
-  const [albums,    setAlbums]    = useState<IAlbum[]>([]);
   const [whitelist, setWhitelist] = useState<IWhitelistUser[]>([]);
   const [blacklist, setBlacklist] = useState<IWhitelistUser[]>([]);
   const [listModalOpen, setListModalOpen] = useState(false);
-  const [isEventOrganizer, setIsEventOrganizer] = useState(false);
 
   // Кошелёк / тариф
   const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
@@ -228,36 +228,6 @@ export default function CreateEventPage() {
       }
     }).finally(() => setLoading(false));
   }, [id, isEditing]);
-
-  // Проверка организатора — отдельно, чтобы не перезаписывать результат гонкой с загрузкой accountId
-  useEffect(() => {
-    if (!isEditing || !id || accountIdLoading) return;
-
-    if (USE_MOCK) {
-      setIsEventOrganizer(true);
-      return;
-    }
-
-    if (!accountId) {
-      setIsEventOrganizer(false);
-      return;
-    }
-
-    let cancelled = false;
-    void fetchEventOrganizators(id)
-      .then((orgs) => {
-        if (!cancelled) {
-          setIsEventOrganizer(orgs.some((o) => o.accountId === accountId));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setIsEventOrganizer(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id, isEditing, accountId, accountIdLoading]);
 
   // Вспомогательные
   const set = (key: keyof FormState) =>
@@ -565,9 +535,6 @@ export default function CreateEventPage() {
 
         const createResult = await apiClient.post<string>('/api/events/create', createPayload);
         const newEventId = createResult?.result ?? createResult as unknown as string;
-        if (newEventId && albums.length > 0) {
-          await Promise.allSettled(albums.map(a => assignAlbumToEvent(newEventId, a.id)));
-        }
         navigate('/my-events');
       }
     } catch (err) {
@@ -940,17 +907,6 @@ export default function CreateEventPage() {
             )}
           </Section>
         )}
-
-        {/* Фотоальбомы */}
-        <Section title="Фотоальбомы">
-          <AlbumSection
-            albums={albums}
-            onAlbumsChange={setAlbums}
-            accountId={null}
-            organizationId={null}
-            eventId={isEditing ? (id ?? null) : null}
-          />
-        </Section>
 
         {isEditing && id && !accountIdLoading && isEventOrganizer && (
           <Section title="Обсуждения">

@@ -39,6 +39,18 @@ export async function assignAlbumToEvent(eventId: string, albumId: string): Prom
   await apiClient.get(`/api/media/albums/assign/toEvent?eventId=${eventId}&albumId=${albumId}`);
 }
 
+export interface IUpdateAlbumPayload {
+  id: string;
+  name: string;
+  description?: string;
+  parameters?: IAlbumParams;
+}
+
+/** Обновить альбом */
+export async function updateAlbum(payload: IUpdateAlbumPayload): Promise<void> {
+  await apiClient.put('/api/media/albums/update', payload);
+}
+
 /** Удалить альбом */
 export async function deleteAlbum(albumId: string): Promise<void> {
   await apiClient.delete(`/api/media/albums/${albumId}`);
