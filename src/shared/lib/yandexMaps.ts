@@ -90,6 +90,15 @@ export function configurePickerMapBehaviors(map: {
   });
 }
 
+/** Развёрнутая карта: зажать и тянуть — сдвиг, клик — выбор точки */
+export function configureExpandedPickerMapBehaviors(map: {
+  behaviors: { disable: (name: string) => void };
+}): void {
+  ['scrollZoom', 'dblClickZoom', 'rightMouseButtonMagnifier'].forEach(b => {
+    map.behaviors.disable(b);
+  });
+}
+
 /** Ссылка «Открыть в Яндекс Картах» с меткой в указанной точке (pt = lon,lat) */
 export function buildYandexMapsPointUrl(lat: number, lng: number, zoom = 16): string {
   return `https://yandex.ru/maps/?pt=${lng},${lat}&z=${zoom}&l=map`;

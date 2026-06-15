@@ -1,8 +1,9 @@
 // features/event-map/YandexMapPicker.tsx — единое поле адреса + карта с темой
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { loadYandexMaps, geocodeAddress, reverseGeocode, YMAP_DISABLE_POI_OPTIONS, addCompactZoomControl, configurePickerMapBehaviors } from '@/shared/lib/yandexMaps';
-import { useThemeStore } from '@/app/store';
+import { useState, useCallback } from 'react';
+import { geocodeAddress } from '@/shared/lib/yandexMaps';
+import { PickerMapView } from './PickerMapView';
+import { MapPickerModal } from './MapPickerModal';
 import styles from './YandexMap.module.css';
 
 interface Props {
@@ -17,92 +18,8 @@ interface Props {
 }
 
 export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, onPick, onAddressChange }: Props) {
-  const ref       = useRef<HTMLDivElement>(null);
-  const mapRef    = useRef<any>(null);
-  const markerRef = useRef<any>(null);
-  const [loadErr,   setLoadErr]   = useState<string | null>(null);
   const [geocoding, setGeocoding] = useState(false);
-  const [ready,     setReady]     = useState(false);
-  const { theme } = useThemeStore();
-
-  useEffect(() => {
-    let destroyed = false;
-    loadYandexMaps().then(() => {
-      if (destroyed || !ref.current) return;
-      const ymaps = (window as any).ymaps;
-      const center: [number, number] = lat !== null && lng !== null
-        ? [lat, lng]
-        : initialCenter ?? [55.7558, 37.6173];
-
-      const map = new ymaps.Map(ref.current, {
-        center, zoom: lat !== null ? 15 : 10,
-        controls: [],
-        type: 'yandex#map',
-      }, YMAP_DISABLE_POI_OPTIONS);
-      addCompactZoomControl(map);
-      configurePickerMapBehaviors(map);
-
-      async function placeOrMove(coords: [number, number], doGeocode: boolean) {
-        if (markerRef.current) {
-          markerRef.current.geometry.setCoordinates(coords);
-        } else {
-          const pm = new ymaps.Placemark(coords, {}, { draggable: true, preset: 'islands#redDotIcon' });
-          pm.events.add('dragend', async () => {
-            const c = pm.geometry.getCoordinates() as [number, number];
-            setGeocoding(true);
-            const a = await reverseGeocode(c[0], c[1]);
-            setGeocoding(false);
-            onAddressChange(a);
-            onPick(c[0], c[1], a);
-          });
-          map.geoObjects.add(pm);
-          markerRef.current = pm;
-        }
-        map.setCenter(coords, 15, { duration: 300 });
-        if (doGeocode) {
-          setGeocoding(true);
-          const a = await reverseGeocode(coords[0], coords[1]);
-          setGeocoding(false);
-          onAddressChange(a);
-          onPick(coords[0], coords[1], a);
-        } else {
-          onPick(coords[0], coords[1], address);
-        }
-      }
-
-      if (lat !== null && lng !== null) placeOrMove([lat, lng], false);
-
-      map.events.add('click', (e: any) => placeOrMove(e.get('coords') as [number, number], true));
-
-      mapRef.current = map;
-      setReady(true);
-    }).catch(e => setLoadErr(e.message));
-    return () => { destroyed = true; mapRef.current?.destroy?.(); mapRef.current = null; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Внешнее обновление координат
-  useEffect(() => {
-    if (!ready || !mapRef.current || lat === null || lng === null) return;
-    const ymaps = (window as any).ymaps;
-    if (markerRef.current) {
-      markerRef.current.geometry.setCoordinates([lat, lng]);
-    } else {
-      const pm = new ymaps.Placemark([lat, lng], {}, { draggable: true, preset: 'islands#redDotIcon' });
-      pm.events.add('dragend', async () => {
-        const c = pm.geometry.getCoordinates() as [number, number];
-        setGeocoding(true);
-        const a = await reverseGeocode(c[0], c[1]);
-        setGeocoding(false);
-        onAddressChange(a);
-        onPick(c[0], c[1], a);
-      });
-      mapRef.current.geoObjects.add(pm);
-      markerRef.current = pm;
-    }
-    mapRef.current.setCenter([lat, lng], 15, { duration: 300 });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, ready]);
+  const [mapExpanded, setMapExpanded] = useState(false);
 
   const handleGeocode = useCallback(async () => {
     if (!address.trim()) return;
@@ -114,10 +31,6 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
       onPick(result.lat, result.lng, result.address);
     }
   }, [address, onPick, onAddressChange]);
-
-  if (loadErr) return <div className={styles.errorBox}>⚠️ {loadErr}</div>;
-
-  const darkFilter = 'invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9)';
 
   return (
     <div className={`${styles.pickerWrap} ${hasError ? styles.pickerWrapError : ''}`}>
@@ -134,12 +47,41 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
           {geocoding ? '⏳' : '🔍'}
         </button>
       </div>
-      <div
-        ref={ref}
-        className={styles.pickerMap}
-        style={theme === 'dark' ? { filter: darkFilter } : undefined}
-      />
+      <div className={styles.pickerMapWrap}>
+        <button
+          type="button"
+          className={styles.pickerExpandBtn}
+          onClick={() => setMapExpanded(true)}
+          aria-label="Развернуть карту"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" />
+          </svg>
+          Развернуть
+        </button>
+        <PickerMapView
+          lat={lat}
+          lng={lng}
+          address={address}
+          initialCenter={initialCenter}
+          onPick={onPick}
+          onAddressChange={onAddressChange}
+          onGeocodingChange={setGeocoding}
+        />
+      </div>
       <p className={styles.hint}>Кликните по карте или перетащите маркер — адрес определится автоматически</p>
+
+      {mapExpanded && (
+        <MapPickerModal
+          lat={lat}
+          lng={lng}
+          address={address}
+          initialCenter={initialCenter}
+          onPick={onPick}
+          onAddressChange={onAddressChange}
+          onClose={() => setMapExpanded(false)}
+        />
+      )}
     </div>
   );
 }
