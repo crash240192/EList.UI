@@ -49,7 +49,7 @@
 }
 
 .avatar { border-radius: 50%; }
-.sm .avatarWrap { width: 26px; height: 26px; }
+.sm .avatarWrap { width: 26px; height: 26px; left: 2px}
 .md .avatarWrap { width: 34px; height: 34px; }
 .sm .avatar { width: 26px; height: 26px; }
 .md .avatar { width: 34px; height: 34px; }
