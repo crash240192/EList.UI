@@ -1,7 +1,12 @@
 // features/event-map/YandexMap.tsx — просмотровая карта
 
 import { useEffect, useRef, useState } from 'react';
-import { loadYandexMaps, addCompactZoomControl, attachYandexCopyrightPointLink } from '@/shared/lib/yandexMaps';
+import {
+  loadYandexMaps,
+  addCompactZoomControl,
+  attachYandexCopyrightPointLink,
+  disableMapPageScrollCapture,
+} from '@/shared/lib/yandexMaps';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
 
@@ -25,12 +30,11 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
         center: [lat, lng], zoom,
         controls: [],
         type: 'yandex#map',
-        behaviors: draggable ? ['default'] : ['scrollZoom'],
+        behaviors: draggable ? ['default'] : [],
       }, { suppressMapOpenBlock: true, yandexMapDisablePoiInteractivity: true });
       addCompactZoomControl(map);
       if (!draggable) {
-        map.behaviors.disable('drag');
-        map.behaviors.disable('multiTouch');
+        disableMapPageScrollCapture(map);
       }
       map.geoObjects.add(
         new ymaps.Placemark([lat, lng], { balloonContent: label ?? '' }, { preset: 'islands#violetDotIcon' }),

@@ -72,6 +72,24 @@ export function addCompactZoomControl(map: { controls: { add: (name: string, opt
   map.controls.add('zoomControl', YMAP_ZOOM_CONTROL_LAYOUT);
 }
 
+/** Не перехватывать колесо мыши и свайпы — прокрутка идёт по странице */
+export function disableMapPageScrollCapture(map: {
+  behaviors: { disable: (name: string) => void };
+}): void {
+  ['scrollZoom', 'drag', 'multiTouch', 'dblClickZoom', 'rightMouseButtonMagnifier'].forEach(b => {
+    map.behaviors.disable(b);
+  });
+}
+
+/** Выбор точки: клик и маркер, без зума колёсиком и сдвига карты */
+export function configurePickerMapBehaviors(map: {
+  behaviors: { disable: (name: string) => void };
+}): void {
+  ['scrollZoom', 'multiTouch', 'drag', 'dblClickZoom', 'rightMouseButtonMagnifier'].forEach(b => {
+    map.behaviors.disable(b);
+  });
+}
+
 /** Ссылка «Открыть в Яндекс Картах» с меткой в указанной точке (pt = lon,lat) */
 export function buildYandexMapsPointUrl(lat: number, lng: number, zoom = 16): string {
   return `https://yandex.ru/maps/?pt=${lng},${lat}&z=${zoom}&l=map`;
