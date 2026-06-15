@@ -345,8 +345,8 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
     finally { setDeleting(false); }
   };
 
-  const renderGrid = (items: IAlbum[], gridStyle?: React.CSSProperties) => (
-    <div className={styles.grid} style={gridStyle}>
+  const renderGrid = (items: IAlbum[], useCompactGrid = false) => (
+    <div className={useCompactGrid ? styles.gridCompact : styles.grid}>
       {items.map(a => (
         <AlbumCard
           key={a.id}
@@ -428,7 +428,7 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
           <div className={styles.title}>Фотоальбомы</div>
           {albums.length > 0 && <span className={styles.count}>{albums.length}</span>}
         </div>
-        {renderGrid(albums.slice(0, canManage ? albums.length : 4), { gridTemplateColumns: '1fr 1fr' })}
+        {renderGrid(albums.slice(0, canManage ? albums.length : 4), true)}
         {modals}
       </div>
     );

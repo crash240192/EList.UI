@@ -2,9 +2,15 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Базовая ширина плитки альбома (левая панель ~280px → 2 колонки по 120px) */
+:root {
+  --album-card-w: 120px;
+  --album-card-w-max: 180px; /* +50% для адаптивной мобильной сетки */
+}
+
 /* ── Основной блок ── */
-.wrap { padding: 0 0 24px; }
-.albumsSection { margin-top: 14px; }
+.wrap { padding: 0 0 24px; min-width: 0; max-width: 100%; }
+.albumsSection { margin-top: 14px; min-width: 0; max-width: 100%; overflow: hidden; }
 .header {
   display: flex; align-items: center; gap: 8px;
   margin-bottom: 14px;
@@ -16,27 +22,60 @@
   font-size: 12px; color: var(--text-muted);
 }
 
-/* Сетка альбомов */
+/* Сетка альбомов — полная ширина (не compact) */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 12px;
+  grid-template-columns: repeat(auto-fill, 160px);
+  justify-content: start;
+  max-width: 100%;
+}
+
+/* Compact: левая панель EventPage — фиксированные колонки на десктопе */
+.gridCompact {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, var(--album-card-w));
+  justify-content: start;
+  max-width: 100%;
+}
+
+@media (max-width: 680px) {
+  .grid,
+  .gridCompact {
+    grid-template-columns: repeat(auto-fill, minmax(var(--album-card-w), var(--album-card-w-max)));
+  }
 }
 
 /* ── Карточка альбома ── */
 .albumCard {
   position: relative;
-  border-radius: 12px; overflow: visible;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 12px;
+  overflow: visible;
   border: 1px solid var(--border); background: var(--surface);
   transition: transform .15s, border-color .15s, box-shadow .15s;
 }
 .albumCard:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 0 10px 2px rgba(99,102,241,0.25); }
 
-.albumCardBody { cursor: pointer; border-radius: 12px; overflow: hidden; }
+.albumCardBody {
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
 
 .addAlbumCard {
-  display: block; width: 100%; padding: 0; text-align: left;
-  border-radius: 12px; overflow: hidden;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  border-radius: 12px;
+  overflow: hidden;
   border: 1px dashed var(--border); background: var(--surface);
   cursor: pointer; transition: transform .15s, border-color .15s, background .15s;
   font-family: inherit;
@@ -120,9 +159,20 @@
   display: flex; align-items: center;
 }
 
-.albumMeta { padding: 8px 10px; }
-.albumName { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.albumDesc { font-size: 11px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.albumMeta { padding: 8px 10px; min-width: 0; overflow: hidden; }
+.albumName {
+  font-size: 13px; font-weight: 500; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.albumDesc {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.35;
+  word-break: break-word;
+}
 
 /* ── Спиннер картинки ── */
 .imgWrap { width: 100%; height: 100%; position: relative; }
