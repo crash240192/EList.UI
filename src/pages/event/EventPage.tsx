@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { IEvent, IParticipantView, IEventOrganizator } from '@/entities/event';
+import type { IEvent, IParticipantView } from '@/entities/event';
 import {
   fetchEventById, participateEvent, leaveEvent,
   fetchEventParticipants, fetchEventParameters,
-  fetchEventOrganizators, MOCK_EVENTS,
+  MOCK_EVENTS,
 } from '@/entities/event';
+import { useEventOrganizers } from '@/features/event/useEventOrganizers';
 import { useFavoritesStore, useToastStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { apiClient } from '@/shared/api/client';
@@ -49,7 +50,6 @@ export default function EventPage() {
 
   const [event,         setEvent]         = useState<IEvent | null>(null);
   const [participants,  setParticipants]  = useState<IParticipantView[]>([]);
-  const [organizers,    setOrganizers]    = useState<IEventOrganizator[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
@@ -64,27 +64,30 @@ export default function EventPage() {
   const [limitNotice,     setLimitNotice]     = useState(false);
   const [pageAccessDenied, setPageAccessDenied] = useState(false);
   const [participantsDenied, setParticipantsDenied] = useState(false);
-  const [organizersDenied, setOrganizersDenied] = useState(false);
   const limitNoticeTimerRef = useRef<number | null>(null);
 
+  const {
+    organizers,
+    isOrganizer,
+    organizerIds,
+    denied: organizersDenied,
+    refetch: refetchOrganizers,
+  } = useEventOrganizers(id, accountId);
+
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
-  const isOrganizer     = !!accountId && organizers.some(o => o.accountId === accountId);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     setPageAccessDenied(false);
     setParticipantsDenied(false);
-    setOrganizersDenied(false);
     setEvent(null);
     setParticipants([]);
-    setOrganizers([]);
 
     if (USE_MOCK) {
       const ev = MOCK_EVENTS.find(e => e.id === id) ?? MOCK_EVENTS[0];
       setEvent(ev);
       setParticipants([]);
-      setOrganizers([]);
       setLoading(false);
       return;
     }
@@ -92,15 +95,12 @@ export default function EventPage() {
     void fetchEventById(id)
       .then(async (ev) => {
         let merged = ev;
-        const [partsResult, paramsResult, orgsResult] = await Promise.all([
+        const [partsResult, paramsResult] = await Promise.all([
           fetchEventParticipants(id)
             .then(p => ({ ok: true as const, data: p }))
             .catch(e => ({ ok: false as const, error: e })),
           fetchEventParameters(id)
             .then(p => ({ ok: true as const, data: p }))
-            .catch(e => ({ ok: false as const, error: e })),
-          fetchEventOrganizators(id)
-            .then(o => ({ ok: true as const, data: o }))
             .catch(e => ({ ok: false as const, error: e })),
         ]);
 
@@ -110,9 +110,6 @@ export default function EventPage() {
         if (paramsResult.ok && paramsResult.data) {
           merged = { ...merged, parameters: { ...paramsResult.data } };
         }
-
-        if (orgsResult.ok) setOrganizers(orgsResult.data);
-        else if (isAccessDeniedError(orgsResult.error)) setOrganizersDenied(true);
 
         setEvent(merged);
       })
@@ -291,7 +288,7 @@ export default function EventPage() {
               <button className={styles.heroBtn} onClick={() => void handleShare()} aria-label="Поделиться" title="Поделиться">
                 <ShareIcon />
               </button>
-              {/* Мобильное меню управления — только для организатора */}
+              {/* Меню организатора */}
               {isOrganizer && (
                 <div className={styles.mobileMenuWrap}>
                   <button className={styles.heroBtn} onClick={() => setMobileMenuOpen(v => !v)} aria-label="Меню">
@@ -473,7 +470,12 @@ export default function EventPage() {
             )}
 
             {/* Альбомы */}
-            <EventAlbums eventId={id!} compact />
+            <EventAlbums
+              eventId={id!}
+              compact
+              canManage={isOrganizer}
+              accountId={accountId}
+            />
 
             {/* Организаторы */}
             {(organizers.length > 0 || organizersDenied) && (
@@ -583,7 +585,7 @@ export default function EventPage() {
           onConfirm={handleCancelEvent} onClose={() => setCancelConfirm(false)} />
       )}
       {participantsModalOpen && (
-        <ParticipantsModal eventId={id!} organizerIds={new Set(organizers.map(o => o.accountId))}
+        <ParticipantsModal eventId={id!} organizerIds={organizerIds}
           currentAccountId={accountId} onClose={() => setParticipantsModalOpen(false)} />
       )}
       {inviteModalOpen && accountId && event?.id && (
@@ -598,9 +600,9 @@ export default function EventPage() {
         <AddOrganizerModal
           eventId={id}
           currentAccountId={accountId}
-          existingOrganizerIds={new Set(organizers.map(o => o.accountId))}
+          existingOrganizerIds={organizerIds}
           onClose={() => setAddOrgModalOpen(false)}
-          onSuccess={() => fetchEventOrganizators(id).then(setOrganizers)}
+          onSuccess={() => void refetchOrganizers()}
         />
       )}
       {bwListOpen && id && (
