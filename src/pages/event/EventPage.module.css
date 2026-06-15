@@ -142,7 +142,21 @@
 .priceVal { font-size:17px; font-weight:600; color:#10b981; }
 .priceBadge { background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); color:#10b981; border-radius:20px; padding:2px 9px; font-size:10px; font-weight:600; }
 .priceValPaid { color:var(--text-primary); }
-.priceBadgePaid { background:var(--surface); border:1px solid var(--border); color:var(--text-secondary); border-radius:20px; padding:2px 9px; font-size:10px; }
+.buyTicketBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background .15s;
+  font-family: inherit;
+}
+.buyTicketBtn:hover { background: var(--accent-hover, #4f46e5); }
 
 /* Fill */
 .fillWrap { margin-top:10px; }
@@ -155,7 +169,7 @@
 .participantsBlock {
   display: block;
   width: 100%;
-  margin: 10px 0;
+  margin: 10px 0 4px;
   padding: 10px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -169,6 +183,7 @@
 .participantsBlock:hover {
   border-color: var(--accent);
   background: var(--surface);
+  --participants-fade: var(--surface);
 }
 .participantsBlock:focus-visible {
   outline: 2px solid var(--accent);
@@ -186,7 +201,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .06em;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 72%, transparent);
 }
 .participantsBlockCap {
   font-size: 11px;
@@ -205,6 +220,16 @@
   position: relative;
   overflow: hidden;
 }
+.participantsChipsFadeActive::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40px;
+  background: linear-gradient(to right, transparent, var(--participants-fade, var(--surface-2)));
+  pointer-events: none;
+}
 .participantsChipsFadeActive {
   mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
@@ -217,6 +242,15 @@
 }
 .participantsChipsRow > * {
   flex-shrink: 0;
+}
+
+@media (min-width: 681px) {
+  .participantsChipsRow {
+    flex-wrap: wrap;
+    align-content: flex-start;
+    max-height: 62px;
+    overflow: hidden;
+  }
 }
 
 /* Albums in left */

@@ -362,7 +362,7 @@ export default function EventPage() {
                 </svg>
               </button>
             )}
-            {!eventFinished && (
+            {!eventFinished && !isOrganizer && (
               <div className={styles.joinBtnWrap}>
                 {limitNotice && isParticipantLimitFull && (
                   <div className={styles.joinLimitNotice} role="status">
@@ -430,7 +430,15 @@ export default function EventPage() {
               </div>
               {cost === 0
                 ? <span className={styles.priceBadge}>Free</span>
-                : <span className={styles.priceBadgePaid}>Платное</span>}
+                : (
+                  <button
+                    type="button"
+                    className={styles.buyTicketBtn}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    Купить билет
+                  </button>
+                )}
             </div>
 
             {showParticipantsBlock && (
