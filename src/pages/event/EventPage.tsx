@@ -199,6 +199,21 @@ export default function EventPage() {
       });
   }, [event]);
 
+  const participantChips = useMemo(() => {
+    const sorted = [
+      ...participants.filter(p => p.accountId === accountId),
+      ...participants.filter(p => p.accountId !== accountId),
+    ];
+    return sorted.map(p => ({
+      accountId: p.accountId,
+      login: p.login,
+      avatarId: p.avatarId ?? null,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      isMe: p.accountId === accountId,
+    }));
+  }, [participants, accountId]);
+
   if (loading) return <PageSkeleton />;
   if (pageAccessDenied) {
     return (
@@ -260,18 +275,6 @@ export default function EventPage() {
   ];
   const showParticipantsBlock =
     participantsDenied || sortedParticipants.length > 0 || maxPersons != null;
-
-  const participantChips = useMemo(
-    () => sortedParticipants.map(p => ({
-      accountId: p.accountId,
-      login: p.login,
-      avatarId: p.avatarId ?? null,
-      firstName: p.firstName,
-      lastName: p.lastName,
-      isMe: p.accountId === accountId,
-    })),
-    [sortedParticipants, accountId],
-  );
 
   return (
     <div className={styles.page}>
