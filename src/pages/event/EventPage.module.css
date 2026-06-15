@@ -151,17 +151,73 @@
 .fillTrack { height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
 .fillInner { height:100%; border-radius:2px; background:linear-gradient(90deg,var(--accent),#8b5cf6); }
 
-/* Participants row */
-.partRow { display:flex; align-items:center; gap:8px; margin-top:10px; cursor:pointer; }
-.partRow:hover .partCnt { color:var(--accent); }
-.avStack { display:flex; }
-.av { border:2px solid var(--surface); margin-right:-7px; flex-shrink:0; }
-.av:last-child { margin-right:0; }
-.avMe    { background:linear-gradient(135deg,#7c3aed,#6366f1); }
-.avOther { background:linear-gradient(135deg,#0891b2,#06b6d4); }
-.avExtra { background:var(--surface-2); color:var(--text-secondary); border-color:var(--border); font-size:8px; }
-.partCnt { font-size:12px; color:var(--text-secondary); margin-left:10px; transition:color .15s; }
-.partCnt strong { color:var(--text-primary); }
+/* Participants block (left column) */
+.participantsBlock {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  transition: border-color .12s, background .12s;
+}
+.participantsBlock:hover {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.participantsBlock:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.participantsBlockHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.participantsBlockTitle {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+}
+.participantsBlockCap {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+.participantsFillTrack {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.participantsChipsFade {
+  position: relative;
+  overflow: hidden;
+}
+.participantsChipsFadeActive {
+  mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+}
+.participantsChipsRow {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: center;
+}
+.participantsChipsRow > * {
+  flex-shrink: 0;
+}
 
 /* Albums in left */
 .albumsSection { margin-top:14px; }
@@ -218,10 +274,6 @@
 /* Discussion stub */
 .discussionStub { border:1px dashed var(--border); border-radius:10px; padding:20px; text-align:center; color:var(--text-muted); font-size:12px; line-height:1.6; }
 
-/* Participants chips */
-.chipsList { display:flex; flex-wrap:wrap; gap:6px; }
-.moreChip { display:flex; align-items:center; padding:4px 12px; border-radius:20px; font-size:12px; color:var(--text-secondary); background:var(--surface-2); border:1px solid var(--border); cursor:pointer; }
-
 /* Skeleton / Error */
 .skeletonHero { height:220px; background:var(--surface-2); animation:shimmer 1.4s ease infinite; }
 .skeletonLine { border-radius:8px; background:var(--surface-2); animation:shimmer 1.4s ease infinite; }
@@ -259,21 +311,10 @@
 .mobileMenuItem:hover { background:var(--surface-2); }
 .mobileMenuItemDanger { color:var(--danger)!important; }
 
-/* Mobile: price + fill in one row */
-.priceAndFill { display:flex; flex-direction:column; gap:10px; }
-
 @media (max-width:680px) {
-  .priceAndFill { flex-direction:row; align-items:flex-start; gap:12px; }
-  .priceAndFill > * { flex:1; }
   .mapBlock { height:228px; }
 }
 
 @media (min-width:681px) {
   .mapExpandBtn { display:flex; }
-}
-
-/* Цена на всю ширину если нет вместимости */
-@media (max-width:680px) {
-  .priceOnly { flex-direction:column!important; }
-  .priceOnly > * { flex:none!important; width:100%; }
 }

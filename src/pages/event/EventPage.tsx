@@ -258,8 +258,8 @@ export default function EventPage() {
     ...participants.filter(p => p.accountId === accountId),
     ...participants.filter(p => p.accountId !== accountId),
   ];
-  const visibleParticipants = sortedParticipants.slice(0, 3);
-  const extraCount = Math.max(0, sortedParticipants.length - 3);
+  const showParticipantsBlock =
+    participantsDenied || sortedParticipants.length > 0 || maxPersons != null;
 
   return (
     <div className={styles.page}>
@@ -423,8 +423,7 @@ export default function EventPage() {
               </div>
             )}
 
-            {/* Цена + заполненность (на мобиле — одна строка) */}
-            <div className={`${styles.priceAndFill} ${!maxPersons ? styles.priceOnly : ''}`}>
+            {/* Цена */}
             <div className={styles.priceBlock}>
               <div className={cost === 0 ? styles.priceVal : styles.priceValPaid}>
                 {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
@@ -434,38 +433,61 @@ export default function EventPage() {
                 : <span className={styles.priceBadgePaid}>Платное</span>}
             </div>
 
-            {maxPersons ? (
-              <div className={styles.priceBlock}>
-                <div className={styles.priceValPaid}>{participants.length} / {maxPersons}</div>
-                <div className={styles.fillTrack} style={{ flex: 1, maxWidth: 60, alignSelf: 'center' }}>
-                  <div className={styles.fillInner} style={{ width: `${Math.min(fillPct ?? 0, 100)}%` }} />
-                </div>
-              </div>
-            ) : null}
-            </div>
-
-            {(sortedParticipants.length > 0 || participantsDenied) && (
+            {showParticipantsBlock && (
               <AccessDeniedGate denied={participantsDenied} variant="section">
                 {participantsDenied ? (
-                  <SectionDeniedPlaceholder lines={2} />
+                  <SectionDeniedPlaceholder lines={3} />
                 ) : (
-                  <div className={styles.partRow} onClick={() => setParticipantsModalOpen(true)}>
-                    <div className={styles.avStack}>
-                      {visibleParticipants.map((p, i) => (
-                        <UserAvatar
-                          key={p.accountId}
-                          accountId={p.accountId}
-                          avatarId={p.avatarId ?? null}
-                          initials={(p.firstName?.[0] ?? p.login?.[0] ?? '?').toUpperCase()}
-                          size={24}
-                          className={`${styles.av} ${p.accountId === accountId ? styles.avMe : styles.avOther}`}
-                          style={{ zIndex: 3 - i }}
-                        />
-                      ))}
-                      {extraCount > 0 && <div className={`${styles.av} ${styles.avExtra}`}>+{extraCount}</div>}
+                  <button
+                    type="button"
+                    className={styles.participantsBlock}
+                    onClick={() => setParticipantsModalOpen(true)}
+                    aria-label={`Участники: ${sortedParticipants.length}`}
+                  >
+                    <div className={styles.participantsBlockHead}>
+                      <span className={styles.participantsBlockTitle}>
+                        Участники ({sortedParticipants.length})
+                      </span>
+                      {maxPersons != null && (
+                        <span className={styles.participantsBlockCap}>
+                          {participants.length} / {maxPersons}
+                        </span>
+                      )}
                     </div>
-                    <span className={styles.partCnt}><strong>{participants.length}</strong> участников</span>
-                  </div>
+
+                    {maxPersons != null && (
+                      <div className={styles.participantsFillTrack}>
+                        <div
+                          className={styles.fillInner}
+                          style={{ width: `${Math.min(fillPct ?? 0, 100)}%` }}
+                        />
+                      </div>
+                    )}
+
+                    {sortedParticipants.length > 0 && (
+                      <div
+                        className={`${styles.participantsChipsFade} ${sortedParticipants.length > 2 ? styles.participantsChipsFadeActive : ''}`}
+                      >
+                        <div className={styles.participantsChipsRow}>
+                          {sortedParticipants.map(p => (
+                            <UserChip
+                              key={p.accountId}
+                              user={{
+                                accountId: p.accountId,
+                                login: p.login,
+                                avatarId: p.avatarId ?? null,
+                                firstName: p.firstName,
+                                lastName: p.lastName,
+                                isMe: p.accountId === accountId,
+                              }}
+                              size="sm"
+                              clickable={false}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </button>
                 )}
               </AccessDeniedGate>
             )}
@@ -545,29 +567,6 @@ export default function EventPage() {
                   <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} draggable={false} />
                 </div>
               </div>
-            )}
-
-            {/* Участники */}
-            {(sortedParticipants.length > 0 || participantsDenied) && (
-              <AccessDeniedGate denied={participantsDenied} variant="section">
-                {participantsDenied ? (
-                  <SectionDeniedPlaceholder lines={4} />
-                ) : (
-                  <div>
-                    <div className={styles.secLabel} style={{ cursor: 'pointer' }} onClick={() => setParticipantsModalOpen(true)}>
-                      Участники ({sortedParticipants.length})
-                    </div>
-                    <div className={styles.chipsList} onClick={() => setParticipantsModalOpen(true)} style={{ cursor: 'pointer' }}>
-                      {sortedParticipants.slice(0, 12).map(p => (
-                        <UserChip key={p.accountId} user={{ accountId: p.accountId, login: p.login, avatarId: p.avatarId ?? null, firstName: p.firstName, lastName: p.lastName, isMe: p.accountId === accountId }} size="sm" />
-                      ))}
-                      {sortedParticipants.length > 12 && (
-                        <span className={styles.moreChip}>ещё {sortedParticipants.length - 12} →</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </AccessDeniedGate>
             )}
 
             {id && (
