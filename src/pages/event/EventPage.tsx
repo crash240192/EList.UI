@@ -460,9 +460,15 @@ export default function EventPage() {
                   <div className={styles.partRow} onClick={() => setParticipantsModalOpen(true)}>
                     <div className={styles.avStack}>
                       {visibleParticipants.map((p, i) => (
-                        <div key={p.accountId} className={`${styles.av} ${p.accountId === accountId ? styles.avMe : styles.avOther}`} style={{ zIndex: 3 - i }}>
-                          {(p.firstName?.[0] ?? p.login?.[0] ?? '?').toUpperCase()}
-                        </div>
+                        <UserAvatar
+                          key={p.accountId}
+                          accountId={p.accountId}
+                          avatarId={p.avatarId ?? null}
+                          initials={(p.firstName?.[0] ?? p.login?.[0] ?? '?').toUpperCase()}
+                          size={24}
+                          className={`${styles.av} ${p.accountId === accountId ? styles.avMe : styles.avOther}`}
+                          style={{ zIndex: 3 - i }}
+                        />
                       ))}
                       {extraCount > 0 && <div className={`${styles.av} ${styles.avExtra}`}>+{extraCount}</div>}
                     </div>

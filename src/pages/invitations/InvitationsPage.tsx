@@ -14,6 +14,7 @@ import { apiClient } from '@/shared/api/client';
 import { isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
 import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { EventModal } from '@/pages/home/EventModal';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
@@ -29,6 +30,12 @@ function inviterName(inv: IInvitation): string {
   const p = inv.inviter?.personInfo;
   if (p?.firstName) return `${p.firstName} ${p.lastName ?? ''}`.trim();
   return inv.inviter?.account?.login ?? 'Неизвестный';
+}
+
+function inviterInitials(inv: IInvitation): string {
+  const p = inv.inviter?.personInfo;
+  if (p?.firstName) return `${p.firstName[0]}${p.lastName?.[0] ?? ''}`.toUpperCase();
+  return inv.inviter?.account?.login?.[0]?.toUpperCase() ?? '?';
 }
 
 export default function InvitationsPage() {
@@ -186,7 +193,13 @@ export default function InvitationsPage() {
                   </div>
                   <div className={styles.content}>
                     <div className={styles.who}>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      <UserAvatar
+                        accountId={inv.inviterAccountId}
+                        avatarId={inv.inviter?.account?.avatarId ?? null}
+                        initials={inviterInitials(inv)}
+                        size={18}
+                        className={styles.whoAvatar}
+                      />
                       <span className={styles.whoName}>{inviterName(inv)}</span>
                       <span>приглашает</span>
                     </div>

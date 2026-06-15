@@ -1,18 +1,44 @@
 // features/auth/useAvatar.ts
-// Кэш fileId аватара по accountId. Источник — поле avatarId в данных аккаунта,
-// без отдельного запроса /api/media/account/avatar/{id}.
+// Кэш fileId аватара по accountId. Источник — поле avatarId в данных аккаунта.
+// Если avatarId неизвестен — один запрос GET /api/accounts/getData/{accountId}.
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/shared/api/client';
-import { getOrFetchAccountId } from '@/entities/user/api';
+import { fetchAccountById, getOrFetchAccountId } from '@/entities/user/api';
 
 // null = у пользователя нет аватара; отсутствие ключа = ещё не известно
 const cache: Map<string, string | null> = new Map();
 const listeners: Map<string, Set<(id: string | null) => void>> = new Map();
+const fetchInFlight = new Map<string, Promise<string | null>>();
+
+function notifyListeners(accountId: string, avatarId: string | null): void {
+  listeners.get(accountId)?.forEach(fn => fn(avatarId));
+}
+
+function resolveAvatarId(accountId: string): Promise<string | null> {
+  if (cache.has(accountId)) return Promise.resolve(cache.get(accountId) ?? null);
+  if (fetchInFlight.has(accountId)) return fetchInFlight.get(accountId)!;
+
+  const promise = fetchAccountById(accountId)
+    .then(data => {
+      const id = data.avatarId ?? null;
+      cache.set(accountId, id);
+      notifyListeners(accountId, id);
+      fetchInFlight.delete(accountId);
+      return id;
+    })
+    .catch(() => {
+      fetchInFlight.delete(accountId);
+      return null;
+    });
+
+  fetchInFlight.set(accountId, promise);
+  return promise;
+}
 
 export function seedAvatarCache(accountId: string, avatarId: string | null): void {
   cache.set(accountId, avatarId);
-  listeners.get(accountId)?.forEach(fn => fn(avatarId));
+  notifyListeners(accountId, avatarId);
 }
 
 export function useAvatar(
@@ -21,7 +47,7 @@ export function useAvatar(
 ): string | null {
   const [fileId, setFileId] = useState<string | null>(() => {
     if (!accountId) return null;
-    if (avatarId !== undefined) return avatarId;
+    if (avatarId) return avatarId;
     return cache.has(accountId) ? (cache.get(accountId) ?? null) : null;
   });
 
@@ -31,17 +57,28 @@ export function useAvatar(
     if (!listeners.has(accountId)) listeners.set(accountId, new Set());
     listeners.get(accountId)!.add(setFileId);
 
-    if (avatarId !== undefined) {
+    const cleanup = () => { listeners.get(accountId)?.delete(setFileId); };
+
+    if (avatarId) {
       cache.set(accountId, avatarId);
       setFileId(avatarId);
-      return () => { listeners.get(accountId)?.delete(setFileId); };
+      return cleanup;
     }
 
     if (cache.has(accountId)) {
       setFileId(cache.get(accountId) ?? null);
+      return cleanup;
     }
 
-    return () => { listeners.get(accountId)?.delete(setFileId); };
+    let cancelled = false;
+    void resolveAvatarId(accountId).then(id => {
+      if (!cancelled) setFileId(id);
+    });
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
   }, [accountId, avatarId]);
 
   return fileId;

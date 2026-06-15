@@ -13,7 +13,7 @@ export interface IInvitationEvent {
 }
 
 export interface IInviter {
-  account: { id: string; login: string };
+  account: { id: string; login: string; avatarId: string | null };
   personInfo: { firstName: string | null; lastName: string | null } | null;
 }
 
@@ -29,6 +29,33 @@ export interface IInvitation {
   event: IInvitationEvent;
 }
 
+function normalizeAccount(raw: unknown): IInviter['account'] {
+  const a = (raw ?? {}) as Record<string, unknown>;
+  const avatar = a.avatarId ?? a.AvatarId;
+  return {
+    id: String(a.id ?? a.Id ?? ''),
+    login: String(a.login ?? a.Login ?? ''),
+    avatarId: avatar != null && avatar !== '' ? String(avatar) : null,
+  };
+}
+
+function normalizePersonInfo(raw: unknown): IInviter['personInfo'] {
+  if (!raw) return null;
+  const p = raw as Record<string, unknown>;
+  return {
+    firstName: (p.firstName ?? p.FirstName ?? null) as string | null,
+    lastName: (p.lastName ?? p.LastName ?? null) as string | null,
+  };
+}
+
+function normalizeInviter(raw: unknown): IInviter {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    account: normalizeAccount(r.account ?? r.Account),
+    personInfo: normalizePersonInfo(r.personInfo ?? r.PersonInfo),
+  };
+}
+
 function normalizeInvitation(raw: Record<string, unknown>): IInvitation {
   const inviter = raw.inviter ?? raw.Inviter;
   const event = raw.event ?? raw.Event;
@@ -39,7 +66,7 @@ function normalizeInvitation(raw: Record<string, unknown>): IInvitation {
     eventId: String(raw.eventId ?? raw.EventId ?? ''),
     creationDate: String(raw.creationDate ?? raw.CreationDate ?? ''),
     viewed: parseInvitationViewed(raw.viewed ?? raw.Viewed),
-    inviter: inviter as IInvitation['inviter'],
+    inviter: normalizeInviter(inviter),
     event: event as IInvitation['event'],
   };
 }

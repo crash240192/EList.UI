@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchEventRating, voteEventRating } from '@/entities/event';
 import type { IRatingItem, IRatingPage, RatingType } from '@/entities/event';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import styles from './RatingSection.module.css';
 
 interface Props {
@@ -44,11 +45,19 @@ function RatingItemRow({ item }: { item: IRatingItem }) {
   const name = item.personInfo?.firstName
     ? `${item.personInfo.firstName} ${item.personInfo.lastName ?? ''}`.trim()
     : item.account.login;
-  const initial = name[0]?.toUpperCase() ?? '?';
+  const initials = item.personInfo?.firstName
+    ? `${item.personInfo.firstName[0]}${item.personInfo.lastName?.[0] ?? ''}`.toUpperCase()
+    : item.account.login[0]?.toUpperCase() ?? '?';
   return (
     <div className={styles.ratingItem}>
       <div className={styles.ratingItemHeader}>
-        <div className={styles.ratingItemAvatar}>{initial}</div>
+        <UserAvatar
+          accountId={item.accountId}
+          avatarId={item.account.avatarId ?? null}
+          initials={initials}
+          size={30}
+          className={styles.ratingItemAvatar}
+        />
         <div className={styles.ratingItemMeta}>
           <span className={styles.ratingItemName}>{name}</span>
           <StarRow value={item.value} />

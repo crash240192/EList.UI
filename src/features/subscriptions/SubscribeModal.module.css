@@ -41,6 +41,12 @@
 .subtitle {
   font-size: 13px; color: var(--text-secondary); margin: 0 0 16px;
 }
+.userRow {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+}
+.userRowText { min-width: 0; flex: 1; }
+.userRowText .title { margin: 0 0 4px; }
+.userRowText .subtitle { margin: 0; }
 .options { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
 .option {
   display: flex; align-items: flex-start; gap: 12px;
