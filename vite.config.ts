@@ -41,6 +41,9 @@ function withQuietProxyErrors(options: ProxyOptions): ProxyOptions {
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['html5-qrcode'],
+  },
   resolve: {
     alias: {
       // FSD-слои доступны как @/entities/..., @/shared/... и т.д.

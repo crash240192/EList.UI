@@ -1,11 +1,14 @@
 // features/subscriptions/AddSubscriptionModal.tsx
 
-import { useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { canUseQrScanner, parseUserIdFromText } from '@/shared/lib/userId';
-import { QrScanner } from '@/shared/ui/QrScanner/QrScanner';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import styles from './AddSubscriptionModal.module.css';
+
+const QrScanner = lazy(() =>
+  import('@/shared/ui/QrScanner/QrScanner').then((m) => ({ default: m.QrScanner })),
+);
 
 interface Props {
   onClose: () => void;
@@ -61,7 +64,9 @@ export function AddSubscriptionModal({ onClose, onBeforeNavigate }: Props) {
         </p>
 
         {scanning ? (
-          <QrScanner onDetected={handleDetected} onClose={() => setScanning(false)} />
+          <Suspense fallback={<p className={styles.scanLoading}>Подключение камеры...</p>}>
+            <QrScanner onDetected={handleDetected} onClose={() => setScanning(false)} />
+          </Suspense>
         ) : (
           <>
             <input
