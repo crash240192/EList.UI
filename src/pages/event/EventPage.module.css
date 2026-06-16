@@ -87,8 +87,23 @@
 .actionRow { display:flex; align-items:center; gap:10px; padding:12px 20px; border-bottom:1px solid var(--border); min-height:58px; }
 .actionTitle { flex:1; min-width:0; font-size:16px; font-weight:600; color:var(--text-primary); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .actionBtns { display:flex; gap:7px; flex-shrink:0; align-items:center; }
-.btnIcon { width:36px; height:36px; border-radius:9px; background:var(--surface-2); border:1px solid var(--border); color:var(--text-secondary); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:border-color .12s,color .12s; }
-.btnIcon:hover { border-color:var(--accent); color:var(--accent); }
+.btnInvite {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 9px;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s;
+}
+.btnInvite:hover { background: var(--accent-hover, #4f46e5); }
+.btnInvite:active { transform: scale(0.97); }
 .btnJoin { height:36px; padding:0 20px; border-radius:9px; background:var(--accent); color:#fff; border:none; font-size:13px; font-weight:500; cursor:pointer; transition:background .15s; white-space:nowrap; }
 .btnJoin:hover:not(:disabled) { background:var(--accent-hover,#4f46e5); }
 .btnJoin:disabled { opacity:.5; cursor:not-allowed; }
