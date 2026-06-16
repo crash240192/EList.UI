@@ -28,6 +28,7 @@ export function EventDiscussionsPanel({
   const [accessDenied, setAccessDenied] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const layoutBoundsRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
   const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
 
   const loadConversations = useCallback(async () => {
@@ -56,6 +57,21 @@ export function EventDiscussionsPanel({
   useEffect(() => {
     void loadConversations();
   }, [loadConversations]);
+
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [conversations.length, canManage]);
 
   const handleCreated = async (conversationId: string) => {
     await loadConversations();
@@ -90,7 +106,7 @@ export function EventDiscussionsPanel({
 
   return (
     <div className={styles.panel}>
-      <div className={styles.tabs} role="tablist">
+      <div ref={tabsRef} className={styles.tabs} role="tablist">
         {conversations.map((c) => (
           <button
             key={c.id}
