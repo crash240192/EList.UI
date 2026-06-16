@@ -16,19 +16,14 @@
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   max-width: 100%;
   min-width: 0;
 }
 
 .tabs::-webkit-scrollbar {
-  height: 4px;
-}
-
-.tabs::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+  display: none;
 }
 
 .tab {
