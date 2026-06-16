@@ -8,7 +8,7 @@ import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
-import brandLogo from '@/shared/assets/brand-logo.svg';
+import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
 import {
   useInvitationsNotViewedCount,
   useInvitationsStore,

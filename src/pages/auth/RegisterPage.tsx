@@ -24,7 +24,7 @@ import { Select, type SelectOption } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import type { Gender } from '@/shared/api/types';
-import brandLogo from '@/shared/assets/brand-logo.svg';
+import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
 import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
 
