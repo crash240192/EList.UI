@@ -97,6 +97,25 @@
   display: block;
 }
 
+@media (max-width: 767px) {
+  .headerLeft {
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .logo {
+    padding: 2px 0;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .logoImg {
+    width: 64px;
+    height: 26px;
+    object-fit: contain;
+  }
+}
+
 .avatarBtn {
   width: 38px; height: 38px; border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
