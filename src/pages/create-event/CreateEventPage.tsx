@@ -27,8 +27,7 @@ import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { DurationPicker } from '@/shared/ui/DurationPicker/DurationPicker';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { InviteModal } from '@/features/event/InviteModal';
-import { EventDiscussionsAdmin } from '@/features/event-discussion';
-import { useEventOrganizers } from '@/features/event/useEventOrganizers';
+import { createConversation } from '@/entities/conversation';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
 import { WhitelistModal } from './WhitelistModal';
@@ -84,11 +83,7 @@ export default function CreateEventPage() {
   const navigate  = useNavigate();
   const { id }    = useParams<{ id: string }>();
   const isEditing = !!id;
-  const { accountId, loading: accountIdLoading } = useAccountId();
-  const { isOrganizer: isEventOrganizer } = useEventOrganizers(id, accountId, {
-    enabled: isEditing,
-    mockAsOrganizer: isEditing,
-  });
+  const { accountId } = useAccountId();
 
   const [form,        setForm]        = useState<FormState>(EMPTY);
   const [loading,     setLoading]     = useState(isEditing);
@@ -536,6 +531,11 @@ export default function CreateEventPage() {
 
         const createResult = await apiClient.post<string>('/api/events/create', createPayload);
         const newEventId = createResult?.result ?? createResult as unknown as string;
+        try {
+          await createConversation({ name: 'обсуждения', eventId: newEventId });
+        } catch {
+          /* не блокируем публикацию, если обсуждение не создалось */
+        }
         navigate('/my-events');
       }
     } catch (err) {
@@ -915,12 +915,6 @@ export default function CreateEventPage() {
                 )}
               </div>
             )}
-          </Section>
-        )}
-
-        {isEditing && id && !accountIdLoading && isEventOrganizer && (
-          <Section title="Обсуждения">
-            <EventDiscussionsAdmin eventId={id} />
           </Section>
         )}
 

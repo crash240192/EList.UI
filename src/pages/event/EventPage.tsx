@@ -573,10 +573,11 @@ export default function EventPage() {
             )}
 
             {id && (
-              <div>
-                <div className={styles.secLabel}>Обсуждения</div>
-                <EventDiscussionsPanel eventId={id} currentAccountId={accountId} />
-              </div>
+              <EventDiscussionsPanel
+                eventId={id}
+                currentAccountId={accountId}
+                canManage={isOrganizer}
+              />
             )}
 
           </div>
