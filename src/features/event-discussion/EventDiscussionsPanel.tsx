@@ -27,9 +27,24 @@ export function EventDiscussionsPanel({
   const [error, setError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [fadeLeft, setFadeLeft] = useState(false);
+  const [fadeRight, setFadeRight] = useState(false);
   const layoutBoundsRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
+
+  const updateTabFades = useCallback(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 1) {
+      setFadeLeft(false);
+      setFadeRight(false);
+      return;
+    }
+    setFadeLeft(el.scrollLeft > 2);
+    setFadeRight(el.scrollLeft < maxScroll - 2);
+  }, []);
 
   const loadConversations = useCallback(async () => {
     setLoading(true);
@@ -73,6 +88,20 @@ export function EventDiscussionsPanel({
     return () => el.removeEventListener('wheel', onWheel);
   }, [conversations.length, canManage]);
 
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+
+    updateTabFades();
+    el.addEventListener('scroll', updateTabFades, { passive: true });
+    const observer = new ResizeObserver(updateTabFades);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener('scroll', updateTabFades);
+      observer.disconnect();
+    };
+  }, [updateTabFades, conversations.length, canManage, loading]);
+
   const handleCreated = async (conversationId: string) => {
     await loadConversations();
     setActiveId(conversationId);
@@ -106,34 +135,38 @@ export function EventDiscussionsPanel({
 
   return (
     <div className={styles.panel}>
-      <div ref={tabsRef} className={styles.tabs} role="tablist">
-        {conversations.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            role="tab"
-            aria-selected={active ? c.id === active.id : false}
-            className={`${styles.tab} ${active && c.id === active.id ? styles.tabActive : ''}`}
-            onClick={() => setActiveId(c.id)}
-          >
-            {c.name}
-          </button>
-        ))}
-        {canManage && (
-          <button
-            type="button"
-            className={styles.addTabBtn}
-            onClick={() => setFormOpen(true)}
-            aria-label="Добавить обсуждение"
-          >
-            <span className={styles.addTabIcon}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            </span>
-            Добавить
-          </button>
-        )}
+      <div className={styles.tabsWrap}>
+        <div ref={tabsRef} className={styles.tabs} role="tablist">
+          {conversations.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              aria-selected={active ? c.id === active.id : false}
+              className={`${styles.tab} ${active && c.id === active.id ? styles.tabActive : ''}`}
+              onClick={() => setActiveId(c.id)}
+            >
+              {c.name}
+            </button>
+          ))}
+          {canManage && (
+            <button
+              type="button"
+              className={styles.addTabBtn}
+              onClick={() => setFormOpen(true)}
+              aria-label="Добавить обсуждение"
+            >
+              <span className={styles.addTabIcon}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </span>
+              Добавить
+            </button>
+          )}
+        </div>
+        {fadeLeft && <div className={`${styles.tabsFade} ${styles.tabsFadeLeft}`} aria-hidden />}
+        {fadeRight && <div className={`${styles.tabsFade} ${styles.tabsFadeRight}`} aria-hidden />}
       </div>
 
       {active ? (
