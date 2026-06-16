@@ -4,6 +4,14 @@
   gap: 16px;
   position: relative;
   min-width: 0;
+  --discussion-tabs-fade: var(--surface);
+}
+
+.tabsWrap {
+  position: relative;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
 }
 
 .tabs {
@@ -11,8 +19,6 @@
   flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -20,6 +26,25 @@
   -ms-overflow-style: none;
   max-width: 100%;
   min-width: 0;
+}
+
+.tabsFade {
+  position: absolute;
+  top: 0;
+  bottom: 8px;
+  width: 44px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.tabsFadeLeft {
+  left: 0;
+  background: linear-gradient(to right, var(--discussion-tabs-fade), transparent);
+}
+
+.tabsFadeRight {
+  right: 0;
+  background: linear-gradient(to left, var(--discussion-tabs-fade), transparent);
 }
 
 .tabs::-webkit-scrollbar {
