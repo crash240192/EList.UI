@@ -8,6 +8,7 @@ import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
+import brandLogo from '@/shared/assets/brand-logo.svg';
 import {
   useInvitationsNotViewedCount,
   useInvitationsStore,
@@ -79,8 +80,7 @@ export function AppLayout() {
               detail: { lat, lng },
             }));
           }} aria-label="На главную">
-            <span>📍</span>
-            <span>EList</span>
+            <img src={brandLogo} alt="EList" className={styles.logoImg} />
           </button>
         </div>
 

@@ -24,6 +24,7 @@ import { Select, type SelectOption } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import type { Gender } from '@/shared/api/types';
+import brandLogo from '@/shared/assets/brand-logo.svg';
 import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
 
@@ -248,8 +249,7 @@ export default function RegisterPage() {
       <div className={styles.card}>
         {/* Logo */}
         <div className={styles.logoWrap}>
-          <div className={styles.logoMark}>📍</div>
-          <div className={styles.logoText}>EList</div>
+          <img src={brandLogo} alt="EList" className={styles.logoImg} />
           <div className={styles.logoSub}>Агрегатор городских мероприятий</div>
         </div>
 

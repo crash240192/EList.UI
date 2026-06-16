@@ -10,6 +10,7 @@ import { getAuthorizationContact, type IAuthorizationContact } from '@/entities/
 import { takeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
+import brandLogo from '@/shared/assets/brand-logo.svg';
 import styles from './AuthPage.module.css';
 import actStyles from './ActivationPage.module.css';
 
@@ -117,7 +118,7 @@ export default function ActivationPage() {
   if (success) return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.logoWrap}><div className={styles.logoMark}>✅</div></div>
+        <div className={styles.logoWrap}><img src={brandLogo} alt="EList" className={styles.logoImg} /></div>
         <h1 className={styles.heading}>Аккаунт активирован!</h1>
         <p className={styles.subheading}>Переходим на главную...</p>
       </div>
@@ -130,8 +131,7 @@ export default function ActivationPage() {
       <div className={styles.card}>
 
         <div className={styles.logoWrap}>
-          <div className={styles.logoMark}>📬</div>
-          <div className={styles.logoText}>EList</div>
+          <img src={brandLogo} alt="EList" className={styles.logoImg} />
         </div>
 
         <h1 className={styles.heading}>Подтверждение</h1>
