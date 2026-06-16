@@ -91,8 +91,8 @@
 }
 .logo:hover { opacity: 0.8; }
 .logoImg {
-  width: 94px;
-  height: 44px;
+  width: 84px;
+  height: 30px;
   object-fit: fill;
   display: block;
 }
@@ -111,8 +111,8 @@
 
   .logoImg {
     width: 64px;
-    height: 26px;
-    object-fit: contain;
+    height: 24px;
+    object-fit: fill;
   }
 }
 
