@@ -3,14 +3,32 @@
   flex-direction: column;
   gap: 16px;
   position: relative;
+  min-width: 0;
 }
 
 .tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--border);
   padding-bottom: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tabs::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
 }
 
 .tab {
@@ -22,6 +40,8 @@
   font-size: 14px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tab:hover {
@@ -50,6 +70,8 @@
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   font-family: inherit;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .addTabBtn:hover {
