@@ -1,8 +1,10 @@
 import type { IMessage } from '@/entities/conversation';
+import { getVisualViewportBottomInset } from '@/shared/lib/useVisualViewportBottomInset';
 
 export const discussionMessageDomId = (messageId: string) => `discussion-msg-${messageId}`;
 
 const DEFAULT_COMPOSER_HEIGHT = 220;
+const REPLY_GAP_PX = 16;
 
 export function findScrollParent(el: HTMLElement): HTMLElement | null {
   let parent = el.parentElement;
@@ -16,58 +18,87 @@ export function findScrollParent(el: HTMLElement): HTMLElement | null {
   return null;
 }
 
-/** Нужен ли доп. хвост внизу ленты, чтобы можно было прокрутить комментарий выше формы */
-export function needsReplyScrollTailSpacer(messageId: string, composerReservePx = 300): boolean {
-  const el = document.getElementById(discussionMessageDomId(messageId));
-  if (!el) return true;
-  const r = el.getBoundingClientRect();
-  const threshold = window.innerHeight - composerReservePx;
-  if (r.bottom > threshold - 8 || r.top > threshold - 48) return true;
-
-  const scrollParent = findScrollParent(el);
-  if (scrollParent) {
-    const atContentBottom =
-      scrollParent.scrollTop + scrollParent.clientHeight >= scrollParent.scrollHeight - 40;
-    if (atContentBottom) return true;
-  }
-
-  return false;
+export function getVisibleViewportTop(): number {
+  return window.visualViewport?.offsetTop ?? 0;
 }
 
-/** Центрирует комментарий в видимой области над выезжающей формой */
+export function getVisibleViewportBottom(): number {
+  const vv = window.visualViewport;
+  return vv ? vv.offsetTop + vv.height : window.innerHeight;
+}
+
+/** Зарезервированная высота снизу экрана: форма + клавиатура */
+export function getReplyComposerReservePx(
+  sheetHeight = DEFAULT_COMPOSER_HEIGHT,
+  keyboardInset = getVisualViewportBottomInset(),
+): number {
+  const safeBottom = keyboardInset > 0 ? 8 : 12;
+  return sheetHeight + keyboardInset + safeBottom;
+}
+
+/** Сколько пикселей добавить внизу ленты, чтобы прокрутить комментарий выше формы */
+export function computeReplyScrollTailPx(
+  messageId: string,
+  reserveBottomPx: number,
+  gap = REPLY_GAP_PX,
+): number {
+  const el = document.getElementById(discussionMessageDomId(messageId));
+  const keyboardBuffer = Math.ceil(window.innerHeight * 0.38);
+
+  if (!el) return Math.max(keyboardBuffer, 360);
+
+  const targetBottom = getVisibleViewportBottom() - reserveBottomPx - gap;
+  const deficit = el.getBoundingClientRect().bottom - targetBottom;
+
+  if (deficit <= 0) {
+    return Math.max(keyboardBuffer, 280);
+  }
+
+  return Math.ceil(deficit + 96);
+}
+
+/**
+ * Прокручивает комментарий так, чтобы он целиком был над формой ввода.
+ * @returns false, если прокрутить не удалось (нужен больший нижний отступ)
+ */
 export function scrollMessageIntoViewForReply(
   messageId: string,
-  composerHeight = DEFAULT_COMPOSER_HEIGHT,
-) {
+  reserveBottomPx: number,
+  options?: { gap?: number; behavior?: ScrollBehavior },
+): boolean {
   const el = document.getElementById(discussionMessageDomId(messageId));
-  if (!el) return;
+  if (!el) return false;
+
+  const gap = options?.gap ?? REPLY_GAP_PX;
+  const behavior = options?.behavior ?? 'smooth';
+  const visibleTop = getVisibleViewportTop();
+  const targetBottom = getVisibleViewportBottom() - reserveBottomPx - gap;
+  const elRect = el.getBoundingClientRect();
+
+  let delta = 0;
+  if (elRect.bottom > targetBottom) {
+    delta = elRect.bottom - targetBottom;
+  } else if (elRect.top < visibleTop + gap) {
+    delta = elRect.top - (visibleTop + gap);
+  }
+
+  if (Math.abs(delta) < 2) return true;
 
   const scrollParent = findScrollParent(el);
   if (!scrollParent) {
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    return;
+    el.scrollIntoView({ block: 'nearest', behavior });
+    return true;
   }
-
-  const elRect = el.getBoundingClientRect();
-  const parentRect = scrollParent.getBoundingClientRect();
-  const bandHeight = Math.max(120, parentRect.height - composerHeight);
-  const targetCenterY = parentRect.top + bandHeight * 0.5;
-  const elCenterY = elRect.top + elRect.height / 2;
-  let delta = elCenterY - targetCenterY;
-
-  if (Math.abs(delta) < 4) return;
 
   const maxScrollTop = scrollParent.scrollHeight - scrollParent.clientHeight;
-  const proposedTop = scrollParent.scrollTop + delta;
-  const clampedTop = Math.max(0, Math.min(maxScrollTop, proposedTop));
-  const actualDelta = clampedTop - scrollParent.scrollTop;
+  const nextTop = Math.max(0, Math.min(maxScrollTop, scrollParent.scrollTop + delta));
 
-  if (Math.abs(actualDelta) < 1 && Math.abs(delta) > 4) {
-    // Не хватает scrollHeight (ещё нет нижнего отступа) — следующий кадр после спейсера
-    return;
+  if (Math.abs(nextTop - scrollParent.scrollTop) < 1) {
+    return false;
   }
 
-  scrollParent.scrollBy({ top: actualDelta, behavior: 'smooth' });
+  scrollParent.scrollTo({ top: nextTop, behavior });
+  return true;
 }
 
 export function messageInitials(msg: IMessage): string {
