@@ -92,12 +92,13 @@ function DeleteAlbumDialog({ albumName, loading, onConfirm, onClose }: {
 interface AlbumCardProps {
   album: IAlbum;
   canManage: boolean;
+  coverVersion?: number;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-function AlbumCard({ album, canManage, onOpen, onEdit, onDelete }: AlbumCardProps) {
+function AlbumCard({ album, canManage, coverVersion = 0, onOpen, onEdit, onDelete }: AlbumCardProps) {
   const [cover, setCover] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -108,7 +109,7 @@ function AlbumCard({ album, canManage, onOpen, onEdit, onDelete }: AlbumCardProp
       if (!cancelled && files.length > 0) setCover(files[0].fileId);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [album.id]);
+  }, [album.id, coverVersion]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -209,6 +210,14 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
   const [formAlbum, setFormAlbum] = useState<IAlbum | null | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<IAlbum | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [coverVersionByAlbumId, setCoverVersionByAlbumId] = useState<Record<string, number>>({});
+
+  const bumpAlbumCover = useCallback((albumId: string) => {
+    setCoverVersionByAlbumId(prev => ({
+      ...prev,
+      [albumId]: (prev[albumId] ?? 0) + 1,
+    }));
+  }, []);
 
   const loadAlbums = useCallback(async () => {
     setLoading(true);
@@ -265,6 +274,7 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
           key={a.id}
           album={a}
           canManage={canManage}
+          coverVersion={coverVersionByAlbumId[a.id] ?? 0}
           onOpen={() => openAlbum(a)}
           onEdit={() => setFormAlbum(a)}
           onDelete={() => setDeleteTarget(a)}
@@ -281,7 +291,7 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
         album={gridAlbum}
         canManage={canManage}
         onClose={() => setGridAlbum(null)}
-        onChanged={() => void loadAlbums()}
+        onChanged={bumpAlbumCover}
       />
       {formAlbum !== undefined && (
         <AlbumFormModal
@@ -308,6 +318,7 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
         <div className={styles.loading}>
           {[0, 1, 2].map(i => <div key={i} className={styles.skeleton} />)}
         </div>
+        {modals}
       </div>
     );
   }

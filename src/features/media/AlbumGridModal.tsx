@@ -18,9 +18,26 @@ import styles from './AlbumGridModal.module.css';
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
 
 function mergeAlbumFiles(prev: IAlbumFile[], server: IAlbumFile[]): IAlbumFile[] {
-  const serverFileIds = new Set(server.map(f => f.fileId));
-  const locals = prev.filter(f => !serverFileIds.has(f.fileId));
-  return [...server, ...locals];
+  const serverByFileId = new Map(server.map(f => [f.fileId, f]));
+  const seen = new Set<string>();
+  const merged: IAlbumFile[] = [];
+
+  for (const file of prev) {
+    const fromServer = serverByFileId.get(file.fileId);
+    if (fromServer) {
+      merged.push(fromServer);
+      seen.add(file.fileId);
+    } else if (!serverByFileId.has(file.fileId)) {
+      merged.push(file);
+      seen.add(file.fileId);
+    }
+  }
+
+  for (const file of server) {
+    if (!seen.has(file.fileId)) merged.push(file);
+  }
+
+  return merged;
 }
 
 function nextUploadId(): string {
@@ -101,7 +118,7 @@ interface AlbumGridModalProps {
   album: IAlbum | null;
   canManage?: boolean;
   onClose: () => void;
-  onChanged?: () => void;
+  onChanged?: (albumId: string) => void;
 }
 
 export function AlbumGridModal({ open, album, canManage = false, onClose, onChanged }: AlbumGridModalProps) {
@@ -157,8 +174,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
       if (prev.some(f => f.fileId === fileId)) return prev;
       return [...prev, { id: `local-${fileId}`, fileId, albumId: album.id }];
     });
-    onChanged?.();
-  }, [album, onChanged]);
+  }, [album]);
 
   const removeUploadingItem = useCallback((localId: string) => {
     setUploadingItems(prev => {
@@ -190,6 +206,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
     ]);
 
     let hadError = false;
+    let uploadedCount = 0;
 
     try {
       await Promise.all(placeholders.map(async ({ localId, file }) => {
@@ -197,6 +214,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
           const fileId = await uploadPhotoToAlbum(album.id, file);
           removeUploadingItem(localId);
           appendFile(fileId);
+          uploadedCount += 1;
         } catch (e) {
           hadError = true;
           const message = e instanceof Error ? e.message : 'Ошибка загрузки';
@@ -214,8 +232,10 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
       setUploadError(prev => prev ?? 'Не удалось загрузить часть фотографий');
     }
 
-    void loadFiles({ silent: true });
-  }, [album, appendFile, loadFiles, removeUploadingItem]);
+    if (uploadedCount > 0) {
+      onChanged?.(album.id);
+    }
+  }, [album, appendFile, onChanged, removeUploadingItem]);
 
   if (!open || !album) return null;
 
@@ -275,7 +295,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
             <div className={styles.grid}>
               {files.map((f, i) => (
                 <GridThumbnail
-                  key={f.id}
+                  key={f.fileId}
                   fileId={f.fileId}
                   alt={`Фото ${i + 1}`}
                   onClick={() => setLightboxIdx(i)}
