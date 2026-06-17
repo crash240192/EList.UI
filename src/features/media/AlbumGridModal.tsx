@@ -7,7 +7,7 @@ import {
   type IAlbum,
   type IAlbumFile,
 } from '@/entities/media/albumApi';
-import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
+import { uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { AlbumPhotoLightbox } from './AlbumPhotoLightbox';
@@ -110,10 +110,8 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
     setUploading(true);
     setUploadError(null);
     try {
-      for (const file of items) {
-        const fileId = await uploadPhotoToAlbum(album.id, file);
-        appendOptimistic(fileId);
-      }
+      const ids = await uploadPhotosToAlbum(album.id, items);
+      ids.forEach(appendOptimistic);
       void loadFiles();
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : 'Ошибка загрузки');

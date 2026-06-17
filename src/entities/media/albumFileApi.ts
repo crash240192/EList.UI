@@ -1,25 +1,21 @@
 // entities/media/albumFileApi.ts
-// Привязка файлов к альбомам. Пока бэкенд не готов — заглушка с явной точкой подключения.
+// Привязка файлов к альбомам после загрузки в файлохранилище
 
 import { apiClient } from '@/shared/api/client';
 import { uploadFile } from '@/shared/api/fileStorageClient';
 
-/** Переключить на true, когда появится endpoint привязки файла к альбому */
-const USE_ALBUM_FILE_LINK_API = false;
-
-async function linkFileToAlbumImpl(albumId: string, fileId: string): Promise<void> {
-  await apiClient.post('/api/media/albums/files/add', { albumId, fileId });
+/** Привязать уже загруженные файлы к альбому */
+export async function linkFilesToAlbum(albumId: string, fileIds: string[]): Promise<void> {
+  if (!fileIds.length) return;
+  await apiClient.post('/api/media/albums/addFiles', {
+    albumId,
+    fileIds,
+  });
 }
 
-/** Привязать уже загруженный файл к альбому */
+/** Привязать один файл к альбому */
 export async function linkFileToAlbum(albumId: string, fileId: string): Promise<void> {
-  if (!USE_ALBUM_FILE_LINK_API) {
-    if (import.meta.env.DEV) {
-      console.info('[albumFileApi] linkFileToAlbum stub', { albumId, fileId });
-    }
-    return;
-  }
-  await linkFileToAlbumImpl(albumId, fileId);
+  await linkFilesToAlbum(albumId, [fileId]);
 }
 
 /** Загрузить файл в хранилище и привязать к альбому */
@@ -27,4 +23,12 @@ export async function uploadPhotoToAlbum(albumId: string, file: File): Promise<s
   const { id } = await uploadFile(file);
   await linkFileToAlbum(albumId, id);
   return id;
+}
+
+/** Загрузить несколько файлов и привязать к альбому одним запросом */
+export async function uploadPhotosToAlbum(albumId: string, files: File[]): Promise<string[]> {
+  if (!files.length) return [];
+  const ids = await Promise.all(files.map(file => uploadFile(file).then(r => r.id)));
+  await linkFilesToAlbum(albumId, ids);
+  return ids;
 }

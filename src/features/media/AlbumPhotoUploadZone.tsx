@@ -1,7 +1,7 @@
 // features/media/AlbumPhotoUploadZone.tsx — зона drag-and-drop для фото альбома
 
 import { useRef, useState } from 'react';
-import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
+import { uploadPhotoToAlbum, uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
 import styles from './AlbumPhotoUploadZone.module.css';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -67,10 +67,10 @@ export function AlbumPhotoUploadZone({
 
     setUploading(true);
     try {
-      for (const file of files) {
-        const fileId = await uploadPhotoToAlbum(albumId, file);
-        onUploaded?.(fileId);
-      }
+      const ids = files.length === 1
+        ? [await uploadPhotoToAlbum(albumId, files[0])]
+        : await uploadPhotosToAlbum(albumId, files);
+      ids.forEach(id => onUploaded?.(id));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
     } finally {

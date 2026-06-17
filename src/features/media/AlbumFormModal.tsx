@@ -8,7 +8,7 @@ import {
   type IAlbum,
   type ICreateAlbumPayload,
 } from '@/entities/media/albumApi';
-import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
+import { uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
 import { AlbumPhotoUploadZone } from './AlbumPhotoUploadZone';
 import styles from './AlbumFormModal.module.css';
 
@@ -67,7 +67,7 @@ export function AlbumFormModal({
         };
         const newId = await createAlbum(payload);
         if (pendingFiles.length > 0) {
-          await Promise.all(pendingFiles.map(file => uploadPhotoToAlbum(newId, file)));
+          await uploadPhotosToAlbum(newId, pendingFiles);
         }
         onSaved({
           id: newId,
