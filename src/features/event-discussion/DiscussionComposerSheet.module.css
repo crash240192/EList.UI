@@ -21,6 +21,7 @@
   background: linear-gradient(to bottom, transparent 0%, var(--surface) 22%);
   pointer-events: auto;
   animation: slideUp 0.22s ease;
+  transition: bottom 0.2s ease;
 }
 
 @keyframes slideUp {

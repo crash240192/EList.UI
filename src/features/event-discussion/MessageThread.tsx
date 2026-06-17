@@ -10,6 +10,7 @@ import { messageAuthorName, needsReplyScrollTailSpacer, scrollMessageIntoViewFor
 import type { HoleRect } from './discussionDimClipPath';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import { useDiscussionSlotRect } from './useDiscussionSlotRect';
+import { getVisualViewportBottomInset } from '@/shared/lib/useVisualViewportBottomInset';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
@@ -92,17 +93,21 @@ function MessageThreadInner({
 
     const scrollToReply = () => {
       const composerHeight = sheetRef.current?.offsetHeight ?? 220;
-      scrollMessageIntoViewForReply(mid, composerHeight);
+      const keyboardInset = getVisualViewportBottomInset();
+      scrollMessageIntoViewForReply(mid, composerHeight + keyboardInset + 8);
       updateHole();
     };
 
     updateHole();
     const anchorEl = document.getElementById(discussionMessageDomId(mid));
     const scrollRoot = anchorEl ? findScrollParent(anchorEl) : null;
+    const visualViewport = window.visualViewport;
 
     window.addEventListener('resize', updateHole);
     window.addEventListener('scroll', updateHole, true);
     scrollRoot?.addEventListener('scroll', updateHole, { passive: true });
+    visualViewport?.addEventListener('resize', scrollToReply);
+    visualViewport?.addEventListener('scroll', scrollToReply);
 
     scrollToReply();
     let raf2 = 0;
@@ -119,6 +124,8 @@ function MessageThreadInner({
       window.removeEventListener('resize', updateHole);
       window.removeEventListener('scroll', updateHole, true);
       scrollRoot?.removeEventListener('scroll', updateHole);
+      visualViewport?.removeEventListener('resize', scrollToReply);
+      visualViewport?.removeEventListener('scroll', scrollToReply);
     };
   }, [sheetOpen, replyTarget, replyScrollTailPx]);
 

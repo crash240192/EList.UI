@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { CSSProperties, Ref, RefObject } from 'react';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import { useVisualViewportBottomInset } from '@/shared/lib/useVisualViewportBottomInset';
 import { MessageComposer } from './MessageComposer';
 import { discussionDimClipPath, type HoleRect } from './discussionDimClipPath';
 import type { DiscussionSlotRect } from './useDiscussionSlotRect';
@@ -34,6 +35,7 @@ export function DiscussionComposerSheet({
   const dimRef = useRef<HTMLDivElement>(null);
   const localSheetRef = useRef<HTMLDivElement>(null);
   const resolvedSheetRef = sheetRef ?? localSheetRef;
+  const keyboardInset = useVisualViewportBottomInset(open);
 
   useModalBackButton(onClose, open);
 
@@ -55,7 +57,7 @@ export function DiscussionComposerSheet({
   const sheetStyle: CSSProperties = {
     left: slot.width > 0 ? Math.max(8, slot.left) : 8,
     width: slot.width > 0 ? Math.max(200, Math.min(slot.width, window.innerWidth - 16)) : Math.min(560, window.innerWidth - 16),
-    bottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
+    bottom: keyboardInset > 0 ? keyboardInset : 'max(12px, env(safe-area-inset-bottom, 0px))',
   };
 
   const dimStyle: CSSProperties = {};
