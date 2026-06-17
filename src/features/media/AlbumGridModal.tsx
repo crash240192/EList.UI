@@ -127,6 +127,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
   }, []);
 
   const handleClose = useCallback(() => {
+    setLightboxIdx(null);
     if (dirtyRef.current && album) {
       onChanged?.(album.id);
       dirtyRef.current = false;
@@ -169,6 +170,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
 
   useEffect(() => {
     if (open) return;
+    setLightboxIdx(null);
     revokeUploadingPreviews(uploadingRef.current);
     setUploadingItems([]);
     setUploadError(null);

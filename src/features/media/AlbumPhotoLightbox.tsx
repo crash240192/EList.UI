@@ -83,7 +83,12 @@ export function AlbumPhotoLightbox({ fileIds, initialIdx, title, onClose }: Albu
   return createPortal(
     <div
       className={`${styles.backdrop} ${fullscreen ? styles.backdropFs : ''}`}
-      onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
+      onClick={e => {
+        if (e.target === e.currentTarget) {
+          e.stopPropagation();
+          handleClose();
+        }
+      }}
     >
       <div className={`${styles.viewer} ${fullscreen ? styles.viewerFs : ''}`}>
         <div className={styles.header}>
