@@ -71,6 +71,9 @@ export interface IAlbumFile {
 /** Получить файлы альбома */
 export async function getAlbumFiles(albumId: string, pageIndex = 1, pageSize = 50): Promise<IAlbumFile[]> {
   const res = await apiClient.get<any>(`/api/media/albums/${albumId}/files?pageIndex=${pageIndex}&pageSize=${pageSize}`);
-  const paged = (res as any).result ?? res;
-  return paged.result ?? [];
+  const data = (res as any).result ?? res;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.result)) return data.result;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
 }

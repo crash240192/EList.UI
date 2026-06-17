@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { uploadPhotoToAlbum, uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
+import { filterImageFiles, isImageFile } from '@/shared/lib/imageFile';
 import styles from './AlbumPhotoUploadZone.module.css';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -42,7 +43,7 @@ export function AlbumPhotoUploadZone({
     const files = Array.from(list);
     const valid: File[] = [];
     for (const file of files) {
-      if (!file.type.startsWith('image/')) {
+      if (!isImageFile(file)) {
         setError('Можно загружать только изображения');
         continue;
       }
