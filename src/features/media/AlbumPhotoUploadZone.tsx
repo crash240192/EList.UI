@@ -15,6 +15,8 @@ interface AlbumPhotoUploadZoneProps {
   compact?: boolean;
   onUploaded?: (fileId: string) => void;
   onFilesQueued?: (files: File[]) => void;
+  /** Если задан — immediate-режим отдаёт файлы родителю (свои прелоадеры) */
+  onFilesSelected?: (files: File[]) => void;
   /** Количество файлов в очереди (режим deferred) */
   pendingCount?: number;
 }
@@ -26,6 +28,7 @@ export function AlbumPhotoUploadZone({
   compact = false,
   onUploaded,
   onFilesQueued,
+  onFilesSelected,
   pendingCount = 0,
 }: AlbumPhotoUploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -64,6 +67,11 @@ export function AlbumPhotoUploadZone({
     }
 
     if (!albumId) return;
+
+    if (onFilesSelected) {
+      onFilesSelected(files);
+      return;
+    }
 
     setUploading(true);
     try {

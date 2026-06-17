@@ -7,7 +7,7 @@ import {
   type IAlbum,
   type IAlbumFile,
 } from '@/entities/media/albumApi';
-import { uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
+import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { AlbumPhotoLightbox } from './AlbumPhotoLightbox';
@@ -15,6 +15,12 @@ import { AlbumPhotoUploadZone } from './AlbumPhotoUploadZone';
 import styles from './AlbumGridModal.module.css';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
+
+interface UploadingItem {
+  localId: string;
+  previewUrl: string;
+  error?: string;
+}
 
 function GridThumbnail({
   fileId,
@@ -56,6 +62,29 @@ function GridThumbnail({
   );
 }
 
+function GridUploadingTile({ item }: { item: UploadingItem }) {
+  return (
+    <div
+      className={`${styles.gridItem} ${styles.gridItemUploading}`}
+      aria-busy={!item.error}
+      aria-label={item.error ? 'Ошибка загрузки' : 'Загрузка фото'}
+    >
+      <img src={item.previewUrl} alt="" className={styles.gridUploadPreview} />
+      {item.error ? (
+        <div className={styles.gridUploadError} title={item.error}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+      ) : (
+        <div className={styles.gridUploadOverlay}>
+          <div className={styles.gridSpinner} aria-hidden />
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface AlbumGridModalProps {
   open: boolean;
   album: IAlbum | null;
@@ -66,60 +95,113 @@ interface AlbumGridModalProps {
 
 export function AlbumGridModal({ open, album, canManage = false, onClose, onChanged }: AlbumGridModalProps) {
   const [files, setFiles] = useState<IAlbumFile[]>([]);
+  const [uploadingItems, setUploadingItems] = useState<UploadingItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadingRef = useRef<UploadingItem[]>([]);
 
   useModalBackButton(onClose, open);
 
-  const loadFiles = useCallback(async () => {
+  const revokeUploadingPreviews = useCallback((items: UploadingItem[]) => {
+    items.forEach(item => URL.revokeObjectURL(item.previewUrl));
+  }, []);
+
+  const loadFiles = useCallback(async (opts?: { silent?: boolean }) => {
     if (!album) return;
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     try {
       const list = await getAlbumFiles(album.id, 1, 200);
       setFiles(list);
     } catch {
-      setFiles([]);
+      if (!opts?.silent) setFiles([]);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [album?.id]);
 
   useEffect(() => {
     if (!open || !album) return;
+    setUploadError(null);
     void loadFiles();
   }, [open, album, loadFiles]);
 
-  const appendOptimistic = (fileId: string) => {
+  useEffect(() => {
+    uploadingRef.current = uploadingItems;
+  }, [uploadingItems]);
+
+  useEffect(() => {
+    if (open) return;
+    revokeUploadingPreviews(uploadingRef.current);
+    setUploadingItems([]);
+    setUploadError(null);
+  }, [open, revokeUploadingPreviews]);
+
+  useEffect(() => () => revokeUploadingPreviews(uploadingRef.current), [revokeUploadingPreviews]);
+
+  const appendFile = useCallback((fileId: string) => {
     if (!album) return;
     setFiles(prev => {
       if (prev.some(f => f.fileId === fileId)) return prev;
       return [...prev, { id: `local-${fileId}`, fileId, albumId: album.id }];
     });
     onChanged?.();
-  };
+  }, [album, onChanged]);
 
-  if (!open || !album) return null;
+  const removeUploadingItem = useCallback((localId: string) => {
+    setUploadingItems(prev => {
+      const item = prev.find(u => u.localId === localId);
+      if (item) URL.revokeObjectURL(item.previewUrl);
+      return prev.filter(u => u.localId !== localId);
+    });
+  }, []);
 
-  const uploadFiles = async (list: FileList | File[]) => {
+  const startUpload = useCallback(async (list: FileList | File[]) => {
+    if (!album) return;
     const items = Array.from(list).filter(f => f.type.startsWith('image/'));
     if (!items.length) return;
 
-    setUploading(true);
     setUploadError(null);
-    try {
-      const ids = await uploadPhotosToAlbum(album.id, items);
-      ids.forEach(appendOptimistic);
-      void loadFiles();
-    } catch (e) {
-      setUploadError(e instanceof Error ? e.message : 'Ошибка загрузки');
-    } finally {
-      setUploading(false);
-    }
-  };
 
+    const placeholders: Array<UploadingItem & { file: File }> = items.map(file => ({
+      localId: `upload-${crypto.randomUUID()}`,
+      previewUrl: URL.createObjectURL(file),
+      file,
+    }));
+
+    setUploadingItems(prev => [
+      ...prev,
+      ...placeholders.map(({ localId, previewUrl }) => ({ localId, previewUrl })),
+    ]);
+
+    let hadError = false;
+
+    await Promise.all(placeholders.map(async ({ localId, previewUrl, file }) => {
+      try {
+        const fileId = await uploadPhotoToAlbum(album.id, file);
+        removeUploadingItem(localId);
+        appendFile(fileId);
+      } catch (e) {
+        hadError = true;
+        const message = e instanceof Error ? e.message : 'Ошибка загрузки';
+        setUploadingItems(prev => prev.map(u => (
+          u.localId === localId ? { ...u, error: message } : u
+        )));
+      }
+    }));
+
+    if (hadError) {
+      setUploadError('Не удалось загрузить часть фотографий');
+    }
+
+    void loadFiles({ silent: true });
+  }, [album, appendFile, loadFiles, removeUploadingItem]);
+
+  if (!open || !album) return null;
+
+  const hasGridContent = files.length > 0 || uploadingItems.length > 0;
+  const uploadingCount = uploadingItems.filter(u => !u.error).length;
   const fileIds = files.map(f => f.fileId);
 
   return createPortal(
@@ -136,10 +218,10 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
               <button
                 type="button"
                 className={styles.uploadBtn}
-                disabled={uploading}
+                disabled={uploadingCount > 0}
                 onClick={() => fileInputRef.current?.click()}
               >
-                {uploading ? 'Загрузка…' : 'Загрузить фото'}
+                {uploadingCount > 0 ? `Загрузка… (${uploadingCount})` : 'Загрузить фото'}
               </button>
             )}
             <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
@@ -157,16 +239,13 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
             <div className={styles.loadingGrid}>
               {[0, 1, 2, 3, 4, 5].map(i => <div key={i} className={styles.skeleton} />)}
             </div>
-          ) : files.length === 0 ? (
+          ) : !hasGridContent ? (
             <div className={styles.empty}>
               {canManage ? (
                 <AlbumPhotoUploadZone
                   mode="immediate"
                   albumId={album.id}
-                  onUploaded={fileId => {
-                    appendOptimistic(fileId);
-                    void loadFiles();
-                  }}
+                  onFilesSelected={files => void startUpload(files)}
                 />
               ) : (
                 <p>В альбоме пока нет фотографий</p>
@@ -182,6 +261,9 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
                   onClick={() => setLightboxIdx(i)}
                 />
               ))}
+              {uploadingItems.map(item => (
+                <GridUploadingTile key={item.localId} item={item} />
+              ))}
             </div>
           )}
         </div>
@@ -193,7 +275,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
           multiple
           className={styles.hiddenInput}
           onChange={e => {
-            if (e.target.files?.length) void uploadFiles(e.target.files);
+            if (e.target.files?.length) void startUpload(e.target.files);
             e.target.value = '';
           }}
         />
