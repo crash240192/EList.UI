@@ -7,7 +7,7 @@ import {
   type IAlbum,
   type IAlbumFile,
 } from '@/entities/media/albumApi';
-import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
+import { uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
 import { filterImageFiles } from '@/shared/lib/imageFile';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -17,31 +17,21 @@ import styles from './AlbumGridModal.module.css';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
 
-function mergeAlbumFiles(prev: IAlbumFile[], server: IAlbumFile[]): IAlbumFile[] {
-  const serverByFileId = new Map(server.map(f => [f.fileId, f]));
-  const seen = new Set<string>();
-  const merged: IAlbumFile[] = [];
-
-  for (const file of prev) {
-    const fromServer = serverByFileId.get(file.fileId);
-    if (fromServer) {
-      merged.push(fromServer);
-      seen.add(file.fileId);
-    } else if (!serverByFileId.has(file.fileId)) {
-      merged.push(file);
-      seen.add(file.fileId);
-    }
-  }
-
-  for (const file of server) {
-    if (!seen.has(file.fileId)) merged.push(file);
-  }
-
-  return merged;
-}
-
 function nextUploadId(): string {
   return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function toAlbumFile(albumId: string, fileId: string): IAlbumFile {
+  return { id: `local-${fileId}`, fileId, albumId };
+}
+
+function appendUniqueFiles(prev: IAlbumFile[], albumId: string, fileIds: string[]): IAlbumFile[] {
+  if (!fileIds.length) return prev;
+  const existing = new Set(prev.map(f => f.fileId));
+  const added = fileIds
+    .filter(id => !existing.has(id))
+    .map(id => toAlbumFile(albumId, id));
+  return added.length ? [...prev, ...added] : prev;
 }
 
 interface UploadingItem {
@@ -124,36 +114,54 @@ interface AlbumGridModalProps {
 export function AlbumGridModal({ open, album, canManage = false, onClose, onChanged }: AlbumGridModalProps) {
   const [files, setFiles] = useState<IAlbumFile[]>([]);
   const [uploadingItems, setUploadingItems] = useState<UploadingItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadingRef = useRef<UploadingItem[]>([]);
-
-  useModalBackButton(onClose, open);
+  const dirtyRef = useRef(false);
+  const loadedForAlbumIdRef = useRef<string | null>(null);
 
   const revokeUploadingPreviews = useCallback((items: UploadingItem[]) => {
     items.forEach(item => URL.revokeObjectURL(item.previewUrl));
   }, []);
 
-  const loadFiles = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!album) return;
-    if (!opts?.silent) setLoading(true);
-    try {
-      const list = await getAlbumFiles(album.id, 1, 200);
-      setFiles(prev => mergeAlbumFiles(prev, list));
-    } catch {
-      if (!opts?.silent) setFiles([]);
-    } finally {
-      if (!opts?.silent) setLoading(false);
+  const handleClose = useCallback(() => {
+    if (dirtyRef.current && album) {
+      onChanged?.(album.id);
+      dirtyRef.current = false;
     }
-  }, [album?.id]);
+    onClose();
+  }, [album, onChanged, onClose]);
+
+  useModalBackButton(handleClose, open);
 
   useEffect(() => {
-    if (!open || !album) return;
+    if (!open || !album) {
+      if (!open) loadedForAlbumIdRef.current = null;
+      return;
+    }
+
+    if (loadedForAlbumIdRef.current === album.id) return;
+
+    let cancelled = false;
+    loadedForAlbumIdRef.current = album.id;
+    setInitialLoading(true);
     setUploadError(null);
-    void loadFiles();
-  }, [open, album?.id, loadFiles]);
+
+    void (async () => {
+      try {
+        const list = await getAlbumFiles(album.id, 1, 200);
+        if (!cancelled) setFiles(list);
+      } catch {
+        if (!cancelled) setFiles([]);
+      } finally {
+        if (!cancelled) setInitialLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [open, album?.id]);
 
   useEffect(() => {
     uploadingRef.current = uploadingItems;
@@ -164,23 +172,23 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
     revokeUploadingPreviews(uploadingRef.current);
     setUploadingItems([]);
     setUploadError(null);
+    dirtyRef.current = false;
   }, [open, revokeUploadingPreviews]);
 
   useEffect(() => () => revokeUploadingPreviews(uploadingRef.current), [revokeUploadingPreviews]);
 
-  const appendFile = useCallback((fileId: string) => {
-    if (!album) return;
-    setFiles(prev => {
-      if (prev.some(f => f.fileId === fileId)) return prev;
-      return [...prev, { id: `local-${fileId}`, fileId, albumId: album.id }];
-    });
-  }, [album]);
-
-  const removeUploadingItem = useCallback((localId: string) => {
+  const clearUploadingPlaceholders = useCallback((localIds: string[]) => {
+    if (!localIds.length) return;
+    const remove = new Set(localIds);
     setUploadingItems(prev => {
-      const item = prev.find(u => u.localId === localId);
-      if (item) URL.revokeObjectURL(item.previewUrl);
-      return prev.filter(u => u.localId !== localId);
+      const next = prev.filter(item => {
+        if (remove.has(item.localId)) {
+          URL.revokeObjectURL(item.previewUrl);
+          return false;
+        }
+        return true;
+      });
+      return next;
     });
   }, []);
 
@@ -205,48 +213,31 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
       ...placeholders.map(({ localId, previewUrl }) => ({ localId, previewUrl })),
     ]);
 
-    let hadError = false;
-    let uploadedCount = 0;
-
     try {
-      await Promise.all(placeholders.map(async ({ localId, file }) => {
-        try {
-          const fileId = await uploadPhotoToAlbum(album.id, file);
-          removeUploadingItem(localId);
-          appendFile(fileId);
-          uploadedCount += 1;
-        } catch (e) {
-          hadError = true;
-          const message = e instanceof Error ? e.message : 'Ошибка загрузки';
-          setUploadingItems(prev => prev.map(u => (
-            u.localId === localId ? { ...u, error: message } : u
-          )));
-        }
-      }));
+      const ids = await uploadPhotosToAlbum(album.id, items);
+      clearUploadingPlaceholders(placeholders.map(p => p.localId));
+      setFiles(prev => appendUniqueFiles(prev, album.id, ids));
+      dirtyRef.current = true;
     } catch (e) {
-      hadError = true;
-      setUploadError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      const message = e instanceof Error ? e.message : 'Ошибка загрузки';
+      setUploadError(message);
+      setUploadingItems(prev => prev.map(item => {
+        const failed = placeholders.some(p => p.localId === item.localId);
+        return failed && !item.error ? { ...item, error: message } : item;
+      }));
     }
-
-    if (hadError) {
-      setUploadError(prev => prev ?? 'Не удалось загрузить часть фотографий');
-    }
-
-    if (uploadedCount > 0) {
-      onChanged?.(album.id);
-    }
-  }, [album, appendFile, onChanged, removeUploadingItem]);
+  }, [album, clearUploadingPlaceholders]);
 
   if (!open || !album) return null;
 
   const hasGridContent = files.length > 0 || uploadingItems.length > 0;
   const uploadingCount = uploadingItems.filter(u => !u.error).length;
-  const showSkeleton = loading && uploadingItems.length === 0;
+  const showSkeleton = initialLoading && uploadingItems.length === 0 && files.length === 0;
   const fileIds = files.map(f => f.fileId);
 
   return createPortal(
     <>
-      <div className={styles.backdrop} onClick={onClose} />
+      <div className={styles.backdrop} onClick={handleClose} />
       <div className={styles.modal} role="dialog" aria-modal aria-labelledby="album-grid-title">
         <div className={styles.header}>
           <div className={styles.headerText}>
@@ -264,7 +255,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
                 {uploadingCount > 0 ? `Загрузка… (${uploadingCount})` : 'Загрузить фото'}
               </button>
             )}
-            <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
+            <button type="button" className={styles.closeBtn} onClick={handleClose} aria-label="Закрыть">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>

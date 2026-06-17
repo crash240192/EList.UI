@@ -284,13 +284,15 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
     </div>
   );
 
+  const handleCloseGrid = useCallback(() => setGridAlbum(null), []);
+
   const modals = (
     <>
       <AlbumGridModal
         open={gridAlbum !== null}
         album={gridAlbum}
         canManage={canManage}
-        onClose={() => setGridAlbum(null)}
+        onClose={handleCloseGrid}
         onChanged={bumpAlbumCover}
       />
       {formAlbum !== undefined && (
