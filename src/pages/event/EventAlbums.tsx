@@ -9,9 +9,9 @@ import {
   assignAlbumToEvent,
   deleteAlbum,
   type IAlbum,
-  type IAlbumFile,
 } from '@/entities/media/albumApi';
 import { AlbumFormModal } from '@/features/media/AlbumFormModal';
+import { AlbumGridModal } from '@/features/media/AlbumGridModal';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
@@ -61,92 +61,6 @@ function SpinnerImage({
         />
       )}
     </div>
-  );
-}
-
-// ── Модалка просмотра альбома ─────────────────────────────────────────────────
-interface AlbumViewerProps {
-  album: IAlbum;
-  files: IAlbumFile[];
-  initialIdx: number;
-  onClose: () => void;
-}
-
-function AlbumViewer({ album, files, initialIdx, onClose }: AlbumViewerProps) {
-  const [idx, setIdx] = useState(initialIdx);
-  const [fullscreen, setFullscreen] = useState(false);
-
-  const prev = useCallback(() => setIdx(i => Math.max(0, i - 1)), []);
-  const next = useCallback(() => setIdx(i => Math.min(files.length - 1, i + 1)), [files.length]);
-
-  useEffect(() => {
-    const fn = (e: KeyboardEvent) => {
-      if (e.key === 'Escape')     { fullscreen ? setFullscreen(false) : onClose(); }
-      if (e.key === 'ArrowLeft')  prev();
-      if (e.key === 'ArrowRight') next();
-    };
-    document.addEventListener('keydown', fn);
-    return () => document.removeEventListener('keydown', fn);
-  }, [prev, next, onClose, fullscreen]);
-
-  const swipeStart = { x: 0 };
-  const handleTouchStart = (e: React.TouchEvent) => { swipeStart.x = e.touches[0].clientX; };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const dx = e.changedTouches[0].clientX - swipeStart.x;
-    if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
-  };
-
-  const cur = files[idx];
-
-  return createPortal(
-    <div className={`${styles.viewerBackdrop} ${fullscreen ? styles.viewerFs : ''}`} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={styles.viewer}>
-        <div className={styles.viewerHeader}>
-          <div>
-            <div className={styles.viewerTitle}>{album.name}</div>
-            <div className={styles.viewerCount}>{idx + 1} / {files.length}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className={styles.viewerBtn} onClick={() => setFullscreen(f => !f)} title={fullscreen ? 'Свернуть' : 'На весь экран'}>
-              {fullscreen
-                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 01-2 2H3M21 8h-3a2 2 0 01-2-2V3M3 16h3a2 2 0 002 2h3M16 21v-3a2 2 0 012-2h3"/></svg>
-                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/></svg>}
-            </button>
-            <button type="button" className={styles.viewerBtn} onClick={onClose}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div className={styles.viewerMain} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-          {cur && <SpinnerImage fileId={cur.fileId} alt={`Фото ${idx + 1}`} className={styles.viewerImg} fullSize />}
-          {idx > 0 && (
-            <button type="button" className={`${styles.arrow} ${styles.arrowLeft}`} onClick={prev}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-          )}
-          {idx < files.length - 1 && (
-            <button type="button" className={`${styles.arrow} ${styles.arrowRight}`} onClick={next}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
-          )}
-        </div>
-
-        {files.length > 1 && (
-          <div className={styles.viewerStrip}>
-            {files.map((f, i) => (
-              <div key={f.id} className={`${styles.thumb} ${i === idx ? styles.thumbActive : ''}`}
-                onClick={() => setIdx(i)}>
-                <SpinnerImage fileId={f.fileId} alt="" className={styles.thumbImg} />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>,
-    document.body,
   );
 }
 
@@ -291,7 +205,7 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
   const [albums,  setAlbums]  = useState<IAlbum[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
-  const [viewer,  setViewer]  = useState<{ album: IAlbum; files: IAlbumFile[]; idx: number } | null>(null);
+  const [gridAlbum, setGridAlbum] = useState<IAlbum | null>(null);
   const [formAlbum, setFormAlbum] = useState<IAlbum | null | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<IAlbum | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -312,9 +226,8 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
 
   useEffect(() => { void loadAlbums(); }, [loadAlbums]);
 
-  const openAlbum = async (album: IAlbum) => {
-    const files = await getAlbumFiles(album.id, 1, 100);
-    setViewer({ album, files, idx: 0 });
+  const openAlbum = (album: IAlbum) => {
+    setGridAlbum(album);
   };
 
   const handleAlbumSaved = async (album: IAlbum) => {
@@ -352,7 +265,7 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
           key={a.id}
           album={a}
           canManage={canManage}
-          onOpen={() => void openAlbum(a)}
+          onOpen={() => openAlbum(a)}
           onEdit={() => setFormAlbum(a)}
           onDelete={() => setDeleteTarget(a)}
         />
@@ -363,14 +276,13 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
 
   const modals = (
     <>
-      {viewer && (
-        <AlbumViewer
-          album={viewer.album}
-          files={viewer.files}
-          initialIdx={viewer.idx}
-          onClose={() => setViewer(null)}
-        />
-      )}
+      <AlbumGridModal
+        open={gridAlbum !== null}
+        album={gridAlbum}
+        canManage={canManage}
+        onClose={() => setGridAlbum(null)}
+        onChanged={() => void loadAlbums()}
+      />
       {formAlbum !== undefined && (
         <AlbumFormModal
           album={formAlbum}

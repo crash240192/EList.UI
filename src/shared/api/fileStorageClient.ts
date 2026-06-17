@@ -87,10 +87,14 @@ export function fileUrl(fileId: string): string {
   return `${FILE_STORAGE_BASE}/api/download/${fileId}`;
 }
 
-/** Заголовки для GET /api/download/{fileId}: без FullSize — превью; FullSize: true — оригинал. */
+/** Заголовки для GET /api/download/{fileId}: FullSize=true — оригинал; FullSize=false — превью. */
 function downloadHeaders(options?: { fullSize?: boolean }): Record<string, string> {
   const h = { ...authHeaders() };
-  if (options?.fullSize) h.FullSize = 'true';
+  if (options?.fullSize) {
+    h.FullSize = 'true';
+  } else {
+    h.FullSize = 'false';
+  }
   return h;
 }
 

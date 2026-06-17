@@ -8,6 +8,8 @@ import {
   type IAlbum,
   type ICreateAlbumPayload,
 } from '@/entities/media/albumApi';
+import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
+import { AlbumPhotoUploadZone } from './AlbumPhotoUploadZone';
 import styles from './AlbumFormModal.module.css';
 
 interface AlbumFormModalProps {
@@ -32,6 +34,7 @@ export function AlbumFormModal({
   const [headAlbum,   setHeadAlbum]   = useState(album?.parameters?.headAlbum ?? false);
   const [readOnly,    setReadOnly]    = useState(album?.parameters?.participantsReadonly ?? false);
   const [isPrivate,   setIsPrivate]   = useState(album?.parameters?.private ?? false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
 
@@ -63,12 +66,16 @@ export function AlbumFormModal({
           parameters,
         };
         const newId = await createAlbum(payload);
+        if (pendingFiles.length > 0) {
+          await Promise.all(pendingFiles.map(file => uploadPhotoToAlbum(newId, file)));
+        }
         onSaved({
           id: newId,
           name: name.trim(),
           description: description.trim() || undefined,
           parameters,
         });
+        setPendingFiles([]);
       }
       onClose();
     } catch (e: unknown) {
@@ -132,13 +139,23 @@ export function AlbumFormModal({
             </label>
           </div>
 
-          <div className={styles.photosPlaceholder}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <path d="M3 9h18M9 3v6M15 3v6"/>
-              <circle cx="12" cy="15" r="2"/>
-            </svg>
-            <span>Добавление фотографий будет доступно после публикации мероприятия</span>
+          <div className={styles.photosSection}>
+            {isEdit && album ? (
+              <AlbumPhotoUploadZone
+                mode="immediate"
+                albumId={album.id}
+                disabled={saving}
+                compact
+              />
+            ) : (
+              <AlbumPhotoUploadZone
+                mode="deferred"
+                disabled={saving}
+                compact
+                pendingCount={pendingFiles.length}
+                onFilesQueued={files => setPendingFiles(prev => [...prev, ...files])}
+              />
+            )}
           </div>
 
           {error && <div className={styles.error}>{error}</div>}
