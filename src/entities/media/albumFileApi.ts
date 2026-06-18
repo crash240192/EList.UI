@@ -28,7 +28,11 @@ export async function uploadPhotoToAlbum(albumId: string, file: File): Promise<s
 /** Загрузить несколько файлов и привязать к альбому одним запросом */
 export async function uploadPhotosToAlbum(albumId: string, files: File[]): Promise<string[]> {
   if (!files.length) return [];
-  const ids = await Promise.all(files.map(file => uploadFile(file).then(r => r.id)));
+  const ids: string[] = [];
+  for (const file of files) {
+    const { id } = await uploadFile(file);
+    ids.push(id);
+  }
   await linkFilesToAlbum(albumId, ids);
   return ids;
 }
