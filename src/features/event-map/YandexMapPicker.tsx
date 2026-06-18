@@ -61,7 +61,7 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
           onPick={onPick}
           onAddressChange={onAddressChange}
           onGeocodingChange={setGeocoding}
-          className={styles.pickerMapPreview}
+          className={`${styles.pickerMap} ${styles.pickerMapPreview}`}
         />
       </button>
       <p className={styles.hint}>Нажмите на карту, чтобы выбрать точку в полноэкранном режиме</p>
