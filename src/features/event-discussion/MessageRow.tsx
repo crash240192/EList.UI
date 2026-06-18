@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { IMessage } from '@/entities/conversation';
-import { updateMessage } from '@/entities/conversation';
+import { updateMessage, fetchMessageReplies } from '@/entities/conversation';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
-import { messageAuthorName, messageInitials, formatMessageDate } from './messageUtils';
+import {
+  messageAuthorName,
+  messageInitials,
+  formatMessageDate,
+  formatReplyCount,
+  discussionMessageDomId,
+} from './messageUtils';
 import { MessageReplies } from './MessageReplies';
 import { useDiscussionRefresh } from './discussionRefreshContext';
-import { discussionMessageDomId } from './messageUtils';
 import styles from './MessageRow.module.css';
 
 interface MessageRowProps {
@@ -16,6 +21,39 @@ interface MessageRowProps {
   conversationId: string;
   currentAccountId: string | null;
   onReply: (message: IMessage) => void;
+}
+
+function ReplyIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function ChevronUpIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
 }
 
 export function MessageRow({
@@ -33,8 +71,10 @@ export function MessageRow({
   const [displayText, setDisplayText] = useState(message.messageText);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [replyTotal, setReplyTotal] = useState<number | null>(null);
 
   const replyBump = useDiscussionRefresh(message.id);
+  const prevReplyBump = useRef(replyBump);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
   const hasReplies = message.replied || replyBump > 0;
   const accountId = message.accountId ?? message.account?.id ?? '';
@@ -46,8 +86,24 @@ export function MessageRow({
   }, [message.messageText]);
 
   useEffect(() => {
-    if (hasReplies) setExpanded(true);
-  }, [hasReplies]);
+    if (replyBump > prevReplyBump.current) setExpanded(true);
+    prevReplyBump.current = replyBump;
+  }, [replyBump]);
+
+  useEffect(() => {
+    if (!hasReplies || expanded) return;
+
+    let cancelled = false;
+    void fetchMessageReplies(message.id, 0, 1)
+      .then(paged => {
+        if (!cancelled) setReplyTotal(paged.total ?? 0);
+      })
+      .catch(() => {
+        if (!cancelled) setReplyTotal(null);
+      });
+
+    return () => { cancelled = true; };
+  }, [message.id, hasReplies, expanded, replyBump]);
 
   const startEdit = () => {
     setEditText(displayText);
@@ -87,6 +143,10 @@ export function MessageRow({
     }
   };
 
+  const collapsedRepliesLabel = replyTotal != null && replyTotal > 0
+    ? formatReplyCount(replyTotal)
+    : 'Есть ответы';
+
   return (
     <div className={styles.wrap}>
       <article
@@ -125,7 +185,7 @@ export function MessageRow({
                 />
                 {editError && <p className={styles.editError}>{editError}</p>}
                 <div className={styles.editActions}>
-                  <button type="button" className={styles.linkBtn} disabled={savingEdit} onClick={cancelEdit}>
+                  <button type="button" className={styles.actionBtn} disabled={savingEdit} onClick={cancelEdit}>
                     Отмена
                   </button>
                   <button
@@ -145,22 +205,25 @@ export function MessageRow({
             {!editing && (
               <footer className={styles.foot}>
                 {currentAccountId && (
-                  <button type="button" className={styles.linkBtn} onClick={() => onReply(message)}>
+                  <button type="button" className={styles.actionBtn} onClick={() => onReply(message)}>
+                    <ReplyIcon />
                     Ответить
                   </button>
                 )}
                 {isMine && (
-                  <button type="button" className={styles.linkBtn} onClick={startEdit}>
+                  <button type="button" className={styles.actionBtn} onClick={startEdit}>
+                    <EditIcon />
                     Редактировать
                   </button>
                 )}
-                {hasReplies && (
+                {hasReplies && expanded && (
                   <button
                     type="button"
-                    className={styles.linkBtn}
-                    onClick={() => setExpanded((v) => !v)}
+                    className={`${styles.actionBtn} ${styles.actionBtnMuted}`}
+                    onClick={() => setExpanded(false)}
                   >
-                    {expanded ? 'Скрыть ответы' : 'Показать ответы'}
+                    <ChevronUpIcon />
+                    Скрыть ответы
                   </button>
                 )}
               </footer>
@@ -168,6 +231,22 @@ export function MessageRow({
           </div>
         </div>
       </article>
+
+      {hasReplies && !expanded && (
+        <button
+          type="button"
+          className={styles.collapsedReplies}
+          onClick={() => setExpanded(true)}
+          aria-expanded={false}
+        >
+          <span className={styles.collapsedRepliesLine} aria-hidden />
+          <span className={styles.collapsedRepliesBody}>
+            <span className={styles.collapsedRepliesCount}>{collapsedRepliesLabel}</span>
+            <span className={styles.collapsedRepliesHint}>Показать цепочку</span>
+          </span>
+          <ChevronDownIcon />
+        </button>
+      )}
 
       {hasReplies && expanded && (
         <MessageReplies
@@ -178,6 +257,7 @@ export function MessageRow({
           conversationId={conversationId}
           currentAccountId={currentAccountId}
           onReply={onReply}
+          onTotalLoaded={setReplyTotal}
         />
       )}
     </div>

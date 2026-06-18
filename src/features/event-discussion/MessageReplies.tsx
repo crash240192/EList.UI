@@ -18,6 +18,7 @@ interface MessageRepliesProps {
   conversationId: string;
   currentAccountId: string | null;
   onReply: (message: IMessage) => void;
+  onTotalLoaded?: (total: number) => void;
 }
 
 export function MessageReplies({
@@ -28,6 +29,7 @@ export function MessageReplies({
   conversationId,
   currentAccountId,
   onReply,
+  onTotalLoaded,
 }: MessageRepliesProps) {
   const [items, setItems] = useState<IMessage[]>([]);
   const [total, setTotal] = useState(0);
@@ -44,10 +46,11 @@ export function MessageReplies({
       const nextTotal = paged.total ?? 0;
       setItems((prev) => (append ? [...prev, ...nextItems] : nextItems));
       setTotal(nextTotal);
+      onTotalLoaded?.(nextTotal);
       setHasMore((pageIndex + 1) * PAGE_SIZE < nextTotal);
       setError(null);
     },
-    [parent.id],
+    [parent.id, onTotalLoaded],
   );
 
   useEffect(() => {

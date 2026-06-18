@@ -131,6 +131,15 @@ export function formatMessageDate(iso: string): string {
   }
 }
 
+export function formatReplyCount(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod100 >= 11 && mod100 <= 14) return `${count} ответов`;
+  if (mod10 === 1) return `${count} ответ`;
+  if (mod10 >= 2 && mod10 <= 4) return `${count} ответа`;
+  return `${count} ответов`;
+}
+
 /** Корневые комментарии (без replyTo) — ответы подгружаются отдельным методом */
 export function filterRootMessages(items: IMessage[]): IMessage[] {
   return items.filter((m) => !m.replyTo);
