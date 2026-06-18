@@ -262,8 +262,29 @@
 /* Right: description */
 .desc { font-size:13px; color:var(--text-secondary); line-height:1.7; white-space:pre-line; }
 .descClamped { display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
-.readMore { background:none; border:none; cursor:pointer; font-size:12px; color:var(--accent); padding:4px 0 0; display:inline-flex; align-items:center; gap:3px; }
-.readMore:hover { text-decoration:underline; }
+
+.descToggle {
+  display:flex; align-items:center; gap:10px;
+  width:100%; margin-top:8px;
+  padding:8px 12px 8px 0;
+  border:none; background:transparent;
+  cursor:pointer; text-align:left; font-family:inherit;
+  border-radius:0 10px 10px 0;
+  transition:background .12s;
+}
+.descToggle:hover { background:color-mix(in srgb, var(--accent) 5%, var(--surface-2) 95%); }
+.descToggleLine {
+  width:2px; align-self:stretch; flex-shrink:0; border-radius:2px;
+  background:linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 55%, var(--border) 45%),
+    color-mix(in srgb, var(--accent) 20%, var(--border) 80%)
+  );
+}
+.descToggleBody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.descToggleTitle { font-size:12px; font-weight:600; color:var(--accent); }
+.descToggleHint { font-size:11px; color:var(--text-muted); }
+.descToggle svg { flex-shrink:0; color:var(--accent); }
 
 /* Details cards */
 .detailsGrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
