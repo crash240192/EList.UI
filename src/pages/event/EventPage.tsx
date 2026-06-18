@@ -500,6 +500,7 @@ export default function EventPage() {
               eventId={id!}
               compact
               canManage={isOrganizer}
+              isParticipating={isParticipating}
               accountId={accountId}
             />
 
