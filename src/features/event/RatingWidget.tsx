@@ -71,10 +71,11 @@ interface RatingItemRowProps {
 function RatingItemRow({ item, isOwn, canDelete, deleteDisabled, onDeleteClick }: RatingItemRowProps) {
   const name = ratingAuthorName(item);
   const hasComment = !!item.comment?.trim();
+  const showDelete = isOwn && canDelete;
 
   return (
     <article className={`${styles.ratingItem} ${isOwn ? styles.ratingItemOwn : ''}`}>
-      <div className={styles.ratingItemHeader}>
+      <div className={styles.ratingItemTop}>
         <UserAvatar
           accountId={item.accountId}
           avatarId={item.account.avatarId ?? null}
@@ -88,12 +89,9 @@ function RatingItemRow({ item, isOwn, canDelete, deleteDisabled, onDeleteClick }
           {isOwn && <span className={styles.ratingItemYou}>Вы</span>}
         </div>
 
-        <div className={styles.ratingItemGrade}>
+        <div className={styles.ratingItemEnd}>
           {item.value > 0 && <GradeBadge score={item.value} size="xs" simple />}
-        </div>
-
-        <div className={styles.ratingItemActions}>
-          {isOwn && canDelete ? (
+          {showDelete && (
             <button
               type="button"
               className={styles.ratingDeleteBtn}
@@ -109,14 +107,15 @@ function RatingItemRow({ item, isOwn, canDelete, deleteDisabled, onDeleteClick }
                 <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
               </svg>
             </button>
-          ) : (
-            <span className={styles.ratingItemActionsSpacer} aria-hidden />
           )}
         </div>
       </div>
 
       {hasComment && (
-        <p className={styles.ratingItemComment}>{item.comment}</p>
+        <>
+          <div className={styles.ratingItemDivider} aria-hidden />
+          <p className={styles.ratingItemComment}>{item.comment}</p>
+        </>
       )}
     </article>
   );

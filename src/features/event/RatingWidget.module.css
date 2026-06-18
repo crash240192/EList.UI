@@ -117,7 +117,7 @@
 .ratingItem {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -130,11 +130,10 @@
   background: color-mix(in srgb, var(--accent) 4%, var(--surface-2));
 }
 
-.ratingItemHeader {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto 30px;
-  gap: 10px;
+.ratingItemTop {
+  display: flex;
   align-items: center;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -150,6 +149,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex: 1;
   overflow: hidden;
 }
 
@@ -175,28 +175,12 @@
   line-height: 1.4;
 }
 
-.ratingItemGrade {
-  flex-shrink: 0;
+.ratingItemEnd {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-width: 28px;
-}
-
-.ratingItemActions {
-  width: 30px;
-  height: 30px;
+  gap: 6px;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ratingItemActionsSpacer {
-  display: block;
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .ratingDeleteBtn {
@@ -224,22 +208,20 @@
   cursor: not-allowed;
 }
 
+.ratingItemDivider {
+  height: 1px;
+  margin: 8px 0 8px 40px;
+  background: color-mix(in srgb, var(--border) 85%, transparent);
+}
+
 .ratingItemComment {
   margin: 0;
-  padding: 8px 10px 8px 40px;
+  padding: 0 0 0 40px;
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.ratingItemOwn .ratingItemComment {
-  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 14%, var(--border));
 }
 
 /* ── Footer ── */
