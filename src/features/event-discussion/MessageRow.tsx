@@ -8,6 +8,7 @@ import {
   formatMessageDate,
   formatReplyCount,
   discussionMessageDomId,
+  isLongMessageText,
 } from './messageUtils';
 import { MessageReplies } from './MessageReplies';
 import { useDiscussionRefresh } from './discussionRefreshContext';
@@ -66,6 +67,7 @@ export function MessageRow({
   onReply,
 }: MessageRowProps) {
   const [expanded, setExpanded] = useState(message.replied);
+  const [textExpanded, setTextExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.messageText);
   const [displayText, setDisplayText] = useState(message.messageText);
@@ -83,7 +85,8 @@ export function MessageRow({
   useEffect(() => {
     setDisplayText(message.messageText);
     setEditText(message.messageText);
-  }, [message.messageText]);
+    setTextExpanded(false);
+  }, [message.id, message.messageText]);
 
   useEffect(() => {
     if (replyBump > prevReplyBump.current) setExpanded(true);
@@ -146,6 +149,7 @@ export function MessageRow({
   const collapsedRepliesLabel = replyTotal != null && replyTotal > 0
     ? formatReplyCount(replyTotal)
     : 'Есть ответы';
+  const isLongText = isLongMessageText(displayText);
 
   return (
     <div className={styles.wrap}>
@@ -199,7 +203,30 @@ export function MessageRow({
                 </div>
               </div>
             ) : (
-              <p className={styles.text}>{displayText}</p>
+              <>
+                <p className={`${styles.text} ${isLongText && !textExpanded ? styles.textClamped : ''}`}>
+                  {displayText}
+                </p>
+                {isLongText && (
+                  <button
+                    type="button"
+                    className={styles.textToggle}
+                    onClick={() => setTextExpanded(v => !v)}
+                    aria-expanded={textExpanded}
+                  >
+                    <span className={styles.textToggleLine} aria-hidden />
+                    <span className={styles.textToggleBody}>
+                      <span className={styles.textToggleTitle}>
+                        {textExpanded ? 'Свернуть' : 'Показать полностью'}
+                      </span>
+                      <span className={styles.textToggleHint}>
+                        {textExpanded ? 'Скрыть комментарий' : 'Развернуть комментарий'}
+                      </span>
+                    </span>
+                    {textExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                  </button>
+                )}
+              </>
             )}
 
             {!editing && (

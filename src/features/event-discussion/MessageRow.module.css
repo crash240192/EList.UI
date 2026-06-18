@@ -103,6 +103,70 @@
   word-break: break-word;
 }
 
+.textClamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 10;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+}
+
+.textToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+  padding: 8px 0 8px 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  border-radius: 0 10px 10px 0;
+  transition: background 0.12s;
+}
+
+.textToggle:hover {
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface-2) 95%);
+}
+
+.textToggleLine {
+  width: 2px;
+  align-self: stretch;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 55%, var(--border) 45%),
+    color-mix(in srgb, var(--accent) 20%, var(--border) 80%)
+  );
+}
+
+.textToggleBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.textToggleTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.textToggleHint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.textToggle svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
 .foot {
   display: flex;
   flex-wrap: wrap;

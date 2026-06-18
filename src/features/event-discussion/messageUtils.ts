@@ -1,5 +1,6 @@
 import type { IMessage } from '@/entities/conversation';
 import { getVisualViewportBottomInset } from '@/shared/lib/useVisualViewportBottomInset';
+import { LONG_MESSAGE_CHAR_THRESHOLD, LONG_MESSAGE_LINE_CLAMP } from './discussionUiConstants';
 
 export const discussionMessageDomId = (messageId: string) => `discussion-msg-${messageId}`;
 
@@ -174,6 +175,13 @@ export function formatReplyCount(count: number): string {
   if (mod10 === 1) return `${count} ответ`;
   if (mod10 >= 2 && mod10 <= 4) return `${count} ответа`;
   return `${count} ответов`;
+}
+
+export function isLongMessageText(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (trimmed.split('\n').length > LONG_MESSAGE_LINE_CLAMP) return true;
+  return trimmed.length > LONG_MESSAGE_CHAR_THRESHOLD;
 }
 
 /** Корневые комментарии (без replyTo) — ответы подгружаются отдельным методом */
