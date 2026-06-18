@@ -62,32 +62,31 @@
 
 .pickerMapWrap {
   position: relative;
-}
-
-.pickerExpandBtn {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 500;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
   cursor: pointer;
   font-family: inherit;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  transition: background 0.15s, color 0.15s;
+  text-align: left;
 }
 
-.pickerExpandBtn:hover {
-  background: var(--surface-2);
-  color: var(--text-primary);
+.pickerMapWrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  transition: background 0.15s;
+  pointer-events: none;
+}
+
+.pickerMapWrap:hover::after {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.pickerMapPreview {
+  pointer-events: none;
 }
 
 .pickerMap {

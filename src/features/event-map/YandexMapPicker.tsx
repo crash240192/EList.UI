@@ -47,18 +47,12 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
           {geocoding ? '⏳' : '🔍'}
         </button>
       </div>
-      <div className={styles.pickerMapWrap}>
-        <button
-          type="button"
-          className={styles.pickerExpandBtn}
-          onClick={() => setMapExpanded(true)}
-          aria-label="Развернуть карту"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" />
-          </svg>
-          Развернуть
-        </button>
+      <button
+        type="button"
+        className={styles.pickerMapWrap}
+        onClick={() => setMapExpanded(true)}
+        aria-label="Открыть карту для выбора точки"
+      >
         <PickerMapView
           lat={lat}
           lng={lng}
@@ -67,9 +61,10 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
           onPick={onPick}
           onAddressChange={onAddressChange}
           onGeocodingChange={setGeocoding}
+          className={styles.pickerMapPreview}
         />
-      </div>
-      <p className={styles.hint}>Кликните по карте или перетащите маркер — адрес определится автоматически</p>
+      </button>
+      <p className={styles.hint}>Нажмите на карту, чтобы выбрать точку в полноэкранном режиме</p>
 
       {mapExpanded && (
         <MapPickerModal
