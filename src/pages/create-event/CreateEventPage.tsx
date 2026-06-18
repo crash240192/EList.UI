@@ -62,6 +62,45 @@ const EMPTY: FormState = {
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
 };
 
+/** Восстанавливает состояние пикера: категория — только если выбраны все её типы */
+function deriveCategoryTypeSelection(
+  eventTypeIds: string[],
+  catalog: IEventType[],
+): { selectedCategories: string[]; selectedTypes: string[] } {
+  if (!eventTypeIds.length) {
+    return { selectedCategories: [], selectedTypes: [] };
+  }
+  if (!catalog.length) {
+    return { selectedCategories: [], selectedTypes: [...eventTypeIds] };
+  }
+
+  const selectedSet = new Set(eventTypeIds);
+  const typesByCategory = new Map<string, string[]>();
+
+  for (const t of catalog) {
+    const catId = t.eventCategoryId;
+    if (!catId) continue;
+    const list = typesByCategory.get(catId) ?? [];
+    list.push(t.id);
+    typesByCategory.set(catId, list);
+  }
+
+  const selectedCategories: string[] = [];
+  const coveredByCategory = new Set<string>();
+
+  for (const [catId, catTypeIds] of typesByCategory) {
+    if (catTypeIds.length > 0 && catTypeIds.every(typeId => selectedSet.has(typeId))) {
+      selectedCategories.push(catId);
+      catTypeIds.forEach(typeId => coveredByCategory.add(typeId));
+    }
+  }
+
+  return {
+    selectedCategories,
+    selectedTypes: eventTypeIds.filter(typeId => !coveredByCategory.has(typeId)),
+  };
+}
+
 type FieldError = 'name' | 'type' | 'location' | 'startDate' | 'startTime' | 'duration' | 'endDate' | 'endTime' | 'cost' | 'maxPersons' | 'ageLimit';
 
 // ---- Helpers ----
@@ -128,6 +167,9 @@ export default function CreateEventPage() {
   const endTimeRef       = useRef<HTMLInputElement>(null);
   const durationRef      = useRef<HTMLDivElement>(null);
   const loadedBWListsRef = useRef<Set<BWListType>>(new Set());
+  const initialEventTypeIdsRef = useRef<string[] | null>(null);
+  const initialTypesAppliedRef = useRef(false);
+  const allTypesRef = useRef<IEventType[]>([]);
 
   // Загрузка кошелька и тарифа
   useEffect(() => {
@@ -154,17 +196,24 @@ export default function CreateEventPage() {
     Promise.all([fetchAllEventTypes(), fetchEventCategories()])
       .then(([types, categories]) => {
         const catMap = new Map(categories.map(c => [c.id, c]));
-        setAllTypes(types.map(t => ({
+        const mapped = types.map(t => ({
           ...t,
           eventCategory: catMap.get(t.eventCategoryId) ?? t.eventCategory ?? null,
-        })));
+        }));
+        setAllTypes(mapped);
       })
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    allTypesRef.current = allTypes;
+  }, [allTypes]);
+
   // Загрузка события для редактирования
   useEffect(() => {
     if (!isEditing) return;
+    initialTypesAppliedRef.current = false;
+    initialEventTypeIdsRef.current = null;
     setLoading(true);
     const loadEvent = USE_MOCK
       ? Promise.resolve(MOCK_EVENTS.find(e => e.id === id) ?? MOCK_EVENTS[0])
@@ -213,17 +262,43 @@ export default function CreateEventPage() {
         else setWhitelist(mapped);
       }).catch(() => { loadedBWListsRef.current.delete(neededList); });
 
-      if (evTypes.length > 0) {
-        setSelectedTypes(evTypes.map(t => t.id));
-        setSelectedCategories([...new Set(evTypes.map(t =>
-          t.eventCategoryId ?? (t as any).eventCategory?.id).filter(Boolean) as string[])]);
-      } else if (ev.eventType?.id) {
-        setSelectedTypes([ev.eventType.id]);
-        const catId = ev.eventType.eventCategoryId ?? ev.eventType.eventCategory?.id;
-        if (catId) setSelectedCategories([catId]);
+      const typeIds = evTypes.length > 0
+        ? evTypes.map(t => t.id)
+        : ev.eventType?.id
+          ? [ev.eventType.id]
+          : [];
+
+      initialEventTypeIdsRef.current = typeIds;
+
+      if (typeIds.length > 0) {
+        const catalog = allTypesRef.current;
+        if (catalog.length > 0) {
+          const selection = deriveCategoryTypeSelection(typeIds, catalog);
+          setSelectedCategories(selection.selectedCategories);
+          setSelectedTypes(selection.selectedTypes);
+          initialTypesAppliedRef.current = true;
+        } else {
+          setSelectedCategories([]);
+          setSelectedTypes(typeIds);
+        }
+      } else {
+        setSelectedCategories([]);
+        setSelectedTypes([]);
       }
     }).finally(() => setLoading(false));
   }, [id, isEditing]);
+
+  // Если типы мероприятия загрузились раньше справочника — применить выбор после allTypes
+  useEffect(() => {
+    if (!isEditing || initialTypesAppliedRef.current) return;
+    const typeIds = initialEventTypeIdsRef.current;
+    if (!typeIds?.length || !allTypes.length) return;
+
+    const selection = deriveCategoryTypeSelection(typeIds, allTypes);
+    setSelectedCategories(selection.selectedCategories);
+    setSelectedTypes(selection.selectedTypes);
+    initialTypesAppliedRef.current = true;
+  }, [isEditing, allTypes]);
 
   // Вспомогательные
   const set = (key: keyof FormState) =>
