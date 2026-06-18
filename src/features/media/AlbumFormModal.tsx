@@ -1,6 +1,6 @@
 // features/media/AlbumFormModal.tsx
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   createAlbum,
@@ -9,7 +9,9 @@ import {
   type ICreateAlbumPayload,
 } from '@/entities/media/albumApi';
 import { uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
+import { filterImageFiles } from '@/shared/lib/imageFile';
 import { AlbumPhotoUploadZone } from './AlbumPhotoUploadZone';
+import { AlbumPhotoPreviewGrid, type PhotoPreviewItem } from './AlbumPhotoPreviewGrid';
 import styles from './AlbumFormModal.module.css';
 
 interface AlbumFormModalProps {
@@ -18,6 +20,16 @@ interface AlbumFormModalProps {
   accountId: string | null;
   organizationId?: string | null;
   album?: IAlbum | null;
+}
+
+interface PendingPhoto {
+  localId: string;
+  previewUrl: string;
+  file: File;
+}
+
+function nextLocalId(): string {
+  return `pending-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 export function AlbumFormModal({
@@ -34,9 +46,40 @@ export function AlbumFormModal({
   const [headAlbum,   setHeadAlbum]   = useState(album?.parameters?.headAlbum ?? false);
   const [readOnly,    setReadOnly]    = useState(album?.parameters?.participantsReadonly ?? false);
   const [isPrivate,   setIsPrivate]   = useState(album?.parameters?.private ?? false);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
+  const pendingRef = useRef<PendingPhoto[]>([]);
+
+  const revokePendingPreviews = useCallback((items: PendingPhoto[]) => {
+    items.forEach(item => URL.revokeObjectURL(item.previewUrl));
+  }, []);
+
+  useEffect(() => {
+    pendingRef.current = pendingPhotos;
+  }, [pendingPhotos]);
+
+  useEffect(() => () => revokePendingPreviews(pendingRef.current), [revokePendingPreviews]);
+
+  const queuePhotos = useCallback((files: File[]) => {
+    const images = filterImageFiles(files);
+    if (!images.length) return;
+    setPendingPhotos(prev => [
+      ...prev,
+      ...images.map(file => ({
+        localId: nextLocalId(),
+        previewUrl: URL.createObjectURL(file),
+        file,
+      })),
+    ]);
+  }, []);
+
+  const previewItems: PhotoPreviewItem[] = pendingPhotos.map(item => ({
+    localId: item.localId,
+    previewUrl: item.previewUrl,
+    uploading: uploadingPhotos,
+  }));
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Укажите название альбома'); return; }
@@ -66,22 +109,25 @@ export function AlbumFormModal({
           parameters,
         };
         const newId = await createAlbum(payload);
-        if (pendingFiles.length > 0) {
-          await uploadPhotosToAlbum(newId, pendingFiles);
+        if (pendingPhotos.length > 0) {
+          setUploadingPhotos(true);
+          await uploadPhotosToAlbum(newId, pendingPhotos.map(p => p.file));
         }
+        revokePendingPreviews(pendingPhotos);
+        setPendingPhotos([]);
         onSaved({
           id: newId,
           name: name.trim(),
           description: description.trim() || undefined,
           parameters,
         });
-        setPendingFiles([]);
       }
       onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Ошибка при сохранении альбома');
     } finally {
       setSaving(false);
+      setUploadingPhotos(false);
     }
   };
 
@@ -148,13 +194,15 @@ export function AlbumFormModal({
                 compact
               />
             ) : (
-              <AlbumPhotoUploadZone
-                mode="deferred"
-                disabled={saving}
-                compact
-                pendingCount={pendingFiles.length}
-                onFilesQueued={files => setPendingFiles(prev => [...prev, ...files])}
-              />
+              <>
+                <AlbumPhotoUploadZone
+                  mode="deferred"
+                  disabled={saving || uploadingPhotos}
+                  compact
+                  onFilesQueued={queuePhotos}
+                />
+                <AlbumPhotoPreviewGrid items={previewItems} />
+              </>
             )}
           </div>
 
@@ -163,8 +211,8 @@ export function AlbumFormModal({
 
         <div className={styles.modalFooter}>
           <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={saving}>Отмена</button>
-          <button type="button" className={styles.saveBtn} onClick={() => void handleSave()} disabled={saving || !name.trim()}>
-            {saving ? 'Сохранение...' : isEdit ? 'Сохранить' : 'Создать альбом'}
+          <button type="button" className={styles.saveBtn} onClick={() => void handleSave()} disabled={saving || uploadingPhotos || !name.trim()}>
+            {saving ? (uploadingPhotos ? 'Загрузка фото…' : 'Сохранение...') : isEdit ? 'Сохранить' : 'Создать альбом'}
           </button>
         </div>
       </div>
