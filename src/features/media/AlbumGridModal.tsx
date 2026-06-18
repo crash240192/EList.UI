@@ -7,7 +7,7 @@ import {
   type IAlbum,
   type IAlbumFile,
 } from '@/entities/media/albumApi';
-import { uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
+import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
 import { canAddPhotosToAlbum } from '@/entities/media/albumPermissions';
 import { filterImageFiles } from '@/shared/lib/imageFile';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
@@ -130,6 +130,7 @@ export function AlbumGridModal({
   const uploadingRef = useRef<UploadingItem[]>([]);
   const dirtyRef = useRef(false);
   const loadedForAlbumIdRef = useRef<string | null>(null);
+  const uploadChainRef = useRef(Promise.resolve());
 
   const revokeUploadingPreviews = useCallback((items: UploadingItem[]) => {
     items.forEach(item => URL.revokeObjectURL(item.previewUrl));
@@ -180,6 +181,7 @@ export function AlbumGridModal({
   useEffect(() => {
     if (open) return;
     setLightboxIdx(null);
+    uploadChainRef.current = Promise.resolve();
     revokeUploadingPreviews(uploadingRef.current);
     setUploadingItems([]);
     setUploadError(null);
@@ -203,7 +205,7 @@ export function AlbumGridModal({
     });
   }, []);
 
-  const startUpload = useCallback(async (list: FileList | File[]) => {
+  const startUpload = useCallback((list: FileList | File[]) => {
     if (!album) return;
     if (!canAddPhotosToAlbum(album, { isOrganizer: canManage, isParticipating })) return;
     const items = filterImageFiles(list);
@@ -212,32 +214,37 @@ export function AlbumGridModal({
       return;
     }
 
-    setUploadError(null);
+    uploadChainRef.current = uploadChainRef.current.then(async () => {
+      setUploadError(null);
 
-    const placeholders: Array<UploadingItem & { file: File }> = items.map(file => ({
-      localId: nextUploadId(),
-      previewUrl: URL.createObjectURL(file),
-      file,
-    }));
-
-    setUploadingItems(prev => [
-      ...prev,
-      ...placeholders.map(({ localId, previewUrl }) => ({ localId, previewUrl })),
-    ]);
-
-    try {
-      const ids = await uploadPhotosToAlbum(album.id, items);
-      clearUploadingPlaceholders(placeholders.map(p => p.localId));
-      setFiles(prev => appendUniqueFiles(prev, album.id, ids));
-      dirtyRef.current = true;
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Ошибка загрузки';
-      setUploadError(message);
-      setUploadingItems(prev => prev.map(item => {
-        const failed = placeholders.some(p => p.localId === item.localId);
-        return failed && !item.error ? { ...item, error: message } : item;
+      const placeholders: Array<UploadingItem & { file: File }> = items.map(file => ({
+        localId: nextUploadId(),
+        previewUrl: URL.createObjectURL(file),
+        file,
       }));
-    }
+
+      setUploadingItems(prev => [
+        ...prev,
+        ...placeholders.map(({ localId, previewUrl }) => ({ localId, previewUrl })),
+      ]);
+
+      for (const placeholder of placeholders) {
+        try {
+          const id = await uploadPhotoToAlbum(album.id, placeholder.file);
+          clearUploadingPlaceholders([placeholder.localId]);
+          setFiles(prev => appendUniqueFiles(prev, album.id, [id]));
+          dirtyRef.current = true;
+        } catch (e) {
+          const message = e instanceof Error ? e.message : 'Ошибка загрузки';
+          setUploadError(message);
+          setUploadingItems(prev => prev.map(item => (
+            item.localId === placeholder.localId && !item.error
+              ? { ...item, error: message }
+              : item
+          )));
+        }
+      }
+    }).catch(() => {});
   }, [album, canManage, isParticipating, clearUploadingPlaceholders]);
 
   if (!open || !album) return null;
@@ -293,7 +300,8 @@ export function AlbumGridModal({
                 <AlbumPhotoUploadZone
                   mode="immediate"
                   albumId={album.id}
-                  onFilesSelected={files => void startUpload(files)}
+                  disabled={uploadingCount > 0}
+                  onFilesSelected={files => startUpload(files)}
                 />
               ) : (
                 <p>В альбоме пока нет фотографий</p>

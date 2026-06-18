@@ -96,10 +96,11 @@ export function AlbumPhotoUploadZone({
       <div
         className={`${styles.zone} ${compact ? styles.zoneCompact : ''} ${dragging ? styles.dragging : ''} ${isDisabled ? styles.disabled : ''}`}
         onClick={() => !isDisabled && inputRef.current?.click()}
-        onDragOver={e => { e.preventDefault(); if (!isDisabled) setDragging(true); }}
+        onDragOver={e => { e.preventDefault(); e.stopPropagation(); if (!isDisabled) setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={e => {
           e.preventDefault();
+          e.stopPropagation();
           setDragging(false);
           if (!isDisabled && e.dataTransfer.files.length) void handleFiles(e.dataTransfer.files);
         }}
