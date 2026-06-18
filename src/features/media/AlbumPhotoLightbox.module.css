@@ -14,7 +14,7 @@
 }
 
 .viewer {
-  width: min(560px, 96vw);
+  width: min(1280px, 96vw);
   height: min(88dvh, 820px);
   max-height: 88dvh;
   display: flex;
