@@ -90,11 +90,11 @@ export function configurePickerMapBehaviors(map: {
   });
 }
 
-/** Развёрнутая карта: зажать и тянуть — сдвиг, клик — выбор точки */
+/** Развёрнутая карта: сдвиг, зум колёсиком/жестами, клик — выбор точки */
 export function configureExpandedPickerMapBehaviors(map: {
   behaviors: { disable: (name: string) => void };
 }): void {
-  ['scrollZoom', 'dblClickZoom', 'rightMouseButtonMagnifier'].forEach(b => {
+  ['dblClickZoom', 'rightMouseButtonMagnifier'].forEach(b => {
     map.behaviors.disable(b);
   });
 }

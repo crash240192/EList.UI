@@ -1,6 +1,7 @@
 // features/event-map/MapPickerModal.tsx — развёрнутая карта для выбора точки
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PickerMapView } from './PickerMapView';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import styles from './EventMapModal.module.css';
@@ -36,7 +37,7 @@ export function MapPickerModal({
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <>
       <div className={styles.backdrop} onClick={onClose} />
       <div className={styles.modal} role="dialog" aria-modal aria-label="Выбор точки на карте">
@@ -72,6 +73,7 @@ export function MapPickerModal({
           />
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

@@ -140,6 +140,22 @@ export function PickerMapView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, ready]);
 
+  useEffect(() => {
+    if (!ready || !mapRef.current || !ref.current) return;
+    const map = mapRef.current;
+    const fit = () => {
+      try {
+        map.container.fitToViewport();
+      } catch {
+        /* ignore */
+      }
+    };
+    fit();
+    const observer = new ResizeObserver(() => fit());
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [ready, panEnabled]);
+
   if (loadErr) return <div className={styles.errorBox}>⚠️ {loadErr}</div>;
 
   const darkFilter = 'invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9)';

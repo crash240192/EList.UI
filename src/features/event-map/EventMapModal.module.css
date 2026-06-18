@@ -94,6 +94,7 @@
 @media (max-width: 680px) {
   .modal {
     width: 100vw;
+    height: 100dvh;
     max-height: 100dvh;
     border-radius: 0;
     top: 0;
@@ -110,6 +111,6 @@
   .mapWrap {
     flex: 1;
     height: auto;
-    min-height: 0;
+    min-height: 280px;
   }
 }

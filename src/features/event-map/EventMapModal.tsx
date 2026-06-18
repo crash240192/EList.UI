@@ -1,6 +1,7 @@
 // features/event-map/EventMapModal.tsx — увеличенная карта мероприятия
 
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { YandexMap } from './YandexMap';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import styles from './EventMapModal.module.css';
@@ -24,7 +25,7 @@ export function EventMapModal({ lat, lng, label, address, onClose }: EventMapMod
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <>
       <div className={styles.backdrop} onClick={onClose} />
       <div className={styles.modal} role="dialog" aria-modal aria-label="Карта места проведения">
@@ -44,6 +45,7 @@ export function EventMapModal({ lat, lng, label, address, onClose }: EventMapMod
           <YandexMap lat={lat} lng={lng} label={label} zoom={15} draggable />
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
