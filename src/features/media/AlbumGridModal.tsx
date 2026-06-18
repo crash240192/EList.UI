@@ -8,6 +8,7 @@ import {
   type IAlbumFile,
 } from '@/entities/media/albumApi';
 import { uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
+import { canAddPhotosToAlbum } from '@/entities/media/albumPermissions';
 import { filterImageFiles } from '@/shared/lib/imageFile';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -107,11 +108,19 @@ interface AlbumGridModalProps {
   open: boolean;
   album: IAlbum | null;
   canManage?: boolean;
+  isParticipating?: boolean;
   onClose: () => void;
   onChanged?: (albumId: string) => void;
 }
 
-export function AlbumGridModal({ open, album, canManage = false, onClose, onChanged }: AlbumGridModalProps) {
+export function AlbumGridModal({
+  open,
+  album,
+  canManage = false,
+  isParticipating = false,
+  onClose,
+  onChanged,
+}: AlbumGridModalProps) {
   const [files, setFiles] = useState<IAlbumFile[]>([]);
   const [uploadingItems, setUploadingItems] = useState<UploadingItem[]>([]);
   const [initialLoading, setInitialLoading] = useState(false);
@@ -196,6 +205,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
 
   const startUpload = useCallback(async (list: FileList | File[]) => {
     if (!album) return;
+    if (!canAddPhotosToAlbum(album, { isOrganizer: canManage, isParticipating })) return;
     const items = filterImageFiles(list);
     if (!items.length) {
       setUploadError('Можно загружать только изображения');
@@ -228,9 +238,14 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
         return failed && !item.error ? { ...item, error: message } : item;
       }));
     }
-  }, [album, clearUploadingPlaceholders]);
+  }, [album, canManage, isParticipating, clearUploadingPlaceholders]);
 
   if (!open || !album) return null;
+
+  const canUploadPhotos = canAddPhotosToAlbum(album, {
+    isOrganizer: canManage,
+    isParticipating,
+  });
 
   const hasGridContent = files.length > 0 || uploadingItems.length > 0;
   const uploadingCount = uploadingItems.filter(u => !u.error).length;
@@ -247,7 +262,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
             {album.description && <p className={styles.desc}>{album.description}</p>}
           </div>
           <div className={styles.headerActions}>
-            {canManage && (
+            {canUploadPhotos && (
               <button
                 type="button"
                 className={styles.uploadBtn}
@@ -274,7 +289,7 @@ export function AlbumGridModal({ open, album, canManage = false, onClose, onChan
             </div>
           ) : !hasGridContent ? (
             <div className={styles.empty}>
-              {canManage ? (
+              {canUploadPhotos ? (
                 <AlbumPhotoUploadZone
                   mode="immediate"
                   albumId={album.id}

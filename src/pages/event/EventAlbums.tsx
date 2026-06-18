@@ -199,10 +199,17 @@ interface EventAlbumsProps {
   eventId: string;
   compact?: boolean;
   canManage?: boolean;
+  isParticipating?: boolean;
   accountId?: string | null;
 }
 
-export function EventAlbums({ eventId, compact, canManage = false, accountId = null }: EventAlbumsProps) {
+export function EventAlbums({
+  eventId,
+  compact,
+  canManage = false,
+  isParticipating = false,
+  accountId = null,
+}: EventAlbumsProps) {
   const [albums,  setAlbums]  = useState<IAlbum[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -292,6 +299,7 @@ export function EventAlbums({ eventId, compact, canManage = false, accountId = n
         open={gridAlbum !== null}
         album={gridAlbum}
         canManage={canManage}
+        isParticipating={isParticipating}
         onClose={handleCloseGrid}
         onChanged={bumpAlbumCover}
       />
