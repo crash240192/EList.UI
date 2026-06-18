@@ -9,6 +9,13 @@
   scroll-margin-bottom: 240px;
 }
 
+@media (max-width: 680px) {
+  .cardReplyTarget {
+    scroll-margin-top: 56px;
+    scroll-margin-bottom: 120px;
+  }
+}
+
 .card {
   background: var(--surface-2);
   border: 1px solid var(--border);

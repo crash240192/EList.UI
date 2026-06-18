@@ -4,7 +4,22 @@ import { getVisualViewportBottomInset } from '@/shared/lib/useVisualViewportBott
 export const discussionMessageDomId = (messageId: string) => `discussion-msg-${messageId}`;
 
 const DEFAULT_COMPOSER_HEIGHT = 220;
+const MOBILE_COMPOSER_HEIGHT_ESTIMATE = 168;
 const REPLY_GAP_PX = 16;
+const NARROW_REPLY_MEDIA = '(max-width: 680px)';
+
+export function isNarrowReplyViewport(): boolean {
+  return window.matchMedia(NARROW_REPLY_MEDIA).matches;
+}
+
+/** Верхний отступ при прокрутке — чтобы комментарий не уезжал за край экрана */
+export function getReplyScrollTopGap(): number {
+  return isNarrowReplyViewport() ? 56 : 16;
+}
+
+export function getDefaultComposerHeightEstimate(): number {
+  return isNarrowReplyViewport() ? MOBILE_COMPOSER_HEIGHT_ESTIMATE : DEFAULT_COMPOSER_HEIGHT;
+}
 
 export function findScrollParent(el: HTMLElement): HTMLElement | null {
   let parent = el.parentElement;
@@ -43,18 +58,21 @@ export function computeReplyScrollTailPx(
   gap = REPLY_GAP_PX,
 ): number {
   const el = document.getElementById(discussionMessageDomId(messageId));
-  const keyboardBuffer = Math.ceil(window.innerHeight * 0.38);
+  const narrow = isNarrowReplyViewport();
+  const minTail = narrow
+    ? Math.max(reserveBottomPx + 48, 96)
+    : Math.max(reserveBottomPx + 72, 180);
 
-  if (!el) return Math.max(keyboardBuffer, 360);
+  if (!el) return narrow ? minTail : Math.max(minTail, 280);
 
   const targetBottom = getVisibleViewportBottom() - reserveBottomPx - gap;
   const deficit = el.getBoundingClientRect().bottom - targetBottom;
 
   if (deficit <= 0) {
-    return Math.max(keyboardBuffer, 280);
+    return minTail;
   }
 
-  return Math.ceil(deficit + 96);
+  return Math.ceil(deficit + (narrow ? 72 : 96));
 }
 
 /**
@@ -64,25 +82,37 @@ export function computeReplyScrollTailPx(
 export function scrollMessageIntoViewForReply(
   messageId: string,
   reserveBottomPx: number,
-  options?: { gap?: number; behavior?: ScrollBehavior },
+  options?: { gap?: number; topGap?: number; behavior?: ScrollBehavior },
 ): boolean {
   const el = document.getElementById(discussionMessageDomId(messageId));
   if (!el) return false;
 
   const gap = options?.gap ?? REPLY_GAP_PX;
+  const topGap = options?.topGap ?? getReplyScrollTopGap();
   const behavior = options?.behavior ?? 'smooth';
-  const visibleTop = getVisibleViewportTop();
-  const targetBottom = getVisibleViewportBottom() - reserveBottomPx - gap;
+  const bandTop = getVisibleViewportTop() + topGap;
+  const bandBottom = getVisibleViewportBottom() - reserveBottomPx - gap;
   const elRect = el.getBoundingClientRect();
 
-  let delta = 0;
-  if (elRect.bottom > targetBottom) {
-    delta = elRect.bottom - targetBottom;
-  } else if (elRect.top < visibleTop + gap) {
-    delta = elRect.top - (visibleTop + gap);
+  if (elRect.top >= bandTop && elRect.bottom <= bandBottom) {
+    return true;
   }
 
-  if (Math.abs(delta) < 2) return true;
+  let delta = 0;
+
+  if (elRect.bottom > bandBottom) {
+    delta = elRect.bottom - bandBottom;
+    const maxUpward = Math.max(0, elRect.top - bandTop);
+    if (delta > maxUpward) {
+      delta = maxUpward;
+    }
+  } else if (elRect.top < bandTop) {
+    delta = elRect.top - bandTop;
+  }
+
+  if (Math.abs(delta) < 2) {
+    return elRect.bottom <= bandBottom + 2;
+  }
 
   const scrollParent = findScrollParent(el);
   if (!scrollParent) {
@@ -91,13 +121,19 @@ export function scrollMessageIntoViewForReply(
   }
 
   const maxScrollTop = scrollParent.scrollHeight - scrollParent.clientHeight;
-  const nextTop = Math.max(0, Math.min(maxScrollTop, scrollParent.scrollTop + delta));
+  const requestedTop = scrollParent.scrollTop + delta;
+  const nextTop = Math.max(0, Math.min(maxScrollTop, requestedTop));
 
   if (Math.abs(nextTop - scrollParent.scrollTop) < 1) {
-    return false;
+    return elRect.bottom <= bandBottom + 2;
   }
 
   scrollParent.scrollTo({ top: nextTop, behavior });
+
+  if (requestedTop > maxScrollTop + 1 && elRect.bottom > bandBottom) {
+    return false;
+  }
+
   return true;
 }
 

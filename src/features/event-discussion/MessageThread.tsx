@@ -13,6 +13,8 @@ import {
   discussionMessageDomId,
   findScrollParent,
   getReplyComposerReservePx,
+  getDefaultComposerHeightEstimate,
+  isNarrowReplyViewport,
 } from './messageUtils';
 import type { HoleRect } from './discussionDimClipPath';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
@@ -68,7 +70,7 @@ function MessageThreadInner({
   }, []);
 
   const handleReply = useCallback((message: IMessage) => {
-    const reserve = getReplyComposerReservePx();
+    const reserve = getReplyComposerReservePx(getDefaultComposerHeightEstimate());
     setReplyScrollTailPx(computeReplyScrollTailPx(message.id, reserve));
     setReplyTarget(message);
     setSheetOpen(true);
@@ -86,6 +88,8 @@ function MessageThreadInner({
     }
 
     const mid = replyTarget.id;
+    const narrow = isNarrowReplyViewport();
+    const followUpBehavior: ScrollBehavior = narrow ? 'auto' : 'smooth';
 
     const updateHole = () => {
       const el = document.getElementById(discussionMessageDomId(mid));
@@ -97,15 +101,16 @@ function MessageThreadInner({
       setReplyHighlightHole({ top: r.top, left: r.left, width: r.width, height: r.height });
     };
 
-    const scrollToReply = (behavior: ScrollBehavior = 'smooth') => {
-      const sheetHeight = sheetRef.current?.offsetHeight ?? 220;
+    const scrollToReply = (behavior: ScrollBehavior = followUpBehavior) => {
+      const sheetHeight = sheetRef.current?.offsetHeight ?? getDefaultComposerHeightEstimate();
       const reserve = getReplyComposerReservePx(sheetHeight);
       const ok = scrollMessageIntoViewForReply(mid, reserve, { behavior });
       if (!ok) {
         setReplyScrollTailPx(prev => {
-          const max = Math.ceil(window.innerHeight * 0.75);
+          const max = Math.ceil(window.innerHeight * (narrow ? 0.65 : 0.75));
           if (prev >= max) return prev;
-          return Math.min(prev + 140, max);
+          const step = narrow ? 96 : 140;
+          return Math.min(prev + step, max);
         });
       }
       updateHole();
@@ -116,7 +121,11 @@ function MessageThreadInner({
     const scrollRoot = anchorEl ? findScrollParent(anchorEl) : null;
     const visualViewport = window.visualViewport;
 
-    const onViewportChange = () => scrollToReply('smooth');
+    let viewportTimer = 0;
+    const onViewportChange = () => {
+      window.clearTimeout(viewportTimer);
+      viewportTimer = window.setTimeout(() => scrollToReply(followUpBehavior), narrow ? 48 : 16);
+    };
 
     window.addEventListener('resize', updateHole);
     window.addEventListener('scroll', updateHole, true);
@@ -128,7 +137,7 @@ function MessageThreadInner({
     const attachSheetObserver = () => {
       const el = sheetRef.current;
       if (!el || resizeObserver) return;
-      resizeObserver = new ResizeObserver(() => scrollToReply('smooth'));
+      resizeObserver = new ResizeObserver(() => scrollToReply(followUpBehavior));
       resizeObserver.observe(el);
     };
     attachSheetObserver();
@@ -138,14 +147,15 @@ function MessageThreadInner({
     const raf1 = requestAnimationFrame(() => {
       attachSheetObserver();
       scrollToReply('auto');
-      raf2 = requestAnimationFrame(() => scrollToReply('smooth'));
+      raf2 = requestAnimationFrame(() => scrollToReply(followUpBehavior));
     });
-    const delays = [50, 120, 340, 520].map(ms => window.setTimeout(() => {
+    const delays = (narrow ? [80, 200, 420] : [50, 120, 340, 520]).map(ms => window.setTimeout(() => {
       attachSheetObserver();
-      scrollToReply('smooth');
+      scrollToReply(followUpBehavior);
     }, ms));
 
     return () => {
+      window.clearTimeout(viewportTimer);
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
       delays.forEach(window.clearTimeout);
