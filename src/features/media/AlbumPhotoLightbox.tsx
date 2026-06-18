@@ -1,6 +1,6 @@
 // features/media/AlbumPhotoLightbox.tsx — просмотр одного фото на весь экран
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -8,14 +8,37 @@ import styles from './AlbumPhotoLightbox.module.css';
 
 type SlideDir = 1 | -1;
 
+export type PhotoLightboxSlide =
+  | { type: 'file'; fileId: string }
+  | { type: 'url'; url: string };
+
 interface AlbumPhotoLightboxProps {
-  fileIds: string[];
+  /** Удобный формат для альбомов — только fileId */
+  fileIds?: string[];
+  /** Полный список слайдов (обложка + headAlbum и т.п.) */
+  slides?: PhotoLightboxSlide[];
   initialIdx: number;
   title?: string;
   onClose: () => void;
 }
 
-export function AlbumPhotoLightbox({ fileIds, initialIdx, title, onClose }: AlbumPhotoLightboxProps) {
+function resolveSlides(fileIds: string[] | undefined, slides: PhotoLightboxSlide[] | undefined): PhotoLightboxSlide[] {
+  if (slides?.length) return slides;
+  return (fileIds ?? []).map(fileId => ({ type: 'file' as const, fileId }));
+}
+
+function slideKey(slide: PhotoLightboxSlide, index: number): string {
+  return slide.type === 'file' ? `file:${slide.fileId}` : `url:${slide.url}:${index}`;
+}
+
+export function AlbumPhotoLightbox({
+  fileIds,
+  slides: slidesProp,
+  initialIdx,
+  title,
+  onClose,
+}: AlbumPhotoLightboxProps) {
+  const slides = useMemo(() => resolveSlides(fileIds, slidesProp), [fileIds, slidesProp]);
   const [idx, setIdx] = useState(initialIdx);
   const [fullscreen, setFullscreen] = useState(false);
   const [slideDir, setSlideDir] = useState<SlideDir | null>(null);
@@ -23,12 +46,16 @@ export function AlbumPhotoLightbox({ fileIds, initialIdx, title, onClose }: Albu
   const idxRef = useRef(initialIdx);
   idxRef.current = idx;
 
+  useEffect(() => {
+    setIdx(initialIdx);
+  }, [initialIdx]);
+
   const goTo = useCallback((newIdx: number) => {
     const current = idxRef.current;
-    if (newIdx === current || newIdx < 0 || newIdx >= fileIds.length) return;
+    if (newIdx === current || newIdx < 0 || newIdx >= slides.length) return;
     setSlideDir(newIdx > current ? 1 : -1);
     setIdx(newIdx);
-  }, [fileIds.length]);
+  }, [slides.length]);
 
   const prev = useCallback(() => goTo(idx - 1), [goTo, idx]);
   const next = useCallback(() => goTo(idx + 1), [goTo, idx]);
@@ -73,12 +100,14 @@ export function AlbumPhotoLightbox({ fileIds, initialIdx, title, onClose }: Albu
     else prev();
   };
 
-  const fileId = fileIds[idx];
+  const currentSlide = slides[idx];
   const slideClass = slideDir === 1
     ? styles.slideFromRight
     : slideDir === -1
       ? styles.slideFromLeft
       : '';
+
+  if (!currentSlide) return null;
 
   return createPortal(
     <div
@@ -94,7 +123,7 @@ export function AlbumPhotoLightbox({ fileIds, initialIdx, title, onClose }: Albu
         <div className={styles.header}>
           <div>
             {title && <div className={styles.title}>{title}</div>}
-            <div className={styles.count}>{idx + 1} / {fileIds.length}</div>
+            <div className={styles.count}>{idx + 1} / {slides.length}</div>
           </div>
           <div className={styles.headerBtns}>
             <button
@@ -121,17 +150,23 @@ export function AlbumPhotoLightbox({ fileIds, initialIdx, title, onClose }: Albu
           onTouchEnd={handleTouchEnd}
         >
           <div className={styles.slideArea}>
-            {fileId && (
-              <div key={fileId} className={`${styles.slide} ${slideClass}`}>
+            <div key={slideKey(currentSlide, idx)} className={`${styles.slide} ${slideClass}`}>
+              {currentSlide.type === 'file' ? (
                 <AuthImage
-                  fileId={fileId}
+                  fileId={currentSlide.fileId}
                   fullSize
                   alt={`Фото ${idx + 1}`}
                   className={styles.img}
                   imageFit="contain"
                 />
-              </div>
-            )}
+              ) : (
+                <img
+                  src={currentSlide.url}
+                  alt={`Фото ${idx + 1}`}
+                  className={styles.img}
+                />
+              )}
+            </div>
           </div>
 
           {idx > 0 && (
@@ -139,7 +174,7 @@ export function AlbumPhotoLightbox({ fileIds, initialIdx, title, onClose }: Albu
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
           )}
-          {idx < fileIds.length - 1 && (
+          {idx < slides.length - 1 && (
             <button type="button" className={`${styles.arrow} ${styles.arrowRight}`} onClick={next} aria-label="Следующее">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
