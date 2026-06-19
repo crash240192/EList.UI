@@ -10,6 +10,7 @@ import {
   discussionMessageDomId,
   isLongMessageText,
 } from './messageUtils';
+import { DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import { MessageReplies } from './MessageReplies';
 import { useDiscussionRefresh } from './discussionRefreshContext';
 import styles from './MessageRow.module.css';
@@ -122,7 +123,7 @@ export function MessageRow({
 
   const saveEdit = async () => {
     const trimmed = editText.trim();
-    if (!trimmed || !currentAccountId || savingEdit) return;
+    if (!trimmed || !currentAccountId || savingEdit || trimmed.length > DISCUSSION_MESSAGE_MAX_LENGTH) return;
     if (trimmed === displayText) {
       setEditing(false);
       return;
@@ -185,6 +186,7 @@ export function MessageRow({
                   rows={3}
                   value={editText}
                   disabled={savingEdit}
+                  maxLength={DISCUSSION_MESSAGE_MAX_LENGTH}
                   onChange={(e) => setEditText(e.target.value)}
                 />
                 {editError && <p className={styles.editError}>{editError}</p>}

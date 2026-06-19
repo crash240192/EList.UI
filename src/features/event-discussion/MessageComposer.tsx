@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import styles from './MessageComposer.module.css';
 
 interface MessageComposerProps {
@@ -37,7 +38,7 @@ export function MessageComposer({
 
   const handleSubmit = async () => {
     const trimmed = text.trim();
-    if (!trimmed || sending || disabled) return;
+    if (!trimmed || sending || disabled || trimmed.length > DISCUSSION_MESSAGE_MAX_LENGTH) return;
     setSending(true);
     try {
       await onSubmit(trimmed);
@@ -66,6 +67,7 @@ export function MessageComposer({
         value={text}
         disabled={disabled || sending}
         placeholder={placeholder}
+        maxLength={DISCUSSION_MESSAGE_MAX_LENGTH}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

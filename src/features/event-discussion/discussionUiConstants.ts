@@ -6,3 +6,6 @@ export const LONG_MESSAGE_LINE_CLAMP = 10;
 
 /** Порог длины текста для сворачивания (для абзацев без переносов строк) */
 export const LONG_MESSAGE_CHAR_THRESHOLD = 480;
+
+/** Максимальная длина текста комментария */
+export const DISCUSSION_MESSAGE_MAX_LENGTH = 10_000;
