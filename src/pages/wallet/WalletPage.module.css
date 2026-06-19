@@ -1,214 +1,705 @@
 /* pages/wallet/WalletPage.module.css */
 
 .page {
-  height: 100%; overflow-y: auto;
-  display: flex; flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
   background: var(--bg);
+  padding: 20px;
+  box-sizing: border-box;
 }
 
-.header {
-  padding: 16px 20px 12px; flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
+.card {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
 }
-.title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
+
+.cardHead {
+  padding: 20px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
 .loader {
-  padding: 40px; text-align: center;
-  font-size: 14px; color: var(--text-secondary);
+  padding: 40px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.walletBody {
+  padding: 20px 28px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .msg {
-  margin: 12px 20px 0;
-  padding: 10px 14px; border-radius: 8px; font-size: 13px;
-}
-.msgOk  { background: rgba(34,197,94,0.1);  color: var(--success); }
-.msgErr { background: rgba(239,68,68,0.1);  color: var(--danger); }
-
-/* ── Empty state ── */
-.emptyState {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; flex: 1;
-  gap: 14px; padding: 40px 20px; text-align: center;
-}
-.emptyIcon  { font-size: 56px; }
-.emptyTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
-.emptyText  { font-size: 14px; color: var(--text-secondary); max-width: 320px; line-height: 1.6; margin: 0; }
-.createBtn {
-  background: var(--accent); color: #fff; border: none;
-  border-radius: 10px; padding: 11px 28px;
-  font-size: 14px; font-weight: 600; cursor: pointer;
-  transition: background 0.15s;
-}
-.createBtn:hover:not(:disabled) { background: var(--accent-hover); }
-.createBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* ── Content ── */
-.content {
-  padding: 20px; display: flex; flex-direction: column;
-  gap: 20px; max-width: 640px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
 }
 
-/* Wallet card */
-.walletCard {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  border-radius: 16px; padding: 22px 24px;
+.msgOk {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success);
+}
+
+.msgErr {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+/* ── Bank card (page header) ── */
+.bankCard {
+  border-radius: 18px;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, #1a1040 0%, #312e81 45%, #1e3a5f 80%, #0d2818 100%);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 180px;
+}
+
+.bankCardStub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+}
+
+.bankCard::before {
+  content: '';
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, transparent 70%);
+  top: -80px;
+  right: -60px;
+}
+
+.bankCard::after {
+  content: '';
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
+  bottom: -60px;
+  left: 40px;
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  z-index: 1;
+}
+
+.cardBrand {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.02em;
+}
+
+.cardChip {
+  width: 36px;
+  height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #d4a847, #f0c94a);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 5px;
+}
+
+.chipLine {
+  height: 2px;
+  background: rgba(180, 140, 30, 0.6);
+  border-radius: 1px;
+}
+
+.cardMid {
+  position: relative;
+  z-index: 1;
+  margin: 20px 0;
+}
+
+.cardLabel {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 4px;
+}
+
+.cardBalance {
+  font-size: 28px;
+  font-weight: 600;
   color: #fff;
-}
-.walletCardHeader {
-  display: flex; justify-content: space-between;
-  align-items: flex-start; margin-bottom: 16px;
-}
-.walletLabel { font-size: 12px; font-weight: 500; opacity: 0.8; }
-.walletId    { font-size: 11px; opacity: 0.6; }
-.walletBalance { font-size: 32px; font-weight: 700; }
-
-/* Section */
-.section { display: flex; flex-direction: column; gap: 14px; }
-.sectionTitle {
-  font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
-/* Tariff card */
-.tariffCard {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px;
-  display: flex; flex-direction: column; gap: 14px;
-}
-.tariffHeader {
-  display: flex; align-items: flex-start;
-  justify-content: space-between; gap: 12px;
-}
-.tariffName { font-size: 16px; font-weight: 600; color: var(--text-primary); }
-.tariffCost { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
-.tariffBadge {
-  font-size: 11px; font-weight: 600;
-  padding: 3px 10px; border-radius: 20px;
-  background: rgba(34,197,94,0.12); color: var(--success);
-  border: 1px solid rgba(34,197,94,0.2); white-space: nowrap;
+.cardCurrency {
+  font-size: 14px;
+  opacity: 0.6;
+  margin-left: 4px;
 }
 
-/* Validator grid */
-.validatorGrid {
-  display: flex; flex-direction: column; gap: 0;
-  border-radius: 10px; overflow: hidden;
+.cardBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  position: relative;
+  z-index: 1;
+}
+
+.cardHolder {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.cardHolderName {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.cardId {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  font-family: monospace;
+  letter-spacing: 0.1em;
+}
+
+.cardActionsRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.cardActionBtn {
+  flex: 1;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.cardActionBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.cardActionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Top-up placeholder ── */
+.topUpSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.topUpStub {
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--surface-2);
+}
+
+.topUpStubForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.topUpLabel {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.topUpInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topUpInput {
+  flex: 1;
+  padding: 10px 12px;
   border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
 }
-.validatorRow {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 9px 13px; border-bottom: 1px solid var(--border);
-  font-size: 13px; transition: background 0.1s;
+
+.topUpInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
-.validatorRow:last-child { border-bottom: none; }
-.validatorLabel { color: var(--text-secondary); }
-.validatorValue {
-  display: flex; align-items: center; gap: 6px;
+
+.topUpCurrency {
+  font-size: 14px;
+  color: var(--text-secondary);
   font-weight: 500;
 }
-.valIcon {
-  width: 18px; height: 18px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; flex-shrink: 0;
+
+.topUpBtn {
+  padding: 10px 18px;
+  background: var(--accent);
+  border: none;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-/* ✓ Разрешено — зелёный */
-.valOk .validatorValue { color: #15803d; }
-.valOk .valIcon        { background: rgba(34,197,94,0.15); color: #15803d; }
-.valOk                 { background: rgba(34,197,94,0.03); }
-
-/* ~ Ограничено — жёлтый */
-.valWarn .validatorValue { color: #b45309; }
-.valWarn .valIcon        { background: rgba(245,158,11,0.15); color: #b45309; }
-.valWarn                 { background: rgba(245,158,11,0.03); }
-
-/* ✗ Недоступно — красный */
-.valNo .validatorValue { color: #b91c1c; }
-.valNo .valIcon        { background: rgba(239,68,68,0.12); color: #b91c1c; }
-.valNo                 { background: rgba(239,68,68,0.03); }
-
-:global(.light-theme) .valOk  .validatorLabel { color: #166534; }
-:global(.light-theme) .valWarn .validatorLabel { color: #92400e; }
-:global(.light-theme) .valNo  .validatorLabel { color: #991b1b; }
-
-.changeTariffBtn {
-  background: none; border: 1px solid var(--border);
-  border-radius: 8px; padding: 8px 16px;
-  font-size: 13px; color: var(--text-secondary); cursor: pointer;
-  align-self: flex-start; transition: all 0.15s;
+.topUpBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
-.changeTariffBtn:hover { border-color: var(--accent); color: var(--accent); }
 
-/* No tariff */
+.topUpHint {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── Tariff section ── */
+.tariffHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sectionSubtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.tariffGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.tc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+
+.tc:hover {
+  border-color: color-mix(in srgb, var(--border) 70%, var(--text-muted));
+}
+
+.tcSelected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+.tcCurrent {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.tcBadge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4px 12px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 0 14px 0 14px;
+}
+
+.tcBadgeActive {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+}
+
+.tcName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.tcPrice {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 10px 0 4px;
+}
+
+.tcPriceFree {
+  color: var(--success);
+}
+
+.tcPeriod {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.tcDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+
+.tcFeat {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+}
+
+.tcRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11px;
+}
+
+.tcRowIcon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.iconOk {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+}
+
+.iconNo {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+}
+
+.iconWarn {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warning);
+}
+
+.tcRowText {
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.tcSelectBtn {
+  margin-top: 14px;
+  width: 100%;
+  padding: 8px;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+  display: none;
+}
+
+.tcSelected .tcSelectBtn {
+  display: block;
+}
+
+.tcSelectBtn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.tcCurrent .tcSelectBtn {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: default;
+  display: block;
+}
+
+.tcSelectBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.selectActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cancelBtn {
+  flex: 1;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cancelBtn:hover {
+  background: var(--surface-2);
+}
+
+.confirmBtn {
+  flex: 1;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.confirmBtn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.confirmBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .noTariff {
-  background: var(--surface); border: 1px dashed var(--border);
-  border-radius: 12px; padding: 20px;
-  display: flex; flex-direction: column; gap: 12px; align-items: flex-start;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
-.noTariff p { font-size: 14px; color: var(--text-secondary); margin: 0; line-height: 1.6; }
-.selectTariffBtn {
-  background: var(--accent); color: #fff; border: none;
-  border-radius: 8px; padding: 9px 20px;
-  font-size: 13px; font-weight: 600; cursor: pointer;
-}
-.selectTariffBtn:hover { background: var(--accent-hover); }
-
-/* Tariff list */
-.tariffList { display: flex; flex-direction: column; gap: 8px; }
-.tariffOption {
-  border-radius: 10px;
-  border: 1px solid var(--border); background: var(--surface);
-  cursor: pointer; transition: all 0.15s; overflow: hidden;
-}
-.tariffOption:hover { border-color: var(--accent); }
-.tariffOptionSelected {
-  border-color: var(--accent) !important;
-  background: rgba(99,102,241,0.04) !important;
-}
-.tariffOptionHeader {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; padding: 12px 14px;
-}
-.tariffOptionInfo { flex: 1; display: flex; flex-direction: column; gap: 3px; }
-.tariffOptionName { font-size: 14px; font-weight: 500; color: var(--text-primary); }
-.tariffOptionCost { font-size: 12px; color: var(--text-secondary); }
-.tariffOptionRight { display: flex; align-items: center; flex-shrink: 0; }
-.checkMark   { color: var(--accent); font-weight: 700; font-size: 16px; }
-.expandHint  { font-size: 11px; color: var(--text-muted); }
-
-/* Expanded details */
-.tariffDetails {
-  border-top: 1px solid var(--border);
-  padding: 0;
-  animation: fadeIn 0.15s ease;
-}
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .detailsLoader {
-  padding: 10px 14px;
-  font-size: 12px; color: var(--text-muted); text-align: center;
-}
-.detailsGrid { display: flex; flex-direction: column; }
-.detailRow {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 7px 14px; border-bottom: 1px solid var(--border);
-  font-size: 12px;
-}
-.detailRow:last-child { border-bottom: none; }
-.detailLabel { color: var(--text-secondary); }
-.detailValue {
-  display: flex; align-items: center; gap: 5px; font-weight: 500;
+  padding: 8px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
 }
 
-.selectActions { display: flex; gap: 8px; }
-.cancelBtn {
-  flex: 1; background: none; border: 1px solid var(--border);
-  border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 500;
-  color: var(--text-secondary); cursor: pointer;
+/* ── History placeholder ── */
+.historySection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.cancelBtn:hover { background: var(--surface-2); }
-.confirmBtn {
-  flex: 1; background: var(--accent); color: #fff; border: none;
-  border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 600;
-  cursor: pointer; transition: background 0.15s;
+
+.stubBadge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 8px;
 }
-.confirmBtn:hover:not(:disabled) { background: var(--accent-hover); }
-.confirmBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.histList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  opacity: 0.65;
+}
+
+.histRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.histRow:last-child {
+  border-bottom: none;
+}
+
+.histIco {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.histIcoIn {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.histIcoOut {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.histIcoTariff {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.histInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.histName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.histMeta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.histAmt {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.histAmtIn {
+  color: var(--success);
+}
+
+.histAmtOut {
+  color: var(--warning);
+}
+
+.histAmtTariff {
+  color: var(--accent);
+}
+
+.historyHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 0;
+  }
+
+  .card {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .walletBody {
+    padding: 16px;
+  }
+
+  .cardHead {
+    padding: 12px 12px 0;
+  }
+
+  .cardActionsRow {
+    flex-direction: column;
+  }
+
+  .topUpStubForm {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topUpBtn {
+    width: 100%;
+  }
+
+  .tariffGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 960px) {
+  .tariffGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
