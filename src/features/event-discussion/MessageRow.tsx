@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { IMessage } from '@/entities/conversation';
 import { updateMessage, deleteMessage, fetchMessageReplies } from '@/entities/conversation';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
@@ -82,6 +83,7 @@ export function MessageRow({
   onReply,
   onDeleted,
 }: MessageRowProps) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(message.replied);
   const [textExpanded, setTextExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -193,6 +195,11 @@ export function MessageRow({
     : 'Есть ответы';
   const isLongText = isLongMessageText(displayText);
 
+  const openAuthorProfile = () => {
+    if (!accountId) return;
+    navigate(isMine ? '/user/me' : `/user/${accountId}`);
+  };
+
   return (
     <div className={styles.wrap}>
       <article
@@ -201,13 +208,20 @@ export function MessageRow({
       >
         <div className={styles.cardInner}>
           {accountId ? (
-            <UserAvatar
-              accountId={accountId}
-              avatarId={message.account?.avatarId ?? null}
-              initials={initials}
-              size={36}
-              className={styles.avatar}
-            />
+            <button
+              type="button"
+              className={styles.avatarBtn}
+              onClick={openAuthorProfile}
+              aria-label={`Профиль: ${messageAuthorName(message)}`}
+            >
+              <UserAvatar
+                accountId={accountId}
+                avatarId={message.account?.avatarId ?? null}
+                initials={initials}
+                size={36}
+                className={styles.avatar}
+              />
+            </button>
           ) : (
             <div className={styles.avatarFallback} aria-hidden>
               {initials}
@@ -215,7 +229,17 @@ export function MessageRow({
           )}
           <div className={styles.content}>
             <header className={styles.head}>
-              <span className={styles.author}>{messageAuthorName(message)}</span>
+              {accountId ? (
+                <button
+                  type="button"
+                  className={styles.authorBtn}
+                  onClick={openAuthorProfile}
+                >
+                  {messageAuthorName(message)}
+                </button>
+              ) : (
+                <span className={styles.author}>{messageAuthorName(message)}</span>
+              )}
               {isMine && <span className={styles.you}>вы</span>}
               <time className={styles.time}>{formatMessageDate(message.createDate)}</time>
             </header>
