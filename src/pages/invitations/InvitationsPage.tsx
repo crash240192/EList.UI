@@ -1,4 +1,4 @@
-// pages/invitations/InvitationsPage.tsx
+// pages/invitations/InvitationsPage.tsx — макет examples/elist_invitations.html
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,16 +15,22 @@ import { isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
 import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
-import { EventModal } from '@/pages/home/EventModal';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import {
+  findUrgentInvitation,
+  formatInvitationEventDate,
+  formatInvitationEventDateShort,
+  formatRelativeInviteTime,
+  getDaysUntil,
+  getEventParams,
+  getEventTypes,
+  getEventUrgency,
+} from './invitationsPageUtils';
 import styles from './InvitationsPage.module.css';
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
-  });
-}
+type Tab = 'incoming' | 'sent';
 
 function inviterName(inv: IInvitation): string {
   const p = inv.inviter?.personInfo;
@@ -41,10 +47,11 @@ function inviterInitials(inv: IInvitation): string {
 export default function InvitationsPage() {
   const navigate = useNavigate();
   const refreshNotViewedCount = useInvitationsStore(s => s.refreshNotViewedCount);
-  const [items,   setItems]   = useState<IInvitation[]>([]);
+  const [tab, setTab] = useState<Tab>('incoming');
+  const [items, setItems] = useState<IInvitation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err,     setErr]     = useState<string | null>(null);
-  const [previewInv,  setPreviewInv]  = useState<IInvitation | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [previewInv, setPreviewInv] = useState<IInvitation | null>(null);
   const [confirmDecl, setConfirmDecl] = useState<IInvitation | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
 
@@ -52,6 +59,8 @@ export default function InvitationsPage() {
     () => items.filter(isInvitationUnviewed).length,
     [items],
   );
+
+  const urgentInv = useMemo(() => findUrgentInvitation(items), [items]);
 
   useEffect(() => {
     fetchUserInvitations()
@@ -82,6 +91,11 @@ export default function InvitationsPage() {
     navigate(`/event/${inv.eventId}`);
   };
 
+  const openPreview = (inv: IInvitation) => {
+    void markViewedIfNeeded(inv);
+    setPreviewInv(inv);
+  };
+
   const doAccept = async (inv: IInvitation) => {
     try {
       await apiClient.get(`/api/invitations/accept?invitationId=${inv.id}`);
@@ -90,7 +104,6 @@ export default function InvitationsPage() {
       void refreshNotViewedCount();
       navigate(`/event/${inv.eventId}`);
     } catch (e) {
-      // AccessError / EventAccessDenied: apiClient не показывает тост (для inline UI на других страницах)
       if (isApiError(e) && isAccessDeniedError(e)) {
         useToastStore.getState().add(e.serverMessage || e.message);
       }
@@ -122,30 +135,48 @@ export default function InvitationsPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={styles.topbar}>
+        <div className={styles.topbarMain}>
+          <h1 className={styles.pageTitle}>Приглашения</h1>
+          {!loading && tab === 'incoming' && items.length > 0 && (
+            <span className={styles.titleBadge}>{items.length}</span>
+          )}
+        </div>
+        {!loading && tab === 'incoming' && unviewedCount > 0 && (
+          <button
+            type="button"
+            className={styles.markAllBtn}
+            onClick={() => { void markAllViewed(); }}
+            disabled={markingAll}
+          >
+            {markingAll ? 'Отмечаем…' : 'Отметить все просмотренными'}
+          </button>
+        )}
+      </div>
 
-        {/* Заголовок карточки */}
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <div className={styles.cardHeaderMain}>
-              <h1 className={styles.cardTitle}>Приглашения</h1>
-              {!loading && items.length > 0 && (
-                <span className={styles.badge}>{items.length}</span>
-              )}
-            </div>
-            {!loading && unviewedCount > 0 && (
-              <button
-                type="button"
-                className={styles.markAllBtn}
-                onClick={() => { void markAllViewed(); }}
-                disabled={markingAll}
-              >
-                {markingAll ? 'Отмечаем…' : 'Отметить все просмотренными'}
-              </button>
-            )}
-          </div>
+      <div className={styles.tabsBar}>
+        <button
+          type="button"
+          className={`${styles.tabBtn} ${tab === 'incoming' ? styles.tabBtnActive : ''}`}
+          onClick={() => setTab('incoming')}
+        >
+          Входящие
+          {!loading && items.length > 0 && (
+            <span className={styles.tabCnt}>{items.length}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          className={`${styles.tabBtn} ${tab === 'sent' ? styles.tabBtnActive : ''}`}
+          onClick={() => setTab('sent')}
+        >
+          Отправленные
+          <span className={styles.tabCnt}>0</span>
+        </button>
+      </div>
 
-          {/* Загрузка */}
+      <div className={styles.content}>
+        <div className={`${styles.tabPane} ${tab === 'incoming' ? styles.tabPaneActive : ''}`}>
           {loading && (
             <div className={styles.skeletons}>
               {Array.from({ length: 3 }).map((_, i) => (
@@ -154,144 +185,320 @@ export default function InvitationsPage() {
             </div>
           )}
 
-          {/* Ошибка */}
           {err && <div className={styles.err}>{err}</div>}
 
-          {/* Пусто */}
-          {!loading && !err && items.length === 0 && (
-            <div className={styles.empty}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.8 19.8 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
-              </svg>
-              <p>Приглашений пока нет</p>
+          {!loading && !err && urgentInv && (
+            <div className={styles.urgentStrip}>
+              <div className={styles.urgentIco}>⏰</div>
+              <div>
+                <div className={styles.urgentText}>
+                  {getDaysUntil(urgentInv.event.startTime) <= 1
+                    ? 'Одно из мероприятий начинается очень скоро'
+                    : 'Одно из мероприятий начинается послезавтра'}
+                </div>
+                <div className={styles.urgentSub}>Не забудьте ответить на приглашение</div>
+              </div>
             </div>
           )}
 
-          {/* Список */}
-          {!loading && items.map(inv => {
-            const event = inv.event;
-            const types = (event as any).eventTypes?.length > 0
-              ? (event as any).eventTypes
-              : (event as any).eventType ? [(event as any).eventType] : [];
-            const params = (event as any).parameters;
-            const cost   = params?.cost ?? 0;
-            const age    = params?.ageLimit;
-
-            const unviewed = isInvitationUnviewed(inv);
-
-            return (
-              <div
-                key={inv.id}
-                className={`${styles.item} ${unviewed ? styles.itemUnviewed : ''}`}
-              >
-                {/* Левая часть: обложка + текст */}
-                <div className={styles.itemLeft} onClick={() => handleInvitationClick(inv)}>
-                  <div className={styles.cover}>
-                    {event.coverImageId
-                      ? <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg} />
-                      : <div className={styles.coverPlaceholder} style={{ background: getEventCoverBackground(event) }} />}
-                  </div>
-                  <div className={styles.content}>
-                    <div className={styles.who}>
-                      <UserAvatar
-                        accountId={inv.inviterAccountId}
-                        avatarId={inv.inviter?.account?.avatarId ?? null}
-                        initials={inviterInitials(inv)}
-                        size={18}
-                        className={styles.whoAvatar}
-                      />
-                      <span className={styles.whoName}>{inviterName(inv)}</span>
-                      <span>приглашает</span>
-                    </div>
-                    <div className={styles.eName}>{event.name}</div>
-                    <div className={styles.meta}>
-                      <div className={styles.mi}>
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        {formatDate(event.startTime)}
-                      </div>
-                      {event.address && (
-                        <div className={styles.mi}>
-                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                          {event.address}
-                        </div>
-                      )}
-                      <div className={`${styles.mi} ${cost === 0 ? styles.miFree : styles.miPaid}`}>
-                        {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
-                      </div>
-                      {age && age > 0 && <div className={styles.mi}>{age}+</div>}
-                    </div>
-                    {types.length > 0 && (
-                      <div className={styles.chips}>
-                        {types.filter(Boolean).slice(0, 3).map((t: any) => {
-                          const color = t.eventCategory?.color ?? '#6366f1';
-                          return (
-                            <span key={t.id} className={styles.chip} style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
-                              {t.ico && <img src={icoToUrl(t.ico) ?? undefined} alt="" width={10} height={10} style={{ objectFit: 'contain', borderRadius: 2 }} />}
-                              {t.name}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Правая часть: кнопки вертикально */}
-                <div className={styles.itemActions}>
-                  <button className={`${styles.btn} ${styles.btnOk}`}
-                    onClick={e => {
-                      e.stopPropagation();
-                      void markViewedIfNeeded(inv);
-                      setPreviewInv(inv);
-                    }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                    Принять
-                  </button>
-                  <button className={`${styles.btn} ${styles.btnNo}`}
-                    onClick={e => { e.stopPropagation(); setConfirmDecl(inv); }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    Отклонить
-                  </button>
-                </div>
+          {!loading && !err && items.length === 0 && (
+            <div className={styles.emptyState}>
+              <div className={styles.emptyIllo}>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.8 19.8 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+                </svg>
               </div>
-            );
-          })}
+              <p className={styles.emptyTitle}>Приглашений пока нет</p>
+              <p className={styles.emptySub}>Когда вас пригласят на мероприятие, оно появится здесь</p>
+            </div>
+          )}
+
+          {!loading && items.map(inv => (
+            <InvitationCard
+              key={inv.id}
+              inv={inv}
+              onOpen={() => handleInvitationClick(inv)}
+              onPreview={() => openPreview(inv)}
+              onDecline={() => setConfirmDecl(inv)}
+              onLater={() => { void markViewedIfNeeded(inv); }}
+            />
+          ))}
+        </div>
+
+        <div className={`${styles.tabPane} ${tab === 'sent' ? styles.tabPaneActive : ''}`}>
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIllo}>📤</div>
+            <p className={styles.emptyTitle}>Отправленных приглашений нет</p>
+            <p className={styles.emptySub}>
+              Приглашения, которые вы отправили участникам своих событий, будут отображаться здесь
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Предпросмотр мероприятия при нажатии «Принять» */}
       {previewInv && (
-        <EventModal
-          event={previewInv.event as any}
+        <AcceptDialog
+          inv={previewInv}
           onClose={() => setPreviewInv(null)}
-        >
-          <div className={styles.previewActions}>
-            <button className={styles.laterBtn} onClick={() => setPreviewInv(null)}>
-              Решу позже
-            </button>
-            <button className={styles.acceptConfirmBtn} onClick={() => doAccept(previewInv)}>
-              ✓ Принять приглашение
-            </button>
-          </div>
-        </EventModal>
+          onAccept={() => doAccept(previewInv)}
+        />
       )}
 
-      {/* Диалог подтверждения отклонения */}
       {confirmDecl && (
-        <>
-          <div className={styles.dialogBackdrop} onClick={() => setConfirmDecl(null)} />
-          <div className={styles.dialog}>
-            <div className={styles.dialogTitle}>Отклонить приглашение?</div>
-            <div className={styles.dialogText}>
+        <div className={styles.overlay} onClick={() => setConfirmDecl(null)}>
+          <div className={styles.declineDialog} onClick={e => e.stopPropagation()}>
+            <div className={styles.declineTitle}>Отклонить приглашение?</div>
+            <div className={styles.declineText}>
               Вы уверены, что хотите отклонить приглашение на «{confirmDecl.event.name}»?
             </div>
-            <div className={styles.dialogBtns}>
-              <button className={styles.dialogCancel} onClick={() => setConfirmDecl(null)}>Отмена</button>
-              <button className={styles.dialogDecline} onClick={() => doDecline(confirmDecl)}>Отклонить</button>
+            <div className={styles.declineBtns}>
+              <button type="button" className={styles.dbtnCancel} onClick={() => setConfirmDecl(null)}>
+                Отмена
+              </button>
+              <button type="button" className={styles.dbtnDecline} onClick={() => doDecline(confirmDecl)}>
+                Отклонить
+              </button>
             </div>
           </div>
-        </>
+        </div>
       )}
+    </div>
+  );
+}
+
+function InvitationCard({
+  inv,
+  onOpen,
+  onPreview,
+  onDecline,
+  onLater,
+}: {
+  inv: IInvitation;
+  onOpen: () => void;
+  onPreview: () => void;
+  onDecline: () => void;
+  onLater: () => void;
+}) {
+  const event = inv.event;
+  const types = getEventTypes(event);
+  const params = getEventParams(event);
+  const urgency = getEventUrgency(event.startTime);
+  const unviewed = isInvitationUnviewed(inv);
+  const coverBg = getEventCoverBackground(event as Parameters<typeof getEventCoverBackground>[0]);
+  const fillPct = params.maxPersonsCount && params.participantsCount != null
+    ? Math.min(100, Math.round((params.participantsCount / params.maxPersonsCount) * 100))
+    : null;
+
+  const urgClass = urgency?.kind === 'hot'
+    ? styles.urgHot
+    : urgency?.kind === 'soon'
+      ? styles.urgSoon
+      : styles.urgOk;
+
+  return (
+    <div
+      className={[
+        styles.invCard,
+        urgency?.kind === 'hot' ? styles.invCardUrgent : '',
+        unviewed ? styles.invCardUnviewed : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <div className={styles.invTop}>
+        <div className={styles.invCover} style={{ background: coverBg }}>
+          {event.coverImageId
+            ? <AuthImage fileId={event.coverImageId} alt="" className={styles.invCoverImg} />
+            : null}
+          <div className={styles.invCoverOverlay} />
+          {urgency && <span className={`${styles.urgBadge} ${urgClass}`}>{urgency.label}</span>}
+        </div>
+
+        <div className={styles.invInfo}>
+          <div className={styles.inviterChip}>
+            <UserAvatar
+              accountId={inv.inviterAccountId}
+              avatarId={inv.inviter?.account?.avatarId ?? null}
+              initials={inviterInitials(inv)}
+              size={22}
+              className={styles.whoAvatar}
+            />
+            <span className={styles.inviterText}>
+              <span className={styles.inviterName}>{inviterName(inv)}</span> приглашает вас
+            </span>
+            <span className={styles.invTime}>{formatRelativeInviteTime(inv.creationDate)}</span>
+          </div>
+
+          <button type="button" className={styles.invEventName} onClick={onOpen}>
+            {event.name}
+          </button>
+
+          <div className={styles.invMeta}>
+            <span className={styles.imeta}>📅 {formatInvitationEventDateShort(event.startTime)}</span>
+            {event.address && (
+              <>
+                <span className={styles.idot} />
+                <span className={styles.imeta}>📍 {event.address}</span>
+              </>
+            )}
+            <span className={styles.idot} />
+            <span className={`${styles.imeta} ${params.cost === 0 ? styles.priceFree : styles.pricePaid}`}>
+              {params.cost === 0 ? 'Бесплатно' : `${params.cost.toLocaleString('ru-RU')} ₽`}
+            </span>
+            {params.ageLimit != null && params.ageLimit > 0 && (
+              <>
+                <span className={styles.idot} />
+                <span className={styles.imeta}>{params.ageLimit}+</span>
+              </>
+            )}
+          </div>
+
+          {types.length > 0 && (
+            <div className={styles.invChips}>
+              {types.filter(Boolean).slice(0, 3).map(t => {
+                const color = t.eventCategory?.color;
+                return (
+                  <span
+                    key={t.id}
+                    className={styles.ichip}
+                    style={color ? {
+                      background: `${color}20`,
+                      border: `1px solid ${color}55`,
+                      color,
+                    } : undefined}
+                  >
+                    {t.ico && (
+                      <img src={icoToUrl(t.ico) ?? undefined} alt="" width={10} height={10} style={{ objectFit: 'contain' }} />
+                    )}
+                    {t.name}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className={styles.invActions}>
+          <button type="button" className={`${styles.actBtn} ${styles.actAccept}`} onClick={onPreview}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Принять
+          </button>
+          <button type="button" className={`${styles.actBtn} ${styles.actDecline}`} onClick={onDecline}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+            Отклонить
+          </button>
+          <button type="button" className={`${styles.actBtn} ${styles.actLater}`} onClick={onLater}>
+            Позже
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.invFooter}>
+        <div className={styles.invFooterLeft}>
+          {params.participantsCount != null && (
+            <span className={styles.participantsMini}>
+              {params.participantsCount} участник{params.participantsCount % 10 === 1 && params.participantsCount % 100 !== 11 ? '' : 'ов'}
+              {params.private ? ' · приватное' : ''}
+            </span>
+          )}
+          {fillPct != null && params.maxPersonsCount != null && params.participantsCount != null && (
+            <div className={styles.fillMini}>
+              <div className={styles.fillMiniBar}>
+                <div className={styles.fillMiniInner} style={{ width: `${fillPct}%` }} />
+              </div>
+              <span>{params.participantsCount} / {params.maxPersonsCount} мест</span>
+            </div>
+          )}
+        </div>
+        <button type="button" className={styles.previewLink} onClick={onPreview}>
+          Подробнее
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AcceptDialog({
+  inv,
+  onClose,
+  onAccept,
+}: {
+  inv: IInvitation;
+  onClose: () => void;
+  onAccept: () => void;
+}) {
+  useModalBackButton(onClose);
+  const event = inv.event;
+  const params = getEventParams(event);
+  const days = getDaysUntil(event.startTime);
+  const coverBg = getEventCoverBackground(event as Parameters<typeof getEventCoverBackground>[0]);
+  const daysLabel = days === 0 ? 'сегодня' : days === 1 ? 'завтра' : days > 0 ? `через ${days} дн.` : '';
+
+  return (
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.dialog} onClick={e => e.stopPropagation()} role="dialog" aria-modal aria-label={event.name}>
+        <div className={styles.dialogCover} style={{ background: coverBg }}>
+          {event.coverImageId && (
+            <AuthImage fileId={event.coverImageId} alt="" className={styles.dialogCoverImg} />
+          )}
+          <div className={styles.dialogCoverOverlay} />
+        </div>
+        <div className={styles.dialogBody}>
+          <div className={styles.dialogInviter}>
+            <UserAvatar
+              accountId={inv.inviterAccountId}
+              avatarId={inv.inviter?.account?.avatarId ?? null}
+              initials={inviterInitials(inv)}
+              size={28}
+              className={styles.dialogInviterAv}
+            />
+            <span className={styles.dialogInviterText}>
+              <span className={styles.dialogInviterName}>{inviterName(inv)}</span> пригласил(а) вас
+            </span>
+          </div>
+          <div className={styles.dialogEventName}>{event.name}</div>
+          <div className={styles.dialogMeta}>
+            <div className={styles.dmetaRow}>
+              <div className={styles.dmetaIco}>📅</div>
+              <div>
+                <div className={styles.dmetaVal}>{formatInvitationEventDate(event.startTime)}</div>
+                {daysLabel && <div className={styles.dmetaSub}>{daysLabel}</div>}
+              </div>
+            </div>
+            {event.address && (
+              <div className={styles.dmetaRow}>
+                <div className={styles.dmetaIco}>📍</div>
+                <div>
+                  <div className={styles.dmetaVal}>{event.address}</div>
+                </div>
+              </div>
+            )}
+            <div className={styles.dmetaRow}>
+              <div className={styles.dmetaIco}>🎫</div>
+              <div>
+                <div className={styles.dmetaVal} style={params.cost === 0 ? { color: 'var(--success)' } : undefined}>
+                  {params.cost === 0 ? 'Бесплатно' : `${params.cost.toLocaleString('ru-RU')} ₽`}
+                </div>
+                {params.maxPersonsCount != null && params.participantsCount != null && (
+                  <div className={styles.dmetaSub}>
+                    {params.participantsCount} из {params.maxPersonsCount} мест занято
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className={styles.dialogBtns}>
+            <button type="button" className={styles.dbtnLater} onClick={onClose}>Решу позже</button>
+            <button type="button" className={styles.dbtnAccept} onClick={onAccept}>✓ Принять приглашение</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
