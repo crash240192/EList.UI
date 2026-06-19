@@ -37,7 +37,7 @@ function MessageThreadInner({
   currentAccountId,
   layoutBoundsRef,
 }: MessageThreadProps) {
-  const { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh } =
+  const { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh, removeMessage } =
     useRootMessages(conversationId);
   const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
@@ -75,6 +75,13 @@ function MessageThreadInner({
     setReplyTarget(message);
     setSheetOpen(true);
   }, []);
+
+  const handleDeleted = useCallback((messageId: string) => {
+    removeMessage(messageId);
+    if (replyTarget?.id === messageId) {
+      closeSheet();
+    }
+  }, [removeMessage, replyTarget, closeSheet]);
 
   useLayoutEffect(() => {
     if (!sheetOpen) {
@@ -236,6 +243,7 @@ function MessageThreadInner({
               conversationId={conversationId}
               currentAccountId={currentAccountId}
               onReply={handleReply}
+              onDeleted={handleDeleted}
             />
           ))}
         </div>

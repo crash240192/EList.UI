@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import type { IMessage } from '@/entities/conversation';
-import { updateMessage, fetchMessageReplies } from '@/entities/conversation';
+import { updateMessage, deleteMessage, fetchMessageReplies } from '@/entities/conversation';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
 import {
   messageAuthorName,
@@ -10,6 +11,8 @@ import {
   formatReplyCount,
   discussionMessageDomId,
   isLongMessageText,
+  canDeleteMessage,
+  messageHasReplies,
 } from './messageUtils';
 import { DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import { MessageReplies } from './MessageReplies';
@@ -24,6 +27,7 @@ interface MessageRowProps {
   conversationId: string;
   currentAccountId: string | null;
   onReply: (message: IMessage) => void;
+  onDeleted?: (messageId: string) => void;
 }
 
 function ReplyIcon() {
@@ -39,6 +43,15 @@ function EditIcon() {
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
       <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
     </svg>
   );
 }
@@ -67,6 +80,7 @@ export function MessageRow({
   conversationId,
   currentAccountId,
   onReply,
+  onDeleted,
 }: MessageRowProps) {
   const [expanded, setExpanded] = useState(message.replied);
   const [textExpanded, setTextExpanded] = useState(false);
@@ -76,11 +90,15 @@ export function MessageRow({
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [replyTotal, setReplyTotal] = useState<number | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const replyBump = useDiscussionRefresh(message.id);
   const prevReplyBump = useRef(replyBump);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
-  const hasReplies = message.replied || replyBump > 0;
+  const hasReplies = messageHasReplies(message, replyBump, replyTotal);
+  const canDelete = isMine && canDeleteMessage(message, replyBump, replyTotal);
   const accountId = message.accountId ?? message.account?.id ?? '';
   const initials = messageInitials(message);
 
@@ -151,6 +169,22 @@ export function MessageRow({
       setEditError(e instanceof Error ? e.message : 'Не удалось сохранить');
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const performDelete = async () => {
+    if (!canDelete || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteMessage(message.id);
+      setDeleteConfirmOpen(false);
+      onDeleted?.(message.id);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Не удалось удалить');
+      setDeleteConfirmOpen(false);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -259,6 +293,17 @@ export function MessageRow({
                     Редактировать
                   </button>
                 )}
+                {canDelete && (
+                  <button
+                    type="button"
+                    className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                    disabled={deleting}
+                    onClick={() => setDeleteConfirmOpen(true)}
+                  >
+                    <DeleteIcon />
+                    Удалить
+                  </button>
+                )}
                 {hasReplies && expanded && (
                   <button
                     type="button"
@@ -271,9 +316,21 @@ export function MessageRow({
                 )}
               </footer>
             )}
+            {deleteError && <p className={styles.deleteError}>{deleteError}</p>}
           </div>
         </div>
       </article>
+
+      {deleteConfirmOpen && (
+        <ConfirmDialog
+          title="Удалить комментарий?"
+          message="Комментарий будет удалён без возможности восстановления."
+          confirmLabel={deleting ? 'Удаление…' : 'Удалить'}
+          cancelLabel="Отмена"
+          onConfirm={() => void performDelete()}
+          onCancel={() => setDeleteConfirmOpen(false)}
+        />
+      )}
 
       {hasReplies && !expanded && (
         <button
@@ -300,6 +357,7 @@ export function MessageRow({
           conversationId={conversationId}
           currentAccountId={currentAccountId}
           onReply={onReply}
+          onDeleted={onDeleted}
           onTotalLoaded={setReplyTotal}
         />
       )}

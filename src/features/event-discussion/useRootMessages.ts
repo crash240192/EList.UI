@@ -83,5 +83,9 @@ export function useRootMessages(conversationId: string | null) {
       });
   }, [conversationId, loadPage]);
 
-  return { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh };
+  const removeMessage = useCallback((messageId: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+  }, []);
+
+  return { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh, removeMessage };
 }

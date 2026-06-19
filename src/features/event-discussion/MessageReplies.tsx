@@ -18,6 +18,7 @@ interface MessageRepliesProps {
   conversationId: string;
   currentAccountId: string | null;
   onReply: (message: IMessage) => void;
+  onDeleted?: (messageId: string) => void;
   onTotalLoaded?: (total: number) => void;
 }
 
@@ -29,6 +30,7 @@ export function MessageReplies({
   conversationId,
   currentAccountId,
   onReply,
+  onDeleted,
   onTotalLoaded,
 }: MessageRepliesProps) {
   const [items, setItems] = useState<IMessage[]>([]);
@@ -69,6 +71,20 @@ export function MessageReplies({
     void loadPage(next, true).finally(() => setLoadingMore(false));
   };
 
+  const handleDeleted = useCallback((messageId: string) => {
+    setItems((prev) => {
+      const next = prev.filter((m) => m.id !== messageId);
+      setTotal((prevTotal) => {
+        const nextTotal = Math.max(0, prevTotal - 1);
+        onTotalLoaded?.(nextTotal);
+        setHasMore(next.length < nextTotal);
+        return nextTotal;
+      });
+      return next;
+    });
+    onDeleted?.(messageId);
+  }, [onDeleted, onTotalLoaded]);
+
   const childDepth = depth + 1;
   const remaining = Math.max(0, total - items.length);
 
@@ -103,6 +119,7 @@ export function MessageReplies({
           currentAccountId={currentAccountId}
           conversationId={conversationId}
           onReply={onReply}
+          onDeleted={handleDeleted}
         />
       ))}
       {hasMore && (
