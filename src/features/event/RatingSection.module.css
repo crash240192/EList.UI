@@ -66,6 +66,10 @@
   gap: 10px;
 }
 
+.lengthHint {
+  margin-right: auto;
+}
+
 .voteError { font-size:11px; color:var(--danger,#ef4444); }
 
 /* Voted badge */
