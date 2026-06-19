@@ -22,18 +22,22 @@ import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
-import { isEventFinished } from '@/features/event/RatingWidget';
+import { icoToUrl } from '@/shared/lib/icoToUrl';
 import {
+  contrastColor,
+  countUniqueUserEvents,
   formatContactHref,
   formatEventListDate,
   formatEventPrice,
   formatShortEventDate,
-  getContactIcon,
+  getContactIconKind,
   getEventCoverStyle,
-  getEventTypeLabels,
+  getEventTypes,
   getUpcomingPreview,
   isContactLink,
+  mergeUserEvents,
   splitEventsByPhase,
+  type ContactIconKind,
   type UserEventsPhase,
   type UserEventsScope,
 } from './userPageUtils';
@@ -41,6 +45,71 @@ import styles from './UserPage.module.css';
 
 type MainTab = UserEventsScope;
 type ListModal = 'subscriptions' | 'subscribers' | null;
+
+const SCOPE_TABS: { key: MainTab; label: string }[] = [
+  { key: 'all', label: 'Все' },
+  { key: 'created', label: 'Организует' },
+  { key: 'participating', label: 'Участвует' },
+];
+
+function ContactIcon({ kind }: { kind: ContactIconKind }) {
+  const svgProps = {
+    width: 14,
+    height: 14,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+  };
+
+  switch (kind) {
+    case 'email':
+      return (
+        <svg {...svgProps}>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="m22 7-8.97 5.7a2 2 0 0 1-2.06 0L2 7" />
+        </svg>
+      );
+    case 'telegram':
+      return (
+        <svg {...svgProps}>
+          <path d="M22 2 11 13" />
+          <path d="m22 2-7 20-4-9-9-4z" />
+        </svg>
+      );
+    case 'phone':
+      return (
+        <svg {...svgProps}>
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+        </svg>
+      );
+    case 'site':
+      return (
+        <svg {...svgProps}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      );
+    case 'location':
+      return (
+        <svg {...svgProps}>
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+          <circle cx="12" cy="10" r="3" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...svgProps}>
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      );
+  }
+}
 
 function ContactRow({ contact }: { contact: IContactDataItem }) {
   const label = contact.contactType?.name
@@ -51,7 +120,9 @@ function ContactRow({ contact }: { contact: IContactDataItem }) {
 
   return (
     <div className={styles.contactRow}>
-      <div className={styles.contactIco} aria-hidden>{getContactIcon(contact)}</div>
+      <div className={styles.contactIco} aria-hidden>
+        <ContactIcon kind={getContactIconKind(contact)} />
+      </div>
       <div className={styles.contactBody}>
         <div className={styles.contactLabel}>{label}</div>
         {linked && href ? (
@@ -91,20 +162,15 @@ function EventCoverThumb({ event }: { event: IEvent }) {
 
 function UserEventCard({
   event,
-  scope,
-  phase,
   onClick,
 }: {
   event: IEvent;
-  scope: UserEventsScope;
-  phase: UserEventsPhase;
   onClick: () => void;
 }) {
   const cost = event.parameters?.cost ?? 0;
   const age = event.parameters?.ageLimit;
   const price = formatEventPrice(cost);
-  const typeLabels = getEventTypeLabels(event);
-  const upcoming = !isEventFinished(event.startTime, event.endTime);
+  const types = getEventTypes(event);
 
   return (
     <button type="button" className={styles.eventCard} onClick={onClick}>
@@ -131,19 +197,35 @@ function UserEventCard({
             </>
           )}
         </div>
-        <div className={styles.ecTags}>
-          <span className={`${styles.ecTag} ${upcoming ? styles.ecTagUpcoming : styles.ecTagPast}`}>
-            {scope === 'created'
-              ? (upcoming ? 'Предстоит' : 'Завершено')
-              : (upcoming ? 'Предстоит' : 'Посетил')}
-          </span>
-          {phase === 'past' && scope === 'participating' && (
-            <span className={`${styles.ecTag} ${styles.ecTagPast}`}>Посетил</span>
-          )}
-          {typeLabels.map(label => (
-            <span key={label} className={styles.ecTag}>{label}</span>
-          ))}
-        </div>
+        {types.length > 0 && (
+          <div className={styles.ecTags}>
+            {types.map(t => {
+              const catColor = t.eventCategory?.color ?? '#6366f1';
+              return (
+                <span
+                  key={t.id}
+                  className={styles.ecTypeTag}
+                  style={{
+                    background: `${catColor}55`,
+                    border: `1px solid ${catColor}99`,
+                    color: contrastColor(catColor),
+                  }}
+                >
+                  {t.ico && (
+                    <img
+                      src={icoToUrl(t.ico) ?? ''}
+                      alt=""
+                      width={10}
+                      height={10}
+                      className={styles.ecTypeIco}
+                    />
+                  )}
+                  {t.name}
+                </span>
+              );
+            })}
+          </div>
+        )}
         {event.participantsCount != null && (
           <div className={styles.ecStats}>
             <span className={styles.ecStat}>
@@ -204,9 +286,11 @@ function UserEventsPanel({
 
       {!isLoading && filtered.length === 0 && (
         <p className={styles.placeholder}>
-          {scope === 'created'
-            ? (phase === 'upcoming' ? 'Нет предстоящих организованных мероприятий' : 'Нет прошедших организованных мероприятий')
-            : (phase === 'upcoming' ? 'Нет предстоящих мероприятий' : 'Нет посещённых мероприятий')}
+          {scope === 'all'
+            ? (phase === 'upcoming' ? 'Нет предстоящих мероприятий' : 'Нет прошедших мероприятий')
+            : scope === 'created'
+              ? (phase === 'upcoming' ? 'Нет предстоящих организованных мероприятий' : 'Нет прошедших организованных мероприятий')
+              : (phase === 'upcoming' ? 'Нет предстоящих мероприятий с участием' : 'Нет прошедших мероприятий с участием')}
         </p>
       )}
 
@@ -214,8 +298,6 @@ function UserEventsPanel({
         <UserEventCard
           key={event.id}
           event={event}
-          scope={scope}
-          phase={phase}
           onClick={() => onOpen(event.id)}
         />
       ))}
@@ -244,9 +326,8 @@ export default function UserPage() {
   const [profile, setProfile] = useState<IFullProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mainTab, setMainTab] = useState<MainTab>('created');
-  const [createdPhase, setCreatedPhase] = useState<UserEventsPhase>('upcoming');
-  const [participatingPhase, setParticipatingPhase] = useState<UserEventsPhase>('upcoming');
+  const [mainTab, setMainTab] = useState<MainTab>('all');
+  const [eventsPhase, setEventsPhase] = useState<UserEventsPhase>('upcoming');
   const [subsCount, setSubsCount] = useState(0);
   const [subscrCount, setSubscrCount] = useState(0);
   const [listModal, setListModal] = useState<ListModal>(null);
@@ -309,6 +390,27 @@ export default function UserPage() {
     setSubscrCount(c => Math.max(0, c - 1));
   }, [profileAccountId]);
 
+  const allEvents = useMemo(
+    () => mergeUserEvents(createdEvents.events, participatingEvents.events),
+    [createdEvents.events, participatingEvents.events],
+  );
+  const allEventsTotal = useMemo(
+    () => countUniqueUserEvents(createdEvents.events, participatingEvents.events),
+    [createdEvents.events, participatingEvents.events],
+  );
+
+  const activeEvents = mainTab === 'all'
+    ? { events: allEvents, total: allEventsTotal, isLoading: createdEvents.isLoading || participatingEvents.isLoading }
+    : mainTab === 'created'
+      ? createdEvents
+      : participatingEvents;
+
+  const scopeCounts: Record<MainTab, number> = {
+    all: allEventsTotal || allEvents.length,
+    created: createdEvents.total || createdEvents.events.length,
+    participating: participatingEvents.total || participatingEvents.events.length,
+  };
+
   const upcomingPreview = useMemo(() => {
     const created = getUpcomingPreview(createdEvents.events, 'created', 2);
     const participating = getUpcomingPreview(participatingEvents.events, 'participating', 2);
@@ -335,8 +437,6 @@ export default function UserPage() {
     : null;
   const visibleContacts = contacts.filter(c => isOwnProfile || c.show);
   const initials = (fullName || account.login).slice(0, 2).toUpperCase();
-  const activeEvents = mainTab === 'created' ? createdEvents : participatingEvents;
-  const activePhase = mainTab === 'created' ? createdPhase : participatingPhase;
 
   return (
     <div className={styles.page}>
@@ -526,22 +626,17 @@ export default function UserPage() {
 
           <section className={styles.rightPanel}>
             <div className={styles.tabsBar}>
-              <button
-                type="button"
-                className={`${styles.tabBtn} ${mainTab === 'created' ? styles.tabBtnActive : ''}`}
-                onClick={() => setMainTab('created')}
-              >
-                Мероприятия
-                <span className={styles.tabCnt}>{createdEvents.total || createdEvents.events.length}</span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.tabBtn} ${mainTab === 'participating' ? styles.tabBtnActive : ''}`}
-                onClick={() => setMainTab('participating')}
-              >
-                Посещал
-                <span className={styles.tabCnt}>{participatingEvents.total || participatingEvents.events.length}</span>
-              </button>
+              {SCOPE_TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={`${styles.tabBtn} ${mainTab === tab.key ? styles.tabBtnActive : ''}`}
+                  onClick={() => setMainTab(tab.key)}
+                >
+                  {tab.label}
+                  <span className={styles.tabCnt}>{scopeCounts[tab.key]}</span>
+                </button>
+              ))}
             </div>
 
             <UserEventsPanel
@@ -549,8 +644,8 @@ export default function UserPage() {
               total={activeEvents.total}
               isLoading={activeEvents.isLoading}
               scope={mainTab}
-              phase={activePhase}
-              onPhaseChange={mainTab === 'created' ? setCreatedPhase : setParticipatingPhase}
+              phase={eventsPhase}
+              onPhaseChange={setEventsPhase}
               onOpen={eventId => navigate(`/event/${eventId}`)}
             />
           </section>
