@@ -1,21 +1,34 @@
-/* pages/wallet/WalletPage.module.css — макет examples/elist_settings_wallet.html */
+/* pages/wallet/WalletPage.module.css */
 
 .page {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
   background: var(--bg);
+  padding: 20px;
+  box-sizing: border-box;
 }
 
-.walletLayout {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 28px 48px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 860px;
+.card {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.cardHeader {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cardTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .loader {
@@ -23,6 +36,13 @@
   text-align: center;
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.walletLayout {
+  padding: 24px 28px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .msg {
@@ -411,6 +431,16 @@
 }
 
 @media (max-width: 720px) {
+  .page {
+    padding: 0;
+  }
+
+  .card {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
   .walletLayout {
     padding: 16px;
   }

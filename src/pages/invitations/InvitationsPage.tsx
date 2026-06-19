@@ -135,48 +135,50 @@ export default function InvitationsPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.topbar}>
-        <div className={styles.topbarMain}>
-          <h1 className={styles.pageTitle}>Приглашения</h1>
-          {!loading && tab === 'incoming' && items.length > 0 && (
-            <span className={styles.titleBadge}>{items.length}</span>
-          )}
-        </div>
-        {!loading && tab === 'incoming' && unviewedCount > 0 && (
-          <button
-            type="button"
-            className={styles.markAllBtn}
-            onClick={() => { void markAllViewed(); }}
-            disabled={markingAll}
-          >
-            {markingAll ? 'Отмечаем…' : 'Отметить все просмотренными'}
-          </button>
-        )}
-      </div>
+      <div className={styles.inner}>
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardHeaderMain}>
+              <h1 className={styles.cardTitle}>Приглашения</h1>
+              {!loading && tab === 'incoming' && items.length > 0 && (
+                <span className={styles.badge}>{items.length}</span>
+              )}
+            </div>
+            {!loading && tab === 'incoming' && unviewedCount > 0 && (
+              <button
+                type="button"
+                className={styles.markAllBtn}
+                onClick={() => { void markAllViewed(); }}
+                disabled={markingAll}
+              >
+                {markingAll ? 'Отмечаем…' : 'Отметить все просмотренными'}
+              </button>
+            )}
+          </div>
 
-      <div className={styles.tabsBar}>
-        <button
-          type="button"
-          className={`${styles.tabBtn} ${tab === 'incoming' ? styles.tabBtnActive : ''}`}
-          onClick={() => setTab('incoming')}
-        >
-          Входящие
-          {!loading && items.length > 0 && (
-            <span className={styles.tabCnt}>{items.length}</span>
-          )}
-        </button>
-        <button
-          type="button"
-          className={`${styles.tabBtn} ${tab === 'sent' ? styles.tabBtnActive : ''}`}
-          onClick={() => setTab('sent')}
-        >
-          Отправленные
-          <span className={styles.tabCnt}>0</span>
-        </button>
-      </div>
+          <div className={styles.tabsBar}>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${tab === 'incoming' ? styles.tabBtnActive : ''}`}
+              onClick={() => setTab('incoming')}
+            >
+              Входящие
+              {!loading && items.length > 0 && (
+                <span className={styles.tabCnt}>{items.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${tab === 'sent' ? styles.tabBtnActive : ''}`}
+              onClick={() => setTab('sent')}
+            >
+              Отправленные
+              <span className={styles.tabCnt}>0</span>
+            </button>
+          </div>
 
-      <div className={styles.content}>
-        <div className={`${styles.tabPane} ${tab === 'incoming' ? styles.tabPaneActive : ''}`}>
+          <div className={styles.cardBody}>
+            <div className={`${styles.tabPane} ${tab === 'incoming' ? styles.tabPaneActive : ''}`}>
           {loading && (
             <div className={styles.skeletons}>
               {Array.from({ length: 3 }).map((_, i) => (
@@ -214,24 +216,25 @@ export default function InvitationsPage() {
           )}
 
           {!loading && items.map(inv => (
-            <InvitationCard
+            <InvitationRow
               key={inv.id}
               inv={inv}
               onOpen={() => handleInvitationClick(inv)}
               onPreview={() => openPreview(inv)}
               onDecline={() => setConfirmDecl(inv)}
-              onLater={() => { void markViewedIfNeeded(inv); }}
             />
           ))}
-        </div>
+            </div>
 
-        <div className={`${styles.tabPane} ${tab === 'sent' ? styles.tabPaneActive : ''}`}>
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIllo}>📤</div>
-            <p className={styles.emptyTitle}>Отправленных приглашений нет</p>
-            <p className={styles.emptySub}>
-              Приглашения, которые вы отправили участникам своих событий, будут отображаться здесь
-            </p>
+            <div className={`${styles.tabPane} ${tab === 'sent' ? styles.tabPaneActive : ''}`}>
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIllo}>📤</div>
+                <p className={styles.emptyTitle}>Отправленных приглашений нет</p>
+                <p className={styles.emptySub}>
+                  Приглашения, которые вы отправили участникам своих событий, будут отображаться здесь
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -266,18 +269,16 @@ export default function InvitationsPage() {
   );
 }
 
-function InvitationCard({
+function InvitationRow({
   inv,
   onOpen,
   onPreview,
   onDecline,
-  onLater,
 }: {
   inv: IInvitation;
   onOpen: () => void;
   onPreview: () => void;
   onDecline: () => void;
-  onLater: () => void;
 }) {
   const event = inv.event;
   const types = getEventTypes(event);
@@ -285,9 +286,6 @@ function InvitationCard({
   const urgency = getEventUrgency(event.startTime);
   const unviewed = isInvitationUnviewed(inv);
   const coverBg = getEventCoverBackground(event as Parameters<typeof getEventCoverBackground>[0]);
-  const fillPct = params.maxPersonsCount && params.participantsCount != null
-    ? Math.min(100, Math.round((params.participantsCount / params.maxPersonsCount) * 100))
-    : null;
 
   const urgClass = urgency?.kind === 'hot'
     ? styles.urgHot
@@ -298,75 +296,71 @@ function InvitationCard({
   return (
     <div
       className={[
-        styles.invCard,
-        urgency?.kind === 'hot' ? styles.invCardUrgent : '',
-        unviewed ? styles.invCardUnviewed : '',
+        styles.item,
+        urgency?.kind === 'hot' ? styles.itemUrgent : '',
+        unviewed ? styles.itemUnviewed : '',
       ].filter(Boolean).join(' ')}
     >
-      <div className={styles.invTop}>
-        <div className={styles.invCover} style={{ background: coverBg }}>
+      <div className={styles.itemLeft} onClick={onOpen}>
+        <div className={styles.cover}>
           {event.coverImageId
-            ? <AuthImage fileId={event.coverImageId} alt="" className={styles.invCoverImg} />
-            : null}
-          <div className={styles.invCoverOverlay} />
+            ? <AuthImage fileId={event.coverImageId} alt="" className={styles.coverImg} />
+            : <div className={styles.coverPlaceholder} style={{ background: coverBg }} />}
           {urgency && <span className={`${styles.urgBadge} ${urgClass}`}>{urgency.label}</span>}
         </div>
 
-        <div className={styles.invInfo}>
+        <div className={styles.content}>
           <div className={styles.inviterChip}>
             <UserAvatar
               accountId={inv.inviterAccountId}
               avatarId={inv.inviter?.account?.avatarId ?? null}
               initials={inviterInitials(inv)}
-              size={22}
+              size={18}
               className={styles.whoAvatar}
             />
             <span className={styles.inviterText}>
-              <span className={styles.inviterName}>{inviterName(inv)}</span> приглашает вас
+              <span className={styles.inviterName}>{inviterName(inv)}</span> приглашает
             </span>
             <span className={styles.invTime}>{formatRelativeInviteTime(inv.creationDate)}</span>
           </div>
 
-          <button type="button" className={styles.invEventName} onClick={onOpen}>
-            {event.name}
-          </button>
+          <div className={styles.eName}>{event.name}</div>
 
-          <div className={styles.invMeta}>
-            <span className={styles.imeta}>📅 {formatInvitationEventDateShort(event.startTime)}</span>
+          <div className={styles.meta}>
+            <div className={styles.mi}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+              {formatInvitationEventDateShort(event.startTime)}
+            </div>
             {event.address && (
-              <>
-                <span className={styles.idot} />
-                <span className={styles.imeta}>📍 {event.address}</span>
-              </>
+              <div className={styles.mi}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                {event.address}
+              </div>
             )}
-            <span className={styles.idot} />
-            <span className={`${styles.imeta} ${params.cost === 0 ? styles.priceFree : styles.pricePaid}`}>
+            <div className={`${styles.mi} ${params.cost === 0 ? styles.miFree : styles.miPaid}`}>
               {params.cost === 0 ? 'Бесплатно' : `${params.cost.toLocaleString('ru-RU')} ₽`}
-            </span>
+            </div>
             {params.ageLimit != null && params.ageLimit > 0 && (
-              <>
-                <span className={styles.idot} />
-                <span className={styles.imeta}>{params.ageLimit}+</span>
-              </>
+              <div className={styles.mi}>{params.ageLimit}+</div>
             )}
           </div>
 
           {types.length > 0 && (
-            <div className={styles.invChips}>
+            <div className={styles.chips}>
               {types.filter(Boolean).slice(0, 3).map(t => {
-                const color = t.eventCategory?.color;
+                const color = t.eventCategory?.color ?? '#6366f1';
                 return (
                   <span
                     key={t.id}
-                    className={styles.ichip}
-                    style={color ? {
+                    className={styles.chip}
+                    style={{
                       background: `${color}20`,
                       border: `1px solid ${color}55`,
                       color,
-                    } : undefined}
+                    }}
                   >
                     {t.ico && (
-                      <img src={icoToUrl(t.ico) ?? undefined} alt="" width={10} height={10} style={{ objectFit: 'contain' }} />
+                      <img src={icoToUrl(t.ico) ?? undefined} alt="" width={10} height={10} style={{ objectFit: 'contain', borderRadius: 2 }} />
                     )}
                     {t.name}
                   </span>
@@ -375,49 +369,24 @@ function InvitationCard({
             </div>
           )}
         </div>
-
-        <div className={styles.invActions}>
-          <button type="button" className={`${styles.actBtn} ${styles.actAccept}`} onClick={onPreview}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            Принять
-          </button>
-          <button type="button" className={`${styles.actBtn} ${styles.actDecline}`} onClick={onDecline}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-            Отклонить
-          </button>
-          <button type="button" className={`${styles.actBtn} ${styles.actLater}`} onClick={onLater}>
-            Позже
-          </button>
-        </div>
       </div>
 
-      <div className={styles.invFooter}>
-        <div className={styles.invFooterLeft}>
-          {params.participantsCount != null && (
-            <span className={styles.participantsMini}>
-              {params.participantsCount} участник{params.participantsCount % 10 === 1 && params.participantsCount % 100 !== 11 ? '' : 'ов'}
-              {params.private ? ' · приватное' : ''}
-            </span>
-          )}
-          {fillPct != null && params.maxPersonsCount != null && params.participantsCount != null && (
-            <div className={styles.fillMini}>
-              <div className={styles.fillMiniBar}>
-                <div className={styles.fillMiniInner} style={{ width: `${fillPct}%` }} />
-              </div>
-              <span>{params.participantsCount} / {params.maxPersonsCount} мест</span>
-            </div>
-          )}
-        </div>
-        <button type="button" className={styles.previewLink} onClick={onPreview}>
-          Подробнее
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
+      <div className={styles.itemActions}>
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnOk}`}
+          onClick={e => { e.stopPropagation(); onPreview(); }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+          Принять
+        </button>
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnNo}`}
+          onClick={e => { e.stopPropagation(); onDecline(); }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          Отклонить
         </button>
       </div>
     </div>

@@ -5,7 +5,6 @@ import { createWallet, getWalletByAccount, setWalletTariff, type IWallet } from 
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
 import { getOrFetchAccountId } from '@/entities/user/api';
-import { SettingsWalletNav } from '@/features/settings/SettingsWalletNav';
 import styles from './WalletPage.module.css';
 
 function formatValidatorRows(v: ITariffValidator): { label: string; value: string; type: 'ok' | 'warn' | 'no' }[] {
@@ -108,16 +107,23 @@ export default function WalletPage() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <SettingsWalletNav />
-        <div className={styles.loader}>Загрузка...</div>
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h1 className={styles.cardTitle}>Кошелёк</h1>
+          </div>
+          <div className={styles.loader}>Загрузка...</div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className={styles.page}>
-      <SettingsWalletNav />
-      <div className={styles.walletLayout}>
+      <div className={styles.card}>
+        <div className={styles.cardHeader}>
+          <h1 className={styles.cardTitle}>Кошелёк</h1>
+        </div>
+        <div className={styles.walletLayout}>
         {msg && (
           <div className={`${styles.msg} ${msg.ok ? styles.msgOk : styles.msgErr}`}>
             {msg.text}
@@ -200,6 +206,7 @@ export default function WalletPage() {
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );

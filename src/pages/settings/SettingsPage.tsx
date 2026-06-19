@@ -18,7 +18,6 @@ import { Select } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { useFiltersStore } from '@/app/store';
-import { SettingsWalletNav } from '@/features/settings/SettingsWalletNav';
 import styles from './SettingsPage.module.css';
 
 type SettingsTab = 'profile' | 'contacts' | 'location' | 'security';
@@ -75,8 +74,11 @@ export default function SettingsPage() {
 
   return (
     <div className={styles.page}>
-      <SettingsWalletNav />
-      <div className={styles.settingsLayout}>
+      <div className={styles.card}>
+        <div className={styles.cardHeader}>
+          <h1 className={styles.cardTitle}>Настройки</h1>
+        </div>
+        <div className={styles.settingsLayout}>
         <nav className={styles.snav}>
           {sections.map(section => (
             <div key={section}>
@@ -109,6 +111,7 @@ export default function SettingsPage() {
           <div className={`${styles.stab} ${tab === 'security' ? styles.stabActive : ''}`}>
             <PasswordSection />
           </div>
+        </div>
         </div>
       </div>
     </div>
