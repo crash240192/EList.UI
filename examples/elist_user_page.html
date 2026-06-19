@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EList — Профиль пользователя</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&family=Onest:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1117;--sur:#181b23;--sur2:#1e2130;--sur3:#252a3a;
+  --bd:#2a2f42;--bd2:#343b52;
+  --ac:#6366f1;--ac-s:rgba(99,102,241,.14);
+  --t1:#eef0f8;--t2:#9498b0;--t3:#5a5e78;
+  --ok:#22c55e;--warn:#f59e0b;--r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Onest',sans-serif;background:var(--bg);color:var(--t1);font-size:13px;line-height:1.5;display:flex;flex-direction:column;}
+
+/* ── COVER ── */
+.cover{position:relative;height:180px;flex-shrink:0;overflow:hidden;}
+.cover-bg{
+  width:100%;height:100%;
+  background:linear-gradient(120deg,#1a1040 0%,#2d1b6e 30%,#1e3a5f 60%,#0d2818 100%);
+}
+.cover-pattern{
+  position:absolute;inset:0;
+  background-image:radial-gradient(circle at 20% 50%, rgba(99,102,241,.18) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(139,92,246,.14) 0%, transparent 40%),
+    radial-gradient(circle at 60% 80%, rgba(16,185,129,.1) 0%, transparent 40%);
+}
+.cover-top{position:absolute;top:14px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:center;}
+.hbtn{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.1);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:5px 11px 5px 8px;color:#fff;font-size:12px;cursor:pointer;font-family:inherit;transition:background .15s;}
+.hbtn:hover{background:rgba(255,255,255,.18);}
+.cover-edit{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:5px 12px;color:rgba(255,255,255,.7);font-size:11px;cursor:pointer;font-family:inherit;transition:background .15s;}
+.cover-edit:hover{background:rgba(255,255,255,.15);}
+
+/* ── PROFILE HEADER ── */
+.pheader{
+  display:flex;align-items:flex-end;gap:16px;
+  padding:0 20px 0;
+  margin-top:-44px;
+  flex-shrink:0;
+  position:relative;z-index:2;
+}
+.avatar-wrap{position:relative;flex-shrink:0;}
+.avatar{
+  width:88px;height:88px;border-radius:50%;
+  background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#06b6d4 100%);
+  border:3px solid var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Unbounded',sans-serif;font-size:22px;font-weight:600;color:#fff;
+  cursor:pointer;transition:opacity .15s;flex-shrink:0;
+}
+.avatar:hover{opacity:.9;}
+.online-dot{position:absolute;bottom:4px;right:4px;width:14px;height:14px;border-radius:50%;background:var(--ok);border:2px solid var(--bg);}
+.pheader-info{flex:1;padding-bottom:10px;min-width:0;}
+.name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pname{font-family:'Unbounded',sans-serif;font-size:16px;font-weight:600;color:var(--t1);line-height:1.2;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.verified{width:18px;height:18px;border-radius:50%;background:var(--ac);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;}
+.plogin{font-size:12px;color:var(--t3);margin-top:2px;}
+.pbio{font-size:12px;color:var(--t2);margin-top:5px;line-height:1.55;max-width:460px;}
+
+/* actions */
+.pheader-actions{display:flex;gap:8px;align-items:center;padding-bottom:10px;flex-shrink:0;}
+.btn-primary{padding:8px 18px;background:var(--ac);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s;}
+.btn-primary:hover{background:#4f46e5;}
+.btn-primary.sub{background:var(--ok);}
+.btn-ghost{display:flex;align-items:center;gap:5px;padding:7px 13px;background:var(--sur2);border:1px solid var(--bd);border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:border-color .15s,color .15s;}
+.btn-ghost:hover{border-color:var(--bd2);color:var(--t1);}
+.btn-icon{width:33px;height:33px;border-radius:8px;background:var(--sur2);border:1px solid var(--bd);color:var(--t2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s;}
+.btn-icon:hover{border-color:var(--bd2);color:var(--t1);}
+
+/* ── STATS BAR ── */
+.stats-bar{
+  display:flex;align-items:center;
+  padding:12px 20px;
+  border-bottom:1px solid var(--bd);
+  gap:0;
+  flex-shrink:0;
+}
+.stat-item{
+  display:flex;flex-direction:column;align-items:center;
+  padding:0 20px;
+  border-right:1px solid var(--bd);
+  cursor:pointer;
+  transition:color .15s;
+  min-width:0;
+}
+.stat-item:first-child{padding-left:0;}
+.stat-item:last-child{border-right:none;}
+.stat-item:hover .stat-num{color:var(--ac);}
+.stat-num{font-family:'Unbounded',sans-serif;font-size:16px;font-weight:600;color:var(--t1);line-height:1;}
+.stat-label{font-size:10px;color:var(--t3);margin-top:3px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+.stat-rating{display:flex;align-items:center;gap:5px;}
+.stars{display:flex;gap:2px;}
+.star{font-size:12px;color:var(--warn);}
+.star-e{color:var(--bd2);}
+.rating-num{font-family:'Unbounded',sans-serif;font-size:16px;font-weight:600;color:var(--t1);}
+
+/* ── MAIN GRID ── */
+.grid{display:grid;grid-template-columns:290px 1fr;flex:1;min-height:0;overflow:hidden;}
+
+/* ── LEFT ── */
+.left{
+  border-right:1px solid var(--bd);
+  padding:16px 14px 24px;
+  overflow-y:auto;
+  display:flex;flex-direction:column;gap:16px;
+}
+.left::-webkit-scrollbar{width:3px;}
+.left::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
+
+.sec-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;font-weight:500;margin-bottom:8px;}
+
+/* contacts */
+.contact-list{display:flex;flex-direction:column;gap:7px;}
+.contact-row{display:flex;align-items:center;gap:9px;}
+.contact-ico{
+  width:28px;height:28px;border-radius:7px;
+  background:var(--sur3);border:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;flex-shrink:0;
+}
+.contact-label{font-size:10px;color:var(--t3);}
+.contact-val{font-size:12px;color:var(--t1);font-weight:500;}
+.contact-link{font-size:12px;color:var(--ac);font-weight:500;cursor:pointer;}
+.contact-link:hover{text-decoration:underline;}
+
+/* interests */
+.tags-wrap{display:flex;flex-wrap:wrap;gap:6px;}
+.itag{
+  padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;
+  background:var(--sur3);border:1px solid var(--bd);color:var(--t2);
+  cursor:pointer;transition:border-color .15s,color .15s;
+}
+.itag:hover{border-color:var(--ac);color:var(--ac);}
+.itag.ac{background:var(--ac-s);border-color:rgba(99,102,241,.3);color:#a5b4fc;}
+
+/* upcoming mini */
+.next-event{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:10px 12px;
+  background:var(--sur2);border:1px solid var(--bd);border-radius:var(--r);
+  cursor:pointer;transition:border-color .15s;
+}
+.next-event:hover{border-color:var(--bd2);}
+.ne-dot-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;padding-top:2px;}
+.ne-dot{width:8px;height:8px;border-radius:50%;background:var(--ac);}
+.ne-line{flex:1;width:1px;background:var(--bd);min-height:20px;}
+.ne-info{flex:1;min-width:0;}
+.ne-date{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+.ne-name{font-size:12px;font-weight:500;color:var(--t1);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ne-meta{font-size:10px;color:var(--t2);margin-top:2px;}
+.ne-badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:600;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:var(--ok);}
+
+/* ── RIGHT ── */
+.right{overflow-y:auto;display:flex;flex-direction:column;}
+.right::-webkit-scrollbar{width:3px;}
+.right::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
+
+/* ── TABS ── */
+.tabs-bar{
+  display:flex;border-bottom:1px solid var(--bd);
+  padding:0 20px;position:sticky;top:0;z-index:5;background:var(--bg);flex-shrink:0;
+}
+.tab-btn{
+  padding:14px 18px 12px;background:none;border:none;font-family:'Onest',sans-serif;
+  font-size:12px;font-weight:500;color:var(--t3);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:color .15s,border-color .15s;white-space:nowrap;display:flex;align-items:center;gap:6px;
+}
+.tab-btn:hover{color:var(--t2);}
+.tab-btn.active{color:var(--t1);border-bottom-color:var(--ac);}
+.tab-cnt{background:var(--sur3);border:1px solid var(--bd);border-radius:10px;padding:1px 6px;font-size:9px;color:var(--t3);}
+.tab-btn.active .tab-cnt{background:var(--ac-s);border-color:rgba(99,102,241,.3);color:#a5b4fc;}
+
+.tab-content{display:none;padding:18px 20px 32px;flex-direction:column;gap:0;}
+.tab-content.active{display:flex;}
+
+/* subtabs */
+.subtabs{display:flex;gap:4px;margin-bottom:16px;}
+.stab{
+  padding:6px 14px;border-radius:20px;
+  background:var(--sur2);border:1px solid var(--bd);
+  font-size:11px;font-weight:500;color:var(--t2);
+  cursor:pointer;font-family:inherit;transition:all .15s;
+}
+.stab:hover{border-color:var(--bd2);color:var(--t1);}
+.stab.active{background:var(--ac-s);border-color:rgba(99,102,241,.3);color:#a5b4fc;}
+
+/* event cards in list */
+.event-card{
+  display:flex;gap:12px;align-items:flex-start;
+  padding:12px 0;border-bottom:1px solid var(--bd);
+  cursor:pointer;
+}
+.event-card:last-child{border-bottom:none;}
+.event-card:hover .ec-name{color:var(--ac);}
+.ec-cover{
+  width:56px;height:56px;border-radius:8px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  border:1px solid var(--bd);
+}
+.ec-info{flex:1;min-width:0;}
+.ec-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+.ec-name{font-size:13px;font-weight:600;color:var(--t1);line-height:1.3;transition:color .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px;}
+.ec-price{font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0;}
+.ec-price.free{color:var(--ok);}
+.ec-price.paid{color:var(--warn);}
+.ec-meta{font-size:11px;color:var(--t2);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.ec-dot{width:3px;height:3px;border-radius:50%;background:var(--t3);}
+.ec-tags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;}
+.ectag{padding:2px 8px;border-radius:10px;font-size:9px;font-weight:500;background:var(--sur3);border:1px solid var(--bd);color:var(--t3);}
+.ectag.status-upcoming{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.2);color:#a5b4fc;}
+.ectag.status-past{background:var(--sur3);color:var(--t3);}
+.ec-stats{display:flex;align-items:center;gap:12px;margin-top:5px;}
+.ec-stat{font-size:10px;color:var(--t3);display:flex;align-items:center;gap:3px;}
+
+/* reviews tab */
+.rating-summary{
+  display:flex;gap:20px;align-items:center;
+  padding:16px;background:var(--sur2);border:1px solid var(--bd);border-radius:var(--r);
+  margin-bottom:16px;
+}
+.big-rating{text-align:center;flex-shrink:0;}
+.big-num{font-family:'Unbounded',sans-serif;font-size:36px;font-weight:600;color:var(--t1);line-height:1;}
+.big-stars{display:flex;gap:3px;justify-content:center;margin:5px 0;}
+.big-cnt{font-size:11px;color:var(--t3);}
+.rating-bars{flex:1;}
+.rbar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.rbar-lbl{font-size:10px;color:var(--t3);width:12px;text-align:right;flex-shrink:0;}
+.rbar-track{flex:1;height:4px;background:var(--bd);border-radius:2px;overflow:hidden;}
+.rbar-inner{height:100%;border-radius:2px;background:var(--warn);}
+.rbar-cnt{font-size:10px;color:var(--t3);width:20px;flex-shrink:0;}
+
+.review-item{padding:14px 0;border-bottom:1px solid var(--bd);}
+.review-item:last-child{border-bottom:none;}
+.review-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;}
+.rev-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0;}
+.rev-info{flex:1;}
+.rev-name{font-size:12px;font-weight:600;color:var(--t1);}
+.rev-meta{font-size:10px;color:var(--t3);margin-top:1px;}
+.rev-stars{display:flex;gap:2px;margin-left:auto;}
+.rev-star{font-size:11px;color:var(--warn);}
+.rev-star.e{color:var(--bd2);}
+.rev-text{font-size:12px;color:var(--t2);line-height:1.6;}
+.rev-event{font-size:11px;color:var(--t3);margin-top:6px;display:flex;align-items:center;gap:4px;}
+.rev-event-name{color:var(--ac);cursor:pointer;}
+.rev-event-name:hover{text-decoration:underline;}
+
+.divider{height:1px;background:var(--bd);margin:0;}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-bg"><div class="cover-pattern"></div></div>
+  <div class="cover-top">
+    <button class="hbtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Назад
+    </button>
+    <button class="cover-edit">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Сменить обложку
+    </button>
+  </div>
+</div>
+
+<!-- PROFILE HEADER -->
+<div class="pheader">
+  <div class="avatar-wrap">
+    <div class="avatar">АК</div>
+    <div class="online-dot" title="Онлайн"></div>
+  </div>
+  <div class="pheader-info">
+    <div class="name-row">
+      <div class="pname">Андрей Ковалёв</div>
+      <div class="verified" title="Верифицированный организатор">✓</div>
+    </div>
+    <div class="plogin">@andrew.kovalev · зарегистрирован в марте 2023</div>
+    <div class="pbio">Организую технологические конференции и нетворкинг-вечера. Сооснователь ProductGuild.</div>
+  </div>
+  <div class="pheader-actions">
+    <button class="btn-primary sub" onclick="toggleSub(this)">✓ Подписан</button>
+    <button class="btn-ghost">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Написать
+    </button>
+    <button class="btn-icon" title="Ещё">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat-item" onclick="">
+    <span class="stat-num">23</span>
+    <span class="stat-label">организовал</span>
+  </div>
+  <div class="stat-item" onclick="">
+    <span class="stat-num">91</span>
+    <span class="stat-label">посетил</span>
+  </div>
+  <div class="stat-item" onclick="">
+    <span class="stat-num">1 240</span>
+    <span class="stat-label">подписчики</span>
+  </div>
+  <div class="stat-item" onclick="">
+    <span class="stat-num">48</span>
+    <span class="stat-label">подписки</span>
+  </div>
+  <div class="stat-item">
+    <div class="stat-rating">
+      <div class="stars">
+        <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star star-e">★</span>
+      </div>
+      <span class="rating-num">4.2</span>
+    </div>
+    <span class="stat-label">рейтинг организатора</span>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="grid">
+
+  <!-- LEFT -->
+  <div class="left">
+
+    <!-- Контакты -->
+    <div>
+      <div class="sec-label">Контакты</div>
+      <div class="contact-list">
+        <div class="contact-row">
+          <div class="contact-ico">📧</div>
+          <div><div class="contact-label">Email</div><div class="contact-link">a.kovalev@productguild.ru</div></div>
+        </div>
+        <div class="contact-row">
+          <div class="contact-ico">💬</div>
+          <div><div class="contact-label">Telegram</div><div class="contact-link">@akovalev_pm</div></div>
+        </div>
+        <div class="contact-row">
+          <div class="contact-ico">🌐</div>
+          <div><div class="contact-label">Сайт</div><div class="contact-link">productguild.ru</div></div>
+        </div>
+        <div class="contact-row">
+          <div class="contact-ico">📍</div>
+          <div><div class="contact-label">Город</div><div class="contact-val">Москва</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:1px;background:var(--bd)"></div>
+
+    <!-- Интересы -->
+    <div>
+      <div class="sec-label">Интересы</div>
+      <div class="tags-wrap">
+        <span class="itag ac">Продукт</span>
+        <span class="itag ac">AI/ML</span>
+        <span class="itag ac">Технологии</span>
+        <span class="itag">Дизайн</span>
+        <span class="itag">Стартапы</span>
+        <span class="itag">Нетворкинг</span>
+        <span class="itag">Growth</span>
+      </div>
+    </div>
+
+    <div style="height:1px;background:var(--bd)"></div>
+
+    <!-- Ближайшие события -->
+    <div>
+      <div class="sec-label">Ближайшие события</div>
+
+      <div class="next-event" onclick="">
+        <div class="ne-dot-col"><div class="ne-dot"></div><div class="ne-line"></div></div>
+        <div class="ne-info">
+          <div class="ne-date">25 мая · сб</div>
+          <div class="ne-name">ProductConf 2025</div>
+          <div class="ne-meta">Манеж, Москва · <span class="ne-badge">Организую</span></div>
+        </div>
+      </div>
+
+      <div class="next-event" style="margin-top:6px" onclick="">
+        <div class="ne-dot-col"><div class="ne-dot" style="background:var(--ok)"></div></div>
+        <div class="ne-info">
+          <div class="ne-date">3 июня · вт</div>
+          <div class="ne-name">AI в продукте: вечерний митап</div>
+          <div class="ne-meta">Точка кипения · <span class="ne-badge" style="background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.2);color:var(--ok)">Участвую</span></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right">
+
+    <!-- TABS -->
+    <div class="tabs-bar">
+      <button class="tab-btn active" onclick="switchTab('events',this)">
+        Мероприятия
+        <span class="tab-cnt">23</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('visited',this)">
+        Посещал
+        <span class="tab-cnt">91</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('reviews',this)">
+        Отзывы
+        <span class="tab-cnt">47</span>
+      </button>
+    </div>
+
+    <!-- TAB: Мероприятия (организую) -->
+    <div class="tab-content active" id="tab-events">
+      <div class="subtabs">
+        <button class="stab active" onclick="switchSubtab(this,'events')">Предстоящие</button>
+        <button class="stab" onclick="switchSubtab(this,'events')">Прошедшие</button>
+      </div>
+
+      <div class="event-card" onclick="">
+        <div class="ec-cover" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)">⚡</div>
+        <div class="ec-info">
+          <div class="ec-top">
+            <div class="ec-name">ProductConf 2025</div>
+            <div class="ec-price free">Бесплатно</div>
+          </div>
+          <div class="ec-meta">
+            <span>25 мая 2025</span><div class="ec-dot"></div>
+            <span>Манеж, Москва</span><div class="ec-dot"></div>
+            <span>18+</span>
+          </div>
+          <div class="ec-tags">
+            <span class="ectag status-upcoming">Предстоит</span>
+            <span class="ectag">Конференция</span>
+            <span class="ectag">Технологии</span>
+          </div>
+          <div class="ec-stats">
+            <span class="ec-stat">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              84 / 200 участников
+            </span>
+            <span class="ec-stat">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              1 248 просмотров
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="event-card" onclick="">
+        <div class="ec-cover" style="background:linear-gradient(135deg,#065f46,#059669)">🌿</div>
+        <div class="ec-info">
+          <div class="ec-top">
+            <div class="ec-name">Нетворкинг для продактов · апрель</div>
+            <div class="ec-price paid">500 ₽</div>
+          </div>
+          <div class="ec-meta">
+            <span>15 апр 2025</span><div class="ec-dot"></div>
+            <span>Кофемания, Москва</span>
+          </div>
+          <div class="ec-tags">
+            <span class="ectag status-upcoming">Предстоит</span>
+            <span class="ectag">Нетворкинг</span>
+          </div>
+          <div class="ec-stats">
+            <span class="ec-stat">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+              32 / 50 участников
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="event-card" onclick="">
+        <div class="ec-cover" style="background:linear-gradient(135deg,#3f3f46,#1c1c1e)">🎤</div>
+        <div class="ec-info">
+          <div class="ec-top">
+            <div class="ec-name">Митап: AI Tools для PM 2025</div>
+            <div class="ec-price free">Бесплатно</div>
+          </div>
+          <div class="ec-meta">
+            <span>2 апр 2025</span><div class="ec-dot"></div>
+            <span>Точка кипения, Москва</span>
+          </div>
+          <div class="ec-tags">
+            <span class="ectag status-upcoming">Предстоит</span>
+            <span class="ectag">Митап</span>
+            <span class="ectag">AI</span>
+          </div>
+          <div class="ec-stats">
+            <span class="ec-stat">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              120 / 150 участников
+            </span>
+            <span class="ec-stat">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              892 просмотра
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB: Посещал -->
+    <div class="tab-content" id="tab-visited">
+      <div class="subtabs">
+        <button class="stab active" onclick="switchSubtab(this,'visited')">Предстоит</button>
+        <button class="stab" onclick="switchSubtab(this,'visited')">Прошедшие</button>
+      </div>
+
+      <div class="event-card" onclick="">
+        <div class="ec-cover" style="background:linear-gradient(135deg,#7c2d12,#b45309)">🎨</div>
+        <div class="ec-info">
+          <div class="ec-top">
+            <div class="ec-name">Дизайн-спринт 2025</div>
+            <div class="ec-price free">Бесплатно</div>
+          </div>
+          <div class="ec-meta">
+            <span>3 июня 2025</span><div class="ec-dot"></div>
+            <span>Artplay, Москва</span>
+          </div>
+          <div class="ec-tags">
+            <span class="ectag status-upcoming">Предстоит</span>
+            <span class="ectag">Дизайн</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="event-card" onclick="">
+        <div class="ec-cover" style="background:linear-gradient(135deg,#1e3a5f,#1d4ed8)">🚀</div>
+        <div class="ec-info">
+          <div class="ec-top">
+            <div class="ec-name">Startup Pitch Night</div>
+            <div class="ec-price paid">1 000 ₽</div>
+          </div>
+          <div class="ec-meta">
+            <span>18 мар 2025</span><div class="ec-dot"></div>
+            <span>Skolkovo, Москва</span>
+          </div>
+          <div class="ec-tags">
+            <span class="ectag status-past">Посетил</span>
+            <span class="ectag">Стартапы</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB: Отзывы -->
+    <div class="tab-content" id="tab-reviews">
+
+      <!-- Summary -->
+      <div class="rating-summary">
+        <div class="big-rating">
+          <div class="big-num">4.2</div>
+          <div class="big-stars">
+            <span class="star" style="font-size:15px">★</span><span class="star" style="font-size:15px">★</span>
+            <span class="star" style="font-size:15px">★</span><span class="star" style="font-size:15px">★</span>
+            <span class="star star-e" style="font-size:15px">★</span>
+          </div>
+          <div class="big-cnt">47 отзывов</div>
+        </div>
+        <div class="rating-bars">
+          <div class="rbar-row"><span class="rbar-lbl">5</span><div class="rbar-track"><div class="rbar-inner" style="width:58%"></div></div><span class="rbar-cnt">27</span></div>
+          <div class="rbar-row"><span class="rbar-lbl">4</span><div class="rbar-track"><div class="rbar-inner" style="width:28%"></div></div><span class="rbar-cnt">13</span></div>
+          <div class="rbar-row"><span class="rbar-lbl">3</span><div class="rbar-track"><div class="rbar-inner" style="width:10%"></div></div><span class="rbar-cnt">5</span></div>
+          <div class="rbar-row"><span class="rbar-lbl">2</span><div class="rbar-track"><div class="rbar-inner" style="width:4%"></div></div><span class="rbar-cnt">2</span></div>
+          <div class="rbar-row"><span class="rbar-lbl">1</span><div class="rbar-track"><div class="rbar-inner" style="width:0%"></div></div><span class="rbar-cnt">0</span></div>
+        </div>
+      </div>
+
+      <!-- Review list -->
+      <div class="review-item">
+        <div class="review-top">
+          <div class="rev-av" style="background:linear-gradient(135deg,#0891b2,#06b6d4)">ОК</div>
+          <div class="rev-info">
+            <div class="rev-name">Ольга Кравцова</div>
+            <div class="rev-meta">2 недели назад</div>
+          </div>
+          <div class="rev-stars">
+            <span class="rev-star">★</span><span class="rev-star">★</span><span class="rev-star">★</span><span class="rev-star">★</span><span class="rev-star">★</span>
+          </div>
+        </div>
+        <div class="rev-text">Отличная организация, всё по расписанию. Нетворкинг-зона была особенно хороша — познакомилась с интересными людьми. Буду ждать следующего события!</div>
+        <div class="rev-event">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span class="rev-event-name">ProductConf 2024</span>
+        </div>
+      </div>
+
+      <div class="review-item">
+        <div class="review-top">
+          <div class="rev-av" style="background:linear-gradient(135deg,#059669,#10b981)">ДВ</div>
+          <div class="rev-info">
+            <div class="rev-name">Дмитрий Волков</div>
+            <div class="rev-meta">1 месяц назад</div>
+          </div>
+          <div class="rev-stars">
+            <span class="rev-star">★</span><span class="rev-star">★</span><span class="rev-star">★</span><span class="rev-star">★</span><span class="rev-star rev-star e">☆</span>
+          </div>
+        </div>
+        <div class="rev-text">Хорошее событие в целом. Докладчики сильные, тема актуальная. Единственный минус — было немного тесно в основном зале. Организатор оперативно реагировал на вопросы в чате.</div>
+        <div class="rev-event">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span class="rev-event-name">Нетворкинг для продактов · февраль</span>
+        </div>
+      </div>
+
+      <div class="review-item">
+        <div class="review-top">
+          <div class="rev-av" style="background:linear-gradient(135deg,#be185d,#db2777)">МС</div>
+          <div class="rev-info">
+            <div class="rev-name">Марина Степанова</div>
+            <div class="rev-meta">2 месяца назад</div>
+          </div>
+          <div class="rev-stars">
+            <span class="rev-star">★</span><span class="rev-star">★</span><span class="rev-star">★</span><span class="rev-star">★</span><span class="rev-star">★</span>
+          </div>
+        </div>
+        <div class="rev-text">Один из лучших митапов по AI, на которых я была. Андрей очень внимательно отнёсся к обратной связи, всё было чётко и без воды. Рекомендую всем продактам!</div>
+        <div class="rev-event">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span class="rev-event-name">Митап: AI Tools для PM 2025</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+function switchSubtab(btn, scope) {
+  const parent = btn.closest('.tab-content');
+  parent.querySelectorAll('.stab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function toggleSub(btn) {
+  const on = btn.classList.contains('sub');
+  if (on) { btn.classList.remove('sub'); btn.textContent = 'Подписаться'; btn.style.background = ''; }
+  else { btn.classList.add('sub'); btn.textContent = '✓ Подписан'; }
+}
+</script>
+</body>
+</html>
