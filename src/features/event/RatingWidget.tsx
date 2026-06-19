@@ -1,9 +1,10 @@
 // features/event/RatingWidget.tsx
 
 import { useState, useEffect, useCallback } from 'react';
-import { fetchEventRating, voteEventRating, deleteEventRating } from '@/entities/event';
+import { fetchEventRating, voteEventRating, deleteEventRating, RATING_COMMENT_MAX_LENGTH } from '@/entities/event';
 import type { IRatingItem, IRatingPage, RatingType } from '@/entities/event';
 import { getEventRatingGrade } from '@/shared/lib/eventRatingGrade';
+import { clampText, textLengthError } from '@/shared/lib/clampText';
 import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import styles from './RatingWidget.module.css';
@@ -211,10 +212,18 @@ function RatingModal({
   const handleEdit = useCallback(() => {
     if (!myItem) return;
     setVoteValue(myItem.value);
-    setComment(myItem.comment);
+    setComment(clampText(myItem.comment, RATING_COMMENT_MAX_LENGTH));
     setEditingId(myItem.id);
     setShowForm(true);
   }, [myItem]);
+
+  const handleCommentChange = useCallback((raw: string) => {
+    const next = clampText(raw, RATING_COMMENT_MAX_LENGTH);
+    setComment(next);
+    setSubmitError(raw.length > RATING_COMMENT_MAX_LENGTH
+      ? textLengthError(raw.length, RATING_COMMENT_MAX_LENGTH)
+      : null);
+  }, []);
 
   const handleCancel = useCallback(() => {
     setShowForm(false);
@@ -226,6 +235,11 @@ function RatingModal({
 
   const handleSubmit = useCallback(async () => {
     if (!accountId || voteValue === 0) return;
+    const lengthError = textLengthError(comment.length, RATING_COMMENT_MAX_LENGTH);
+    if (lengthError) {
+      setSubmitError(lengthError);
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -371,9 +385,9 @@ function RatingModal({
                   className={styles.commentArea}
                   placeholder="Комментарий (необязательно)"
                   value={comment}
-                  onChange={e => setComment(e.target.value)}
+                  onChange={e => handleCommentChange(e.target.value)}
                   rows={3}
-                  maxLength={500}
+                  maxLength={RATING_COMMENT_MAX_LENGTH}
                 />
                 {submitError && <div className={styles.voteError}>{submitError}</div>}
                 <div className={styles.voteFormBtns}>
@@ -383,7 +397,7 @@ function RatingModal({
                   <button
                     type="button"
                     className={styles.submitBtn}
-                    disabled={voteValue === 0 || submitting}
+                    disabled={voteValue === 0 || submitting || comment.length > RATING_COMMENT_MAX_LENGTH}
                     onClick={() => void handleSubmit()}
                   >
                     {submitting ? 'Отправка...' : editingId ? 'Сохранить' : 'Отправить'}

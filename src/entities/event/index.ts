@@ -57,6 +57,7 @@ export {
   fetchEventRating,
   voteEventRating,
   deleteEventRating,
+  RATING_COMMENT_MAX_LENGTH,
 } from './ratingApi';
 
 export type {

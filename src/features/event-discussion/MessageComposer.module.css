@@ -65,6 +65,12 @@
   opacity: 0.6;
 }
 
+.lengthError {
+  margin: 0;
+  font-size: 12px;
+  color: #ef4444;
+}
+
 .actions {
   display: flex;
   align-items: center;

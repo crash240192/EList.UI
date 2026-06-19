@@ -1,9 +1,10 @@
 // features/event/RatingSection.tsx
 
 import { useState, useEffect, useCallback } from 'react';
-import { fetchEventRating, voteEventRating } from '@/entities/event';
+import { fetchEventRating, voteEventRating, RATING_COMMENT_MAX_LENGTH } from '@/entities/event';
 import type { IRatingItem, IRatingPage, RatingType } from '@/entities/event';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
+import { clampText, textLengthError } from '@/shared/lib/clampText';
 import styles from './RatingSection.module.css';
 
 interface Props {
@@ -98,8 +99,21 @@ export function RatingSection({ eventId, eventStartTime, accountId }: Props) {
     }
   }, [data, accountId]);
 
+  const handleCommentChange = useCallback((raw: string) => {
+    const next = clampText(raw, RATING_COMMENT_MAX_LENGTH);
+    setComment(next);
+    setSubmitError(raw.length > RATING_COMMENT_MAX_LENGTH
+      ? textLengthError(raw.length, RATING_COMMENT_MAX_LENGTH)
+      : null);
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     if (!accountId || starValue === 0) return;
+    const lengthError = textLengthError(comment.length, RATING_COMMENT_MAX_LENGTH);
+    if (lengthError) {
+      setSubmitError(lengthError);
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -147,14 +161,14 @@ export function RatingSection({ eventId, eventStartTime, accountId }: Props) {
                 className={styles.commentArea}
                 placeholder="Комментарий (необязательно)"
                 value={comment}
-                onChange={e => setComment(e.target.value)}
+                onChange={e => handleCommentChange(e.target.value)}
                 rows={2}
-                maxLength={500}
+                maxLength={RATING_COMMENT_MAX_LENGTH}
               />
               {submitError && <div className={styles.voteError}>{submitError}</div>}
               <button
                 className={styles.voteBtn}
-                disabled={starValue === 0 || submitting}
+                disabled={starValue === 0 || submitting || comment.length > RATING_COMMENT_MAX_LENGTH}
                 onClick={handleSubmit}
               >
                 {submitting ? 'Отправка...' : 'Оценить'}

@@ -1,6 +1,10 @@
 // entities/event/ratingApi.ts
 
 import { apiClient } from '@/shared/api/client';
+import { textLengthError } from '@/shared/lib/clampText';
+import { RATING_COMMENT_MAX_LENGTH } from '@/shared/lib/textLimits';
+
+export { RATING_COMMENT_MAX_LENGTH } from '@/shared/lib/textLimits';
 
 export type RatingType = 'Expectation' | 'Summary';
 
@@ -72,6 +76,8 @@ export async function fetchEventRating(
 // Используем POST — ASP.NET Core обычно принимает оба метода для [HttpGet].
 // Если сервер вернёт 405, замените на getWithBody.
 export async function voteEventRating(req: IRatingVoteRequest): Promise<void> {
+  const lengthError = textLengthError(req.comment.length, RATING_COMMENT_MAX_LENGTH);
+  if (lengthError) throw new Error(lengthError);
   await apiClient.post('/api/Rating/events/vote', req);
 }
 

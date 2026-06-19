@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { IMessage } from '@/entities/conversation';
 import { updateMessage, fetchMessageReplies } from '@/entities/conversation';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
+import { clampText, textLengthError } from '@/shared/lib/clampText';
 import {
   messageAuthorName,
   messageInitials,
@@ -85,8 +86,9 @@ export function MessageRow({
 
   useEffect(() => {
     setDisplayText(message.messageText);
-    setEditText(message.messageText);
+    setEditText(clampText(message.messageText, DISCUSSION_MESSAGE_MAX_LENGTH));
     setTextExpanded(false);
+    setEditError(null);
   }, [message.id, message.messageText]);
 
   useEffect(() => {
@@ -123,7 +125,12 @@ export function MessageRow({
 
   const saveEdit = async () => {
     const trimmed = editText.trim();
-    if (!trimmed || !currentAccountId || savingEdit || trimmed.length > DISCUSSION_MESSAGE_MAX_LENGTH) return;
+    const lengthErr = textLengthError(trimmed.length, DISCUSSION_MESSAGE_MAX_LENGTH);
+    if (!trimmed || !currentAccountId || savingEdit) return;
+    if (lengthErr) {
+      setEditError(lengthErr);
+      return;
+    }
     if (trimmed === displayText) {
       setEditing(false);
       return;
@@ -187,7 +194,14 @@ export function MessageRow({
                   value={editText}
                   disabled={savingEdit}
                   maxLength={DISCUSSION_MESSAGE_MAX_LENGTH}
-                  onChange={(e) => setEditText(e.target.value)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const next = clampText(raw, DISCUSSION_MESSAGE_MAX_LENGTH);
+                    setEditText(next);
+                    setEditError(raw.length > DISCUSSION_MESSAGE_MAX_LENGTH
+                      ? textLengthError(raw.length, DISCUSSION_MESSAGE_MAX_LENGTH)
+                      : null);
+                  }}
                 />
                 {editError && <p className={styles.editError}>{editError}</p>}
                 <div className={styles.editActions}>
@@ -197,7 +211,7 @@ export function MessageRow({
                   <button
                     type="button"
                     className={styles.saveBtn}
-                    disabled={savingEdit || !editText.trim()}
+                    disabled={savingEdit || !editText.trim() || editText.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH}
                     onClick={() => void saveEdit()}
                   >
                     {savingEdit ? 'Сохранение…' : 'Сохранить'}
