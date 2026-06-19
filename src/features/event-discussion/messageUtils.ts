@@ -188,3 +188,23 @@ export function isLongMessageText(text: string): boolean {
 export function filterRootMessages(items: IMessage[]): IMessage[] {
   return items.filter((m) => !m.replyTo);
 }
+
+/** Сообщение можно удалить, если на него ещё нет ответов */
+export function canDeleteMessage(
+  message: IMessage,
+  replyBump: number,
+  replyTotal: number | null,
+): boolean {
+  if (message.replied || replyBump > 0) return false;
+  if (replyTotal != null && replyTotal > 0) return false;
+  return true;
+}
+
+export function messageHasReplies(
+  message: IMessage,
+  replyBump: number,
+  replyTotal: number | null,
+): boolean {
+  if (replyTotal === 0) return false;
+  return message.replied || replyBump > 0;
+}
