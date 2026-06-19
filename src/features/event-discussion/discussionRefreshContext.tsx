@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 
 interface DiscussionRefreshContextValue {
   bump: (messageId: string) => void;
+  resetBump: (messageId: string) => void;
   getBump: (messageId: string) => number;
 }
 
@@ -14,9 +15,18 @@ export function DiscussionRefreshProvider({ children }: { children: React.ReactN
     setBumps((prev) => ({ ...prev, [messageId]: (prev[messageId] ?? 0) + 1 }));
   }, []);
 
+  const resetBump = useCallback((messageId: string) => {
+    setBumps((prev) => {
+      if (prev[messageId] == null) return prev;
+      const next = { ...prev };
+      delete next[messageId];
+      return next;
+    });
+  }, []);
+
   const getBump = useCallback((messageId: string) => bumps[messageId] ?? 0, [bumps]);
 
-  const value = useMemo(() => ({ bump, getBump }), [bump, getBump]);
+  const value = useMemo(() => ({ bump, resetBump, getBump }), [bump, resetBump, getBump]);
 
   return (
     <DiscussionRefreshContext.Provider value={value}>{children}</DiscussionRefreshContext.Provider>
