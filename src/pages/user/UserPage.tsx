@@ -555,21 +555,21 @@ export default function UserPage() {
               </div>
             )}
           </div>
-
-          {!isOwnProfile && (
-            <div className={styles.profileActions}>
-              {isSubscribed ? (
-                <button type="button" className={`${styles.btnJoin} ${styles.btnLeave}`} onClick={() => void handleUnsubscribe()}>
-                  Отписаться
-                </button>
-              ) : (
-                <button type="button" className={styles.btnJoin} onClick={() => setShowSubscribe(true)}>
-                  Подписаться
-                </button>
-              )}
-            </div>
-          )}
         </div>
+
+        {!isOwnProfile && (
+          <div className={styles.actionRow}>
+            {isSubscribed ? (
+              <button type="button" className={`${styles.btnJoin} ${styles.btnLeave}`} onClick={() => void handleUnsubscribe()}>
+                Отписаться
+              </button>
+            ) : (
+              <button type="button" className={styles.btnJoin} onClick={() => setShowSubscribe(true)}>
+                Подписаться
+              </button>
+            )}
+          </div>
+        )}
 
         <div className={styles.statsBar}>
           <button type="button" className={styles.statItem} onClick={() => { setMainTab('created'); }}>
