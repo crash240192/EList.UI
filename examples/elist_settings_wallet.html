@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EList — Настройки и кошелёк</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&family=Onest:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1117;--sur:#181b23;--sur2:#1e2130;--sur3:#252a3a;
+  --bd:#2a2f42;--bd2:#343b52;
+  --ac:#6366f1;--acs:rgba(99,102,241,.13);--acb:rgba(99,102,241,.25);
+  --t1:#eef0f8;--t2:#9498b0;--t3:#5a5e78;
+  --ok:#22c55e;--oks:rgba(34,197,94,.12);
+  --warn:#f59e0b;--ws:rgba(245,158,11,.12);
+  --err:#ef4444;--errs:rgba(239,68,68,.12);
+  --r:10px;--r-lg:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Onest',sans-serif;background:var(--bg);color:var(--t1);font-size:13px;line-height:1.5;display:flex;flex-direction:column;}
+
+/* ── TOP NAV ── */
+.topnav{
+  display:flex;align-items:center;gap:0;
+  border-bottom:1px solid var(--bd);
+  padding:0;flex-shrink:0;background:var(--bg);
+}
+.tnav-btn{
+  padding:13px 22px;background:none;border:none;font-family:'Onest',sans-serif;
+  font-size:13px;font-weight:500;color:var(--t3);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:color .15s,border-color .15s;display:flex;align-items:center;gap:7px;
+}
+.tnav-btn:hover{color:var(--t2);}
+.tnav-btn.active{color:var(--t1);border-bottom-color:var(--ac);}
+.tnav-back{
+  display:flex;align-items:center;gap:5px;padding:8px 16px;
+  background:none;border:none;border-right:1px solid var(--bd);
+  color:var(--t2);font-size:12px;cursor:pointer;font-family:inherit;
+  transition:color .15s;
+}
+.tnav-back:hover{color:var(--t1);}
+
+/* ── PAGES ── */
+.page{display:none;flex:1;min-height:0;overflow:hidden;}
+.page.active{display:flex;}
+
+/* ══════════════════════════════════
+   SETTINGS PAGE
+══════════════════════════════════ */
+.settings-layout{display:grid;grid-template-columns:220px 1fr;flex:1;min-height:0;overflow:hidden;}
+
+/* left nav */
+.snav{border-right:1px solid var(--bd);padding:16px 12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;}
+.snav-section{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;padding:8px 8px 4px;margin-top:6px;}
+.snav-section:first-child{margin-top:0;}
+.snav-item{
+  display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;
+  cursor:pointer;color:var(--t2);font-size:12px;font-weight:500;
+  transition:background .12s,color .12s;border:1px solid transparent;
+}
+.snav-item:hover{background:var(--sur2);color:var(--t1);}
+.snav-item.active{background:var(--acs);border-color:var(--acb);color:var(--ac);}
+.snav-icon{width:16px;height:16px;flex-shrink:0;opacity:.7;}
+.snav-item.active .snav-icon{opacity:1;}
+
+/* right content */
+.scontent{overflow-y:auto;padding:24px 28px 40px;display:flex;flex-direction:column;gap:24px;}
+.scontent::-webkit-scrollbar{width:3px;}
+.scontent::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
+
+.stab{display:none;}
+.stab.active{display:flex;flex-direction:column;gap:20px;}
+
+/* section card */
+.scard{background:var(--sur);border:1px solid var(--bd);border-radius:var(--r-lg);overflow:hidden;}
+.scard-head{padding:14px 18px 0;border-bottom:1px solid var(--bd);padding-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+.scard-title{font-size:13px;font-weight:600;color:var(--t1);}
+.scard-desc{font-size:11px;color:var(--t3);margin-top:2px;}
+.scard-body{padding:18px;}
+.scard-body.pad0{padding:0;}
+
+/* avatar section */
+.avatar-section{display:flex;align-items:center;gap:16px;padding:16px 18px;border-bottom:1px solid var(--bd);}
+.big-av{
+  width:72px;height:72px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6 50%,#06b6d4);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Unbounded',sans-serif;font-size:20px;font-weight:600;color:#fff;
+  cursor:pointer;position:relative;transition:opacity .15s;border:2px solid var(--bd2);
+}
+.big-av:hover{opacity:.85;}
+.av-overlay{
+  position:absolute;inset:0;border-radius:50%;
+  background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .15s;font-size:18px;
+}
+.big-av:hover .av-overlay{opacity:1;}
+.av-info h4{font-size:14px;font-weight:600;color:var(--t1);}
+.av-info p{font-size:11px;color:var(--t3);margin-top:2px;line-height:1.5;}
+.av-btns{display:flex;gap:8px;margin-top:8px;}
+.btn-xs{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .15s;}
+.btn-xs-primary{background:var(--ac);border:none;color:#fff;}
+.btn-xs-primary:hover{background:#4f46e5;}
+.btn-xs-ghost{background:none;border:1px solid var(--bd);color:var(--t2);}
+.btn-xs-ghost:hover{border-color:var(--bd2);color:var(--t1);}
+.btn-xs-danger{background:none;border:1px solid rgba(239,68,68,.3);color:var(--err);}
+.btn-xs-danger:hover{background:var(--errs);border-color:var(--err);}
+
+/* form rows */
+.frow{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--bd);}
+.frow:last-child{border-bottom:none;}
+.frow-label{font-size:12px;color:var(--t2);width:130px;flex-shrink:0;}
+.frow-control{flex:1;}
+.finput{
+  width:100%;padding:8px 11px;background:var(--sur2);border:1px solid var(--bd);
+  border-radius:8px;color:var(--t1);font-size:12px;font-family:inherit;outline:none;
+  transition:border-color .15s;
+}
+.finput:focus{border-color:var(--ac);}
+.finput::placeholder{color:var(--t3);}
+.finput[type=date]{color-scheme:dark;}
+.fselect{
+  width:100%;padding:8px 11px;background:var(--sur2);border:1px solid var(--bd);
+  border-radius:8px;color:var(--t1);font-size:12px;font-family:inherit;outline:none;
+  appearance:none;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235a5e78' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;
+}
+.fselect:focus{border-color:var(--ac);outline:none;}
+
+/* bio textarea */
+.ftextarea{
+  width:100%;padding:9px 11px;background:var(--sur2);border:1px solid var(--bd);
+  border-radius:8px;color:var(--t1);font-size:12px;font-family:inherit;outline:none;
+  resize:vertical;min-height:72px;line-height:1.6;transition:border-color .15s;
+}
+.ftextarea:focus{border-color:var(--ac);}
+.ftextarea::placeholder{color:var(--t3);}
+
+/* interests tags editor */
+.tags-editor{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.etag{
+  display:flex;align-items:center;gap:5px;
+  padding:4px 8px 4px 10px;border-radius:20px;font-size:11px;font-weight:500;
+  background:var(--acs);border:1px solid var(--acb);color:#a5b4fc;
+}
+.etag-del{background:none;border:none;color:rgba(165,180,252,.6);cursor:pointer;padding:0;font-size:13px;line-height:1;display:flex;align-items:center;}
+.etag-del:hover{color:#a5b4fc;}
+.etag-add{
+  padding:4px 10px;border-radius:20px;font-size:11px;
+  background:var(--sur2);border:1px dashed var(--bd);color:var(--t3);cursor:pointer;
+  transition:border-color .15s,color .15s;
+}
+.etag-add:hover{border-color:var(--ac);color:var(--ac);}
+
+/* contact rows */
+.contact-row-edit{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 18px;border-bottom:1px solid var(--bd);
+}
+.contact-row-edit:last-of-type{border-bottom:none;}
+.cre-ico{width:30px;height:30px;border-radius:8px;background:var(--sur3);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.cre-info{flex:1;min-width:0;}
+.cre-type{font-size:10px;color:var(--t3);}
+.cre-val{font-size:12px;color:var(--t1);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cre-badge{padding:2px 8px;border-radius:10px;font-size:9px;font-weight:500;}
+.cre-pub{background:var(--oks);color:var(--ok);border:1px solid rgba(34,197,94,.2);}
+.cre-priv{background:var(--sur3);color:var(--t3);border:1px solid var(--bd);}
+.cre-auth{background:var(--acs);color:#a5b4fc;border:1px solid var(--acb);}
+.cre-actions{display:flex;gap:6px;}
+.icon-btn{width:28px;height:28px;border-radius:7px;background:var(--sur2);border:1px solid var(--bd);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t3);transition:border-color .15s,color .15s;}
+.icon-btn:hover{border-color:var(--bd2);color:var(--t1);}
+.icon-btn.danger:hover{border-color:rgba(239,68,68,.4);color:var(--err);background:var(--errs);}
+
+/* city block */
+.city-block{display:flex;align-items:center;gap:10px;padding:12px 18px;}
+.city-name{font-size:14px;font-weight:600;color:var(--t1);}
+.city-sub{font-size:11px;color:var(--t3);margin-top:1px;}
+.city-det-btn{margin-left:auto;display:flex;align-items:center;gap:5px;padding:6px 12px;background:var(--sur2);border:1px solid var(--bd);border-radius:8px;color:var(--t2);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;}
+.city-det-btn:hover{border-color:var(--bd2);color:var(--t1);}
+
+/* toggle switch */
+.toggle{position:relative;display:inline-flex;align-items:center;gap:8px;cursor:pointer;}
+.toggle-track{
+  width:36px;height:20px;border-radius:10px;background:var(--bd2);
+  border:1px solid var(--bd2);position:relative;transition:background .2s;flex-shrink:0;
+}
+.toggle-track.on{background:var(--ac);border-color:var(--ac);}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s;}
+.toggle-track.on .toggle-thumb{transform:translateX(16px);}
+.toggle-label{font-size:12px;color:var(--t2);}
+
+/* password strength */
+.pw-strength{height:3px;border-radius:2px;margin-top:6px;transition:all .3s;background:var(--bd);}
+.pw-strength.w1{width:33%;background:var(--err);}
+.pw-strength.w2{width:66%;background:var(--warn);}
+.pw-strength.w3{width:100%;background:var(--ok);}
+
+/* scard footer */
+.scard-footer{
+  padding:12px 18px;border-top:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.save-btn{padding:8px 20px;background:var(--ac);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s;}
+.save-btn:hover{background:#4f46e5;}
+.save-btn:disabled{background:var(--sur3);color:var(--t3);cursor:default;}
+.msg-ok{font-size:11px;color:var(--ok);display:flex;align-items:center;gap:4px;}
+.msg-err{font-size:11px;color:var(--err);}
+
+/* notification rows */
+.notif-row{display:flex;align-items:center;justify-content:space-between;padding:11px 18px;border-bottom:1px solid var(--bd);}
+.notif-row:last-child{border-bottom:none;}
+.notif-info{}
+.notif-title{font-size:12px;font-weight:500;color:var(--t1);}
+.notif-sub{font-size:10px;color:var(--t3);margin-top:1px;}
+
+/* session rows */
+.session-row{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--bd);}
+.session-row:last-child{border-bottom:none;}
+.session-ico{width:34px;height:34px;border-radius:9px;background:var(--sur3);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.session-info{flex:1;}
+.session-name{font-size:12px;font-weight:500;color:var(--t1);}
+.session-meta{font-size:10px;color:var(--t3);margin-top:1px;}
+.session-badge{padding:2px 8px;border-radius:10px;font-size:9px;background:var(--oks);color:var(--ok);border:1px solid rgba(34,197,94,.2);}
+
+/* ══════════════════════════════════
+   WALLET PAGE
+══════════════════════════════════ */
+.wallet-layout{flex:1;overflow-y:auto;padding:24px 28px 48px;display:flex;flex-direction:column;gap:20px;max-width:860px;}
+.wallet-layout::-webkit-scrollbar{width:3px;}
+.wallet-layout::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
+
+/* bank card */
+.bank-card{
+  border-radius:18px;padding:24px 28px;
+  background:linear-gradient(135deg,#1a1040 0%,#312e81 45%,#1e3a5f 80%,#0d2818 100%);
+  border:1px solid rgba(99,102,241,.2);
+  position:relative;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:space-between;
+  min-height:180px;
+}
+.bank-card::before{
+  content:'';position:absolute;
+  width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(circle,rgba(99,102,241,.25) 0%,transparent 70%);
+  top:-80px;right:-60px;
+}
+.bank-card::after{
+  content:'';position:absolute;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(139,92,246,.15) 0%,transparent 70%);
+  bottom:-60px;left:40px;
+}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1;}
+.card-brand{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:600;color:rgba(255,255,255,.9);letter-spacing:.02em;}
+.card-chip{
+  width:36px;height:28px;border-radius:6px;
+  background:linear-gradient(135deg,#d4a847,#f0c94a);
+  border:1px solid rgba(255,255,255,.2);
+  display:flex;flex-direction:column;gap:5px;padding:6px 5px;
+}
+.chip-line{height:2px;background:rgba(180,140,30,.6);border-radius:1px;}
+.card-mid{position:relative;z-index:1;}
+.card-label{font-size:10px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+.card-balance{font-family:'Unbounded',sans-serif;font-size:28px;font-weight:600;color:#fff;letter-spacing:-.02em;line-height:1;}
+.card-currency{font-size:14px;opacity:.6;margin-left:4px;}
+.card-bottom{display:flex;justify-content:space-between;align-items:flex-end;position:relative;z-index:1;}
+.card-meta{}
+.card-holder{font-size:11px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.07em;}
+.card-holder-name{font-size:13px;color:rgba(255,255,255,.85);font-weight:500;margin-top:2px;}
+.card-id{font-size:10px;color:rgba(255,255,255,.35);font-family:monospace;letter-spacing:.1em;}
+.card-actions-row{display:flex;gap:8px;margin-top:4px;}
+.card-action-btn{
+  flex:1;padding:9px;
+  background:rgba(255,255,255,.1);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.12);border-radius:9px;
+  color:rgba(255,255,255,.8);font-size:11px;font-weight:500;
+  cursor:pointer;font-family:inherit;transition:background .15s;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.card-action-btn:hover{background:rgba(255,255,255,.18);}
+
+/* wallet stats */
+.wallet-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.wstat{background:var(--sur);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px;}
+.wstat-icon{font-size:18px;margin-bottom:6px;}
+.wstat-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em;}
+.wstat-val{font-size:18px;font-family:'Unbounded',sans-serif;font-weight:600;color:var(--t1);margin-top:2px;}
+.wstat-sub{font-size:10px;color:var(--t3);margin-top:2px;}
+
+/* tariff section */
+.tariff-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.section-title{font-size:13px;font-weight:600;color:var(--t1);}
+.section-subtitle{font-size:11px;color:var(--t3);margin-top:1px;}
+
+/* tariff cards grid */
+.tariff-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.tc{
+  background:var(--sur);border:1px solid var(--bd);border-radius:var(--r-lg);
+  padding:18px 16px;display:flex;flex-direction:column;gap:0;
+  cursor:pointer;transition:border-color .15s,background .15s;
+  position:relative;overflow:hidden;
+}
+.tc:hover{border-color:var(--bd2);}
+.tc.selected{border-color:var(--ac);background:var(--acs);}
+.tc.current{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.05);}
+.tc-badge{
+  position:absolute;top:0;right:0;
+  padding:4px 12px;font-size:9px;font-weight:600;letter-spacing:.04em;
+  border-radius:0 var(--r-lg) 0 var(--r-lg);
+}
+.tc-badge.active-badge{background:rgba(34,197,94,.15);color:var(--ok);}
+.tc-badge.pop-badge{background:var(--acs);color:#a5b4fc;}
+.tc-name{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px;}
+.tc-price{font-size:20px;font-family:'Unbounded',sans-serif;font-weight:600;color:var(--t1);margin:10px 0 4px;}
+.tc-price.free{color:var(--ok);}
+.tc-period{font-size:10px;color:var(--t3);}
+.tc-divider{height:1px;background:var(--bd);margin:12px 0;}
+.tc-feat{display:flex;flex-direction:column;gap:7px;}
+.tc-row{display:flex;align-items:flex-start;gap:7px;font-size:11px;}
+.tc-row-icon{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0;margin-top:1px;}
+.icon-ok{background:rgba(34,197,94,.15);color:var(--ok);}
+.icon-no{background:rgba(239,68,68,.12);color:var(--err);}
+.icon-warn{background:var(--ws);color:var(--warn);}
+.tc-row-text{color:var(--t2);line-height:1.35;}
+.tc-select-btn{
+  margin-top:14px;width:100%;padding:8px;
+  background:var(--ac);border:none;border-radius:8px;
+  color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;
+  transition:background .15s;display:none;
+}
+.tc.selected .tc-select-btn{display:block;}
+.tc-select-btn:hover{background:#4f46e5;}
+.tc.current .tc-select-btn{background:var(--sur3);color:var(--t3);cursor:default;display:block;}
+
+/* history */
+.hist-list{display:flex;flex-direction:column;}
+.hist-row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bd);background:var(--sur);transition:background .12s;}
+.hist-row:first-child{border-radius:var(--r-lg) var(--r-lg) 0 0;}
+.hist-row:last-child{border-bottom:none;border-radius:0 0 var(--r-lg) var(--r-lg);}
+.hist-row:hover{background:var(--sur2);}
+.hist-ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.hist-ico.in{background:var(--oks);border:1px solid rgba(34,197,94,.2);}
+.hist-ico.out{background:var(--ws);border:1px solid rgba(245,158,11,.15);}
+.hist-ico.tariff{background:var(--acs);border:1px solid var(--acb);}
+.hist-info{flex:1;}
+.hist-name{font-size:12px;font-weight:500;color:var(--t1);}
+.hist-meta{font-size:10px;color:var(--t3);margin-top:1px;}
+.hist-amt{font-size:13px;font-weight:600;}
+.hist-amt.in{color:var(--ok);}
+.hist-amt.out{color:var(--warn);}
+.hist-amt.tariff{color:var(--t2);}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <button class="tnav-back">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    Назад
+  </button>
+  <button class="tnav-btn active" onclick="showPage('settings',this)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Настройки
+  </button>
+  <button class="tnav-btn" onclick="showPage('wallet',this)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    Кошелёк
+  </button>
+</div>
+
+<!-- ══════════════════════
+     SETTINGS PAGE
+══════════════════════ -->
+<div class="page active" id="page-settings">
+<div class="settings-layout">
+
+  <!-- LEFT NAV -->
+  <div class="snav">
+    <div class="snav-section">Аккаунт</div>
+    <div class="snav-item active" onclick="showTab('profile',this)">
+      <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Личные данные
+    </div>
+    <div class="snav-item" onclick="showTab('contacts',this)">
+      <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.56 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      Контакты
+    </div>
+    <div class="snav-item" onclick="showTab('location',this)">
+      <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      Местоположение
+    </div>
+
+    <div class="snav-section">Безопасность</div>
+    <div class="snav-item" onclick="showTab('security',this)">
+      <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Пароль
+    </div>
+    <div class="snav-item" onclick="showTab('sessions',this)">
+      <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Устройства и сессии
+    </div>
+
+    <div class="snav-section">Настройки</div>
+    <div class="snav-item" onclick="showTab('notifications',this)">
+      <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Уведомления
+    </div>
+    <div class="snav-item" onclick="showTab('privacy',this)">
+      <svg class="snav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Приватность
+    </div>
+  </div>
+
+  <!-- RIGHT CONTENT -->
+  <div class="scontent">
+
+    <!-- ── Личные данные ── -->
+    <div class="stab active" id="stab-profile">
+
+      <div class="scard">
+        <div class="scard-head">
+          <div><div class="scard-title">Фото профиля</div><div class="scard-desc">Видна всем пользователям</div></div>
+        </div>
+        <div class="avatar-section">
+          <div class="big-av">АК<div class="av-overlay">📷</div></div>
+          <div class="av-info">
+            <h4>Андрей Ковалёв</h4>
+            <p>JPG, PNG или GIF · до 5 МБ<br>Рекомендуется 400×400 пикселей</p>
+            <div class="av-btns">
+              <button class="btn-xs btn-xs-primary">Загрузить фото</button>
+              <button class="btn-xs btn-xs-danger">Удалить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scard">
+        <div class="scard-head">
+          <div><div class="scard-title">Личная информация</div></div>
+        </div>
+        <div class="scard-body pad0">
+          <div class="frow">
+            <label class="frow-label">Имя</label>
+            <div class="frow-control"><input class="finput" value="Андрей" placeholder="Имя"></div>
+          </div>
+          <div class="frow">
+            <label class="frow-label">Фамилия</label>
+            <div class="frow-control"><input class="finput" value="Ковалёв" placeholder="Фамилия"></div>
+          </div>
+          <div class="frow">
+            <label class="frow-label">Отчество</label>
+            <div class="frow-control"><input class="finput" value="Сергеевич" placeholder="Отчество (необязательно)"></div>
+          </div>
+          <div class="frow">
+            <label class="frow-label">Пол</label>
+            <div class="frow-control">
+              <select class="fselect">
+                <option value="">Не указан</option>
+                <option selected>Мужской</option>
+                <option>Женский</option>
+              </select>
+            </div>
+          </div>
+          <div class="frow">
+            <label class="frow-label">Дата рождения</label>
+            <div class="frow-control"><input class="finput" type="date" value="1993-04-12"></div>
+          </div>
+        </div>
+        <div class="scard-footer">
+          <span class="msg-ok">✓ Изменения сохранены</span>
+          <button class="save-btn">Сохранить</button>
+        </div>
+      </div>
+
+      <div class="scard">
+        <div class="scard-head">
+          <div><div class="scard-title">О себе</div><div class="scard-desc">Отображается в вашем профиле</div></div>
+        </div>
+        <div class="scard-body">
+          <textarea class="ftextarea" placeholder="Расскажите о себе — чем занимаетесь, какие события организуете...">Организую технологические конференции и нетворкинг-вечера. Сооснователь ProductGuild.</textarea>
+          <div style="font-size:10px;color:var(--t3);margin-top:5px;text-align:right">82 / 300 символов</div>
+        </div>
+        <div class="scard-footer">
+          <span></span>
+          <button class="save-btn">Сохранить</button>
+        </div>
+      </div>
+
+      <div class="scard">
+        <div class="scard-head">
+          <div><div class="scard-title">Интересы</div><div class="scard-desc">Помогают находить релевантные события</div></div>
+        </div>
+        <div class="scard-body">
+          <div class="tags-editor">
+            <span class="etag">Продукт<button class="etag-del" onclick="this.parentElement.remove()">×</button></span>
+            <span class="etag">AI/ML<button class="etag-del" onclick="this.parentElement.remove()">×</button></span>
+            <span class="etag">Технологии<button class="etag-del" onclick="this.parentElement.remove()">×</button></span>
+            <span class="etag">Стартапы<button class="etag-del" onclick="this.parentElement.remove()">×</button></span>
+            <span class="etag">Нетворкинг<button class="etag-del" onclick="this.parentElement.remove()">×</button></span>
+            <button class="etag-add">+ Добавить</button>
+          </div>
+        </div>
+        <div class="scard-footer"><span></span><button class="save-btn">Сохранить</button></div>
+      </div>
+
+    </div>
+
+    <!-- ── Контакты ── -->
+    <div class="stab" id="stab-contacts">
+
+      <div class="scard">
+        <div class="scard-head">
+          <div><div class="scard-title">Контактные данные</div><div class="scard-desc">Публичные контакты видны другим пользователям</div></div>
+        </div>
+        <div class="scard-body pad0">
+          <div class="contact-row-edit">
+            <div class="cre-ico">📧</div>
+            <div class="cre-info">
+              <div class="cre-type">Email</div>
+              <div class="cre-val">a.kovalev@productguild.ru</div>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+              <span class="cre-badge cre-pub">публичный</span>
+              <span class="cre-badge cre-auth">авторизация</span>
+            </div>
+            <div class="cre-actions">
+              <button class="icon-btn" title="Редактировать">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="contact-row-edit">
+            <div class="cre-ico">💬</div>
+            <div class="cre-info">
+              <div class="cre-type">Telegram</div>
+              <div class="cre-val">@akovalev_pm</div>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+              <span class="cre-badge cre-pub">публичный</span>
+            </div>
+            <div class="cre-actions">
+              <button class="icon-btn" title="Редактировать">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="icon-btn danger" title="Удалить">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="contact-row-edit">
+            <div class="cre-ico">🌐</div>
+            <div class="cre-info">
+              <div class="cre-type">Сайт</div>
+              <div class="cre-val">productguild.ru</div>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+              <span class="cre-badge cre-pub">публичный</span>
+            </div>
+            <div class="cre-actions">
+              <button class="icon-btn">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="icon-btn danger">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="scard-footer">
+          <button class="btn-xs btn-xs-ghost">+ Добавить контакт</button>
+          <span></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Местоположение ── -->
+    <div class="stab" id="stab-location">
+      <div class="scard">
+        <div class="scard-head"><div><div class="scard-title">Текущий город</div><div class="scard-desc">Используется для поиска событий поблизости</div></div></div>
+        <div class="city-block">
+          <div style="font-size:28px">📍</div>
+          <div>
+            <div class="city-name">Москва</div>
+            <div class="city-sub">55.7558° N, 37.6173° E · обновлено 3 дня назад</div>
+          </div>
+          <button class="city-det-btn">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Определить автоматически
+          </button>
+        </div>
+        <div class="scard-body">
+          <input class="finput" placeholder="Поиск города..." style="max-width:360px">
+          <div style="font-size:11px;color:var(--t3);margin-top:8px">Или введите название города вручную</div>
+        </div>
+        <div class="scard-footer"><span></span><button class="save-btn">Сохранить</button></div>
+      </div>
+    </div>
+
+    <!-- ── Пароль ── -->
+    <div class="stab" id="stab-security">
+      <div class="scard">
+        <div class="scard-head"><div><div class="scard-title">Изменить пароль</div></div></div>
+        <div class="scard-body pad0">
+          <div class="frow">
+            <label class="frow-label">Текущий пароль</label>
+            <div class="frow-control"><input class="finput" type="password" placeholder="Введите текущий пароль"></div>
+          </div>
+          <div class="frow">
+            <label class="frow-label">Новый пароль</label>
+            <div class="frow-control">
+              <input class="finput" type="password" placeholder="Минимум 8 символов" id="newpw" oninput="pwStrength(this.value)">
+              <div class="pw-strength" id="pw-bar"></div>
+              <div id="pw-hint" style="font-size:10px;color:var(--t3);margin-top:4px"></div>
+            </div>
+          </div>
+          <div class="frow">
+            <label class="frow-label">Подтверждение</label>
+            <div class="frow-control"><input class="finput" type="password" placeholder="Повторите новый пароль"></div>
+          </div>
+        </div>
+        <div class="scard-footer"><span></span><button class="save-btn">Изменить пароль</button></div>
+      </div>
+    </div>
+
+    <!-- ── Устройства ── -->
+    <div class="stab" id="stab-sessions">
+      <div class="scard">
+        <div class="scard-head"><div><div class="scard-title">Активные сессии</div><div class="scard-desc">Ваши устройства, авторизованные в EList</div></div></div>
+        <div class="scard-body pad0">
+          <div class="session-row">
+            <div class="session-ico">💻</div>
+            <div class="session-info">
+              <div class="session-name">Chrome · macOS Sequoia</div>
+              <div class="session-meta">Москва · прямо сейчас</div>
+            </div>
+            <span class="session-badge">Текущее</span>
+          </div>
+          <div class="session-row">
+            <div class="session-ico">📱</div>
+            <div class="session-info">
+              <div class="session-name">Safari · iPhone 15 Pro</div>
+              <div class="session-meta">Москва · 2 часа назад</div>
+            </div>
+            <button class="icon-btn danger" title="Завершить">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="session-row">
+            <div class="session-ico">💻</div>
+            <div class="session-info">
+              <div class="session-name">Firefox · Windows 11</div>
+              <div class="session-meta">Санкт-Петербург · 5 дней назад</div>
+            </div>
+            <button class="icon-btn danger" title="Завершить">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="scard-footer">
+          <button class="btn-xs btn-xs-danger">Завершить все остальные сессии</button>
+          <span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Уведомления ── -->
+    <div class="stab" id="stab-notifications">
+      <div class="scard">
+        <div class="scard-head"><div><div class="scard-title">Email-уведомления</div></div></div>
+        <div class="scard-body pad0">
+          <div class="notif-row">
+            <div class="notif-info"><div class="notif-title">Новые участники</div><div class="notif-sub">Когда кто-то записывается на ваше событие</div></div>
+            <div class="toggle" onclick="this.querySelector('.toggle-track').classList.toggle('on')"><div class="toggle-track on"><div class="toggle-thumb"></div></div></div>
+          </div>
+          <div class="notif-row">
+            <div class="notif-info"><div class="notif-title">Напоминание об событии</div><div class="notif-sub">За 24 часа до начала</div></div>
+            <div class="toggle" onclick="this.querySelector('.toggle-track').classList.toggle('on')"><div class="toggle-track on"><div class="toggle-thumb"></div></div></div>
+          </div>
+          <div class="notif-row">
+            <div class="notif-info"><div class="notif-title">Новые комментарии</div><div class="notif-sub">Ответы на ваши комментарии и обсуждения</div></div>
+            <div class="toggle" onclick="this.querySelector('.toggle-track').classList.toggle('on')"><div class="toggle-track"><div class="toggle-thumb"></div></div></div>
+          </div>
+          <div class="notif-row">
+            <div class="notif-info"><div class="notif-title">Новые подписчики</div><div class="notif-sub">Когда кто-то подписывается на вас</div></div>
+            <div class="toggle" onclick="this.querySelector('.toggle-track').classList.toggle('on')"><div class="toggle-track"><div class="toggle-thumb"></div></div></div>
+          </div>
+          <div class="notif-row">
+            <div class="notif-info"><div class="notif-title">Маркетинговые письма</div><div class="notif-sub">Советы, новости платформы, акции</div></div>
+            <div class="toggle" onclick="this.querySelector('.toggle-track').classList.toggle('on')"><div class="toggle-track"><div class="toggle-thumb"></div></div></div>
+          </div>
+        </div>
+        <div class="scard-footer"><span></span><button class="save-btn">Сохранить</button></div>
+      </div>
+    </div>
+
+    <!-- ── Приватность ── -->
+    <div class="stab" id="stab-privacy">
+      <div class="scard">
+        <div class="scard-head"><div><div class="scard-title">Видимость профиля</div></div></div>
+        <div class="scard-body pad0">
+          <div class="notif-row">
+            <div class="notif-info"><div class="notif-title">Профиль доступен всем</div><div class="notif-sub">Незарегистрированные пользователи могут видеть ваш профиль</div></div>
+            <div class="toggle" onclick="this.querySelector('.toggle-track').classList.toggle('on')"><div class="toggle-track on"><div class="toggle-thumb"></div></div></div>
+          </div>
+          <div class="notif-row">
+            <div class="notif-info"><div class="notif-title">Показывать посещённые события</div><div class="notif-sub">Другие видят события, на которые вы ходили</div></div>
+            <div class="toggle" onclick="this.querySelector('.toggle-track').classList.toggle('on')"><div class="toggle-track on"><div class="toggle-thumb"></div></div></div>
+          </div>
+          <div class="notif-row">
+            <div class="notif-info"><div class="notif-title">Разрешить писать напрямую</div><div class="notif-sub">Личные сообщения от незнакомых пользователей</div></div>
+            <div class="toggle" onclick="this.querySelector('.toggle-track').classList.toggle('on')"><div class="toggle-track"><div class="toggle-thumb"></div></div></div>
+          </div>
+        </div>
+        <div class="scard-footer"><span></span><button class="save-btn">Сохранить</button></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════
+     WALLET PAGE
+══════════════════════ -->
+<div class="page" id="page-wallet">
+<div class="wallet-layout">
+
+  <!-- Bank card -->
+  <div>
+    <div class="bank-card">
+      <div class="card-top">
+        <div class="card-brand">EList Pay</div>
+        <div class="card-chip">
+          <div class="chip-line"></div>
+          <div class="chip-line"></div>
+          <div class="chip-line"></div>
+        </div>
+      </div>
+      <div class="card-mid">
+        <div class="card-label">Баланс</div>
+        <div class="card-balance">3 840<span class="card-currency">₽</span></div>
+      </div>
+      <div class="card-bottom">
+        <div class="card-meta">
+          <div class="card-holder">Владелец</div>
+          <div class="card-holder-name">Андрей Ковалёв</div>
+          <div class="card-id">ID: a8f3c2d1...</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-actions-row">
+      <button class="card-action-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+        Пополнить
+      </button>
+      <button class="card-action-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        Вывести
+      </button>
+      <button class="card-action-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        Реквизиты
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="wallet-stats">
+    <div class="wstat">
+      <div class="wstat-icon">📈</div>
+      <div class="wstat-label">Пополнено всего</div>
+      <div class="wstat-val">12 400 ₽</div>
+      <div class="wstat-sub">за всё время</div>
+    </div>
+    <div class="wstat">
+      <div class="wstat-icon">🎫</div>
+      <div class="wstat-label">Потрачено на события</div>
+      <div class="wstat-val">8 560 ₽</div>
+      <div class="wstat-sub">23 события</div>
+    </div>
+    <div class="wstat">
+      <div class="wstat-icon">📅</div>
+      <div class="wstat-label">Кошелёк с</div>
+      <div class="wstat-val" style="font-size:14px;margin-top:4px">марта 2023</div>
+      <div class="wstat-sub">26 месяцев</div>
+    </div>
+  </div>
+
+  <!-- Tariff -->
+  <div>
+    <div class="tariff-header">
+      <div>
+        <div class="section-title">Тарифный план</div>
+        <div class="section-subtitle">Выберите план для доступа к расширенным возможностям создания событий</div>
+      </div>
+    </div>
+    <div class="tariff-grid">
+
+      <!-- Базовый -->
+      <div class="tc" onclick="selectTariff(this)">
+        <div class="tc-name">Базовый</div>
+        <div class="tc-price free">0 ₽</div>
+        <div class="tc-period">навсегда</div>
+        <div class="tc-divider"></div>
+        <div class="tc-feat">
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">До 50 участников</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">Только бесплатные события</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-no">✗</div><div class="tc-row-text">Приватные события</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-no">✗</div><div class="tc-row-text">Фильтр участников по полу</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-no">✗</div><div class="tc-row-text">Возрастной ценз</div></div>
+        </div>
+        <button class="tc-select-btn">Выбрать</button>
+      </div>
+
+      <!-- Стандарт (текущий) -->
+      <div class="tc current" onclick="selectTariff(this)">
+        <div class="tc-badge active-badge">✓ Активен</div>
+        <div class="tc-name">Стандарт</div>
+        <div class="tc-price">490 ₽</div>
+        <div class="tc-period">в месяц · 30 дней</div>
+        <div class="tc-divider"></div>
+        <div class="tc-feat">
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">До 200 участников</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">Платные события до 5 000 ₽</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">Приватные события</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-warn">~</div><div class="tc-row-text">Фильтр по полу (ограничен)</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">Возрастной ценз до 18+</div></div>
+        </div>
+        <button class="tc-select-btn" disabled>Текущий план</button>
+      </div>
+
+      <!-- Про -->
+      <div class="tc" onclick="selectTariff(this)">
+        <div class="tc-badge pop-badge">Популярный</div>
+        <div class="tc-name">Про</div>
+        <div class="tc-price">1 490 ₽</div>
+        <div class="tc-period">в месяц · 30 дней</div>
+        <div class="tc-divider"></div>
+        <div class="tc-feat">
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">Без ограничений участников</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">Платные события без лимита</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">Приватные события</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">Полный фильтр участников</div></div>
+          <div class="tc-row"><div class="tc-row-icon icon-ok">✓</div><div class="tc-row-text">Любой возрастной ценз</div></div>
+        </div>
+        <button class="tc-select-btn">Подключить</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Transaction history -->
+  <div>
+    <div class="tariff-header"><div><div class="section-title">История операций</div></div></div>
+    <div class="hist-list">
+      <div class="hist-row">
+        <div class="hist-ico in">⬇</div>
+        <div class="hist-info"><div class="hist-name">Пополнение кошелька</div><div class="hist-meta">15 мая 2025 · Банковская карта</div></div>
+        <div class="hist-amt in">+ 2 000 ₽</div>
+      </div>
+      <div class="hist-row">
+        <div class="hist-ico tariff">★</div>
+        <div class="hist-info"><div class="hist-name">Тариф «Стандарт»</div><div class="hist-meta">1 мая 2025 · Автопродление</div></div>
+        <div class="hist-amt tariff">− 490 ₽</div>
+      </div>
+      <div class="hist-row">
+        <div class="hist-ico out">🎫</div>
+        <div class="hist-info"><div class="hist-name">Startup Pitch Night</div><div class="hist-meta">18 мар 2025 · Билет на мероприятие</div></div>
+        <div class="hist-amt out">− 1 000 ₽</div>
+      </div>
+      <div class="hist-row">
+        <div class="hist-ico in">⬇</div>
+        <div class="hist-info"><div class="hist-name">Пополнение кошелька</div><div class="hist-meta">10 мар 2025 · СБП</div></div>
+        <div class="hist-amt in">+ 5 000 ₽</div>
+      </div>
+      <div class="hist-row">
+        <div class="hist-ico tariff">★</div>
+        <div class="hist-info"><div class="hist-name">Тариф «Стандарт»</div><div class="hist-meta">1 мар 2025 · Автопродление</div></div>
+        <div class="hist-amt tariff">− 490 ₽</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function showPage(name, btn) {
+  document.querySelectorAll('.tnav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('page-' + name).classList.add('active');
+}
+function showTab(name, item) {
+  document.querySelectorAll('.snav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+  item.classList.add('active');
+  document.getElementById('stab-' + name).classList.add('active');
+}
+function selectTariff(card) {
+  if (card.classList.contains('current')) return;
+  document.querySelectorAll('.tc').forEach(c => {
+    if (!c.classList.contains('current')) c.classList.remove('selected');
+  });
+  card.classList.toggle('selected');
+}
+function pwStrength(v) {
+  const bar = document.getElementById('pw-bar');
+  const hint = document.getElementById('pw-hint');
+  if (!v) { bar.className = 'pw-strength'; hint.textContent = ''; return; }
+  const hasUp = /[A-Z]/.test(v), hasNum = /\d/.test(v), hasSpec = /[^a-zA-Z0-9]/.test(v);
+  const score = (v.length >= 8 ? 1 : 0) + (hasUp ? 1 : 0) + (hasNum && hasSpec ? 1 : 0);
+  const map = ['', 'w1', 'w2', 'w3'];
+  const labels = ['', 'Слабый пароль', 'Средний пароль', 'Надёжный пароль'];
+  bar.className = 'pw-strength ' + map[score];
+  hint.textContent = labels[score];
+  hint.style.color = score === 3 ? 'var(--ok)' : score === 2 ? 'var(--warn)' : 'var(--err)';
+}
+</script>
+</body>
+</html>

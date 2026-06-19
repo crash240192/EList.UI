@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EList — Приглашения</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&family=Onest:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1117;--sur:#181b23;--sur2:#1e2130;--sur3:#252a3a;
+  --bd:#2a2f42;--bd2:#343b52;
+  --ac:#6366f1;--acs:rgba(99,102,241,.13);--acb:rgba(99,102,241,.28);
+  --t1:#eef0f8;--t2:#9498b0;--t3:#5a5e78;
+  --ok:#22c55e;--oks:rgba(34,197,94,.12);--okb:rgba(34,197,94,.25);
+  --err:#ef4444;--errs:rgba(239,68,68,.1);--errb:rgba(239,68,68,.25);
+  --warn:#f59e0b;--ws:rgba(245,158,11,.12);--wb:rgba(245,158,11,.25);
+  --r:10px;--r-lg:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Onest',sans-serif;background:var(--bg);color:var(--t1);font-size:13px;line-height:1.5;display:flex;flex-direction:column;}
+
+/* ── TOP BAR ── */
+.topbar{
+  display:flex;align-items:center;gap:12px;
+  padding:13px 20px;border-bottom:1px solid var(--bd);
+  flex-shrink:0;
+}
+.back-btn{
+  display:flex;align-items:center;gap:5px;
+  background:none;border:1px solid var(--bd);border-radius:8px;
+  padding:5px 10px;color:var(--t2);font-size:12px;cursor:pointer;font-family:inherit;
+  transition:border-color .15s,color .15s;
+}
+.back-btn:hover{border-color:var(--bd2);color:var(--t1);}
+.page-title{font-family:'Unbounded',sans-serif;font-size:15px;font-weight:600;color:var(--t1);letter-spacing:-.02em;}
+.title-badge{
+  background:var(--ac);color:#fff;
+  font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:20px;
+}
+
+/* ── TABS ── */
+.tabs-bar{
+  display:flex;align-items:center;gap:0;
+  padding:0 20px;border-bottom:1px solid var(--bd);flex-shrink:0;
+}
+.tab-btn{
+  padding:13px 18px 11px;background:none;border:none;
+  font-family:'Onest',sans-serif;font-size:12px;font-weight:500;
+  color:var(--t3);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:color .15s,border-color .15s;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+}
+.tab-btn:hover{color:var(--t2);}
+.tab-btn.active{color:var(--t1);border-bottom-color:var(--ac);}
+.tab-cnt{
+  background:var(--sur3);border:1px solid var(--bd);
+  border-radius:10px;padding:1px 7px;font-size:9px;color:var(--t3);
+}
+.tab-btn.active .tab-cnt{background:var(--acs);border-color:var(--acb);color:#a5b4fc;}
+
+/* ── CONTENT AREA ── */
+.content{flex:1;overflow-y:auto;padding:20px;}
+.content::-webkit-scrollbar{width:3px;}
+.content::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
+
+.tab-pane{display:none;}
+.tab-pane.active{display:flex;flex-direction:column;gap:10px;}
+
+/* ── ALERT STRIP ── */
+.urgent-strip{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);
+  border-radius:var(--r);padding:10px 14px;margin-bottom:4px;
+}
+.urgent-ico{font-size:16px;flex-shrink:0;}
+.urgent-text{font-size:12px;color:var(--warn);font-weight:500;}
+.urgent-sub{font-size:11px;color:rgba(245,158,11,.6);margin-top:1px;}
+
+/* ── INVITATION CARD ── */
+.inv-card{
+  background:var(--sur);border:1px solid var(--bd);border-radius:var(--r-lg);
+  overflow:hidden;transition:border-color .15s;display:flex;flex-direction:column;
+}
+.inv-card:hover{border-color:var(--bd2);}
+.inv-card.urgent{border-color:rgba(245,158,11,.3);}
+.inv-card.urgent:hover{border-color:rgba(245,158,11,.5);}
+
+/* card top: cover + main info + actions */
+.inv-top{display:flex;align-items:stretch;gap:0;}
+
+/* cover */
+.inv-cover{
+  width:96px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;position:relative;overflow:hidden;
+}
+.inv-cover-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+.inv-cover-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(to right,transparent 60%,var(--sur) 100%);
+}
+
+/* urgency badge on cover */
+.urg-badge{
+  position:absolute;top:8px;left:8px;
+  padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.03em;
+  backdrop-filter:blur(6px);
+}
+.urg-hot{background:rgba(239,68,68,.8);color:#fff;}
+.urg-soon{background:rgba(245,158,11,.8);color:#fff;}
+.urg-ok{background:rgba(34,197,94,.7);color:#fff;}
+
+/* main info */
+.inv-info{flex:1;padding:14px 12px;min-width:0;display:flex;flex-direction:column;gap:6px;}
+
+/* inviter chip */
+.inviter-chip{display:flex;align-items:center;gap:7px;}
+.inviter-av{
+  width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:8px;font-weight:700;color:#fff;flex-shrink:0;
+  border:1.5px solid var(--bd);
+}
+.inviter-text{font-size:11px;color:var(--t2);}
+.inviter-name{font-weight:600;color:var(--t1);}
+.inv-time{font-size:10px;color:var(--t3);margin-left:auto;white-space:nowrap;padding-left:6px;}
+
+/* event name */
+.inv-event-name{
+  font-size:14px;font-weight:600;color:var(--t1);
+  line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  cursor:pointer;transition:color .15s;
+}
+.inv-event-name:hover{color:var(--ac);}
+
+/* meta row */
+.inv-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.imeta{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--t2);}
+.idot{width:3px;height:3px;border-radius:50%;background:var(--t3);flex-shrink:0;}
+.price-free{color:var(--ok);font-weight:600;}
+.price-paid{color:var(--warn);font-weight:600;}
+
+/* event type chips */
+.inv-chips{display:flex;gap:5px;flex-wrap:wrap;}
+.ichip{
+  padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500;
+  background:var(--acs);border:1px solid var(--acb);color:#a5b4fc;
+}
+
+/* ── ACTION COLUMN ── */
+.inv-actions{
+  display:flex;flex-direction:column;justify-content:center;gap:7px;
+  padding:14px 14px 14px 4px;flex-shrink:0;width:130px;
+}
+.act-btn{
+  width:100%;padding:9px 0;border-radius:9px;
+  font-family:'Onest',sans-serif;font-size:12px;font-weight:600;
+  cursor:pointer;border:none;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.act-accept{background:var(--ac);color:#fff;}
+.act-accept:hover{background:#4f46e5;transform:translateY(-1px);box-shadow:0 4px 12px rgba(99,102,241,.3);}
+.act-accept:active{transform:translateY(0);}
+.act-decline{background:var(--errs);border:1px solid var(--errb);color:var(--err);}
+.act-decline:hover{background:rgba(239,68,68,.18);}
+.act-later{background:none;border:1px solid var(--bd);color:var(--t3);font-size:11px;padding:6px 0;}
+.act-later:hover{border-color:var(--bd2);color:var(--t2);}
+
+/* ── CARD FOOTER (event preview summary) ── */
+.inv-footer{
+  border-top:1px solid var(--bd);
+  padding:9px 14px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--sur2);
+}
+.inv-footer-left{display:flex;align-items:center;gap:8px;}
+.participants-mini{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2);}
+.av-mini-stack{display:flex;}
+.av-mini{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--sur2);font-size:7px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;margin-right:-5px;flex-shrink:0;}
+.av-mini:last-child{margin-right:0;}
+.fill-mini{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3);}
+.fill-mini-bar{width:60px;height:3px;background:var(--bd);border-radius:2px;overflow:hidden;}
+.fill-mini-inner{height:100%;background:linear-gradient(90deg,var(--ac),#8b5cf6);border-radius:2px;}
+.preview-link{font-size:11px;color:var(--ac);cursor:pointer;display:flex;align-items:center;gap:3px;}
+.preview-link:hover{text-decoration:underline;}
+
+/* ── SENT TAB CARDS ── */
+.sent-card{
+  background:var(--sur);border:1px solid var(--bd);border-radius:var(--r-lg);
+  overflow:hidden;transition:border-color .15s;
+}
+.sent-card:hover{border-color:var(--bd2);}
+.sent-top{display:flex;align-items:center;gap:0;}
+.sent-cover{
+  width:72px;flex-shrink:0;aspect-ratio:1;
+  display:flex;align-items:center;justify-content:center;font-size:24px;
+}
+.sent-info{flex:1;padding:12px;min-width:0;}
+.sent-event-name{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sent-meta{font-size:11px;color:var(--t2);display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.sent-recipients{border-top:1px solid var(--bd);padding:9px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.recipient-chip{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 10px 4px 6px;border-radius:20px;border:1px solid var(--bd);background:var(--sur2);
+}
+.rchip-av{width:20px;height:20px;border-radius:50%;font-size:8px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rchip-name{font-size:11px;color:var(--t1);}
+.rchip-status{font-size:9px;font-weight:600;margin-left:2px;}
+.rchip-accepted{color:var(--ok);}
+.rchip-pending{color:var(--t3);}
+.rchip-declined{color:var(--err);}
+
+/* ── EMPTY STATE ── */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:48px 20px;gap:12px;
+}
+.empty-illo{
+  width:80px;height:80px;border-radius:50%;
+  background:var(--sur2);border:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:center;font-size:32px;
+  margin-bottom:4px;
+}
+.empty-title{font-size:15px;font-weight:600;color:var(--t1);}
+.empty-sub{font-size:12px;color:var(--t3);max-width:280px;line-height:1.6;}
+
+/* ── ACCEPT DIALOG ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:none;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.dialog{
+  background:var(--sur);border:1px solid var(--bd);border-radius:var(--r-lg);
+  width:min(420px,90vw);overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);
+  animation:popIn .18s ease;
+}
+@keyframes popIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.dialog-cover{
+  height:140px;display:flex;align-items:center;justify-content:center;font-size:48px;
+  position:relative;
+}
+.dialog-cover-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,var(--sur) 100%);}
+.dialog-body{padding:0 20px 20px;}
+.dialog-inviter{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.dialog-inviter-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;}
+.dialog-inviter-text{font-size:12px;color:var(--t2);}
+.dialog-inviter-name{font-weight:600;color:var(--t1);}
+.dialog-event-name{font-family:'Unbounded',sans-serif;font-size:15px;font-weight:600;color:var(--t1);line-height:1.3;margin-bottom:12px;}
+.dialog-meta{display:flex;flex-direction:column;gap:7px;margin-bottom:18px;}
+.dmeta-row{display:flex;align-items:center;gap:9px;}
+.dmeta-ico{width:28px;height:28px;border-radius:7px;background:var(--sur3);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.dmeta-val{font-size:12px;color:var(--t1);font-weight:500;}
+.dmeta-sub{font-size:10px;color:var(--t2);}
+.dialog-btns{display:flex;gap:8px;}
+.dbtn-accept{flex:2;padding:11px;background:var(--ac);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s;}
+.dbtn-accept:hover{background:#4f46e5;}
+.dbtn-later{flex:1;padding:11px;background:none;border:1px solid var(--bd);border-radius:9px;color:var(--t2);font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;}
+.dbtn-later:hover{border-color:var(--bd2);color:var(--t1);}
+
+/* ── DECLINE DIALOG ── */
+.decline-dialog{
+  background:var(--sur);border:1px solid var(--bd);border-radius:var(--r-lg);
+  width:min(340px,90vw);padding:22px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);animation:popIn .18s ease;
+}
+.decline-title{font-size:15px;font-weight:600;color:var(--t1);margin-bottom:6px;}
+.decline-text{font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;}
+.decline-btns{display:flex;gap:8px;justify-content:flex-end;}
+.dbtn-cancel{padding:8px 16px;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;font-family:inherit;}
+.dbtn-cancel:hover{border-color:var(--bd2);color:var(--t1);}
+.dbtn-decline{padding:8px 16px;background:var(--errs);border:1px solid var(--errb);border-radius:8px;color:var(--err);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s;}
+.dbtn-decline:hover{background:rgba(239,68,68,.2);}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <button class="back-btn">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    Назад
+  </button>
+  <div class="page-title">Приглашения</div>
+  <span class="title-badge">3</span>
+</div>
+
+<!-- TABS -->
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="switchTab('incoming',this)">
+    Входящие
+    <span class="tab-cnt">3</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('sent',this)">
+    Отправленные
+    <span class="tab-cnt">5</span>
+  </button>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- ══ ВХОДЯЩИЕ ══ -->
+  <div class="tab-pane active" id="tab-incoming">
+
+    <!-- Urgent strip -->
+    <div class="urgent-strip">
+      <div class="urgent-ico">⏰</div>
+      <div>
+        <div class="urgent-text">Одно из мероприятий начинается послезавтра</div>
+        <div class="urgent-sub">Не забудьте ответить на приглашение</div>
+      </div>
+    </div>
+
+    <!-- ── Card 1: URGENT (2 дня) ── -->
+    <div class="inv-card urgent">
+      <div class="inv-top">
+        <div class="inv-cover" style="background:linear-gradient(135deg,#7c2d12,#b45309)">
+          <div class="inv-cover-inner">🎨</div>
+          <div class="inv-cover-overlay"></div>
+          <span class="urg-badge urg-hot">2 дня</span>
+        </div>
+        <div class="inv-info">
+          <div class="inviter-chip">
+            <div class="inviter-av" style="background:linear-gradient(135deg,#0891b2,#06b6d4)">ОК</div>
+            <span class="inviter-text"><span class="inviter-name">Ольга Кравцова</span> приглашает вас</span>
+            <span class="inv-time">2 ч назад</span>
+          </div>
+          <div class="inv-event-name" onclick="openAccept()">Дизайн-спринт 2025 · воркшоп для продуктовых команд</div>
+          <div class="inv-meta">
+            <span class="imeta">📅 25 мая, воскресенье · 10:00</span>
+            <span class="idot"></span>
+            <span class="imeta">📍 Artplay, Москва</span>
+            <span class="idot"></span>
+            <span class="imeta price-free">Бесплатно</span>
+          </div>
+          <div class="inv-chips">
+            <span class="ichip">🎨 Дизайн</span>
+            <span class="ichip">Воркшоп</span>
+          </div>
+        </div>
+        <div class="inv-actions">
+          <button class="act-btn act-accept" onclick="openAccept()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Принять
+          </button>
+          <button class="act-btn act-decline" onclick="openDecline('Дизайн-спринт 2025')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Отклонить
+          </button>
+          <button class="act-btn act-later">Позже</button>
+        </div>
+      </div>
+      <div class="inv-footer">
+        <div class="inv-footer-left">
+          <div class="participants-mini">
+            <div class="av-mini-stack">
+              <div class="av-mini" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">АН</div>
+              <div class="av-mini" style="background:linear-gradient(135deg,#059669,#10b981)">ДВ</div>
+              <div class="av-mini" style="background:linear-gradient(135deg,#be185d,#db2777)">КЛ</div>
+            </div>
+            <span>38 участников</span>
+          </div>
+          <div class="fill-mini">
+            <div class="fill-mini-bar"><div class="fill-mini-inner" style="width:76%"></div></div>
+            <span>38 / 50 мест</span>
+          </div>
+        </div>
+        <div class="preview-link" onclick="openAccept()">
+          Подробнее
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Card 2: SOON (10 дней) ── -->
+    <div class="inv-card">
+      <div class="inv-top">
+        <div class="inv-cover" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)">
+          <div class="inv-cover-inner">⚡</div>
+          <div class="inv-cover-overlay"></div>
+          <span class="urg-badge urg-soon">10 дней</span>
+        </div>
+        <div class="inv-info">
+          <div class="inviter-chip">
+            <div class="inviter-av" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">PG</div>
+            <span class="inviter-text"><span class="inviter-name">ProductGuild</span> приглашает вас</span>
+            <span class="inv-time">вчера</span>
+          </div>
+          <div class="inv-event-name">AI Meetup · вечерний митап по нейросетям</div>
+          <div class="inv-meta">
+            <span class="imeta">📅 3 июня, вторник · 19:00</span>
+            <span class="idot"></span>
+            <span class="imeta">📍 Точка кипения</span>
+            <span class="idot"></span>
+            <span class="imeta price-paid">500 ₽</span>
+            <span class="idot"></span>
+            <span class="imeta">18+</span>
+          </div>
+          <div class="inv-chips">
+            <span class="ichip">🤖 AI/ML</span>
+            <span class="ichip">Митап</span>
+            <span class="ichip">Технологии</span>
+          </div>
+        </div>
+        <div class="inv-actions">
+          <button class="act-btn act-accept" onclick="openAccept()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Принять
+          </button>
+          <button class="act-btn act-decline" onclick="openDecline('AI Meetup')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Отклонить
+          </button>
+          <button class="act-btn act-later">Позже</button>
+        </div>
+      </div>
+      <div class="inv-footer">
+        <div class="inv-footer-left">
+          <div class="participants-mini">
+            <div class="av-mini-stack">
+              <div class="av-mini" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">АН</div>
+              <div class="av-mini" style="background:linear-gradient(135deg,#0891b2,#06b6d4)">ОК</div>
+            </div>
+            <span>62 участника</span>
+          </div>
+          <div class="fill-mini">
+            <div class="fill-mini-bar"><div class="fill-mini-inner" style="width:41%"></div></div>
+            <span>62 / 150 мест</span>
+          </div>
+        </div>
+        <div class="preview-link">
+          Подробнее
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Card 3: OK (2 месяца) ── -->
+    <div class="inv-card">
+      <div class="inv-top">
+        <div class="inv-cover" style="background:linear-gradient(135deg,#064e3b,#0f766e)">
+          <div class="inv-cover-inner">🎂</div>
+          <div class="inv-cover-overlay"></div>
+          <span class="urg-badge urg-ok">2 мес.</span>
+        </div>
+        <div class="inv-info">
+          <div class="inviter-chip">
+            <div class="inviter-av" style="background:linear-gradient(135deg,#d97706,#f59e0b)">МС</div>
+            <span class="inviter-text"><span class="inviter-name">Марина Степанова</span> приглашает вас</span>
+            <span class="inv-time">3 дня назад</span>
+          </div>
+          <div class="inv-event-name">День рождения Марины 🎉</div>
+          <div class="inv-meta">
+            <span class="imeta">📅 12 августа, среда · 18:00</span>
+            <span class="idot"></span>
+            <span class="imeta">📍 Мансарда, Москва</span>
+            <span class="idot"></span>
+            <span class="imeta price-free">Бесплатно</span>
+          </div>
+          <div class="inv-chips">
+            <span class="ichip" style="background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.3);color:#fbbf24">🎂 День рождения</span>
+            <span class="ichip" style="background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.3);color:#fbbf24">Приватное</span>
+          </div>
+        </div>
+        <div class="inv-actions">
+          <button class="act-btn act-accept" onclick="openAccept()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Принять
+          </button>
+          <button class="act-btn act-decline" onclick="openDecline('День рождения Марины')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Отклонить
+          </button>
+          <button class="act-btn act-later">Позже</button>
+        </div>
+      </div>
+      <div class="inv-footer">
+        <div class="inv-footer-left">
+          <div class="participants-mini">
+            <div class="av-mini-stack">
+              <div class="av-mini" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">АН</div>
+              <div class="av-mini" style="background:linear-gradient(135deg,#be185d,#db2777)">КЛ</div>
+            </div>
+            <span>12 участников · приватное</span>
+          </div>
+        </div>
+        <div class="preview-link">
+          Подробнее
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ ОТПРАВЛЕННЫЕ ══ -->
+  <div class="tab-pane" id="tab-sent">
+
+    <!-- Sent card 1 -->
+    <div class="sent-card">
+      <div class="sent-top">
+        <div class="sent-cover" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)">⚡</div>
+        <div class="sent-info">
+          <div class="sent-event-name">ProductConf 2025</div>
+          <div class="sent-meta">
+            <span>📅 25 мая 2025</span>
+            <span>·</span>
+            <span>Манеж, Москва</span>
+            <span>·</span>
+            <span style="color:var(--ok);font-weight:500">Бесплатно</span>
+          </div>
+        </div>
+      </div>
+      <div class="sent-recipients">
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#0891b2,#06b6d4)">ОК</div>
+          <span class="rchip-name">Ольга К.</span>
+          <span class="rchip-status rchip-accepted">✓</span>
+        </div>
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#059669,#10b981)">ДВ</div>
+          <span class="rchip-name">Дмитрий В.</span>
+          <span class="rchip-status rchip-accepted">✓</span>
+        </div>
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#be185d,#db2777)">КЛ</div>
+          <span class="rchip-name">Катя Л.</span>
+          <span class="rchip-status rchip-pending">···</span>
+        </div>
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#d97706,#f59e0b)">МС</div>
+          <span class="rchip-name">Марина С.</span>
+          <span class="rchip-status rchip-declined">✗</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sent card 2 -->
+    <div class="sent-card">
+      <div class="sent-top">
+        <div class="sent-cover" style="background:linear-gradient(135deg,#064e3b,#059669)">🌿</div>
+        <div class="sent-info">
+          <div class="sent-event-name">Нетворкинг для продактов · апрель</div>
+          <div class="sent-meta">
+            <span>📅 15 апр 2025</span>
+            <span>·</span>
+            <span>Кофемания, Москва</span>
+            <span>·</span>
+            <span style="color:var(--warn);font-weight:500">500 ₽</span>
+          </div>
+        </div>
+      </div>
+      <div class="sent-recipients">
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">АН</div>
+          <span class="rchip-name">Андрей Н.</span>
+          <span class="rchip-status rchip-accepted">✓</span>
+        </div>
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#0891b2,#06b6d4)">ОК</div>
+          <span class="rchip-name">Ольга К.</span>
+          <span class="rchip-status rchip-accepted">✓</span>
+        </div>
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">ИП</div>
+          <span class="rchip-name">Иван П.</span>
+          <span class="rchip-status rchip-pending">···</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sent card 3 -->
+    <div class="sent-card">
+      <div class="sent-top">
+        <div class="sent-cover" style="background:linear-gradient(135deg,#3f3f46,#18181b)">🎤</div>
+        <div class="sent-info">
+          <div class="sent-event-name">Митап: AI Tools для PM 2025</div>
+          <div class="sent-meta">
+            <span>📅 2 апр 2025</span>
+            <span>·</span>
+            <span>Точка кипения</span>
+            <span>·</span>
+            <span style="color:var(--ok);font-weight:500">Бесплатно</span>
+          </div>
+        </div>
+      </div>
+      <div class="sent-recipients">
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#059669,#10b981)">ДВ</div>
+          <span class="rchip-name">Дмитрий В.</span>
+          <span class="rchip-status rchip-accepted">✓</span>
+        </div>
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#be185d,#db2777)">КЛ</div>
+          <span class="rchip-name">Катя Л.</span>
+          <span class="rchip-status rchip-accepted">✓</span>
+        </div>
+        <div class="recipient-chip">
+          <div class="rchip-av" style="background:linear-gradient(135deg,#d97706,#f59e0b)">МС</div>
+          <span class="rchip-name">Марина С.</span>
+          <span class="rchip-status rchip-accepted">✓</span>
+        </div>
+        <div style="font-size:11px;color:var(--t3);padding:2px 6px;">+4 ещё</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ══ ACCEPT DIALOG ══ -->
+<div class="overlay" id="accept-overlay" onclick="if(event.target===this)closeAccept()">
+  <div class="dialog">
+    <div class="dialog-cover" style="background:linear-gradient(135deg,#7c2d12,#b45309)">
+      <span style="font-size:52px;position:relative;z-index:1">🎨</span>
+      <div class="dialog-cover-overlay"></div>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-inviter">
+        <div class="dialog-inviter-av" style="background:linear-gradient(135deg,#0891b2,#06b6d4)">ОК</div>
+        <span class="dialog-inviter-text"><span class="dialog-inviter-name">Ольга Кравцова</span> пригласила вас</span>
+      </div>
+      <div class="dialog-event-name">Дизайн-спринт 2025</div>
+      <div class="dialog-meta">
+        <div class="dmeta-row">
+          <div class="dmeta-ico">📅</div>
+          <div>
+            <div class="dmeta-val">25 мая 2025, воскресенье</div>
+            <div class="dmeta-sub">10:00 – 18:00 · через 2 дня</div>
+          </div>
+        </div>
+        <div class="dmeta-row">
+          <div class="dmeta-ico">📍</div>
+          <div>
+            <div class="dmeta-val">Artplay, Москва</div>
+            <div class="dmeta-sub">Нижняя Сыромятническая ул., 10</div>
+          </div>
+        </div>
+        <div class="dmeta-row">
+          <div class="dmeta-ico">🎫</div>
+          <div>
+            <div class="dmeta-val" style="color:var(--ok)">Бесплатно</div>
+            <div class="dmeta-sub">38 из 50 мест занято</div>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-btns">
+        <button class="dbtn-later" onclick="closeAccept()">Решу позже</button>
+        <button class="dbtn-accept" onclick="acceptInvite()">✓ Принять приглашение</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DECLINE DIALOG ══ -->
+<div class="overlay" id="decline-overlay" onclick="if(event.target===this)closeDecline()">
+  <div class="decline-dialog">
+    <div class="decline-title">Отклонить приглашение?</div>
+    <div class="decline-text" id="decline-text">Вы уверены, что хотите отклонить приглашение?</div>
+    <div class="decline-btns">
+      <button class="dbtn-cancel" onclick="closeDecline()">Отмена</button>
+      <button class="dbtn-decline" onclick="declineInvite()">Отклонить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+function openAccept() { document.getElementById('accept-overlay').classList.add('open'); }
+function closeAccept() { document.getElementById('accept-overlay').classList.remove('open'); }
+function acceptInvite() {
+  closeAccept();
+  const strip = document.querySelector('.urgent-strip');
+  if (strip) { strip.style.background='rgba(34,197,94,.08)'; strip.style.borderColor='rgba(34,197,94,.2)'; strip.querySelector('.urgent-ico').textContent='✓'; strip.querySelector('.urgent-text').style.color='var(--ok)'; strip.querySelector('.urgent-text').textContent='Вы приняли приглашение на Дизайн-спринт 2025'; strip.querySelector('.urgent-sub').textContent='Событие добавлено в ваш список'; }
+}
+function openDecline(name) {
+  document.getElementById('decline-text').textContent = `Вы уверены, что хотите отклонить приглашение на «${name}»?`;
+  document.getElementById('decline-overlay').classList.add('open');
+}
+function closeDecline() { document.getElementById('decline-overlay').classList.remove('open'); }
+function declineInvite() { closeDecline(); }
+</script>
+</body>
+</html>
