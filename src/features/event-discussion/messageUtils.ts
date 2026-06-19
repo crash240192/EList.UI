@@ -195,8 +195,8 @@ export function canDeleteMessage(
   replyBump: number,
   replyTotal: number | null,
 ): boolean {
+  if (replyTotal != null) return replyTotal === 0;
   if (message.replied || replyBump > 0) return false;
-  if (replyTotal != null && replyTotal > 0) return false;
   return true;
 }
 
@@ -205,6 +205,8 @@ export function messageHasReplies(
   replyBump: number,
   replyTotal: number | null,
 ): boolean {
+  if (replyBump > 0) return true;
   if (replyTotal === 0) return false;
-  return message.replied || replyBump > 0;
+  if (replyTotal != null) return replyTotal > 0;
+  return message.replied;
 }

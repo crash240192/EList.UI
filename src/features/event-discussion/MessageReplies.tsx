@@ -6,6 +6,7 @@ import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
+import { useDiscussionRefreshActions } from './discussionRefreshContext';
 import styles from './MessageReplies.module.css';
 
 const PAGE_SIZE = 5;
@@ -33,6 +34,7 @@ export function MessageReplies({
   onDeleted,
   onTotalLoaded,
 }: MessageRepliesProps) {
+  const { resetBump } = useDiscussionRefreshActions();
   const [items, setItems] = useState<IMessage[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -78,12 +80,13 @@ export function MessageReplies({
         const nextTotal = Math.max(0, prevTotal - 1);
         onTotalLoaded?.(nextTotal);
         setHasMore(next.length < nextTotal);
+        if (nextTotal === 0) resetBump(parent.id);
         return nextTotal;
       });
       return next;
     });
     onDeleted?.(messageId);
-  }, [onDeleted, onTotalLoaded]);
+  }, [onDeleted, onTotalLoaded, parent.id, resetBump]);
 
   const childDepth = depth + 1;
   const remaining = Math.max(0, total - items.length);
