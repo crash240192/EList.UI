@@ -19,30 +19,25 @@
   overflow: hidden;
 }
 
-.cardHeader {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-}
-
-.cardTitle {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
+.cardHead {
+  padding: 20px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .loader {
   padding: 40px;
   text-align: center;
   font-size: 14px;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.7);
 }
 
-.walletLayout {
-  padding: 24px 28px 48px;
+.walletBody {
+  padding: 20px 28px 48px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 .msg {
@@ -61,7 +56,7 @@
   color: var(--danger);
 }
 
-/* ── Bank card ── */
+/* ── Bank card (page header) ── */
 .bankCard {
   border-radius: 18px;
   padding: 24px 28px;
@@ -73,6 +68,13 @@
   flex-direction: column;
   justify-content: space-between;
   min-height: 180px;
+}
+
+.bankCardStub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
 }
 
 .bankCard::before {
@@ -185,6 +187,126 @@
   color: rgba(255, 255, 255, 0.35);
   font-family: monospace;
   letter-spacing: 0.1em;
+}
+
+.cardActionsRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.cardActionBtn {
+  flex: 1;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.cardActionBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.cardActionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Top-up placeholder ── */
+.topUpSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.topUpStub {
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--surface-2);
+}
+
+.topUpStubForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.topUpLabel {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.topUpInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topUpInput {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.topUpInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.topUpCurrency {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.topUpBtn {
+  padding: 10px 18px;
+  background: var(--accent);
+  border: none;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.topUpBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.topUpHint {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 /* ── Tariff section ── */
@@ -430,6 +552,115 @@
   text-align: center;
 }
 
+/* ── History placeholder ── */
+.historySection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stubBadge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+
+.histList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  opacity: 0.65;
+}
+
+.histRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.histRow:last-child {
+  border-bottom: none;
+}
+
+.histIco {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.histIcoIn {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.histIcoOut {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.histIcoTariff {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.histInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.histName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.histMeta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.histAmt {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.histAmtIn {
+  color: var(--success);
+}
+
+.histAmtOut {
+  color: var(--warning);
+}
+
+.histAmtTariff {
+  color: var(--accent);
+}
+
+.historyHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
 @media (max-width: 720px) {
   .page {
     padding: 0;
@@ -441,8 +672,25 @@
     border-right: none;
   }
 
-  .walletLayout {
+  .walletBody {
     padding: 16px;
+  }
+
+  .cardHead {
+    padding: 12px 12px 0;
+  }
+
+  .cardActionsRow {
+    flex-direction: column;
+  }
+
+  .topUpStubForm {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topUpBtn {
+    width: 100%;
   }
 
   .tariffGrid {

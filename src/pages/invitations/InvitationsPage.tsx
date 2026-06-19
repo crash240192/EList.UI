@@ -215,59 +215,65 @@ export default function InvitationsPage() {
           <div className={styles.cardBody}>
             <div className={`${styles.tabPane} ${tab === 'incoming' ? styles.tabPaneActive : ''}`}>
           {loading && (
-            <div className={styles.skeletons}>
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className={styles.skeleton} />
-              ))}
+            <div className={styles.invList}>
+              <div className={styles.skeletons}>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className={styles.skeleton} />
+                ))}
+              </div>
             </div>
           )}
 
           {err && <div className={styles.err}>{err}</div>}
 
-          {!loading && !err && urgentInv && (
-            <div className={styles.urgentStrip}>
-              <div className={styles.urgentIco}>⏰</div>
-              <div>
-                <div className={styles.urgentText}>
-                  {getDaysUntil(urgentInv.event.startTime) <= 1
-                    ? 'Одно из мероприятий начинается очень скоро'
-                    : 'Одно из мероприятий начинается послезавтра'}
+          <div className={styles.invList}>
+            {!loading && !err && urgentInv && (
+              <div className={styles.urgentStrip}>
+                <div className={styles.urgentIco}>⏰</div>
+                <div>
+                  <div className={styles.urgentText}>
+                    {getDaysUntil(urgentInv.event.startTime) <= 1
+                      ? 'Одно из мероприятий начинается очень скоро'
+                      : 'Одно из мероприятий начинается послезавтра'}
+                  </div>
+                  <div className={styles.urgentSub}>Не забудьте ответить на приглашение</div>
                 </div>
-                <div className={styles.urgentSub}>Не забудьте ответить на приглашение</div>
               </div>
-            </div>
-          )}
+            )}
 
-          {!loading && !err && items.length === 0 && (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyIllo}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.8 19.8 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-                </svg>
+            {!loading && !err && items.length === 0 && (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIllo}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 13a19.8 19.8 0 01-3.07-8.67A2 2 0 012 2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+                  </svg>
+                </div>
+                <p className={styles.emptyTitle}>Приглашений пока нет</p>
+                <p className={styles.emptySub}>Когда вас пригласят на мероприятие, оно появится здесь</p>
               </div>
-              <p className={styles.emptyTitle}>Приглашений пока нет</p>
-              <p className={styles.emptySub}>Когда вас пригласят на мероприятие, оно появится здесь</p>
-            </div>
-          )}
+            )}
 
-          {!loading && items.map(inv => (
-            <InvitationRow
-              key={inv.id}
-              inv={inv}
-              onOpen={() => handleInvitationClick(inv)}
-              onPreview={() => openPreview(inv)}
-              onDecline={() => setConfirmDecl(inv)}
-            />
-          ))}
+            {!loading && items.map(inv => (
+              <InvitationRow
+                key={inv.id}
+                inv={inv}
+                onOpen={() => handleInvitationClick(inv)}
+                onPreview={() => openPreview(inv)}
+                onDecline={() => setConfirmDecl(inv)}
+              />
+            ))}
+          </div>
             </div>
 
             <div className={`${styles.tabPane} ${tab === 'sent' ? styles.tabPaneActive : ''}`}>
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIllo}>📤</div>
-                <p className={styles.emptyTitle}>Отправленных приглашений нет</p>
-                <p className={styles.emptySub}>
-                  Приглашения, которые вы отправили участникам своих событий, будут отображаться здесь
-                </p>
+              <div className={styles.invList}>
+                <div className={styles.emptyState}>
+                  <div className={styles.emptyIllo}>📤</div>
+                  <p className={styles.emptyTitle}>Отправленных приглашений нет</p>
+                  <p className={styles.emptySub}>
+                    Приглашения, которые вы отправили участникам своих событий, будут отображаться здесь
+                  </p>
+                </div>
               </div>
             </div>
           </div>

@@ -7,6 +7,31 @@ import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } fr
 import { getOrFetchAccountId } from '@/entities/user/api';
 import styles from './WalletPage.module.css';
 
+const HISTORY_STUB: {
+  id: string;
+  kind: 'in' | 'out' | 'tariff';
+  icon: string;
+  name: string;
+  meta: string;
+  amount: string;
+}[] = [
+  { id: '1', kind: 'in', icon: '⬇', name: 'Пополнение кошелька', meta: '15 мая 2025 · Банковская карта', amount: '+ 2 000 ₽' },
+  { id: '2', kind: 'tariff', icon: '★', name: 'Тариф «Стандарт»', meta: '1 мая 2025 · Автопродление', amount: '− 490 ₽' },
+  { id: '3', kind: 'out', icon: '🎫', name: 'Startup Pitch Night', meta: '18 мар 2025 · Билет на мероприятие', amount: '− 1 000 ₽' },
+];
+
+const HIST_ICO_CLASS = {
+  in: styles.histIcoIn,
+  out: styles.histIcoOut,
+  tariff: styles.histIcoTariff,
+} as const;
+
+const HIST_AMT_CLASS = {
+  in: styles.histAmtIn,
+  out: styles.histAmtOut,
+  tariff: styles.histAmtTariff,
+} as const;
+
 function formatValidatorRows(v: ITariffValidator): { label: string; value: string; type: 'ok' | 'warn' | 'no' }[] {
   return [
     {
@@ -108,10 +133,11 @@ export default function WalletPage() {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <h1 className={styles.cardTitle}>Кошелёк</h1>
+          <div className={styles.cardHead}>
+            <div className={`${styles.bankCard} ${styles.bankCardStub}`}>
+              <div className={styles.loader}>Загрузка...</div>
+            </div>
           </div>
-          <div className={styles.loader}>Загрузка...</div>
         </div>
       </div>
     );
@@ -120,18 +146,8 @@ export default function WalletPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.cardHeader}>
-          <h1 className={styles.cardTitle}>Кошелёк</h1>
-        </div>
-        <div className={styles.walletLayout}>
-        {msg && (
-          <div className={`${styles.msg} ${msg.ok ? styles.msgOk : styles.msgErr}`}>
-            {msg.text}
-          </div>
-        )}
-
         {wallet && (
-          <>
+          <div className={styles.cardHead}>
             <div className={styles.bankCard}>
               <div className={styles.cardTop}>
                 <div className={styles.cardBrand}>EList Pay</div>
@@ -161,51 +177,142 @@ export default function WalletPage() {
                   <div className={styles.cardId}>ID: {wallet.id.slice(0, 8)}...</div>
                 )}
               </div>
-            </div>
 
-            <div>
-              <div className={styles.tariffHeader}>
-                <div>
-                  <div className={styles.sectionTitle}>Тарифный план</div>
-                  <div className={styles.sectionSubtitle}>
-                    Выберите план для доступа к расширенным возможностям создания событий
+              <div className={styles.cardActionsRow}>
+                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <polyline points="19 12 12 19 5 12" />
+                  </svg>
+                  Пополнить
+                </button>
+                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="12" y1="19" x2="12" y2="5" />
+                    <polyline points="5 12 12 5 19 12" />
+                  </svg>
+                  Вывести
+                </button>
+                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <rect x="5" y="2" width="14" height="20" rx="2" />
+                    <line x1="12" y1="18" x2="12.01" y2="18" />
+                  </svg>
+                  Реквизиты
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className={styles.walletBody}>
+          {msg && (
+            <div className={`${styles.msg} ${msg.ok ? styles.msgOk : styles.msgErr}`}>
+              {msg.text}
+            </div>
+          )}
+
+          {wallet && (
+            <>
+              <div className={styles.topUpSection}>
+                <div className={styles.sectionTitle}>Пополнение кошелька</div>
+                <div className={styles.topUpStub}>
+                  <div className={styles.topUpStubForm}>
+                    <label className={styles.topUpLabel}>
+                      Сумма пополнения
+                      <div className={styles.topUpInputRow}>
+                        <input
+                          type="text"
+                          className={styles.topUpInput}
+                          placeholder="1 000"
+                          disabled
+                          aria-disabled
+                        />
+                        <span className={styles.topUpCurrency}>₽</span>
+                      </div>
+                    </label>
+                    <button type="button" className={styles.topUpBtn} disabled>
+                      Перейти к оплате
+                    </button>
                   </div>
+                  <p className={styles.topUpHint}>
+                    Механизм пополнения в разработке. Здесь появится выбор способа оплаты: банковская карта, СБП и другие.
+                  </p>
                 </div>
               </div>
 
-              {allTariffs.length === 0 ? (
-                <div className={styles.noTariff}>
-                  Тарифы пока не добавлены. Обратитесь к администратору.
-                </div>
-              ) : (
-                <>
-                  <div className={styles.tariffGrid}>
-                    {allTariffs.map(t => (
-                      <TariffCard
-                        key={t.id}
-                        tariff={t}
-                        validator={validators[t.id] ?? null}
-                        isCurrent={tariff?.id === t.id}
-                        isSelected={selectedTariffId === t.id}
-                        onSelect={() => setSelectedTariffId(prev => prev === t.id ? '' : t.id)}
-                      />
-                    ))}
-                  </div>
-                  {selectedTariffId && selectedTariffId !== tariff?.id && (
-                    <div className={styles.selectActions}>
-                      <button type="button" className={styles.cancelBtn} onClick={() => setSelectedTariffId('')}>
-                        Отмена
-                      </button>
-                      <button type="button" className={styles.confirmBtn} onClick={handleSetTariff} disabled={saving}>
-                        {saving ? 'Подключение...' : 'Подключить'}
-                      </button>
+              <div>
+                <div className={styles.tariffHeader}>
+                  <div>
+                    <div className={styles.sectionTitle}>Тарифный план</div>
+                    <div className={styles.sectionSubtitle}>
+                      Выберите план для доступа к расширенным возможностям создания событий
                     </div>
-                  )}
-                </>
-              )}
-            </div>
-          </>
-        )}
+                  </div>
+                </div>
+
+                {allTariffs.length === 0 ? (
+                  <div className={styles.noTariff}>
+                    Тарифы пока не добавлены. Обратитесь к администратору.
+                  </div>
+                ) : (
+                  <>
+                    <div className={styles.tariffGrid}>
+                      {allTariffs.map(t => (
+                        <TariffCard
+                          key={t.id}
+                          tariff={t}
+                          validator={validators[t.id] ?? null}
+                          isCurrent={tariff?.id === t.id}
+                          isSelected={selectedTariffId === t.id}
+                          onSelect={() => setSelectedTariffId(prev => prev === t.id ? '' : t.id)}
+                        />
+                      ))}
+                    </div>
+                    {selectedTariffId && selectedTariffId !== tariff?.id && (
+                      <div className={styles.selectActions}>
+                        <button type="button" className={styles.cancelBtn} onClick={() => setSelectedTariffId('')}>
+                          Отмена
+                        </button>
+                        <button type="button" className={styles.confirmBtn} onClick={handleSetTariff} disabled={saving}>
+                          {saving ? 'Подключение...' : 'Подключить'}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className={styles.historySection}>
+                <div className={styles.tariffHeader}>
+                  <div>
+                    <div className={styles.sectionTitle}>История операций</div>
+                    <div className={styles.sectionSubtitle}>Пополнения, списания и оплата тарифов</div>
+                  </div>
+                  <span className={styles.stubBadge}>заглушка</span>
+                </div>
+                <div className={styles.histList} aria-hidden>
+                  {HISTORY_STUB.map(row => (
+                    <div key={row.id} className={styles.histRow}>
+                      <div className={`${styles.histIco} ${HIST_ICO_CLASS[row.kind]}`}>
+                        {row.icon}
+                      </div>
+                      <div className={styles.histInfo}>
+                        <div className={styles.histName}>{row.name}</div>
+                        <div className={styles.histMeta}>{row.meta}</div>
+                      </div>
+                      <div className={`${styles.histAmt} ${HIST_AMT_CLASS[row.kind]}`}>
+                        {row.amount}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className={styles.historyHint}>
+                  Реальная история транзакций появится после подключения платёжного API.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
