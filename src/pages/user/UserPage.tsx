@@ -21,6 +21,7 @@ import { UserShareMenu } from '@/features/user/UserShareMenu';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { useAvatar } from '@/features/auth/useAvatar';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import {
@@ -51,6 +52,31 @@ const SCOPE_TABS: { key: MainTab; label: string }[] = [
   { key: 'created', label: 'Организует' },
   { key: 'participating', label: 'Участвует' },
 ];
+
+function UserCoverBackground({
+  accountId,
+  avatarId,
+}: {
+  accountId: string;
+  avatarId: string | null;
+}) {
+  const fileId = useAvatar(accountId, avatarId);
+
+  return (
+    <div className={styles.coverBg}>
+      <div className={styles.coverBgGradient} aria-hidden />
+      {fileId ? (
+        <AuthImage
+          fileId={fileId}
+          alt=""
+          className={styles.coverAvatarImg}
+        />
+      ) : (
+        <div className={styles.coverPattern} aria-hidden />
+      )}
+    </div>
+  );
+}
 
 function ContactIcon({ kind }: { kind: ContactIconKind }) {
   const svgProps = {
@@ -442,9 +468,10 @@ export default function UserPage() {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.cover}>
-          <div className={styles.coverBg}>
-            <div className={styles.coverPattern} />
-          </div>
+          <UserCoverBackground
+            accountId={profileAccountId}
+            avatarId={account.avatarId ?? null}
+          />
           <div className={styles.coverOverlay} />
 
           <div className={styles.heroTop}>
