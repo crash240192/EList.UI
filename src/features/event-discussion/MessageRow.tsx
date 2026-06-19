@@ -236,6 +236,12 @@ export function MessageRow({
                       ? textLengthError(raw.length, DISCUSSION_MESSAGE_MAX_LENGTH)
                       : null);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      void saveEdit();
+                    }
+                  }}
                 />
                 {editError && <p className={styles.editError}>{editError}</p>}
                 <div className={styles.editActions}>
