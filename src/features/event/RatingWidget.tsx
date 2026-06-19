@@ -5,6 +5,7 @@ import { fetchEventRating, voteEventRating, deleteEventRating, RATING_COMMENT_MA
 import type { IRatingItem, IRatingPage, RatingType } from '@/entities/event';
 import { getEventRatingGrade } from '@/shared/lib/eventRatingGrade';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
+import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
 import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import styles from './RatingWidget.module.css';
@@ -218,11 +219,8 @@ function RatingModal({
   }, [myItem]);
 
   const handleCommentChange = useCallback((raw: string) => {
-    const next = clampText(raw, RATING_COMMENT_MAX_LENGTH);
-    setComment(next);
-    setSubmitError(raw.length > RATING_COMMENT_MAX_LENGTH
-      ? textLengthError(raw.length, RATING_COMMENT_MAX_LENGTH)
-      : null);
+    setComment(clampText(raw, RATING_COMMENT_MAX_LENGTH));
+    setSubmitError(null);
   }, []);
 
   const handleCancel = useCallback(() => {
@@ -394,14 +392,17 @@ function RatingModal({
                   <button type="button" className={styles.cancelBtn} onClick={handleCancel}>
                     Отмена
                   </button>
-                  <button
-                    type="button"
-                    className={styles.submitBtn}
-                    disabled={voteValue === 0 || submitting || comment.length > RATING_COMMENT_MAX_LENGTH}
-                    onClick={() => void handleSubmit()}
-                  >
-                    {submitting ? 'Отправка...' : editingId ? 'Сохранить' : 'Отправить'}
-                  </button>
+                  <div className={styles.submitRow}>
+                    <TextLengthHint length={comment.length} maxLength={RATING_COMMENT_MAX_LENGTH} />
+                    <button
+                      type="button"
+                      className={styles.submitBtn}
+                      disabled={voteValue === 0 || submitting || comment.length > RATING_COMMENT_MAX_LENGTH}
+                      onClick={() => void handleSubmit()}
+                    >
+                      {submitting ? 'Отправка...' : editingId ? 'Сохранить' : 'Отправить'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

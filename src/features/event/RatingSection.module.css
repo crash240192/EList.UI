@@ -45,12 +45,26 @@
 .commentArea::placeholder { color:var(--text-muted); }
 
 .voteBtn {
-  align-self:flex-start; height:32px; padding:0 16px; border-radius:8px;
-  background:var(--accent); color:#fff; border:none;
-  font-size:12px; font-weight:500; cursor:pointer; transition:background .15s;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s;
 }
 .voteBtn:hover:not(:disabled) { background:var(--accent-hover,#4f46e5); }
 .voteBtn:disabled { opacity:.45; cursor:not-allowed; }
+
+.voteActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
 
 .voteError { font-size:11px; color:var(--danger,#ef4444); }
 

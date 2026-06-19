@@ -5,6 +5,7 @@ import { fetchEventRating, voteEventRating, RATING_COMMENT_MAX_LENGTH } from '@/
 import type { IRatingItem, IRatingPage, RatingType } from '@/entities/event';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
+import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
 import styles from './RatingSection.module.css';
 
 interface Props {
@@ -100,11 +101,8 @@ export function RatingSection({ eventId, eventStartTime, accountId }: Props) {
   }, [data, accountId]);
 
   const handleCommentChange = useCallback((raw: string) => {
-    const next = clampText(raw, RATING_COMMENT_MAX_LENGTH);
-    setComment(next);
-    setSubmitError(raw.length > RATING_COMMENT_MAX_LENGTH
-      ? textLengthError(raw.length, RATING_COMMENT_MAX_LENGTH)
-      : null);
+    setComment(clampText(raw, RATING_COMMENT_MAX_LENGTH));
+    setSubmitError(null);
   }, []);
 
   const handleSubmit = useCallback(async () => {
@@ -166,13 +164,16 @@ export function RatingSection({ eventId, eventStartTime, accountId }: Props) {
                 maxLength={RATING_COMMENT_MAX_LENGTH}
               />
               {submitError && <div className={styles.voteError}>{submitError}</div>}
-              <button
-                className={styles.voteBtn}
-                disabled={starValue === 0 || submitting || comment.length > RATING_COMMENT_MAX_LENGTH}
-                onClick={handleSubmit}
-              >
-                {submitting ? 'Отправка...' : 'Оценить'}
-              </button>
+              <div className={styles.voteActions}>
+                <TextLengthHint length={comment.length} maxLength={RATING_COMMENT_MAX_LENGTH} />
+                <button
+                  className={styles.voteBtn}
+                  disabled={starValue === 0 || submitting || comment.length > RATING_COMMENT_MAX_LENGTH}
+                  onClick={handleSubmit}
+                >
+                  {submitting ? 'Отправка...' : 'Оценить'}
+                </button>
+              </div>
             </div>
           )}
 
