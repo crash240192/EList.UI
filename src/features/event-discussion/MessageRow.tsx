@@ -3,6 +3,7 @@ import type { IMessage } from '@/entities/conversation';
 import { updateMessage, fetchMessageReplies } from '@/entities/conversation';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
+import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
 import {
   messageAuthorName,
   messageInitials,
@@ -194,21 +195,16 @@ export function MessageRow({
                   value={editText}
                   disabled={savingEdit}
                   maxLength={DISCUSSION_MESSAGE_MAX_LENGTH}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const next = clampText(raw, DISCUSSION_MESSAGE_MAX_LENGTH);
-                    setEditText(next);
-                    setEditError(raw.length > DISCUSSION_MESSAGE_MAX_LENGTH
-                      ? textLengthError(raw.length, DISCUSSION_MESSAGE_MAX_LENGTH)
-                      : null);
-                  }}
+                  onChange={(e) => setEditText(clampText(e.target.value, DISCUSSION_MESSAGE_MAX_LENGTH))}
                 />
                 {editError && <p className={styles.editError}>{editError}</p>}
                 <div className={styles.editActions}>
                   <button type="button" className={styles.actionBtn} disabled={savingEdit} onClick={cancelEdit}>
                     Отмена
                   </button>
-                  <button
+                  <div className={styles.saveRow}>
+                    <TextLengthHint length={editText.length} maxLength={DISCUSSION_MESSAGE_MAX_LENGTH} />
+                    <button
                     type="button"
                     className={styles.saveBtn}
                     disabled={savingEdit || !editText.trim() || editText.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH}
@@ -216,6 +212,7 @@ export function MessageRow({
                   >
                     {savingEdit ? 'Сохранение…' : 'Сохранить'}
                   </button>
+                  </div>
                 </div>
               </div>
             ) : (

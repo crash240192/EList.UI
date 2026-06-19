@@ -9,3 +9,27 @@ export function textLengthError(length: number, maxLength: number): string | nul
   }
   return null;
 }
+
+/** С какой длины показывать счётчик (последние ~15% или 500 символов, но не раньше 85%) */
+export function getTextLengthHintShowAt(maxLength: number): number {
+  return Math.min(
+    maxLength - 1,
+    Math.max(Math.floor(maxLength * 0.85), maxLength - 500),
+  );
+}
+
+export function shouldShowTextLengthHint(length: number, maxLength: number): boolean {
+  return length >= getTextLengthHintShowAt(maxLength);
+}
+
+export function formatTextLengthCount(length: number, maxLength: number): string {
+  const fmt = (n: number) => n.toLocaleString('ru-RU');
+  return `${fmt(length)} / ${fmt(maxLength)}`;
+}
+
+export type TextLengthHintTone = 'near' | 'max';
+
+export function getTextLengthHintTone(length: number, maxLength: number): TextLengthHintTone | null {
+  if (!shouldShowTextLengthHint(length, maxLength)) return null;
+  return length >= maxLength ? 'max' : 'near';
+}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
+import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
 import { DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import styles from './MessageComposer.module.css';
 
@@ -26,15 +27,10 @@ export function MessageComposer({
 }: MessageComposerProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const [lengthError, setLengthError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleTextChange = (raw: string) => {
-    const next = clampText(raw, DISCUSSION_MESSAGE_MAX_LENGTH);
-    setLengthError(raw.length > DISCUSSION_MESSAGE_MAX_LENGTH
-      ? textLengthError(raw.length, DISCUSSION_MESSAGE_MAX_LENGTH)
-      : null);
-    setText(next);
+    setText(clampText(raw, DISCUSSION_MESSAGE_MAX_LENGTH));
   };
 
   useEffect(() => {
@@ -49,15 +45,11 @@ export function MessageComposer({
   const handleSubmit = async () => {
     const trimmed = text.trim();
     const error = textLengthError(trimmed.length, DISCUSSION_MESSAGE_MAX_LENGTH);
-    if (!trimmed || sending || disabled || error) {
-      if (error) setLengthError(error);
-      return;
-    }
+    if (!trimmed || sending || disabled || error) return;
     setSending(true);
     try {
       await onSubmit(trimmed);
       setText('');
-      setLengthError(null);
     } finally {
       setSending(false);
     }
@@ -91,17 +83,19 @@ export function MessageComposer({
           }
         }}
       />
-      {lengthError && <p className={styles.lengthError}>{lengthError}</p>}
       <div className={styles.actions}>
         <span className={styles.hint}>Ctrl+Enter — отправить</span>
-        <button
-          type="button"
-          className={styles.submit}
-          disabled={disabled || sending || !text.trim() || text.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH}
-          onClick={() => void handleSubmit()}
-        >
-          {sending ? 'Отправка…' : submitLabel}
-        </button>
+        <div className={styles.submitRow}>
+          <TextLengthHint length={text.length} maxLength={DISCUSSION_MESSAGE_MAX_LENGTH} />
+          <button
+            type="button"
+            className={styles.submit}
+            disabled={disabled || sending || !text.trim() || text.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH}
+            onClick={() => void handleSubmit()}
+          >
+            {sending ? 'Отправка…' : submitLabel}
+          </button>
+        </div>
       </div>
     </div>
   );

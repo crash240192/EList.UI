@@ -310,6 +310,14 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.saveRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .saveBtn {
