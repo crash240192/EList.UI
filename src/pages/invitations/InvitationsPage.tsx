@@ -17,6 +17,7 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { contrastColor } from '@/pages/user/userPageUtils';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import {
   findUrgentInvitation,
@@ -28,6 +29,7 @@ import {
   getEventTypes,
   getEventUrgency,
 } from './invitationsPageUtils';
+import type { IEventType } from '@/entities/event/types';
 import styles from './InvitationsPage.module.css';
 
 type Tab = 'incoming' | 'sent';
@@ -42,6 +44,39 @@ function inviterInitials(inv: IInvitation): string {
   const p = inv.inviter?.personInfo;
   if (p?.firstName) return `${p.firstName[0]}${p.lastName?.[0] ?? ''}`.toUpperCase();
   return inv.inviter?.account?.login?.[0]?.toUpperCase() ?? '?';
+}
+
+function EventTypeTags({ types, className }: { types: IEventType[]; className?: string }) {
+  if (types.length === 0) return null;
+  return (
+    <div className={className}>
+      {types.slice(0, 3).map(t => {
+        const catColor = t.eventCategory?.color ?? '#6366f1';
+        return (
+          <span
+            key={t.id}
+            className={styles.chip}
+            style={{
+              background: `${catColor}55`,
+              border: `1px solid ${catColor}99`,
+              color: contrastColor(catColor),
+            }}
+          >
+            {t.ico && (
+              <img
+                src={icoToUrl(t.ico) ?? undefined}
+                alt=""
+                width={10}
+                height={10}
+                className={styles.chipIco}
+              />
+            )}
+            {t.name}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function InvitationsPage() {
@@ -346,27 +381,7 @@ function InvitationRow({
           </div>
 
           {types.length > 0 && (
-            <div className={styles.chips}>
-              {types.filter(Boolean).slice(0, 3).map(t => {
-                const color = t.eventCategory?.color ?? '#6366f1';
-                return (
-                  <span
-                    key={t.id}
-                    className={styles.chip}
-                    style={{
-                      background: `${color}20`,
-                      border: `1px solid ${color}55`,
-                      color,
-                    }}
-                  >
-                    {t.ico && (
-                      <img src={icoToUrl(t.ico) ?? undefined} alt="" width={10} height={10} style={{ objectFit: 'contain', borderRadius: 2 }} />
-                    )}
-                    {t.name}
-                  </span>
-                );
-              })}
-            </div>
+            <EventTypeTags types={types} className={styles.chips} />
           )}
         </div>
       </div>
@@ -405,6 +420,7 @@ function AcceptDialog({
   useModalBackButton(onClose);
   const event = inv.event;
   const params = getEventParams(event);
+  const types = getEventTypes(event);
   const days = getDaysUntil(event.startTime);
   const coverBg = getEventCoverBackground(event as Parameters<typeof getEventCoverBackground>[0]);
   const daysLabel = days === 0 ? 'сегодня' : days === 1 ? 'завтра' : days > 0 ? `через ${days} дн.` : '';
@@ -432,6 +448,9 @@ function AcceptDialog({
             </span>
           </div>
           <div className={styles.dialogEventName}>{event.name}</div>
+          {types.length > 0 && (
+            <EventTypeTags types={types} className={styles.dialogChips} />
+          )}
           <div className={styles.dialogMeta}>
             <div className={styles.dmetaRow}>
               <div className={styles.dmetaIco}>📅</div>

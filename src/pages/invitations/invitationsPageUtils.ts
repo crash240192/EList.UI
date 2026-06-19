@@ -1,6 +1,7 @@
 // pages/invitations/invitationsPageUtils.ts
 
-import type { IInvitation } from '@/entities/invitation/invitationsApi';
+import type { IInvitation, IInvitationEvent } from '@/entities/invitation/invitationsApi';
+import type { IEventType } from '@/entities/event/types';
 
 export type UrgencyKind = 'hot' | 'soon' | 'ok';
 
@@ -67,28 +68,27 @@ export function findUrgentInvitation(items: IInvitation[]): IInvitation | null {
   return best;
 }
 
-export function getEventTypes(event: unknown): Array<{ id: string; name: string; ico?: string; eventCategory?: { color?: string } }> {
-  const e = event as Record<string, unknown>;
-  const types = e?.eventTypes as unknown[] | undefined;
-  if (types?.length) return types as ReturnType<typeof getEventTypes>;
-  const single = e?.eventType;
-  return single ? [single as ReturnType<typeof getEventTypes>[0]] : [];
+export function getEventTypes(event: IInvitationEvent | unknown): IEventType[] {
+  const e = event as IInvitationEvent;
+  if (e?.eventTypes?.length) return e.eventTypes;
+  if (e?.eventType) return [e.eventType];
+  return [];
 }
 
-export function getEventParams(event: unknown): {
+export function getEventParams(event: IInvitationEvent | unknown): {
   cost: number;
   ageLimit: number | null;
   maxPersonsCount: number | null;
   private: boolean;
   participantsCount: number | null;
 } {
-  const e = event as Record<string, unknown>;
-  const p = (e?.parameters ?? {}) as Record<string, unknown>;
+  const e = event as IInvitationEvent;
+  const p = e?.parameters;
   return {
-    cost: (p.cost as number) ?? 0,
-    ageLimit: (p.ageLimit as number | null) ?? null,
-    maxPersonsCount: (p.maxPersonsCount as number | null) ?? null,
-    private: !!(p.private),
-    participantsCount: (e.participantsCount as number | null) ?? null,
+    cost: p?.cost ?? 0,
+    ageLimit: p?.ageLimit ?? null,
+    maxPersonsCount: p?.maxPersonsCount ?? null,
+    private: !!(p?.private),
+    participantsCount: e?.participantsCount ?? null,
   };
 }

@@ -1,6 +1,9 @@
 // entities/invitation/invitationsApi.ts
 
 import { apiClient } from '@/shared/api/client';
+import type { IEventType } from '@/entities/event/types';
+import { fetchEventTypes } from '@/entities/event/api';
+import { fetchEventTypesByEvent } from '@/entities/event/participationApi';
 import { parseInvitationViewed } from './invitationViewed';
 
 export interface IInvitationEvent {
@@ -10,6 +13,15 @@ export interface IInvitationEvent {
   endTime: string;
   address: string | null;
   coverImageId: string | null;
+  eventTypes?: IEventType[];
+  eventType?: IEventType | null;
+  parameters?: {
+    cost?: number;
+    ageLimit?: number | null;
+    maxPersonsCount?: number | null;
+    private?: boolean;
+  } | null;
+  participantsCount?: number | null;
 }
 
 export interface IInviter {
@@ -56,6 +68,68 @@ function normalizeInviter(raw: unknown): IInviter {
   };
 }
 
+function normalizeEventCategory(raw: unknown): IEventType['eventCategory'] {
+  if (!raw || typeof raw !== 'object') return null;
+  const c = raw as Record<string, unknown>;
+  return {
+    id: String(c.id ?? c.Id ?? ''),
+    name: String(c.name ?? c.Name ?? ''),
+    namePath: String(c.namePath ?? c.NamePath ?? ''),
+    ico: (c.ico ?? c.Ico ?? null) as string | null,
+    description: (c.description ?? c.Description ?? null) as string | null,
+    color: (c.color ?? c.Color ?? null) as string | null,
+  };
+}
+
+function normalizeEventType(raw: unknown): IEventType | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const t = raw as Record<string, unknown>;
+  const id = String(t.id ?? t.Id ?? '');
+  if (!id) return null;
+  const cat = t.eventCategory ?? t.EventCategory;
+  return {
+    id,
+    name: String(t.name ?? t.Name ?? ''),
+    namePath: String(t.namePath ?? t.NamePath ?? ''),
+    description: (t.description ?? t.Description ?? null) as string | null,
+    ico: (t.ico ?? t.Ico ?? null) as string | null,
+    eventCategoryId: String(t.eventCategoryId ?? t.EventCategoryId ?? (cat as any)?.id ?? ''),
+    eventCategory: normalizeEventCategory(cat),
+  };
+}
+
+function normalizeEventTypes(raw: unknown): IEventType[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeEventType).filter((t): t is IEventType => t != null);
+}
+
+function normalizeEvent(raw: unknown): IInvitationEvent {
+  const e = (raw ?? {}) as Record<string, unknown>;
+  const types = normalizeEventTypes(e.Types ?? e.types ?? e.eventTypes);
+  const single = normalizeEventType(e.eventType ?? e.EventType) ?? types[0] ?? null;
+  const params = (e.parameters ?? e.Parameters ?? null) as Record<string, unknown> | null;
+
+  return {
+    id: String(e.id ?? e.Id ?? ''),
+    name: String(e.name ?? e.Name ?? ''),
+    startTime: String(e.startTime ?? e.StartTime ?? ''),
+    endTime: String(e.endTime ?? e.EndTime ?? ''),
+    address: (e.address ?? e.Address ?? null) as string | null,
+    coverImageId: (e.coverImageId ?? e.CoverImageId ?? null) as string | null,
+    eventTypes: types.length > 0 ? types : single ? [single] : [],
+    eventType: single,
+    parameters: params
+      ? {
+          cost: (params.cost ?? params.Cost ?? 0) as number,
+          ageLimit: (params.ageLimit ?? params.AgeLimit ?? null) as number | null,
+          maxPersonsCount: (params.maxPersonsCount ?? params.MaxPersonsCount ?? null) as number | null,
+          private: !!(params.private ?? params.Private),
+        }
+      : null,
+    participantsCount: (e.participantsCount ?? e.ParticipantsCount ?? null) as number | null,
+  };
+}
+
 function normalizeInvitation(raw: Record<string, unknown>): IInvitation {
   const inviter = raw.inviter ?? raw.Inviter;
   const event = raw.event ?? raw.Event;
@@ -67,7 +141,7 @@ function normalizeInvitation(raw: Record<string, unknown>): IInvitation {
     creationDate: String(raw.creationDate ?? raw.CreationDate ?? ''),
     viewed: parseInvitationViewed(raw.viewed ?? raw.Viewed),
     inviter: normalizeInviter(inviter),
-    event: event as IInvitation['event'],
+    event: normalizeEvent(event),
   };
 }
 
@@ -88,10 +162,45 @@ export async function fetchUserInvitations(pageIndex = 0, pageSize = 20): Promis
   const payload = r.result;
   if (!payload) return { result: [], total: 0 };
   const list = Array.isArray(payload.result) ? payload.result : [];
+  const normalized = list.map(row => normalizeInvitation(row as unknown as Record<string, unknown>));
+  const enriched = await enrichInvitationsWithEventTypes(normalized);
   return {
-    result: list.map(row => normalizeInvitation(row as unknown as Record<string, unknown>)),
+    result: enriched,
     total: typeof payload.total === 'number' ? payload.total : list.length,
   };
+}
+
+/** Подгружает типы мероприятий, если их нет во вложенном event */
+export async function enrichInvitationsWithEventTypes(invitations: IInvitation[]): Promise<IInvitation[]> {
+  const missing = invitations.filter(inv => !inv.event.eventTypes?.length);
+  if (missing.length === 0) return invitations;
+
+  const eventIds = [...new Set(missing.map(inv => inv.eventId))];
+  const allTypes = await fetchEventTypes().catch(() => []);
+  const typeById = new Map(allTypes.map(t => [t.id, t]));
+
+  const typesByEvent = new Map<string, IEventType[]>();
+  await Promise.all(eventIds.map(async eventId => {
+    const refs = await fetchEventTypesByEvent(eventId);
+    const types = refs
+      .map(ref => typeById.get(ref.id))
+      .filter((t): t is IEventType => !!t);
+    typesByEvent.set(eventId, types);
+  }));
+
+  return invitations.map(inv => {
+    if (inv.event.eventTypes?.length) return inv;
+    const types = typesByEvent.get(inv.eventId) ?? [];
+    if (types.length === 0) return inv;
+    return {
+      ...inv,
+      event: {
+        ...inv.event,
+        eventTypes: types,
+        eventType: types[0] ?? null,
+      },
+    };
+  });
 }
 
 /** GET /api/invitations/notViewedCount */

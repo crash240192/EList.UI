@@ -419,13 +419,23 @@
   font-size: 10px;
   font-weight: 500;
   padding: 2px 8px;
-  border-radius: 20px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  background: color-mix(in srgb, var(--accent) 13%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
-  color: color-mix(in srgb, var(--accent) 80%, #fff);
+  gap: 4px;
+}
+
+.chipIco {
+  object-fit: contain;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.dialogChips {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
 }
 
 /* Hover slide-out actions */
