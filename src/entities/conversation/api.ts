@@ -1,4 +1,6 @@
 import { apiClient } from '@/shared/api/client';
+import { textLengthError } from '@/shared/lib/clampText';
+import { DISCUSSION_MESSAGE_MAX_LENGTH } from '@/shared/lib/textLimits';
 import type { PagedList } from '@/shared/api/types';
 import type { IConversation, IConversationRequest, IMessage, IMessageRequest } from './types';
 
@@ -52,11 +54,15 @@ export async function fetchMessageReplies(
 }
 
 export async function createMessage(request: IMessageRequest): Promise<string> {
+  const lengthError = textLengthError(request.messageText.trim().length, DISCUSSION_MESSAGE_MAX_LENGTH);
+  if (lengthError) throw new Error(lengthError);
   const data = await apiClient.post<string>('/api/conversations/messages/create', request);
   return data.result;
 }
 
 export async function updateMessage(request: IMessageRequest): Promise<void> {
+  const lengthError = textLengthError(request.messageText.trim().length, DISCUSSION_MESSAGE_MAX_LENGTH);
+  if (lengthError) throw new Error(lengthError);
   await apiClient.put('/api/conversations/messages/update', request);
 }
 
