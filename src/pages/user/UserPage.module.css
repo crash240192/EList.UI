@@ -42,51 +42,96 @@
     radial-gradient(circle at 60% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 40%);
 }
 
-.coverTop {
+.coverOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 30%, rgba(0, 0, 0, 0.6) 100%);
+  pointer-events: none;
+}
+
+.heroTop {
   position: absolute;
   top: 14px;
-  left: 16px;
-  right: 16px;
+  left: 14px;
+  right: 14px;
+  z-index: 10;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  z-index: 2;
 }
 
-.coverBackBtn,
-.coverEditBtn {
+.heroTopRight {
+  display: flex;
+  gap: 8px;
+}
+
+.heroBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  border: 0.5px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 5px;
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  font-family: inherit;
-  cursor: pointer;
+  justify-content: center;
   transition: background 0.15s;
+  font-family: inherit;
+  padding: 0;
 }
 
-.coverBackBtn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 5px 11px 5px 8px;
-  color: #fff;
-  font-size: 12px;
+.heroBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
-.coverBackBtn:hover {
-  background: rgba(255, 255, 255, 0.18);
+.menuWrap {
+  position: relative;
+  z-index: 11;
 }
 
-.coverEditBtn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 5px 12px;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 11px;
+.menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
 }
 
-.coverEditBtn:hover {
-  background: rgba(255, 255, 255, 0.15);
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  min-width: 200px;
+  z-index: 201;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.menuItem:last-child {
+  border-bottom: none;
+}
+
+.menuItem:hover {
+  background: var(--surface-2);
 }
 
 /* ── Profile header ── */
@@ -167,75 +212,32 @@
   align-items: center;
   padding-bottom: 10px;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  margin-left: auto;
 }
 
-.btnPrimary,
-.btnGhost,
-.btnIcon {
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.btnPrimary {
-  padding: 8px 18px;
+.btnJoin {
+  height: 36px;
+  padding: 0 20px;
+  border-radius: 9px;
   background: var(--accent);
-  border: none;
-  border-radius: 8px;
   color: #fff;
-  font-size: 12px;
-  font-weight: 600;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
   white-space: nowrap;
+  font-family: inherit;
 }
 
-.btnPrimary:hover {
-  background: color-mix(in srgb, var(--accent) 85%, #000);
+.btnJoin:hover:not(:disabled) {
+  background: var(--accent-hover, #4f46e5);
 }
 
-.btnPrimarySub {
-  background: rgba(34, 197, 94, 0.18);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  color: #86efac;
-}
-
-.btnPrimarySub:hover {
-  background: rgba(34, 197, 94, 0.28);
-}
-
-.btnGhost {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 13px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.btnGhost:hover {
-  border-color: color-mix(in srgb, var(--border) 70%, var(--accent));
-  color: var(--text-primary);
-}
-
-.btnIcon {
-  width: 33px;
-  height: 33px;
-  border-radius: 8px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btnIcon:hover {
-  border-color: color-mix(in srgb, var(--border) 70%, var(--accent));
-  color: var(--text-primary);
+.btnLeave {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-secondary) !important;
 }
 
 /* ── Stats bar ── */
