@@ -165,7 +165,11 @@ export function RatingSection({ eventId, eventStartTime, accountId }: Props) {
               />
               {submitError && <div className={styles.voteError}>{submitError}</div>}
               <div className={styles.voteActions}>
-                <TextLengthHint length={comment.length} maxLength={RATING_COMMENT_MAX_LENGTH} />
+                <TextLengthHint
+                  length={comment.length}
+                  maxLength={RATING_COMMENT_MAX_LENGTH}
+                  className={styles.lengthHint}
+                />
                 <button
                   className={styles.voteBtn}
                   disabled={starValue === 0 || submitting || comment.length > RATING_COMMENT_MAX_LENGTH}

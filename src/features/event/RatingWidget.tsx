@@ -389,20 +389,22 @@ function RatingModal({
                 />
                 {submitError && <div className={styles.voteError}>{submitError}</div>}
                 <div className={styles.voteFormBtns}>
+                  <TextLengthHint
+                    length={comment.length}
+                    maxLength={RATING_COMMENT_MAX_LENGTH}
+                    className={styles.lengthHint}
+                  />
                   <button type="button" className={styles.cancelBtn} onClick={handleCancel}>
                     Отмена
                   </button>
-                  <div className={styles.submitRow}>
-                    <TextLengthHint length={comment.length} maxLength={RATING_COMMENT_MAX_LENGTH} />
-                    <button
-                      type="button"
-                      className={styles.submitBtn}
-                      disabled={voteValue === 0 || submitting || comment.length > RATING_COMMENT_MAX_LENGTH}
-                      onClick={() => void handleSubmit()}
-                    >
-                      {submitting ? 'Отправка...' : editingId ? 'Сохранить' : 'Отправить'}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className={styles.submitBtn}
+                    disabled={voteValue === 0 || submitting || comment.length > RATING_COMMENT_MAX_LENGTH}
+                    onClick={() => void handleSubmit()}
+                  >
+                    {submitting ? 'Отправка...' : editingId ? 'Сохранить' : 'Отправить'}
+                  </button>
                 </div>
               </div>
             )}
