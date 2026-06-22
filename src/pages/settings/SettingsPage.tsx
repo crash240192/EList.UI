@@ -380,6 +380,7 @@ function PasswordSection() {
   const [form, setForm] = useState({
     oldPassword: '', newPassword: '', newPasswordConfirmation: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -410,22 +411,45 @@ function PasswordSection() {
   return (
     <SectionCard title="Изменить пароль">
       <Row label="Текущий пароль">
-        <input className={styles.input} type="password"
-          value={form.oldPassword} onChange={set('oldPassword')}
-          placeholder="Введите текущий пароль" 
-                  onFocus={e => (e.target as HTMLInputElement).select()} />
+        <div className={styles.inputWrap}>
+          <input
+            className={`${styles.input} ${styles.inputWithBtn}`}
+            type={showPassword ? 'text' : 'password'}
+            value={form.oldPassword}
+            onChange={set('oldPassword')}
+            placeholder="Введите текущий пароль"
+            onFocus={e => (e.target as HTMLInputElement).select()}
+          />
+          <button
+            type="button"
+            className={styles.eyeBtn}
+            tabIndex={-1}
+            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+            onClick={() => setShowPassword(v => !v)}
+          >
+            {showPassword ? '🙈' : '👁'}
+          </button>
+        </div>
       </Row>
       <Row label="Новый пароль">
-        <input className={styles.input} type="password"
-          value={form.newPassword} onChange={set('newPassword')}
-          placeholder="Минимум 6 символов" 
-                  onFocus={e => (e.target as HTMLInputElement).select()} />
+        <input
+          className={styles.input}
+          type={showPassword ? 'text' : 'password'}
+          value={form.newPassword}
+          onChange={set('newPassword')}
+          placeholder="Минимум 6 символов"
+          onFocus={e => (e.target as HTMLInputElement).select()}
+        />
       </Row>
       <Row label="Подтверждение">
-        <input className={styles.input} type="password"
-          value={form.newPasswordConfirmation} onChange={set('newPasswordConfirmation')}
-          placeholder="Повторите новый пароль" 
-                  onFocus={e => (e.target as HTMLInputElement).select()} />
+        <input
+          className={styles.input}
+          type={showPassword ? 'text' : 'password'}
+          value={form.newPasswordConfirmation}
+          onChange={set('newPasswordConfirmation')}
+          placeholder="Повторите новый пароль"
+          onFocus={e => (e.target as HTMLInputElement).select()}
+        />
       </Row>
       <SaveRow msg={msg} saving={saving} onSave={handleSave} label="Изменить пароль" />
     </SectionCard>

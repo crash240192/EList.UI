@@ -70,6 +70,15 @@
 }
 .input:focus { border-color: var(--accent); }
 
+.inputWrap { position: relative; }
+.inputWithBtn { padding-right: 40px; }
+.eyeBtn {
+  position: absolute; right: 10px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 15px; padding: 2px;
+}
+
 /* ── Строка сохранения ── */
 .saveRow {
   display: flex; align-items: center; justify-content: flex-end;
