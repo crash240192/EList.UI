@@ -348,7 +348,7 @@
 
 .scrollTopBtn {
   position: fixed;
-  right: 24px;
+  left: calc(var(--sidebar-icons, 52px) + 16px);
   bottom: 24px;
   z-index: 120;
   display: inline-flex;
@@ -385,8 +385,14 @@
 @media (max-width:680px) {
   .mapBlock { height:228px; }
   .scrollTopBtn {
-    right: 16px;
+    left: 16px;
     bottom: 16px;
     padding: 9px 12px;
+  }
+}
+
+@media (max-width:767px) {
+  .scrollTopBtn {
+    left: 16px;
   }
 }
