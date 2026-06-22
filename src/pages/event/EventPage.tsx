@@ -64,6 +64,8 @@ export default function EventPage() {
   const [pageAccessDenied, setPageAccessDenied] = useState(false);
   const [participantsDenied, setParticipantsDenied] = useState(false);
   const limitNoticeTimerRef = useRef<number | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const {
     organizers,
@@ -74,6 +76,24 @@ export default function EventPage() {
   } = useEventOrganizers(id, accountId);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
+
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el || !event) return;
+
+    const onScroll = () => {
+      setShowScrollTop(el.scrollTop > 360);
+    };
+
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [event?.id]);
+
+  useEffect(() => {
+    if (!loading) return;
+    setShowScrollTop(false);
+  }, [loading]);
 
   useEffect(() => {
     if (!id) return;
@@ -268,6 +288,10 @@ export default function EventPage() {
     void handleParticipate();
   };
 
+  const scrollToTop = () => {
+    pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
     ...participants.filter(p => p.accountId === accountId),
@@ -277,7 +301,7 @@ export default function EventPage() {
     participantsDenied || sortedParticipants.length > 0 || maxPersons != null;
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} ref={pageRef}>
       <div className={styles.card}>
 
         {/* ── Hero ── */}
@@ -640,6 +664,18 @@ export default function EventPage() {
           onClose={() => setMapModalOpen(false)}
         />
       )}
+
+      <button
+        type="button"
+        className={`${styles.scrollTopBtn} ${showScrollTop ? styles.scrollTopBtnVisible : ''}`}
+        onClick={scrollToTop}
+        aria-label="Наверх"
+        aria-hidden={!showScrollTop}
+        tabIndex={showScrollTop ? 0 : -1}
+      >
+        <ChevronUpIcon />
+        <span>Наверх</span>
+      </button>
     </div>
   );
 }
