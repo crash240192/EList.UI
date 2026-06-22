@@ -65,21 +65,19 @@ function SpinnerImage({
 }
 
 // ── Диалог подтверждения удаления ─────────────────────────────────────────────
-function DeleteAlbumDialog({ albumName, loading, onConfirm, onClose }: {
-  albumName: string; loading: boolean; onConfirm: () => void; onClose: () => void;
+function DeleteAlbumDialog({ title, text, confirmLabel, loading, onConfirm, onClose }: {
+  title: string; text: string; confirmLabel: string; loading: boolean; onConfirm: () => void; onClose: () => void;
 }) {
   return createPortal(
     <>
       <div className={styles.dialogBackdrop} onClick={onClose} />
       <div className={styles.dialog} role="dialog" aria-modal>
-        <div className={styles.dialogTitle}>Удалить альбом?</div>
-        <div className={styles.dialogText}>
-          Альбом «{albumName}» будет удалён без возможности восстановления.
-        </div>
+        <div className={styles.dialogTitle}>{title}</div>
+        <div className={styles.dialogText}>{text}</div>
         <div className={styles.dialogBtns}>
           <button type="button" className={styles.dialogCancel} onClick={onClose} disabled={loading}>Отмена</button>
           <button type="button" className={styles.dialogDelete} onClick={onConfirm} disabled={loading}>
-            {loading ? 'Удаление...' : 'Удалить'}
+            {confirmLabel}
           </button>
         </div>
       </div>
@@ -216,6 +214,8 @@ export function EventAlbums({
   const [gridAlbum, setGridAlbum] = useState<IAlbum | null>(null);
   const [formAlbum, setFormAlbum] = useState<IAlbum | null | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<IAlbum | null>(null);
+  const [deleteStage, setDeleteStage] = useState<'confirm' | 'photos'>('confirm');
+  const [checkingPhotos, setCheckingPhotos] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [coverVersionByAlbumId, setCoverVersionByAlbumId] = useState<Record<string, number>>({});
 
@@ -263,15 +263,37 @@ export function EventAlbums({
     void loadAlbums();
   };
 
-  const handleDelete = async () => {
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null);
+    setDeleteStage('confirm');
+  };
+
+  const performDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
       await deleteAlbum(deleteTarget.id);
       setAlbums(prev => prev.filter(a => a.id !== deleteTarget.id));
-      setDeleteTarget(null);
+      closeDeleteDialog();
     } catch { /* ignore */ }
     finally { setDeleting(false); }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setCheckingPhotos(true);
+    let hasPhotos = false;
+    try {
+      const files = await getAlbumFiles(deleteTarget.id, 1, 1);
+      hasPhotos = files.length > 0;
+    } catch { /* если проверку не удалось выполнить — удаляем напрямую */ }
+    finally { setCheckingPhotos(false); }
+
+    if (hasPhotos) {
+      setDeleteStage('photos');
+    } else {
+      await performDelete();
+    }
   };
 
   const renderGrid = (items: IAlbum[], useCompactGrid = false) => (
@@ -311,12 +333,24 @@ export function EventAlbums({
           onSaved={handleAlbumSaved}
         />
       )}
-      {deleteTarget && (
+      {deleteTarget && deleteStage === 'confirm' && (
         <DeleteAlbumDialog
-          albumName={deleteTarget.name}
+          title="Удалить альбом?"
+          text={`Альбом «${deleteTarget.name}» будет удалён без возможности восстановления.`}
+          confirmLabel={checkingPhotos ? 'Проверка...' : 'Удалить'}
+          loading={checkingPhotos || deleting}
+          onConfirm={() => void handleConfirmDelete()}
+          onClose={() => { if (!checkingPhotos && !deleting) closeDeleteDialog(); }}
+        />
+      )}
+      {deleteTarget && deleteStage === 'photos' && (
+        <DeleteAlbumDialog
+          title="В альбоме есть фотографии"
+          text="Фотографии, находящиеся в альбоме будут удалены безвозвратно. Всё равно удалить?"
+          confirmLabel={deleting ? 'Удаление...' : 'Всё равно удалить'}
           loading={deleting}
-          onConfirm={() => void handleDelete()}
-          onClose={() => !deleting && setDeleteTarget(null)}
+          onConfirm={() => void performDelete()}
+          onClose={() => { if (!deleting) closeDeleteDialog(); }}
         />
       )}
     </>
