@@ -213,8 +213,8 @@ function MessageThreadInner({
         position: 'fixed',
         left:
           slot.width > 0
-            ? Math.min(slot.left + slot.width - 52 - 8, window.innerWidth - 60)
-            : window.innerWidth - 60,
+            ? Math.max(12, slot.left + 8)
+            : 16,
         bottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
         zIndex: 499,
       }
