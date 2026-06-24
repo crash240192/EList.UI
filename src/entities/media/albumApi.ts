@@ -1,6 +1,7 @@
 // entities/media/albumApi.ts
 
 import { apiClient } from '@/shared/api/client';
+import type { PagedList } from '@/shared/api/types';
 
 export interface IAlbumParams {
   albumId?: string;
@@ -60,6 +61,32 @@ export async function deleteAlbum(albumId: string): Promise<void> {
 export async function getEventAlbums(eventId: string): Promise<IAlbum[]> {
   const res = await apiClient.get<IAlbum[]>(`/api/media/albums/byEvent/${eventId}`);
   return ((res as any).result ?? res) as IAlbum[];
+}
+
+export interface IEventAlbumsEvent {
+  id: string;
+  startTime: string;
+  name: string;
+  latitude?: number;
+  longitude?: number;
+  colors?: string[];
+}
+
+export interface IEventAlbumsGroup {
+  event: IEventAlbumsEvent;
+  albums: IAlbum[];
+}
+
+/** Альбомы, сгруппированные по мероприятиям, доступные аккаунту */
+export async function getAlbumsByEvents(
+  accountId: string,
+  pageIndex = 0,
+  pageSize = 10,
+): Promise<PagedList<IEventAlbumsGroup>> {
+  const res = await apiClient.get<PagedList<IEventAlbumsGroup>>(
+    `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}`,
+  );
+  return ((res as { result?: PagedList<IEventAlbumsGroup> }).result ?? res) as PagedList<IEventAlbumsGroup>;
 }
 
 export interface IAlbumFile {
