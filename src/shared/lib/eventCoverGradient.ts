@@ -31,6 +31,7 @@ function seededUnit(seed: string, index: number): number {
 }
 
 function withAlpha(hex: string, alpha: number): string {
+  if (typeof hex !== 'string' || !hex) return DEFAULT_COLORS[0];
   const raw = hex.replace('#', '');
   const full = raw.length === 3
     ? raw.split('').map(c => c + c).join('')
@@ -44,12 +45,13 @@ function withAlpha(hex: string, alpha: number): string {
  * CSS background: базовый линейный градиент + несколько radial-gradient «пятен»
  * в детерминированных позициях (seed), чтобы обложка не менялась при перерисовке.
  */
-export function buildEventCoverBackground(seed: string, colors?: string[]): string {
-  const palette = colors?.length ? colors : DEFAULT_COLORS;
-  const blobCount = Math.min(Math.max(palette.length + 1, 3), 5);
+export function buildEventCoverBackground(seed: string, colors?: Array<string | null | undefined>): string {
+  const palette = colors?.filter((c): c is string => typeof c === 'string' && c.length > 0) ?? [];
+  const resolved = palette.length ? palette : DEFAULT_COLORS;
+  const blobCount = Math.min(Math.max(resolved.length + 1, 3), 5);
 
   const blobs = Array.from({ length: blobCount }, (_, i) => {
-    const color = palette[i % palette.length];
+    const color = resolved[i % resolved.length];
     const x = 12 + seededUnit(seed, i * 3) * 76;
     const y = 10 + seededUnit(seed, i * 3 + 1) * 80;
     const size = 42 + seededUnit(seed, i * 3 + 2) * 38;
@@ -57,8 +59,8 @@ export function buildEventCoverBackground(seed: string, colors?: string[]): stri
     return `radial-gradient(ellipse ${size.toFixed(0)}% ${(size * 1.15).toFixed(0)}% at ${x.toFixed(1)}% ${y.toFixed(1)}%, ${withAlpha(color, alpha)} 0%, transparent 72%)`;
   });
 
-  const c0 = palette[0];
-  const c1 = palette[palette.length > 1 ? 1 : 0];
+  const c0 = resolved[0];
+  const c1 = resolved[resolved.length > 1 ? 1 : 0];
   const base = `linear-gradient(145deg, ${c0} 0%, ${c1} 100%)`;
   return [...blobs, base].join(', ');
 }
