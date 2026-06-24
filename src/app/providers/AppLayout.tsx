@@ -46,10 +46,6 @@ export function AppLayout() {
     navigate('/login', { replace: true });
   };
 
-  useEffect(() => {
-    document.body.classList.toggle('light-theme', theme === 'light');
-  }, [theme]);
-
   // Закрытие sidebar по Escape
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setSidebarExpanded(false); };
