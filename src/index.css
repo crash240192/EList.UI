@@ -9,33 +9,24 @@
 }
 
 :root {
-  /* Тёмная тема (по умолчанию) — не pitch-black, а приятный тёмно-синеватый */
-  --bg:             #16171e;   /* фон страницы */
-  --surface:        #1f2028;   /* карточки, панели */
-  --surface-2:      #272932;   /* вложенные элементы, инпуты */
-  --border:         #32343f;   /* разделители */
-  --accent:         #6366f1;
-  --accent-hover:   #4f46e5;
-  --text-primary:   #f0f1f7;
+  /* Fallback до theme-init (синхронизировано с themes/default/dark.ts) */
+  --bg: #16171e;
+  --surface: #1f2028;
+  --surface-2: #272932;
+  --border: #32343f;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --text-primary: #f0f1f7;
   --text-secondary: #b8bac8;
-  --text-muted:     #7a7c8c;
-  --success:        #22c55e;
-  --danger:         #ef4444;
-  --warning:        #f59e0b;
-  --header-h:       49px;
-  --sidebar-w:      220px;
-  --radius:         12px;
-  --transition:     0.18s ease;
-}
-
-.light-theme {
-  --bg:             #dfe3ea;
-  --surface:        #f0f2f6;
-  --surface-2:      #e6e9f0;
-  --border:         #ccd2dc;
-  --text-primary:   #1a1f2e;
-  --text-secondary: #5c6370;
-  --text-muted:     #8a919d;
+  --text-muted: #7a7c8c;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  /* Структурные переменные */
+  --header-h: 49px;
+  --sidebar-w: 220px;
+  --radius: 12px;
+  --transition: 0.18s ease;
 }
 
 html {
@@ -77,7 +68,7 @@ input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; }
 * { transition: background-color var(--transition), border-color var(--transition); }
 /* Кнопки — добавляем переход для box-shadow */
 button { transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition); }
-button:hover:not(:disabled) { box-shadow: 0 0 8px 2px rgba(99, 102, 241, 0.3); }
+button:hover:not(:disabled) { box-shadow: 0 0 8px 2px color-mix(in srgb, var(--accent) 30%, transparent); }
 /* Но не для анимаций */
 *[class*='skeleton'],
 *[class*='Skeleton'] { transition: none; }

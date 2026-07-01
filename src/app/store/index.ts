@@ -12,12 +12,13 @@ import { getActivationRequired, setActivationRequired, logout as apiLogout } fro
 
 // ---- Theme Store ----
 
-type Theme = 'dark' | 'light';
+import type { ThemeMode } from '@/shared/config/theme.types';
+import { applyThemeMode } from '@/shared/config/themes/applyTheme';
 
 interface ThemeState {
-  theme: Theme;
+  theme: ThemeMode;
   toggleTheme: () => void;
-  setTheme: (t: Theme) => void;
+  setTheme: (t: ThemeMode) => void;
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -26,16 +27,21 @@ export const useThemeStore = create<ThemeState>()(
       theme: 'dark',
       toggleTheme: () =>
         set((s) => {
-          const next = s.theme === 'dark' ? 'light' : 'dark';
-          document.body.classList.toggle('light-theme', next === 'light');
+          const next: ThemeMode = s.theme === 'dark' ? 'light' : 'dark';
+          applyThemeMode(next);
           return { theme: next };
         }),
       setTheme: (theme) => {
-        document.body.classList.toggle('light-theme', theme === 'light');
+        applyThemeMode(theme);
         set({ theme });
       },
     }),
-    { name: 'elist-theme' }
+    {
+      name: 'elist-theme',
+      onRehydrateStorage: () => (state) => {
+        if (state) applyThemeMode(state.theme);
+      },
+    },
   )
 );
 

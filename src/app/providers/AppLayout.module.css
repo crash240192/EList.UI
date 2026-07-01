@@ -1,31 +1,11 @@
 /* AppLayout.module.css */
 
 :root {
-  --bg:             #0f0f0f;
-  --surface:        #1a1a1a;
-  --surface-2:      #222222;
-  --border:         #2a2a2a;
-  --accent:         #6366f1;
-  --accent-hover:   #4f46e5;
-  --text-primary:   #e0e0e0;
-  --text-secondary: #888888;
-  --text-muted:     #555555;
-  --success:        #22c55e;
-  --danger:         #ef4444;
-  --warning:        #f59e0b;
+  /* Цвета задаются из src/shared/config/themes/* через applyThemeMode() */
   --header-h:       56px;
   --sidebar-icons:  52px;
   --sidebar-full:   220px;
   --transition:     0.22s ease;
-}
-:global(.light-theme) {
-  --bg:             #dfe3ea;
-  --surface:        #f0f2f6;
-  --surface-2:      #e6e9f0;
-  --border:         #ccd2dc;
-  --text-primary:   #1a1f2e;
-  --text-secondary: #5c6370;
-  --text-muted:     #8a919d;
 }
 
 /* ---- Root ---- */
