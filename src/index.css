@@ -51,8 +51,7 @@ body {
   overflow-x: hidden; /* дублируем на body для надёжности */
   background: var(--bg);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, sans-serif;
+  font-family: Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', 'Lucida Console', monospace;
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
