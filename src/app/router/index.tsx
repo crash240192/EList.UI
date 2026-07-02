@@ -1,6 +1,6 @@
 // app/router/index.tsx
 
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
@@ -10,18 +10,21 @@ import { registerSessionUnauthorizedHandler } from '@/shared/auth/sessionUnautho
 import { useAuthStore, useToastStore } from '@/app/store';
 import { ToastContainer } from '@/shared/ui/Toast/Toast';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
+import { lazyWithRetry } from '@/shared/lib/lazyWithRetry';
 
-const HomePage        = lazy(() => import('@/pages/home/HomePage'));
-const EventPage       = lazy(() => import('@/pages/event/EventPage'));
-const UserPage        = lazy(() => import('@/pages/user/UserPage'));
-const MyEventsPage    = lazy(() => import('@/pages/my-events/MyEventsPage'));
-const CreateEventPage = lazy(() => import('@/pages/create-event/CreateEventPage'));
-const AdminPage       = lazy(() => import('@/pages/admin/AdminPage'));
-const SettingsPage    = lazy(() => import('@/pages/settings/SettingsPage'));
-const WalletPage      = lazy(() => import('@/pages/wallet/WalletPage'));
-const LoginPage       = lazy(() => import('@/pages/auth/LoginPage'));
-const ActivationPage  = lazy(() => import('@/pages/auth/ActivationPage'));
-const RegisterPage    = lazy(() => import('@/pages/auth/RegisterPage'));
+const HomePage        = lazyWithRetry(() => import('@/pages/home/HomePage'));
+const EventPage       = lazyWithRetry(() => import('@/pages/event/EventPage'));
+const UserPage        = lazyWithRetry(() => import('@/pages/user/UserPage'));
+const MyEventsPage    = lazyWithRetry(() => import('@/pages/my-events/MyEventsPage'));
+const CreateEventPage = lazyWithRetry(() => import('@/pages/create-event/CreateEventPage'));
+const AdminPage       = lazyWithRetry(() => import('@/pages/admin/AdminPage'));
+const SettingsPage    = lazyWithRetry(() => import('@/pages/settings/SettingsPage'));
+const WalletPage      = lazyWithRetry(() => import('@/pages/wallet/WalletPage'));
+const LoginPage       = lazyWithRetry(() => import('@/pages/auth/LoginPage'));
+const ActivationPage  = lazyWithRetry(() => import('@/pages/auth/ActivationPage'));
+const RegisterPage    = lazyWithRetry(() => import('@/pages/auth/RegisterPage'));
+const InvitationsPage = lazyWithRetry(() => import('@/pages/invitations/InvitationsPage'));
+const EventAlbumsPage = lazyWithRetry(() => import('@/pages/event-albums/EventAlbumsPage'));
 
 const Loader = () => (
   <div
@@ -55,8 +58,8 @@ const router = createBrowserRouter([
       { index: true,              element: S(HomePage) },
       { path: 'event/:id',        element: S(EventPage) },
       { path: 'user/:id',         element: S(UserPage) },
-      { path: 'invitations',       element: S(lazy(() => import('@/pages/invitations/InvitationsPage'))) },
-      { path: 'event-albums',      element: S(lazy(() => import('@/pages/event-albums/EventAlbumsPage'))) },
+      { path: 'invitations',       element: S(InvitationsPage) },
+      { path: 'event-albums',      element: S(EventAlbumsPage) },
       { path: 'my-events',        element: S(MyEventsPage) },
       { path: 'create-event',     element: S(CreateEventPage) },
       { path: 'edit-event/:id',   element: S(CreateEventPage) },

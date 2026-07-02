@@ -41,6 +41,10 @@ function withQuietProxyErrors(options: ProxyOptions): ProxyOptions {
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // Один CSS-бандл: lazy-роуты не тянут отдельные *.css после деплоя
+    cssCodeSplit: false,
+  },
   optimizeDeps: {
     include: ['html5-qrcode'],
   },
