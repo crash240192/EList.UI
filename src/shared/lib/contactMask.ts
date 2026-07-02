@@ -1,23 +1,51 @@
 // shared/lib/contactMask.ts
 // Валидация контактов по regex-маске приходящей с бэкенда
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Маска из API — regex (например "^7\\d{10}$") или подсказка формата ("_@_._"). */
+export function isRegexMask(mask: string): boolean {
+  return (
+    mask.startsWith('^')
+    || mask.includes('\\d')
+    || mask.includes('\\w')
+    || mask.includes('\\s')
+    || mask.includes('?')
+    || mask.includes('[')
+  );
+}
+
 /**
  * Проверяет значение по regex-маске из API.
  * mask — строка regex (например "^[^\s@]+@[^\s@]+\.[^\s@]+$")
+ * или человекочитаемая подсказка (например "_@_._").
  * Возвращает текст ошибки или null если всё ок.
  */
 export function validateContactValue(value: string, mask: string | null): string | null {
   if (!value.trim()) return 'Введите контактные данные';
   if (!mask) return null;
 
-  try {
-    const regex = new RegExp(mask);
-    if (!regex.test(value.trim())) {
-      return `Значение не соответствует требуемому формату`;
+  const trimmed = value.trim();
+
+  if (isRegexMask(mask)) {
+    try {
+      const regex = new RegExp(mask);
+      if (!regex.test(trimmed)) {
+        return 'Значение не соответствует требуемому формату';
+      }
+    } catch {
+      // Невалидный regex — пропускаем валидацию
     }
-  } catch {
-    // Невалидный regex — пропускаем валидацию
+    return null;
   }
+
+  // Подсказка вида "_@_._" — не regex, для email проверяем стандартным паттерном
+  if (mask.includes('@')) {
+    if (!EMAIL_REGEX.test(trimmed)) {
+      return 'Значение не соответствует требуемому формату';
+    }
+  }
+
   return null;
 }
 
