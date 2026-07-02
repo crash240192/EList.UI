@@ -12,7 +12,8 @@ import { useEventOrganizers } from '@/features/event/useEventOrganizers';
 import { useToastStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { apiClient } from '@/shared/api/client';
-import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { EventHeroCover } from '@/features/event/EventHeroCover';
+import { useEventHeadAlbumPhotos } from '@/features/event/useEventHeadAlbumPhotos';
 import { ParticipantsChipPreview } from '@/features/event/ParticipantsChipPreview';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ParticipantsModal } from '@/features/event/ParticipantsModal';
@@ -74,6 +75,8 @@ export default function EventPage() {
     denied: organizersDenied,
     refetch: refetchOrganizers,
   } = useEventOrganizers(id, accountId);
+
+  const headAlbumFileIds = useEventHeadAlbumPhotos(id);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
 
@@ -305,15 +308,12 @@ export default function EventPage() {
       <div className={styles.card}>
 
         {/* ── Hero ── */}
-        <div className={styles.hero} style={!(event.coverImageId || event.coverUrl) ? {
-          background: getEventCoverBackground(event),
-        } : undefined}>
-          {event.coverImageId ? (
-            <AuthImage fileId={event.coverImageId} fullSize imageFit="cover" alt={event.name} className={styles.heroImg}
-              fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.heroImg} /> : undefined} />
-          ) : event.coverUrl ? (
-            <img src={event.coverUrl} alt={event.name} className={styles.heroImg} />
-          ) : null}
+        <div className={styles.hero}>
+          <EventHeroCover
+            event={event}
+            headAlbumFileIds={headAlbumFileIds}
+            fallbackBackground={getEventCoverBackground(event)}
+          />
           <div className={styles.heroOverlay} />
 
           <div className={styles.heroTop}>
