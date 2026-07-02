@@ -9,6 +9,7 @@ import {
   isAuthenticated as clientIsAuthenticated,
 } from '@/shared/api/client';
 import { getActivationRequired, setActivationRequired, logout as apiLogout } from '@/features/auth/api';
+import { clearLocationSession } from '@/features/auth/locationSession';
 
 // ---- Theme Store ----
 
@@ -104,6 +105,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   logout: () => {
     apiLogout();
+    clearLocationSession();
+    useFiltersStore.getState().setMapCenter(null);
     set({ token: null, accountId: null, activationRequired: false });
   },
 

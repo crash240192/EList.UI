@@ -3,19 +3,28 @@
 import { useState, useEffect } from 'react';
 import { updateLocation } from '@/entities/user/settingsApi';
 import { cookies } from '@/shared/lib/cookies';
-import { apiClient } from '@/shared/api/client';
-import { isAuthenticated } from '@/shared/api/client';
+import { apiClient, isAuthenticated } from '@/shared/api/client';
+import { useAuthStore } from '@/app/store';
+import {
+  type UserCoords,
+  COOKIE_LAT,
+  COOKIE_LNG,
+  COOKIE_ACCOUNT_LAT,
+  COOKIE_ACCOUNT_LNG,
+  COOKIE_DECISION_DONE,
+  COOKIE_HOME_CITY_NAME,
+  COOKIE_CITY_NAME,
+  readCookieCoords,
+  writeCookieCoords,
+  readLocationAccountId,
+  storeLocationAccountId,
+  notifyHomeCityChanged,
+} from './locationSession';
 
-const COOKIE_LAT          = 'elist_user_lat';      // выбранные координаты для карты
-const COOKIE_LNG          = 'elist_user_lng';
-const COOKIE_ACCOUNT_LAT  = 'elist_acct_lat';      // последние известные координаты аккаунта
-const COOKIE_ACCOUNT_LNG  = 'elist_acct_lng';
-const COOKIE_DECISION_DONE = 'elist_city_decided'; // "1" — пользователь уже ответил на диалог
+export type { UserCoords };
 
-export interface UserCoords { lat: number; lng: number; }
 const MOSCOW: UserCoords = { lat: 55.7558, lng: 37.6173 };
 const CITY_CHANGE_THRESHOLD_KM = 200;
-// Если аккаунтные координаты изменились более чем на N км — сбрасываем решение
 const ACCOUNT_CHANGE_THRESHOLD_KM = 50;
 
 function haversineKm(a: UserCoords, b: UserCoords): number {
@@ -27,18 +36,6 @@ function haversineKm(a: UserCoords, b: UserCoords): number {
     * Math.cos((b.lat * Math.PI) / 180)
     * Math.sin(dN / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-}
-
-function readCookieCoords(latKey: string, lngKey: string): UserCoords | null {
-  const la = cookies.get(latKey), lo = cookies.get(lngKey);
-  if (!la || !lo) return null;
-  const lat = parseFloat(la), lng = parseFloat(lo);
-  return isNaN(lat) || isNaN(lng) ? null : { lat, lng };
-}
-
-function writeCookieCoords(latKey: string, lngKey: string, c: UserCoords): void {
-  cookies.set(latKey, String(c.lat), 30);
-  cookies.set(lngKey, String(c.lng), 30);
 }
 
 function storeUserCoords(c: UserCoords)    { writeCookieCoords(COOKIE_LAT, COOKIE_LNG, c); }
@@ -82,6 +79,13 @@ async function getCityName(c: UserCoords): Promise<string> {
   } catch { return `${c.lat.toFixed(2)}, ${c.lng.toFixed(2)}`; }
 }
 
+function refreshHomeCityName(accountCoords: UserCoords, cancelled: () => boolean): void {
+  getCityName(accountCoords).then(name => {
+    if (cancelled() || !name) return;
+    notifyHomeCityChanged(accountCoords, name);
+  }).catch(() => {});
+}
+
 export interface UseUserLocationResult {
   coords:          UserCoords;
   showCityConfirm: boolean;
@@ -92,6 +96,7 @@ export interface UseUserLocationResult {
 }
 
 export function useUserLocation(): UseUserLocationResult {
+  const token = useAuthStore(s => s.token);
   const [coords,          setCoords]          = useState<UserCoords>(readUserCoords() ?? MOSCOW);
   const [showCityConfirm, setShowCityConfirm] = useState(false);
   const [detectedCity,    setDetectedCity]    = useState('');
@@ -99,14 +104,17 @@ export function useUserLocation(): UseUserLocationResult {
 
   useEffect(() => {
     let cancelled = false;
+    const isCancelled = () => cancelled;
 
     async function init() {
-      // 1. Получаем координаты аккаунта
       let accountCoords: UserCoords | null = null;
+      let accountId: string | null = null;
+
       if (isAuthenticated()) {
         try {
-          const r = await apiClient.get<any>('/api/accounts/getData');
+          const r = await apiClient.get<{ id?: string; latitude?: number; longitude?: number }>('/api/accounts/getData');
           const d = r.result;
+          accountId = d?.id ?? null;
           const lat = Number(d?.latitude);
           const lng = Number(d?.longitude);
           if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
@@ -117,7 +125,6 @@ export function useUserLocation(): UseUserLocationResult {
       if (cancelled) return;
 
       if (!accountCoords) {
-        // Нет координат в аккаунте — используем cookies или IP
         const cached = readUserCoords();
         if (cached) { setCoords(cached); return; }
         const detected = await detectCurrentCoords();
@@ -128,44 +135,32 @@ export function useUserLocation(): UseUserLocationResult {
         return;
       }
 
-      // 2. Есть координаты аккаунта
-      //    Проверяем, менялись ли они с прошлого раза
+      const prevLocationAccountId = readLocationAccountId();
+      const switchedAccount = !!accountId && accountId !== prevLocationAccountId;
+      if (accountId) storeLocationAccountId(accountId);
+
       const prevAccountCoords = readAccountCoords();
-      const accountChanged = !prevAccountCoords
+      const coordsChanged = !prevAccountCoords
         || haversineKm(prevAccountCoords, accountCoords) > ACCOUNT_CHANGE_THRESHOLD_KM;
 
-      if (accountChanged) {
-        // Координаты аккаунта изменились → сбрасываем старое решение пользователя
+      if (switchedAccount || coordsChanged) {
         clearCityDecision();
         storeAccountCoords(accountCoords);
-        // Ставим координаты аккаунта как текущие
         setCoords(accountCoords);
         storeUserCoords(accountCoords);
+        notifyHomeCityChanged(accountCoords, cookies.get(COOKIE_HOME_CITY_NAME) ?? '');
+        refreshHomeCityName(accountCoords, isCancelled);
       } else {
-        // Координаты аккаунта те же — используем то что пользователь выбрал ранее
         const userChosen = readUserCoords();
         if (userChosen) {
           setCoords(userChosen);
         } else {
           setCoords(accountCoords);
           storeUserCoords(accountCoords);
+          notifyHomeCityChanged(accountCoords, cookies.get(COOKIE_HOME_CITY_NAME) ?? '');
         }
       }
 
-      // Если название родного города ещё не записано (или координаты сменились) —
-      // геокодируем и сохраняем, затем обновляем FilterBar через событие
-      const existingHomeName = cookies.get('elist_home_city_name');
-      if (!existingHomeName || accountChanged) {
-        getCityName(accountCoords).then(name => {
-          if (cancelled || !name) return;
-          cookies.set('elist_home_city_name', name, 30);
-          window.dispatchEvent(new CustomEvent('elist:homeCityChanged', {
-            detail: { lat: accountCoords.lat, lng: accountCoords.lng, name },
-          }));
-        }).catch(() => {});
-      }
-
-      // 3. Показываем диалог только если пользователь ещё не принял решение
       if (isDecisionDone()) return;
 
       const current = await detectCurrentCoords();
@@ -178,43 +173,32 @@ export function useUserLocation(): UseUserLocationResult {
         setDetectedCity(city);
         setShowCityConfirm(true);
       } else {
-        // Всё в порядке — запоминаем что диалог не нужен
         markDecisionDone();
       }
     }
 
     init();
     return () => { cancelled = true; };
-  }, []);
+  }, [token]);
 
   const confirmCity = () => {
     if (!pendingCoords) return;
-    // Обновляем родной город в профиле
     updateLocation(pendingCoords.lat, pendingCoords.lng).catch(() => {});
-    // Сохраняем новые координаты как текущие
     setCoords(pendingCoords);
     storeUserCoords(pendingCoords);
     storeAccountCoords(pendingCoords);
-    // Сохраняем название родного города в отдельную cookie
     if (detectedCity) {
-      cookies.set('elist_home_city_name', detectedCity, 30);
-      cookies.set('elist_city_name', detectedCity, 30);
+      notifyHomeCityChanged(pendingCoords, detectedCity);
     }
-    // Диспатчим событие чтобы FilterBar обновил city name
-    window.dispatchEvent(new CustomEvent('elist:homeCityChanged', {
-      detail: { lat: pendingCoords.lat, lng: pendingCoords.lng, name: detectedCity },
-    }));
     markDecisionDone();
     setShowCityConfirm(false);
   };
 
   const keepOldCity = () => {
-    // Пользователь остался в старом городе — просто закрываем диалог
     markDecisionDone();
     setShowCityConfirm(false);
   };
 
-  // Слушаем изменение родного города из настроек профиля
   useEffect(() => {
     const handler = () => triggerCityCheck();
     window.addEventListener('elist:profileCityChanged', handler);
@@ -226,7 +210,6 @@ export function useUserLocation(): UseUserLocationResult {
     clearCityDecision();
     setShowCityConfirm(false);
     setDetectedCity('');
-    // Перезапускаем определение местоположения
     detectCurrentCoords().then(async current => {
       if (!current) return;
       const accountCoords = readUserCoords();
@@ -242,6 +225,8 @@ export function useUserLocation(): UseUserLocationResult {
 
   return { coords, showCityConfirm, detectedCity, confirmCity, keepOldCity, triggerCityCheck };
 }
+
+export { clearLocationSession } from './locationSession';
 
 export function getStoredUserCoords(): UserCoords {
   return readUserCoords() ?? MOSCOW;
