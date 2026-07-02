@@ -19,7 +19,7 @@ import { useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
-import { validateContactValue, getMaskInputMode } from '@/shared/lib/contactMask';
+import { validateContactValue, getMaskInputMode, isRegexMask } from '@/shared/lib/contactMask';
 import { Select, type SelectOption } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
@@ -60,7 +60,7 @@ function getContactPlaceholder(ct: import('@/features/auth/registrationApi').ICo
   if (name.includes('whatsapp'))
     return '+7 (999) 123-45-67';
   // Если маска выглядит как regex — скрываем её, показываем generic
-  if (ct.mask && (ct.mask.startsWith('^') || ct.mask.includes('\\d') || ct.mask.includes('?')))
+  if (ct.mask && isRegexMask(ct.mask))
     return `Введите ${ct.name ?? 'контакт'}`;
   // Если маска — человекочитаемый пример, показываем её
   return ct.mask ?? `Введите ${ct.name ?? 'контакт'}`;
