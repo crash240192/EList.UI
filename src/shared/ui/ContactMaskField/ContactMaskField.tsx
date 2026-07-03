@@ -1,40 +1,14 @@
 // shared/ui/ContactMaskField/ContactMaskField.tsx
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import {
-  buildContactMaskSegments,
+  buildContactDisplayValue,
   extractRawFromValue,
   processEmailRaw,
   processPhoneRaw,
   resolveContactMaskTemplate,
-  type MaskSegment,
 } from '@/shared/lib/contactMaskFormat';
-import styles from '@/shared/ui/DatePicker/DatePicker.module.css';
-
-const SEG_CLASS: Record<MaskSegment['type'], string> = {
-  filled: styles.maskFilled,
-  ghost:  styles.maskGhost,
-  sep:    styles.maskSep,
-};
-
-function MaskVisual({ segments, focused }: { segments: MaskSegment[]; focused?: boolean }) {
-  let caretPlaced = false;
-  return (
-    <div className={styles.maskVisual} aria-hidden="true">
-      {segments.map((seg, i) => {
-        const placeCaret = Boolean(focused) && !caretPlaced && seg.type === 'ghost';
-        if (placeCaret) caretPlaced = true;
-        return (
-          <span key={i}>
-            {placeCaret && <span className={styles.maskCaret} />}
-            <span className={SEG_CLASS[seg.type]}>{seg.text}</span>
-          </span>
-        );
-      })}
-      {focused && !caretPlaced && <span className={styles.maskCaret} />}
-    </div>
-  );
-}
+import styles from './ContactMaskField.module.css';
 
 interface ContactMaskFieldProps {
   mask: string | null;
@@ -44,6 +18,12 @@ interface ContactMaskFieldProps {
   onBlur?: () => void;
   ariaLabel?: string;
   className?: string;
+}
+
+function hasTextSelection(input: HTMLInputElement): boolean {
+  const start = input.selectionStart ?? 0;
+  const end = input.selectionEnd ?? 0;
+  return start !== end;
 }
 
 export function ContactMaskField({
@@ -56,9 +36,7 @@ export function ContactMaskField({
   className,
 }: ContactMaskFieldProps) {
   const template = resolveContactMaskTemplate(mask, typeName);
-  const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const replaceAllRef = useRef(false);
 
   if (!template) {
     return (
@@ -77,7 +55,7 @@ export function ContactMaskField({
 
   const isPhone = template.includes('#');
   const raw = extractRawFromValue(template, value);
-  const segments = buildContactMaskSegments(template, raw);
+  const displayValue = buildContactDisplayValue(template, raw);
 
   const applyRaw = (nextRaw: string) => {
     const processed = isPhone
@@ -87,25 +65,21 @@ export function ContactMaskField({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
     const mod = e.ctrlKey || e.metaKey;
+    const selected = hasTextSelection(input);
 
-    if (mod && e.key.toLowerCase() === 'a') {
-      e.preventDefault();
-      replaceAllRef.current = true;
-      return;
-    }
+    if (mod && e.key.toLowerCase() === 'a') return;
 
     if (mod && e.key === 'Backspace') {
       e.preventDefault();
-      replaceAllRef.current = false;
       applyRaw('');
       return;
     }
 
     if (e.key === 'Backspace' || e.key === 'Delete') {
       e.preventDefault();
-      if (replaceAllRef.current) {
-        replaceAllRef.current = false;
+      if (selected) {
         applyRaw('');
       } else {
         applyRaw(raw.slice(0, -1));
@@ -115,13 +89,10 @@ export function ContactMaskField({
 
     if (e.key.length !== 1 || mod || e.altKey) return;
 
-    const replaceAll = replaceAllRef.current;
-    replaceAllRef.current = false;
-
     if (isPhone) {
       if (/\d/.test(e.key)) {
         e.preventDefault();
-        applyRaw(replaceAll ? e.key : raw + e.key);
+        applyRaw(selected ? e.key : raw + e.key);
       } else {
         e.preventDefault();
       }
@@ -130,16 +101,16 @@ export function ContactMaskField({
 
     if (/[a-zA-Z0-9@._+-]/.test(e.key)) {
       e.preventDefault();
-      applyRaw(replaceAll ? e.key : raw + e.key);
+      applyRaw(selected ? e.key : raw + e.key);
     } else {
       e.preventDefault();
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const pasted = e.target.value;
-    e.target.value = '';
-    replaceAllRef.current = false;
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text');
+    if (!pasted) return;
 
     if (isPhone) {
       const digits = pasted.replace(/\D/g, '');
@@ -152,18 +123,18 @@ export function ContactMaskField({
   };
 
   return (
-    <div className={`${styles.maskField} ${className ?? ''}`} style={{ width: '100%' }}>
-      <MaskVisual segments={segments} focused={focused} />
+    <div className={`${styles.field} ${className ?? ''}`}>
       <input
         ref={inputRef}
         type="text"
         inputMode={isPhone ? 'tel' : 'email'}
         autoComplete="off"
-        className={styles.maskCapture}
+        className={styles.input}
+        value={displayValue}
         onKeyDown={handleKeyDown}
-        onChange={handleChange}
-        onFocus={() => setFocused(true)}
-        onBlur={() => { setFocused(false); onBlur?.(); }}
+        onPaste={handlePaste}
+        onChange={() => {}}
+        onBlur={onBlur}
         aria-label={ariaLabel}
       />
     </div>

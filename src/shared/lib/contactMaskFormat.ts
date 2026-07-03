@@ -143,6 +143,10 @@ export function buildContactMaskSegments(template: string, raw: string): MaskSeg
     : [{ type: 'ghost', text: GHOST_CHAR }];
 }
 
+export function buildContactDisplayValue(template: string, raw: string): string {
+  return buildContactMaskSegments(template, raw).map(seg => seg.text).join('');
+}
+
 export function validateContactValue(value: string, mask: string | null, typeName = ''): string | null {
   if (!value.trim()) return 'Введите контактные данные';
   if (!mask) return null;
