@@ -59,10 +59,12 @@ export function phoneDigitsFromValue(value: string): string {
   return d.slice(0, PHONE_DIGIT_SLOTS);
 }
 
-/** Каноническое значение телефона для API / regex-валидации. */
+/** Значение телефона для API / regex-валидации: +7 (XXX) XXX-XX-XX */
 export function phoneCanonical(digits: string): string {
   const d = digits.replace(/\D/g, '').slice(0, PHONE_DIGIT_SLOTS);
-  return d.length ? `+7${d}` : '';
+  if (!d.length) return '';
+  if (d.length < PHONE_DIGIT_SLOTS) return `+7${d}`;
+  return `+7 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6, 8)}-${d.slice(8, 10)}`;
 }
 
 /** Сырые символы, которые вводит пользователь (без литералов маски). */

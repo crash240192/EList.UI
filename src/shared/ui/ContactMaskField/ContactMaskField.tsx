@@ -58,6 +58,7 @@ export function ContactMaskField({
   const template = resolveContactMaskTemplate(mask, typeName);
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const replaceAllRef = useRef(false);
 
   if (!template) {
     return (
@@ -86,18 +87,41 @@ export function ContactMaskField({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' || e.key === 'Delete') {
+    const mod = e.ctrlKey || e.metaKey;
+
+    if (mod && e.key.toLowerCase() === 'a') {
       e.preventDefault();
-      applyRaw(raw.slice(0, -1));
+      replaceAllRef.current = true;
       return;
     }
 
-    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (mod && e.key === 'Backspace') {
+      e.preventDefault();
+      replaceAllRef.current = false;
+      applyRaw('');
+      return;
+    }
+
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      e.preventDefault();
+      if (replaceAllRef.current) {
+        replaceAllRef.current = false;
+        applyRaw('');
+      } else {
+        applyRaw(raw.slice(0, -1));
+      }
+      return;
+    }
+
+    if (e.key.length !== 1 || mod || e.altKey) return;
+
+    const replaceAll = replaceAllRef.current;
+    replaceAllRef.current = false;
 
     if (isPhone) {
       if (/\d/.test(e.key)) {
         e.preventDefault();
-        applyRaw(raw + e.key);
+        applyRaw(replaceAll ? e.key : raw + e.key);
       } else {
         e.preventDefault();
       }
@@ -106,7 +130,7 @@ export function ContactMaskField({
 
     if (/[a-zA-Z0-9@._+-]/.test(e.key)) {
       e.preventDefault();
-      applyRaw(raw + e.key);
+      applyRaw(replaceAll ? e.key : raw + e.key);
     } else {
       e.preventDefault();
     }
@@ -115,6 +139,7 @@ export function ContactMaskField({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const pasted = e.target.value;
     e.target.value = '';
+    replaceAllRef.current = false;
 
     if (isPhone) {
       const digits = pasted.replace(/\D/g, '');
