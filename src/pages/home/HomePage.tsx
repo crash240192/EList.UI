@@ -61,6 +61,16 @@ export default function HomePage() {
     triggerCityCheck,
   } = useUserLocation();
 
+  // Центр карты из профиля — не ждём только FilterBar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { lat, lng } = (e as CustomEvent<{ lat: number; lng: number }>).detail;
+      setMapCenter([lat, lng]);
+    };
+    window.addEventListener('elist:homeCityChanged', handler);
+    return () => window.removeEventListener('elist:homeCityChanged', handler);
+  }, [setMapCenter]);
+
   const prevMapLoadingRef = useRef(false);
 
   // Слушаем событие сброса города из FilterBar
@@ -70,9 +80,11 @@ export default function HomePage() {
     return () => window.removeEventListener('elist:resetCityDecision', handler);
   }, [triggerCityCheck]);
 
-  // Центр карты: всегда из стора (живёт между навигациями)
+  // Центр карты: стор → фильтры → координаты пользователя → Москва (последний fallback)
   const computedCenter: [number, number] = mapCenter
-    ?? [filters.latitude ?? userCoords.lat, filters.longitude ?? userCoords.lng];
+    ?? (filters.latitude != null && filters.longitude != null
+      ? [filters.latitude, filters.longitude]
+      : [userCoords.lat, userCoords.lng]);
 
   const debouncedName = useDebounce(searchName, 300);
 

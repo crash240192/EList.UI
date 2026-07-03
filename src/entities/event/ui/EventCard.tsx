@@ -3,7 +3,7 @@
 import React, { createContext, useContext } from 'react';
 import type { IEvent } from '../types';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import styles from './EventCard.module.css';
 
@@ -57,22 +57,15 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
 
       {/* Бейджи всех типов */}
       <div className={styles.typeBadges}>
-        {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes : event.eventType ? [event.eventType] : [])!.slice(0, 2).map(t => {
-          const catColor = t.eventCategory?.color ?? '#6366f1';
-          return (
-            <div key={t.id} className={styles.typeBadge} style={{
-              background: `${catColor}55`,
-              border: `1px solid ${catColor}99`,
-              color: '#ffffff',
-            }}>
-              {t.ico && (
-                <img src={icoToUrl(t.ico) ?? ''} className="event-type-ico"
-                  alt={t.name} width={12} height={12} style={{ objectFit: 'contain', borderRadius: 2 }} />
-              )}
-              <span>{t.name}</span>
-            </div>
-          );
-        })}
+        {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes : event.eventType ? [event.eventType] : [])!.slice(0, 2).map(t => (
+          <EventTypeChip
+            key={t.id}
+            type={t}
+            variant="overlay"
+            className={styles.typeBadge}
+            iconSize={12}
+          />
+        ))}
       </div>
       {(event.parameters?.ageLimit ?? 0) > 0 && (
         <span className={styles.ageBadge}>{event.parameters!.ageLimit}+</span>

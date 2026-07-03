@@ -715,19 +715,9 @@
 }
 
 .ecTypeTag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  font-size: 9px;
   padding: 2px 8px;
   border-radius: 10px;
-  font-size: 9px;
-  font-weight: 500;
-}
-
-.ecTypeIco {
-  object-fit: contain;
-  border-radius: 2px;
-  flex-shrink: 0;
 }
 
 .ecStats {

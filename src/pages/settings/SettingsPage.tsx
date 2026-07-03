@@ -513,6 +513,7 @@ function PasswordSection() {
   const [form, setForm] = useState({
     oldPassword: '', newPassword: '', newPasswordConfirmation: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -555,28 +556,51 @@ function PasswordSection() {
         <div className={styles.frow}>
           <label className={styles.frowLabel}>Текущий пароль</label>
           <div className={styles.frowControl}>
-            <input className={styles.input} type="password"
-              value={form.oldPassword} onChange={set('oldPassword')}
-              placeholder="Введите текущий пароль"
-              onFocus={e => e.target.select()} />
+            <div className={styles.inputWrap}>
+              <input
+                className={`${styles.input} ${styles.inputWithBtn}`}
+                type={showPassword ? 'text' : 'password'}
+                value={form.oldPassword}
+                onChange={set('oldPassword')}
+                placeholder="Введите текущий пароль"
+                onFocus={e => e.target.select()}
+              />
+              <button
+                type="button"
+                className={styles.eyeBtn}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                onClick={() => setShowPassword(v => !v)}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
           </div>
         </div>
         <div className={styles.frow}>
           <label className={styles.frowLabel}>Новый пароль</label>
           <div className={styles.frowControl}>
-            <input className={styles.input} type="password"
-              value={form.newPassword} onChange={set('newPassword')}
+            <input
+              className={styles.input}
+              type={showPassword ? 'text' : 'password'}
+              value={form.newPassword}
+              onChange={set('newPassword')}
               placeholder="Минимум 6 символов"
-              onFocus={e => e.target.select()} />
+              onFocus={e => e.target.select()}
+            />
           </div>
         </div>
         <div className={styles.frow}>
           <label className={styles.frowLabel}>Подтверждение</label>
           <div className={styles.frowControl}>
-            <input className={styles.input} type="password"
-              value={form.newPasswordConfirmation} onChange={set('newPasswordConfirmation')}
+            <input
+              className={styles.input}
+              type={showPassword ? 'text' : 'password'}
+              value={form.newPasswordConfirmation}
+              onChange={set('newPasswordConfirmation')}
               placeholder="Повторите новый пароль"
-              onFocus={e => e.target.select()} />
+              onFocus={e => e.target.select()}
+            />
           </div>
         </div>
       </div>

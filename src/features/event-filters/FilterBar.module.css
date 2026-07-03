@@ -113,6 +113,7 @@
 .quickBtn:hover { border-color: var(--accent); color: var(--accent); }
 .quickBtnOn { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
 .quickBtnIcon { padding: 7px 9px; }
+.quickBtnLetter { font-size: 12px; font-weight: 600; color: currentColor; }
 
 /* 2 — «Дополнительно» и «Сбросить» прижаты вправо блоком quickRowTail */
 .quickRowTail {

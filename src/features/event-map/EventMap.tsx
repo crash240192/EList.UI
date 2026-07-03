@@ -298,6 +298,16 @@ export function EventMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Следим за центром из пропа (родной город / фильтр) после инициализации карты
+  useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    const map = mapRef.current;
+    const current = map.getCenter() as [number, number];
+    const [lat, lng] = center;
+    if (Math.abs(current[0] - lat) < 0.0001 && Math.abs(current[1] - lng) < 0.0001) return;
+    map.setCenter(center, zoom, { checkZoomRange: true, duration: ready ? 400 : 0 });
+  }, [center, zoom, ready]);
+
   // Маркеры
   useEffect(() => {
     if (!ready || !mapRef.current) return;

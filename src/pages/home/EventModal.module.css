@@ -76,10 +76,10 @@
   display: flex; gap: 5px; flex-wrap: wrap;
 }
 .typeChip {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
-  color: #fff; font-size: 10px; font-weight: 500;
-  padding: 3px 9px; border-radius: 20px;
+  backdrop-filter: blur(4px);
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 20px;
 }
 
 /* Body */

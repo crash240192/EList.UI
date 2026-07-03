@@ -23,9 +23,8 @@ import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useAvatar } from '@/features/auth/useAvatar';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
-import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import {
-  contrastColor,
   countUniqueUserEvents,
   formatContactHref,
   formatEventListDate,
@@ -225,31 +224,15 @@ function UserEventCard({
         </div>
         {types.length > 0 && (
           <div className={styles.ecTags}>
-            {types.map(t => {
-              const catColor = t.eventCategory?.color ?? '#6366f1';
-              return (
-                <span
-                  key={t.id}
-                  className={styles.ecTypeTag}
-                  style={{
-                    background: `${catColor}55`,
-                    border: `1px solid ${catColor}99`,
-                    color: contrastColor(catColor),
-                  }}
-                >
-                  {t.ico && (
-                    <img
-                      src={icoToUrl(t.ico) ?? ''}
-                      alt=""
-                      width={10}
-                      height={10}
-                      className={styles.ecTypeIco}
-                    />
-                  )}
-                  {t.name}
-                </span>
-              );
-            })}
+            {types.map(t => (
+              <EventTypeChip
+                key={t.id}
+                type={t}
+                variant="overlay"
+                className={styles.ecTypeTag}
+                iconSize={10}
+              />
+            ))}
           </div>
         )}
         {event.participantsCount != null && (

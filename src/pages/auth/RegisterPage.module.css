@@ -35,6 +35,13 @@
 .fieldHint { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
 .loadingSelect { font-size: 13px; color: var(--text-muted); padding: 8px 0; }
 
+.contactMaskWrap {
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+}
+
 /* City search dropdown */
 .cityRow { position: relative; }
 .citySuggestions {

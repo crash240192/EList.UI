@@ -15,9 +15,8 @@ import { isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
 import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
-import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
-import { contrastColor } from '@/pages/user/userPageUtils';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import {
   findUrgentInvitation,
@@ -50,31 +49,14 @@ function EventTypeTags({ types, className }: { types: IEventType[]; className?: 
   if (types.length === 0) return null;
   return (
     <div className={className}>
-      {types.slice(0, 3).map(t => {
-        const catColor = t.eventCategory?.color ?? '#6366f1';
-        return (
-          <span
-            key={t.id}
-            className={styles.chip}
-            style={{
-              background: `${catColor}55`,
-              border: `1px solid ${catColor}99`,
-              color: contrastColor(catColor),
-            }}
-          >
-            {t.ico && (
-              <img
-                src={icoToUrl(t.ico) ?? undefined}
-                alt=""
-                width={10}
-                height={10}
-                className={styles.chipIco}
-              />
-            )}
-            {t.name}
-          </span>
-        );
-      })}
+      {types.slice(0, 3).map(t => (
+        <EventTypeChip
+          key={t.id}
+          type={t}
+          className={styles.chip}
+          iconSize={10}
+        />
+      ))}
     </div>
   );
 }

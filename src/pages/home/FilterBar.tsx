@@ -77,7 +77,7 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
   // Подставляем координаты и радиус по умолчанию
   const storedCoords = getStoredUserCoords();
   useEffect(() => {
-    if (!filters.latitude && storedCoords.lat !== 0) {
+    if (!filters.latitude && storedCoords) {
       setFilter('latitude',  storedCoords.lat);
       setFilter('longitude', storedCoords.lng);
     }
@@ -149,7 +149,7 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
     setQuickDate(null);
     setExpanded(false);
     // Восстанавливаем дефолтный радиус и координаты
-    if (storedCoords.lat !== 0) {
+    if (storedCoords) {
       setFilter('latitude',  storedCoords.lat);
       setFilter('longitude', storedCoords.lng);
     }

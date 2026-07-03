@@ -131,10 +131,10 @@ export function FilterBar({
         else setFilter('locationRange', DEFAULT_RADIUS_M);
       };
     } else {
-      if (!filters.latitude && storedCoords.lat !== 0) {
+      if (!filters.latitude && storedCoords) {
         setFilter('latitude',  storedCoords.lat);
         setFilter('longitude', storedCoords.lng);
-        // Первый заход: подставляем родной город, если поисковый ещё не задан
+        setMapCenter([storedCoords.lat, storedCoords.lng]);
         const searchName = getSearchCityName();
         const homeName = getHomeCityName();
         const label = searchName || homeName;
@@ -217,7 +217,7 @@ export function FilterBar({
     const homeName = getHomeCityName() || getSearchCityName();
     setCityName(homeName);
     if (homeName) cookies.set('elist_city_name', homeName, 30);
-    const home = storedCoords.lat !== 0 ? storedCoords : null;
+    const home = storedCoords;
     if (home) {
       setFilter('latitude',  home.lat);
       setFilter('longitude', home.lng);
@@ -405,7 +405,7 @@ export function FilterBar({
             onClick={() => toggleType(t.id)}>
             {t.ico
               ? <img src={icoToUrl(t.ico) ?? ''} alt={t.name} width={14} height={14} className="event-type-ico" style={{ objectFit: 'contain' }} />
-              : <span style={{ fontSize: 12 }}>{t.name[0]}</span>}
+              : <span className={styles.quickBtnLetter}>{t.name[0]}</span>}
           </button>
         ))}
         <button className={`${styles.quickBtn} ${(draftTypes.length > 0 || draftCats.length > 0) ? styles.quickBtnOn : ''}`}

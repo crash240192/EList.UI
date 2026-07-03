@@ -25,9 +25,9 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { DurationPicker } from '@/shared/ui/DurationPicker/DurationPicker';
-import { icoToUrl } from '@/shared/lib/icoToUrl';
 import { InviteModal } from '@/features/event/InviteModal';
 import { createConversation } from '@/entities/conversation';
+import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import type { Gender } from '@/shared/api/types';
 import { WhitelistModal } from './WhitelistModal';
@@ -134,7 +134,7 @@ export default function CreateEventPage() {
   const [coverUrl,     setCoverUrl]     = useState<string | null>(null);
   const [coverImageId, setCoverImageId] = useState<string | null>(null);
 
-  const userCoords = getStoredUserCoords();
+  const userCoords = getStoredUserCoords() ?? { lat: 55.7558, lng: 37.6173 };
 
   // Выбранные типы + полные объекты для отображения чипов
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -720,18 +720,15 @@ export default function CreateEventPage() {
             </button>
             {selectedTypeObjects.length > 0 && (
               <div className={styles.typeChips}>
-                {selectedTypeObjects.map(t => {
-                  const color = getTypeColor(t);
-                  return (
-                    <div key={t.id} className={styles.typeChip}
-                      style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
-                      {t.ico && <img src={icoToUrl(t.ico) ?? t.ico} alt="" width={14} height={14} className="event-type-ico" style={{ borderRadius: 2, objectFit: 'contain' }} />}
-                      {t.name}
-                      <button className={styles.typeChipRemove} style={{ color }}
-                        onClick={() => handleRemoveTypeChip(t.id)}>×</button>
-                    </div>
-                  );
-                })}
+                {selectedTypeObjects.map(t => (
+                  <EventTypeChip
+                    key={t.id}
+                    type={t}
+                    className={styles.typeChip}
+                    iconSize={14}
+                    onRemove={() => handleRemoveTypeChip(t.id)}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -1021,16 +1018,14 @@ export default function CreateEventPage() {
             {/* Типы мероприятия */}
             {selectedTypeObjects.length > 0 && (
               <div className={styles.previewTypes}>
-                {selectedTypeObjects.slice(0, 3).map(t => {
-                  const color = getTypeColor(t);
-                  return (
-                    <span key={t.id} className={styles.previewTypeChip}
-                      style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
-                      {t.ico && <img src={icoToUrl(t.ico) ?? undefined} alt="" width={10} height={10} className="event-type-ico" style={{ objectFit: 'contain' }} />}
-                      {t.name}
-                    </span>
-                  );
-                })}
+                {selectedTypeObjects.slice(0, 3).map(t => (
+                  <EventTypeChip
+                    key={t.id}
+                    type={t}
+                    className={styles.previewTypeChip}
+                    iconSize={10}
+                  />
+                ))}
                 {selectedTypeObjects.length > 3 && (
                   <span className={styles.previewTypeChip} style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', border: '0.5px solid var(--border)' }}>
                     +{selectedTypeObjects.length - 3}

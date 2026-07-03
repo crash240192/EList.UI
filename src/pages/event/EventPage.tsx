@@ -21,7 +21,7 @@ import { AddOrganizerModal } from '@/features/event/AddOrganizerModal';
 import { BWListModal } from '@/features/event/BWListModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import { EventMapModal } from '@/features/event-map/EventMapModal';
-import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import { EventDiscussionsPanel } from '@/features/event-discussion';
@@ -32,15 +32,6 @@ import { buildEventShareUrl, canUseNativeShare, shareLink } from '@/shared/lib/s
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
-
-/** Возвращает белый или тёмный текст под цвет фона */
-function contrastColor(hex: string): string {
-  const c = hex.replace('#', '');
-  const r = parseInt(c.slice(0, 2), 16);
-  const g = parseInt(c.slice(2, 4), 16);
-  const b = parseInt(c.slice(4, 6), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? '#1a1a2e' : '#ffffff';
-}
 
 export default function EventPage() {
   const { id }   = useParams<{ id: string }>();
@@ -64,6 +55,8 @@ export default function EventPage() {
   const [pageAccessDenied, setPageAccessDenied] = useState(false);
   const [participantsDenied, setParticipantsDenied] = useState(false);
   const limitNoticeTimerRef = useRef<number | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const {
     organizers,
@@ -74,6 +67,24 @@ export default function EventPage() {
   } = useEventOrganizers(id, accountId);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
+
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el || !event) return;
+
+    const onScroll = () => {
+      setShowScrollTop(el.scrollTop > 360);
+    };
+
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [event?.id]);
+
+  useEffect(() => {
+    if (!loading) return;
+    setShowScrollTop(false);
+  }, [loading]);
 
   useEffect(() => {
     if (!id) return;
@@ -268,6 +279,10 @@ export default function EventPage() {
     void handleParticipate();
   };
 
+  const scrollToTop = () => {
+    pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
     ...participants.filter(p => p.accountId === accountId),
@@ -277,7 +292,7 @@ export default function EventPage() {
     participantsDenied || sortedParticipants.length > 0 || maxPersons != null;
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} ref={pageRef}>
       <div className={styles.card}>
 
         {/* ── Hero ── */}
@@ -330,18 +345,15 @@ export default function EventPage() {
           </div>
 
           <div className={styles.heroBottom}>
-            {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : event.eventType ? [event.eventType] : []).map(t => {
-              const catColor = t.eventCategory?.color ?? '#6366f1';
-              return (
-                <span key={t.id} className={styles.tagType} style={{
-                  background: `${catColor}55`, border: `1px solid ${catColor}44`,
-                  color: contrastColor(catColor),
-                }}>
-                  {t.ico && <img src={icoToUrl(t.ico) ?? ''} className="event-type-ico" alt="" width={10} height={10} style={{ objectFit: 'contain' }} />}
-                  {t.name}
-                </span>
-              );
-            })}
+            {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : event.eventType ? [event.eventType] : []).map(t => (
+              <EventTypeChip
+                key={t.id}
+                type={t}
+                variant="overlay"
+                className={styles.tagType}
+                iconSize={10}
+              />
+            ))}
             {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
             {event.parameters?.ageLimit && (
               <span className={styles.tagAge}>{event.parameters.ageLimit}+</span>
@@ -640,6 +652,18 @@ export default function EventPage() {
           onClose={() => setMapModalOpen(false)}
         />
       )}
+
+      <button
+        type="button"
+        className={`${styles.scrollTopBtn} ${showScrollTop ? styles.scrollTopBtnVisible : ''}`}
+        onClick={scrollToTop}
+        aria-label="Наверх"
+        aria-hidden={!showScrollTop}
+        tabIndex={showScrollTop ? 0 : -1}
+      >
+        <ChevronUpIcon />
+        <span>Наверх</span>
+      </button>
     </div>
   );
 }

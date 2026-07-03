@@ -5,18 +5,10 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import styles from './EventModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
-
-function contrastColor(hex: string): string {
-  const c = hex.replace('#', '');
-  const r = parseInt(c.slice(0, 2), 16);
-  const g = parseInt(c.slice(2, 4), 16);
-  const b = parseInt(c.slice(4, 6), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? '#1a1a2e' : '#ffffff';
-}
 
 interface EventModalProps { event: IEvent; onClose: () => void; children?: React.ReactNode; }
 
@@ -82,20 +74,14 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
             <div className={styles.typeRow}>
               {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : [event.eventType!]).map(t => {
                 if (!t) return null;
-                const catColor = t.eventCategory?.color ?? '#6366f1';
-                const textColor = contrastColor(catColor);
                 return (
-                  <span key={t.id} className={styles.typeChip} style={{
-                    background: `${catColor}55`,
-                    border: `1px solid ${catColor}44`,
-                    color: textColor,
-                  }}>
-                    {t.ico && (
-                      <img src={icoToUrl(t.ico) ?? ''} className="event-type-ico"
-                        alt="" width={12} height={12} style={{ borderRadius: 2, objectFit: 'contain' }} />
-                    )}
-                    {t.name}
-                  </span>
+                  <EventTypeChip
+                    key={t.id}
+                    type={t}
+                    variant="overlay"
+                    className={styles.typeChip}
+                    iconSize={12}
+                  />
                 );
               })}
             </div>
