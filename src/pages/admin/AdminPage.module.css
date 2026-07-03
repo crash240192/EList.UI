@@ -33,13 +33,14 @@
 .tab {
   background: none; border: none;
   border-bottom: 2px solid transparent;
-  padding: 11px 16px 11px 0;
+  border-radius: 8px 8px 0 0;
+  padding: 11px 16px;
   font-size: 13px; font-weight: 500;
   color: var(--text-secondary); cursor: pointer;
   margin-bottom: -1px;
-  transition: color 0.15s;
+  transition: color 0.15s, background 0.15s;
 }
-.tab:hover { color: var(--text-primary); }
+.tab:hover { color: var(--text-primary); background: var(--surface-2); }
 .tabActive { color: var(--accent) !important; border-bottom-color: var(--accent); }
 
 /* ---- Content ---- */

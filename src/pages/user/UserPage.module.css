@@ -170,6 +170,20 @@
   background: none;
   cursor: pointer;
   font-family: inherit;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.avatarWrap:hover {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.avatarWrap:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .avatar {
@@ -530,13 +544,14 @@
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
   margin-bottom: -1px;
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
   white-space: nowrap;
   display: flex;
   align-items: center;
@@ -545,6 +560,7 @@
 
 .tabBtn:hover {
   color: var(--text-secondary);
+  background: var(--surface-2);
 }
 
 .tabBtnActive {
