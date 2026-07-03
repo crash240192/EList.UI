@@ -147,6 +147,24 @@ export function buildContactDisplayValue(template: string, raw: string): string 
   return buildContactMaskSegments(template, raw).map(seg => seg.text).join('');
 }
 
+/** Позиция курсора в отображаемой строке — сразу после последнего введённого символа. */
+export function getContactCaretIndex(template: string, raw: string): number {
+  if (isPhoneTemplate(template)) {
+    const digits = raw.replace(/\D/g, '');
+    let di = 0;
+    let pos = 0;
+    for (const ch of template) {
+      if (ch === '#') {
+        if (di >= digits.length) return pos;
+        di++;
+      }
+      pos++;
+    }
+    return pos;
+  }
+  return buildContactDisplayValue(template, raw).length;
+}
+
 export function validateContactValue(value: string, mask: string | null, typeName = ''): string | null {
   if (!value.trim()) return 'Введите контактные данные';
   if (!mask) return null;

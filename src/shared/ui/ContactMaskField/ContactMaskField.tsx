@@ -1,14 +1,23 @@
 // shared/ui/ContactMaskField/ContactMaskField.tsx
 
-import { useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import {
   buildContactDisplayValue,
+  buildContactMaskSegments,
   extractRawFromValue,
+  getContactCaretIndex,
   processEmailRaw,
   processPhoneRaw,
   resolveContactMaskTemplate,
+  type MaskSegment,
 } from '@/shared/lib/contactMaskFormat';
 import styles from './ContactMaskField.module.css';
+
+const SEG_CLASS: Record<MaskSegment['type'], string> = {
+  filled: styles.filled,
+  ghost:  styles.ghost,
+  sep:    styles.sep,
+};
 
 interface ContactMaskFieldProps {
   mask: string | null;
@@ -26,6 +35,16 @@ function hasTextSelection(input: HTMLInputElement): boolean {
   return start !== end;
 }
 
+function MaskVisual({ segments }: { segments: MaskSegment[] }) {
+  return (
+    <div className={styles.visual} aria-hidden="true">
+      {segments.map((seg, i) => (
+        <span key={i} className={SEG_CLASS[seg.type]}>{seg.text}</span>
+      ))}
+    </div>
+  );
+}
+
 export function ContactMaskField({
   mask,
   typeName = '',
@@ -37,6 +56,20 @@ export function ContactMaskField({
 }: ContactMaskFieldProps) {
   const template = resolveContactMaskTemplate(mask, typeName);
   const inputRef = useRef<HTMLInputElement>(null);
+  const caretIndexRef = useRef<number | null>(null);
+
+  const isPhone = Boolean(template?.includes('#'));
+  const raw = template ? extractRawFromValue(template, value) : value;
+  const displayValue = template ? buildContactDisplayValue(template, raw) : value;
+  const segments = template ? buildContactMaskSegments(template, raw) : [];
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    const pos = caretIndexRef.current;
+    if (!input || pos === null) return;
+    input.setSelectionRange(pos, pos);
+    caretIndexRef.current = null;
+  }, [displayValue]);
 
   if (!template) {
     return (
@@ -53,14 +86,15 @@ export function ContactMaskField({
     );
   }
 
-  const isPhone = template.includes('#');
-  const raw = extractRawFromValue(template, value);
-  const displayValue = buildContactDisplayValue(template, raw);
+  const scheduleCaret = (nextRaw: string) => {
+    caretIndexRef.current = getContactCaretIndex(template, nextRaw);
+  };
 
   const applyRaw = (nextRaw: string) => {
     const processed = isPhone
       ? processPhoneRaw(template, nextRaw)
       : processEmailRaw(template, nextRaw);
+    scheduleCaret(processed);
     onChange(processed);
   };
 
@@ -122,8 +156,16 @@ export function ContactMaskField({
     if (cleaned) applyRaw(cleaned);
   };
 
+  const handleFocus = () => {
+    const input = inputRef.current;
+    if (!input) return;
+    const pos = getContactCaretIndex(template, raw);
+    input.setSelectionRange(pos, pos);
+  };
+
   return (
     <div className={`${styles.field} ${className ?? ''}`}>
+      <MaskVisual segments={segments} />
       <input
         ref={inputRef}
         type="text"
@@ -133,6 +175,7 @@ export function ContactMaskField({
         value={displayValue}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
+        onFocus={handleFocus}
         onChange={() => {}}
         onBlur={onBlur}
         aria-label={ariaLabel}
