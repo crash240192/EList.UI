@@ -59,12 +59,18 @@ export function phoneDigitsFromValue(value: string): string {
   return d.slice(0, PHONE_DIGIT_SLOTS);
 }
 
-/** Значение телефона для API / regex-валидации: +7 (XXX) XXX-XX-XX */
-export function phoneCanonical(digits: string): string {
+/** Маскированный формат для проверки regex API: +7 (XXX) XXX-XX-XX */
+export function formatPhoneMasked(digits: string): string {
   const d = digits.replace(/\D/g, '').slice(0, PHONE_DIGIT_SLOTS);
   if (!d.length) return '';
   if (d.length < PHONE_DIGIT_SLOTS) return `+7${d}`;
   return `+7 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6, 8)}-${d.slice(8, 10)}`;
+}
+
+/** Компактный формат для отправки на API: +7XXXXXXXXXX */
+export function phoneApiValue(digits: string): string {
+  const d = digits.replace(/\D/g, '').slice(0, PHONE_DIGIT_SLOTS);
+  return d.length ? `+7${d}` : '';
 }
 
 /** Сырые символы, которые вводит пользователь (без литералов маски). */
@@ -87,7 +93,7 @@ export function extractRawFromValue(template: string, value: string): string {
  */
 export function composeContactValue(template: string, raw: string): string {
   if (isPhoneTemplate(template)) {
-    return phoneCanonical(raw);
+    return phoneApiValue(raw);
   }
   if (isEmailTemplate(template)) {
     return raw.replace(/[^a-zA-Z0-9@._+-]/g, '');
@@ -142,8 +148,9 @@ export function validateContactValue(value: string, mask: string | null, typeNam
   if (!mask) return null;
 
   const template = resolveContactMaskTemplate(mask, typeName);
+  const raw = template ? extractRawFromValue(template, value) : value.trim();
   const trimmed = template
-    ? composeContactValue(template, extractRawFromValue(template, value))
+    ? (isPhoneTemplate(template) ? formatPhoneMasked(raw) : composeContactValue(template, raw))
     : value.trim();
 
   if (isRegexMask(mask)) {
