@@ -16,7 +16,7 @@ import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { EventModal } from '@/pages/home/EventModal';
-import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import styles from './InvitationsPage.module.css';
 
@@ -222,15 +222,14 @@ export default function InvitationsPage() {
                     </div>
                     {types.length > 0 && (
                       <div className={styles.chips}>
-                        {types.filter(Boolean).slice(0, 3).map((t: any) => {
-                          const color = t.eventCategory?.color ?? '#6366f1';
-                          return (
-                            <span key={t.id} className={styles.chip} style={{ background: `${color}20`, border: `0.5px solid ${color}55`, color }}>
-                              {t.ico && <img src={icoToUrl(t.ico) ?? undefined} alt="" width={10} height={10} style={{ objectFit: 'contain', borderRadius: 2 }} />}
-                              {t.name}
-                            </span>
-                          );
-                        })}
+                        {types.filter(Boolean).slice(0, 3).map((t: any) => (
+                          <EventTypeChip
+                            key={t.id}
+                            type={t}
+                            className={styles.chip}
+                            iconSize={10}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>

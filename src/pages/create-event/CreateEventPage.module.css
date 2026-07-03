@@ -115,14 +115,10 @@
 .pickerBtnError  { border-color: var(--danger) !important; }
 .typeChips { display: flex; flex-wrap: wrap; gap: 6px; }
 .typeChip {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
 }
-.typeChipRemove {
-  background: none; border: none; cursor: pointer;
-  font-size: 14px; line-height: 1; padding: 0 0 0 2px; opacity: 0.7;
-}
-.typeChipRemove:hover { opacity: 1; }
 
 /* ── Переключатель режима ── */
 .endModeToggle {

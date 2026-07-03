@@ -21,7 +21,7 @@ import { AddOrganizerModal } from '@/features/event/AddOrganizerModal';
 import { BWListModal } from '@/features/event/BWListModal';
 import { YandexMap } from '@/features/event-map/YandexMap';
 import { EventMapModal } from '@/features/event-map/EventMapModal';
-import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import { EventDiscussionsPanel } from '@/features/event-discussion';
@@ -32,15 +32,6 @@ import { buildEventShareUrl, canUseNativeShare, shareLink } from '@/shared/lib/s
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
-
-/** Возвращает белый или тёмный текст под цвет фона */
-function contrastColor(hex: string): string {
-  const c = hex.replace('#', '');
-  const r = parseInt(c.slice(0, 2), 16);
-  const g = parseInt(c.slice(2, 4), 16);
-  const b = parseInt(c.slice(4, 6), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? '#1a1a2e' : '#ffffff';
-}
 
 export default function EventPage() {
   const { id }   = useParams<{ id: string }>();
@@ -354,18 +345,15 @@ export default function EventPage() {
           </div>
 
           <div className={styles.heroBottom}>
-            {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : event.eventType ? [event.eventType] : []).map(t => {
-              const catColor = t.eventCategory?.color ?? '#6366f1';
-              return (
-                <span key={t.id} className={styles.tagType} style={{
-                  background: `${catColor}55`, border: `1px solid ${catColor}44`,
-                  color: contrastColor(catColor),
-                }}>
-                  {t.ico && <img src={icoToUrl(t.ico) ?? ''} className="event-type-ico" alt="" width={10} height={10} style={{ objectFit: 'contain' }} />}
-                  {t.name}
-                </span>
-              );
-            })}
+            {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : event.eventType ? [event.eventType] : []).map(t => (
+              <EventTypeChip
+                key={t.id}
+                type={t}
+                variant="overlay"
+                className={styles.tagType}
+                iconSize={10}
+              />
+            ))}
             {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
             {event.parameters?.ageLimit && (
               <span className={styles.tagAge}>{event.parameters.ageLimit}+</span>

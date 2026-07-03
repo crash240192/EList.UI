@@ -7,10 +7,6 @@ export type UserEventsScope = 'all' | 'created' | 'participating';
 export type UserEventsPhase = 'upcoming' | 'past';
 export type ContactIconKind = 'email' | 'telegram' | 'phone' | 'site' | 'location' | 'user';
 
-import { contrastColor } from '@/shared/lib/contrastColor';
-
-export { contrastColor };
-
 export function getContactIconKind(contact: IContactDataItem): ContactIconKind {
   const name = (
     contact.contactType?.name
