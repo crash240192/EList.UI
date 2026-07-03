@@ -75,8 +75,8 @@ export function AppLayout() {
             navigate('/');
             // Приоритет: выбранный город в фильтрах → координаты пользователя
             const userCoords = getStoredUserCoords();
-            const lat = filters.latitude  ?? userCoords.lat;
-            const lng = filters.longitude ?? userCoords.lng;
+            const lat = filters.latitude  ?? userCoords?.lat ?? 55.7558;
+            const lng = filters.longitude ?? userCoords?.lng ?? 37.6173;
             window.dispatchEvent(new CustomEvent('elist:centerMap', {
               detail: { lat, lng },
             }));

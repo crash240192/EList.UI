@@ -55,4 +55,7 @@ export function notifyHomeCityChanged(c: UserCoords, name: string): void {
   window.dispatchEvent(new CustomEvent('elist:homeCityChanged', {
     detail: { lat: c.lat, lng: c.lng, name },
   }));
+  window.dispatchEvent(new CustomEvent('elist:centerMap', {
+    detail: { lat: c.lat, lng: c.lng },
+  }));
 }

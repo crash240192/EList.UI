@@ -4,7 +4,7 @@
 //   Шаг 2 — ФИО, пол, дата рождения (необязательно, можно скипнуть)
 //   Финал — автоматический логин → setPersonInfo (если не скипнули) → /activate или /
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   fetchContactTypes,
@@ -19,7 +19,8 @@ import { useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
-import { validateContactValue, getMaskInputMode } from '@/shared/lib/contactMask';
+import { validateContactValue, isRegexMask, resolveContactMaskTemplate } from '@/shared/lib/contactMask';
+import { ContactMaskField } from '@/shared/ui/ContactMaskField/ContactMaskField';
 import { Select, type SelectOption } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
@@ -60,10 +61,11 @@ function getContactPlaceholder(ct: import('@/features/auth/registrationApi').ICo
   if (name.includes('whatsapp'))
     return '+7 (999) 123-45-67';
   // Если маска выглядит как regex — скрываем её, показываем generic
-  if (ct.mask && (ct.mask.startsWith('^') || ct.mask.includes('\\d') || ct.mask.includes('?')))
+  if (ct.mask && isRegexMask(ct.mask))
     return `Введите ${ct.name ?? 'контакт'}`;
-  // Если маска — человекочитаемый пример, показываем её
-  return ct.mask ?? `Введите ${ct.name ?? 'контакт'}`;
+  const template = resolveContactMaskTemplate(ct.mask, ct.name || ct.localizedName || '');
+  if (template) return template;
+  return `Введите ${ct.name ?? 'контакт'}`;
 }
 
 export default function RegisterPage() {
@@ -105,13 +107,6 @@ export default function RegisterPage() {
     contactTypeId: '', contactValue: '',
   });
   const [contactError, setContactError] = useState<string | null>(null);
-
-  // Умный обработчик поля контакта — форматирует телефон по маске
-  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setForm1(f => ({ ...f, contactValue: raw }));
-    if (contactError) setContactError(null);
-  };
 
   const handleContactBlur = () => {
     const mask = selectedContactType?.mask ?? null;
@@ -312,23 +307,26 @@ export default function RegisterPage() {
                   : (
                     <Select
                       value={form1.contactTypeId}
-                      onChange={v => setForm1(f => ({...f, contactTypeId: v}))}
+                      onChange={v => setForm1(f => ({ ...f, contactTypeId: v, contactValue: '' }))}
                       options={contactTypes.map(ct => ({ value: ct.id, label: ct.name || ct.localizedName || '' }))}
                     />
                   )}
               </Field>
 
               <Field label={selectedContactType?.name || selectedContactType?.localizedName || 'Контакт'}>
-                <input
-                  className={`${styles.input} ${contactError ? styles.inputError : ''}`}
-                  placeholder={getContactPlaceholder(selectedContactType)}
-                  value={form1.contactValue}
-                  onChange={handleContactChange}
-                  onBlur={handleContactBlur}
-                  onKeyDown={e => e.key === 'Enter' && handleStep1()}
-                  inputMode={getMaskInputMode(selectedContactType?.mask ?? null)}
-                  autoComplete="off"
-                />
+                <div className={`${styles.input} ${regStyles.contactMaskWrap} ${contactError ? styles.inputError : ''}`}>
+                  <ContactMaskField
+                    mask={selectedContactType?.mask ?? null}
+                    typeName={selectedContactType?.name || selectedContactType?.localizedName || ''}
+                    value={form1.contactValue}
+                    onChange={raw => {
+                      setForm1(f => ({ ...f, contactValue: raw }));
+                      if (contactError) setContactError(null);
+                    }}
+                    onBlur={handleContactBlur}
+                    ariaLabel={getContactPlaceholder(selectedContactType)}
+                  />
+                </div>
                 {contactError && (
                   <p style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3 }}>{contactError}</p>
                 )}

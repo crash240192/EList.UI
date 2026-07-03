@@ -7,13 +7,9 @@ export type UserEventsScope = 'all' | 'created' | 'participating';
 export type UserEventsPhase = 'upcoming' | 'past';
 export type ContactIconKind = 'email' | 'telegram' | 'phone' | 'site' | 'location' | 'user';
 
-export function contrastColor(hex: string): string {
-  const c = hex.replace('#', '');
-  const r = parseInt(c.slice(0, 2), 16);
-  const g = parseInt(c.slice(2, 4), 16);
-  const b = parseInt(c.slice(4, 6), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? '#1a1a2e' : '#ffffff';
-}
+import { contrastColor } from '@/shared/lib/contrastColor';
+
+export { contrastColor };
 
 export function getContactIconKind(contact: IContactDataItem): ContactIconKind {
   const name = (

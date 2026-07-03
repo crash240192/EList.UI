@@ -228,6 +228,6 @@ export function useUserLocation(): UseUserLocationResult {
 
 export { clearLocationSession } from './locationSession';
 
-export function getStoredUserCoords(): UserCoords {
-  return readUserCoords() ?? MOSCOW;
+export function getStoredUserCoords(): UserCoords | null {
+  return readUserCoords();
 }
