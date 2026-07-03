@@ -3,7 +3,6 @@
 import { useRef, useState } from 'react';
 import {
   buildContactMaskSegments,
-  composeContactValue,
   extractRawFromValue,
   processEmailRaw,
   processPhoneRaw,
@@ -83,7 +82,7 @@ export function ContactMaskField({
     const processed = isPhone
       ? processPhoneRaw(template, nextRaw)
       : processEmailRaw(template, nextRaw);
-    onChange(composeContactValue(template, processed));
+    onChange(processed);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

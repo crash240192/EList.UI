@@ -6,6 +6,8 @@ export interface MaskSegment {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_DIGIT_SLOTS = 10;
+const GHOST_CHAR = '_';
 
 export function isRegexMask(mask: string): boolean {
   return (
@@ -23,12 +25,12 @@ export function resolveContactMaskTemplate(mask: string | null, typeName = ''): 
   if (!mask) return null;
 
   if (!isRegexMask(mask)) {
-    return mask.replace(/#/g, '#');
+    return mask;
   }
 
   const name = typeName.toLowerCase();
   if (mask.includes('@') || name.includes('email') || name.includes('почт') || name.includes('mail')) {
-    return '____@____.___';
+    return '_@_._';
   }
 
   if (mask.includes('\\d') && !mask.includes('@')) {
@@ -39,7 +41,7 @@ export function resolveContactMaskTemplate(mask: string | null, typeName = ''): 
 }
 
 function digitSlots(template: string): number {
-  return (template.match(/#/g) ?? []).length;
+  return (template.match(/#/g) ?? []).length || PHONE_DIGIT_SLOTS;
 }
 
 function isPhoneTemplate(template: string): boolean {
@@ -52,20 +54,24 @@ function isEmailTemplate(template: string): boolean {
 
 export function phoneDigitsFromValue(value: string): string {
   const d = value.replace(/\D/g, '');
-  if (d.startsWith('7') && d.length >= 11) return d.slice(1, 11);
-  if (d.startsWith('8') && d.length >= 11) return d.slice(1, 11);
-  return d.slice(0, 10);
+  if (d.startsWith('7') && d.length > 1) return d.slice(1, 11);
+  if (d.startsWith('8') && d.length > 1) return d.slice(1, 11);
+  return d.slice(0, PHONE_DIGIT_SLOTS);
 }
 
+/** Каноническое значение телефона для API / regex-валидации. */
 export function phoneCanonical(digits: string): string {
-  const d = digits.replace(/\D/g, '').slice(0, 10);
+  const d = digits.replace(/\D/g, '').slice(0, PHONE_DIGIT_SLOTS);
   return d.length ? `+7${d}` : '';
 }
 
-/** Сырые символы для отображения маски. */
+/** Сырые символы, которые вводит пользователь (без литералов маски). */
 export function extractRawFromValue(template: string, value: string): string {
   if (isPhoneTemplate(template)) {
-    return phoneDigitsFromValue(value);
+    if (value.startsWith('+') || value.startsWith('7') || value.startsWith('8')) {
+      return phoneDigitsFromValue(value);
+    }
+    return value.replace(/\D/g, '').slice(0, digitSlots(template));
   }
   if (isEmailTemplate(template)) {
     return value.replace(/[^a-zA-Z0-9@._+-]/g, '');
@@ -73,31 +79,22 @@ export function extractRawFromValue(template: string, value: string): string {
   return value;
 }
 
-/** Собирает итоговую строку контакта по шаблону. */
+/**
+ * Собирает итоговую строку для отправки на API.
+ * Вызывается при валидации и submit — не на каждый keystroke.
+ */
 export function composeContactValue(template: string, raw: string): string {
   if (isPhoneTemplate(template)) {
     return phoneCanonical(raw);
   }
-
   if (isEmailTemplate(template)) {
-    const chars = raw.replace(/[^a-zA-Z0-9@._+-]/g, '');
-    let ci = 0;
-    let out = '';
-    for (const ch of template) {
-      if (ch === '_') {
-        out += ci < chars.length ? chars[ci++] : '';
-      } else {
-        out += ch;
-      }
-    }
-    return out + chars.slice(ci);
+    return raw.replace(/[^a-zA-Z0-9@._+-]/g, '');
   }
-
   return raw;
 }
 
-export function processPhoneRaw(_template: string, raw: string): string {
-  return raw.replace(/\D/g, '').slice(0, digitSlots('+7 (###) ###-##-##'));
+export function processPhoneRaw(template: string, raw: string): string {
+  return raw.replace(/\D/g, '').slice(0, digitSlots(template));
 }
 
 export function processEmailRaw(_template: string, raw: string): string {
@@ -105,17 +102,16 @@ export function processEmailRaw(_template: string, raw: string): string {
 }
 
 export function buildContactMaskSegments(template: string, raw: string): MaskSegment[] {
-  const segments: MaskSegment[] = [];
-
   if (isPhoneTemplate(template)) {
     const digits = raw.replace(/\D/g, '').slice(0, digitSlots(template));
+    const segments: MaskSegment[] = [];
     let di = 0;
     for (const ch of template) {
       if (ch === '#') {
         const filled = di < digits.length;
         segments.push({
           type: filled ? 'filled' : 'ghost',
-          text: filled ? digits[di++] : '#',
+          text: filled ? digits[di++] : GHOST_CHAR,
         });
       } else {
         segments.push({ type: 'sep', text: ch });
@@ -125,33 +121,45 @@ export function buildContactMaskSegments(template: string, raw: string): MaskSeg
   }
 
   if (isEmailTemplate(template)) {
-    const chars = raw.replace(/[^a-zA-Z0-9@._+-]/g, '');
-    let ci = 0;
-    for (const ch of template) {
-      if (ch === '_') {
-        const filled = ci < chars.length;
-        segments.push({
-          type: filled ? 'filled' : 'ghost',
-          text: filled ? chars[ci++] : '_',
-        });
+    const segments: MaskSegment[] = [];
+    let ri = 0;
+    for (const tch of template) {
+      if (tch === '_') {
+        if (ri < raw.length) {
+          segments.push({ type: 'filled', text: raw[ri++] });
+        } else {
+          segments.push({ type: 'ghost', text: GHOST_CHAR });
+        }
+      } else if (tch === '@' || tch === '.') {
+        if (ri < raw.length && raw[ri] === tch) {
+          segments.push({ type: 'sep', text: tch });
+          ri++;
+        } else {
+          segments.push({ type: 'ghost', text: tch });
+        }
       } else {
-        segments.push({ type: 'sep', text: ch });
+        segments.push({ type: 'sep', text: tch });
       }
     }
-    if (ci < chars.length) {
-      segments.push({ type: 'filled', text: chars.slice(ci) });
+    if (ri < raw.length) {
+      segments.push({ type: 'filled', text: raw.slice(ri) });
     }
     return segments;
   }
 
-  return raw ? [{ type: 'filled', text: raw }] : [{ type: 'ghost', text: '_' }];
+  return raw
+    ? [{ type: 'filled', text: raw }]
+    : [{ type: 'ghost', text: GHOST_CHAR }];
 }
 
-export function validateContactValue(value: string, mask: string | null): string | null {
+export function validateContactValue(value: string, mask: string | null, typeName = ''): string | null {
   if (!value.trim()) return 'Введите контактные данные';
   if (!mask) return null;
 
-  const trimmed = value.trim();
+  const template = resolveContactMaskTemplate(mask, typeName);
+  const trimmed = template
+    ? composeContactValue(template, extractRawFromValue(template, value))
+    : value.trim();
 
   if (isRegexMask(mask)) {
     try {

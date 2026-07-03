@@ -19,7 +19,7 @@ import { useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
-import { validateContactValue, isRegexMask, resolveContactMaskTemplate } from '@/shared/lib/contactMask';
+import { validateContactValue, isRegexMask, resolveContactMaskTemplate, composeContactValue } from '@/shared/lib/contactMask';
 import { ContactMaskField } from '@/shared/ui/ContactMaskField/ContactMaskField';
 import { Select, type SelectOption } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
@@ -68,6 +68,17 @@ function getContactPlaceholder(ct: import('@/features/auth/registrationApi').ICo
   return `Введите ${ct.name ?? 'контакт'}`;
 }
 
+function contactTypeLabel(ct: IContactType | undefined): string {
+  return ct?.name || ct?.localizedName || ct?.namePath || '';
+}
+
+function contactSubmitValue(ct: IContactType | undefined, raw: string): string {
+  const template = resolveContactMaskTemplate(ct?.mask ?? null, contactTypeLabel(ct));
+  const trimmed = raw.trim();
+  if (!template) return trimmed;
+  return composeContactValue(template, trimmed);
+}
+
 export default function RegisterPage() {
   const navigate    = useNavigate();
   const { setAuth } = useAuthStore();
@@ -110,7 +121,7 @@ export default function RegisterPage() {
 
   const handleContactBlur = () => {
     const mask = selectedContactType?.mask ?? null;
-    const err = validateContactValue(form1.contactValue, mask);
+    const err = validateContactValue(form1.contactValue, mask, contactTypeLabel(selectedContactType));
     if (err && form1.contactValue.trim()) setContactError(err);
   };
 
@@ -148,7 +159,11 @@ export default function RegisterPage() {
     if (form1.password.length < 6) return 'Пароль — не менее 6 символов';
     if (form1.password !== form1.passwordConfirmation) return 'Пароли не совпадают';
     if (!form1.contactTypeId)      return 'Выберите тип контакта';
-    const maskErr = validateContactValue(form1.contactValue, selectedContactType?.mask ?? null);
+    const maskErr = validateContactValue(
+      form1.contactValue,
+      selectedContactType?.mask ?? null,
+      contactTypeLabel(selectedContactType),
+    );
     if (maskErr) return maskErr;
     return null;
   }
@@ -165,7 +180,7 @@ export default function RegisterPage() {
         password:                  form1.password,
         passwordConfirmation:      form1.passwordConfirmation,
         authorizationContactType:  form1.contactTypeId,
-        authorizationContactValue: form1.contactValue.trim(),
+        authorizationContactValue: contactSubmitValue(selectedContactType, form1.contactValue),
         showContact:               true,
         latitude:  finalCoords?.lat ?? undefined,
         longitude: finalCoords?.lng ?? undefined,
