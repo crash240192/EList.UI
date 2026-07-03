@@ -91,21 +91,39 @@ export function ContactMaskField({
       applyRaw(raw.slice(0, -1));
       return;
     }
-    if (e.key.length === 1) {
-      if (isPhone && /\d/.test(e.key)) {
+
+    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+
+    if (isPhone) {
+      if (/\d/.test(e.key)) {
         e.preventDefault();
         applyRaw(raw + e.key);
-      } else if (!isPhone && /[a-zA-Z0-9@._+-]/.test(e.key)) {
+      } else {
         e.preventDefault();
-        applyRaw(raw + e.key);
       }
+      return;
+    }
+
+    if (/[a-zA-Z0-9@._+-]/.test(e.key)) {
+      e.preventDefault();
+      applyRaw(raw + e.key);
+    } else {
+      e.preventDefault();
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const pasted = e.target.value;
     e.target.value = '';
-    applyRaw(isPhone ? pasted.replace(/\D/g, '') : pasted);
+
+    if (isPhone) {
+      const digits = pasted.replace(/\D/g, '');
+      if (digits) applyRaw(digits);
+      return;
+    }
+
+    const cleaned = pasted.replace(/[^a-zA-Z0-9@._+-]/g, '');
+    if (cleaned) applyRaw(cleaned);
   };
 
   return (

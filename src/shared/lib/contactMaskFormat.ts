@@ -121,30 +121,13 @@ export function buildContactMaskSegments(template: string, raw: string): MaskSeg
   }
 
   if (isEmailTemplate(template)) {
-    const segments: MaskSegment[] = [];
-    let ri = 0;
-    for (const tch of template) {
-      if (tch === '_') {
-        if (ri < raw.length) {
-          segments.push({ type: 'filled', text: raw[ri++] });
-        } else {
-          segments.push({ type: 'ghost', text: GHOST_CHAR });
-        }
-      } else if (tch === '@' || tch === '.') {
-        if (ri < raw.length && raw[ri] === tch) {
-          segments.push({ type: 'sep', text: tch });
-          ri++;
-        } else {
-          segments.push({ type: 'ghost', text: tch });
-        }
-      } else {
-        segments.push({ type: 'sep', text: tch });
-      }
+    if (!raw) {
+      return template.split('').map(ch => ({
+        type: ch === '_' ? 'ghost' : 'sep',
+        text: ch === '_' ? GHOST_CHAR : ch,
+      }));
     }
-    if (ri < raw.length) {
-      segments.push({ type: 'filled', text: raw.slice(ri) });
-    }
-    return segments;
+    return [{ type: 'filled', text: raw }];
   }
 
   return raw
