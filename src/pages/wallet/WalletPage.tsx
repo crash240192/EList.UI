@@ -1,6 +1,6 @@
 // pages/wallet/WalletPage.tsx — макет examples/elist_settings_wallet.html
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { createWallet, getWalletByAccount, setWalletTariff, type IWallet } from '@/entities/user/walletApi';
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
@@ -59,6 +59,75 @@ function formatValidatorRows(v: ITariffValidator): { label: string; value: strin
       type: v.ageLimit == null ? 'ok' : v.ageLimit === 0 ? 'no' : 'warn',
     },
   ];
+}
+
+const TARIFF_CAROUSEL_MIN = 4;
+
+function TariffPlansCarousel({ children, count }: { children: ReactNode; count: number }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setCanScrollPrev(el.scrollLeft > 4);
+    setCanScrollNext(el.scrollLeft < maxScroll - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    updateScrollState();
+    el.addEventListener('scroll', updateScrollState, { passive: true });
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', updateScrollState);
+      ro.disconnect();
+    };
+  }, [count, updateScrollState]);
+
+  const scrollByPage = (dir: -1 | 1) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' });
+  };
+
+  if (count < TARIFF_CAROUSEL_MIN) {
+    return <div className={styles.tariffGrid}>{children}</div>;
+  }
+
+  return (
+    <div className={styles.tariffCarousel}>
+      <button
+        type="button"
+        className={styles.tariffCarouselBtn}
+        onClick={() => scrollByPage(-1)}
+        disabled={!canScrollPrev}
+        aria-label="Предыдущие тарифы"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+      <div ref={trackRef} className={styles.tariffCarouselTrack}>
+        {children}
+      </div>
+      <button
+        type="button"
+        className={styles.tariffCarouselBtn}
+        onClick={() => scrollByPage(1)}
+        disabled={!canScrollNext}
+        aria-label="Следующие тарифы"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+    </div>
+  );
 }
 
 export default function WalletPage() {
@@ -256,7 +325,7 @@ export default function WalletPage() {
                   </div>
                 ) : (
                   <>
-                    <div className={styles.tariffGrid}>
+                    <TariffPlansCarousel count={allTariffs.length}>
                       {allTariffs.map(t => (
                         <TariffCard
                           key={t.id}
@@ -267,7 +336,7 @@ export default function WalletPage() {
                           onSelect={() => setSelectedTariffId(prev => prev === t.id ? '' : t.id)}
                         />
                       ))}
-                    </div>
+                    </TariffPlansCarousel>
                     {selectedTariffId && selectedTariffId !== tariff?.id && (
                       <div className={styles.selectActions}>
                         <button type="button" className={styles.cancelBtn} onClick={() => setSelectedTariffId('')}>
@@ -339,8 +408,15 @@ function TariffCard({
   ].filter(Boolean).join(' ');
 
   return (
-    <div className={cardClass} onClick={isCurrent ? undefined : onSelect} role="button" tabIndex={0}
-      onKeyDown={e => { if (e.key === 'Enter' && !isCurrent) onSelect(); }}>
+    <div
+      className={cardClass}
+      onClick={isCurrent ? undefined : onSelect}
+      role="button"
+      tabIndex={isCurrent ? -1 : 0}
+      aria-pressed={isSelected}
+      aria-disabled={isCurrent}
+      onKeyDown={e => { if (e.key === 'Enter' && !isCurrent) onSelect(); }}
+    >
       {isCurrent && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>Активен</div>}
       <div className={styles.tcName}>{tariff.name}</div>
       <div className={`${styles.tcPrice} ${tariff.cost === 0 ? styles.tcPriceFree : ''}`}>
@@ -359,16 +435,6 @@ function TariffCard({
           </div>
         ))}
       </div>
-      {!isCurrent && (
-        <button type="button" className={styles.tcSelectBtn} onClick={e => { e.stopPropagation(); onSelect(); }}>
-          Выбрать
-        </button>
-      )}
-      {isCurrent && (
-        <button type="button" className={styles.tcSelectBtn} disabled>
-          Текущий план
-        </button>
-      )}
     </div>
   );
 }
