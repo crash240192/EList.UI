@@ -36,6 +36,10 @@ function resolveAvatarId(accountId: string): Promise<string | null> {
   return promise;
 }
 
+function isExplicitlyEmpty(avatarId?: string | null): boolean {
+  return avatarId === null || avatarId === '';
+}
+
 export function seedAvatarCache(accountId: string, avatarId: string | null): void {
   cache.set(accountId, avatarId);
   notifyListeners(accountId, avatarId);
@@ -47,17 +51,27 @@ export function useAvatar(
 ): string | null {
   const [fileId, setFileId] = useState<string | null>(() => {
     if (!accountId) return null;
+    if (isExplicitlyEmpty(avatarId)) return null;
     if (avatarId) return avatarId;
     return cache.has(accountId) ? (cache.get(accountId) ?? null) : null;
   });
 
   useEffect(() => {
-    if (!accountId) return;
+    if (!accountId) {
+      setFileId(null);
+      return;
+    }
 
     if (!listeners.has(accountId)) listeners.set(accountId, new Set());
     listeners.get(accountId)!.add(setFileId);
 
     const cleanup = () => { listeners.get(accountId)?.delete(setFileId); };
+
+    if (isExplicitlyEmpty(avatarId)) {
+      cache.set(accountId, null);
+      setFileId(null);
+      return cleanup;
+    }
 
     if (avatarId) {
       cache.set(accountId, avatarId);
@@ -65,8 +79,10 @@ export function useAvatar(
       return cleanup;
     }
 
+    // avatarId не передан — сбрасываем устаревший fileId от предыдущего accountId
+    setFileId(cache.has(accountId) ? (cache.get(accountId) ?? null) : null);
+
     if (cache.has(accountId)) {
-      setFileId(cache.get(accountId) ?? null);
       return cleanup;
     }
 
@@ -113,4 +129,5 @@ export function useMyAvatar(): { fileId: string | null; refresh: () => void } {
 
 export function invalidateAvatarCache(accountId: string): void {
   cache.delete(accountId);
+  notifyListeners(accountId, null);
 }

@@ -1,0 +1,62 @@
+import type { IEventType } from '@/entities/event/types';
+import { getEventCoverBackground, buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+
+export interface EventListItemData {
+  id: string;
+  name: string;
+  startTime?: string | null;
+  address?: string | null;
+  coverImageId?: string | null;
+  coverUrl?: string | null;
+  eventTypes?: IEventType[];
+  eventType?: IEventType | null;
+  parameters?: {
+    cost?: number;
+    ageLimit?: number | null;
+    maxPersonsCount?: number | null;
+  } | null;
+  participantsCount?: number | null;
+  colors?: string[];
+}
+
+export function getEventListTypes(event: EventListItemData, limit = 3): IEventType[] {
+  const types = event.eventTypes?.length
+    ? event.eventTypes
+    : event.eventType
+      ? [event.eventType]
+      : [];
+  return types.slice(0, limit);
+}
+
+export function getEventListParams(event: EventListItemData) {
+  const p = event.parameters;
+  return {
+    cost: p?.cost ?? 0,
+    ageLimit: p?.ageLimit ?? null,
+    maxPersonsCount: p?.maxPersonsCount ?? null,
+    participantsCount: event.participantsCount ?? null,
+  };
+}
+
+export function formatEventListItemDate(iso?: string | null): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function formatEventListItemPrice(cost: number): { label: string; free: boolean } {
+  if (cost === 0) return { label: 'Бесплатно', free: true };
+  return { label: `${cost.toLocaleString('ru-RU')} ₽`, free: false };
+}
+
+export function getEventListCoverBackground(event: EventListItemData): string {
+  if (event.coverImageId || event.coverUrl) return '#111';
+  if (event.colors?.length) {
+    return buildEventCoverBackground(event.id, event.colors);
+  }
+  return getEventCoverBackground(event as Parameters<typeof getEventCoverBackground>[0]);
+}

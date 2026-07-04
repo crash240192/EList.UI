@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
+import { fetchOrganizerRating } from '@/entities/event';
 import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
@@ -23,18 +24,16 @@ import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useAvatar } from '@/features/auth/useAvatar';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
-import { EventTypeChip } from '@/shared/ui/EventTypeChip';
+import { EventListItem, EventList } from '@/entities/event/ui/EventListItem';
+import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
+import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { TabBar } from '@/shared/ui/TabBar';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import {
   countUniqueUserEvents,
   formatContactHref,
-  formatEventListDate,
-  formatEventPrice,
   formatShortEventDate,
   getContactIconKind,
-  getEventCoverStyle,
-  getEventTypes,
   getUpcomingPreview,
   isContactLink,
   mergeUserEvents,
@@ -45,13 +44,18 @@ import {
 } from './userPageUtils';
 import styles from './UserPage.module.css';
 
-type MainTab = UserEventsScope;
+type MainTab = UserEventsScope | 'albums';
 type ListModal = 'subscriptions' | 'subscribers' | null;
 
-const SCOPE_TABS: { key: MainTab; label: string }[] = [
+const SCOPE_TABS: { key: UserEventsScope; label: string }[] = [
   { key: 'all', label: 'Все' },
   { key: 'created', label: 'Организует' },
   { key: 'participating', label: 'Участвует' },
+];
+
+const MAIN_TABS: { key: MainTab; label: string }[] = [
+  ...SCOPE_TABS,
+  { key: 'albums', label: 'Альбомы' },
 ];
 
 function UserCoverBackground({
@@ -164,93 +168,6 @@ function ContactRow({ contact }: { contact: IContactDataItem }) {
   );
 }
 
-function EventCoverThumb({ event }: { event: IEvent }) {
-  return (
-    <div className={styles.ecCover} style={{ background: getEventCoverStyle(event) }}>
-      {event.coverImageId ? (
-        <AuthImage
-          fileId={event.coverImageId}
-          alt=""
-          className={styles.ecCoverImg}
-          fallback={
-            event.coverUrl
-              ? <img src={event.coverUrl} alt="" className={styles.ecCoverImg} />
-              : undefined
-          }
-        />
-      ) : event.coverUrl ? (
-        <img src={event.coverUrl} alt="" className={styles.ecCoverImg} />
-      ) : (
-        <span className={styles.ecCoverFallback} aria-hidden />
-      )}
-    </div>
-  );
-}
-
-function UserEventCard({
-  event,
-  onClick,
-}: {
-  event: IEvent;
-  onClick: () => void;
-}) {
-  const cost = event.parameters?.cost ?? 0;
-  const age = event.parameters?.ageLimit;
-  const price = formatEventPrice(cost);
-  const types = getEventTypes(event);
-
-  return (
-    <button type="button" className={styles.eventCard} onClick={onClick}>
-      <EventCoverThumb event={event} />
-      <div className={styles.ecInfo}>
-        <div className={styles.ecTop}>
-          <div className={styles.ecName}>{event.name}</div>
-          <div className={`${styles.ecPrice} ${price.free ? styles.ecPriceFree : styles.ecPricePaid}`}>
-            {price.label}
-          </div>
-        </div>
-        <div className={styles.ecMeta}>
-          {event.startTime && <span>{formatEventListDate(event.startTime)}</span>}
-          {event.address && (
-            <>
-              <span className={styles.ecDot} aria-hidden />
-              <span>{event.address}</span>
-            </>
-          )}
-          {age != null && age > 0 && (
-            <>
-              <span className={styles.ecDot} aria-hidden />
-              <span>{age}+</span>
-            </>
-          )}
-        </div>
-        {types.length > 0 && (
-          <div className={styles.ecTags}>
-            {types.map(t => (
-              <EventTypeChip
-                key={t.id}
-                type={t}
-                variant="overlay"
-                className={styles.ecTypeTag}
-                iconSize={10}
-              />
-            ))}
-          </div>
-        )}
-        {event.participantsCount != null && (
-          <div className={styles.ecStats}>
-            <span className={styles.ecStat}>
-              <PeopleIcon />
-              {event.participantsCount}
-              {event.parameters?.maxPersonsCount ? ` / ${event.parameters.maxPersonsCount}` : ''} участников
-            </span>
-          </div>
-        )}
-      </div>
-    </button>
-  );
-}
-
 function UserEventsPanel({
   events,
   total,
@@ -301,13 +218,17 @@ function UserEventsPanel({
         </p>
       )}
 
-      {!isLoading && filtered.map(event => (
-        <UserEventCard
-          key={event.id}
-          event={event}
-          onClick={() => onOpen(event.id)}
-        />
-      ))}
+      {!isLoading && filtered.length > 0 && (
+        <EventList className={styles.eventsList}>
+          {filtered.map(event => (
+            <EventListItem
+              key={event.id}
+              event={event}
+              onClick={() => onOpen(event.id)}
+            />
+          ))}
+        </EventList>
+      )}
 
       {!isLoading && total > events.length && filtered.length > 0 && (
         <p className={styles.moreHint}>Показано {events.length} из {total}</p>
@@ -334,6 +255,8 @@ export default function UserPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>('all');
+  const [albumsCount, setAlbumsCount] = useState(0);
+  const [organizerRating, setOrganizerRating] = useState<number | null>(null);
   const [eventsPhase, setEventsPhase] = useState<UserEventsPhase>('upcoming');
   const [subsCount, setSubsCount] = useState(0);
   const [subscrCount, setSubscrCount] = useState(0);
@@ -374,6 +297,13 @@ export default function UserPage() {
   }, [profileAccountId]);
 
   useEffect(() => {
+    if (!profileAccountId) return;
+    fetchOrganizerRating(profileAccountId)
+      .then(setOrganizerRating)
+      .catch(() => setOrganizerRating(null));
+  }, [profileAccountId]);
+
+  useEffect(() => {
     if (!profileAccountId || !myAccountId || isOwnProfile) return;
     fetchSubscriptions(myAccountId, { pageSize: 200 })
       .then(page => {
@@ -410,12 +340,15 @@ export default function UserPage() {
     ? { events: allEvents, total: allEventsTotal, isLoading: createdEvents.isLoading || participatingEvents.isLoading }
     : mainTab === 'created'
       ? createdEvents
-      : participatingEvents;
+      : mainTab === 'participating'
+        ? participatingEvents
+        : { events: [], total: 0, isLoading: false };
 
-  const scopeCounts: Record<MainTab, number> = {
+  const tabCounts: Record<MainTab, number> = {
     all: allEventsTotal || allEvents.length,
     created: createdEvents.total || createdEvents.events.length,
     participating: participatingEvents.total || participatingEvents.events.length,
+    albums: albumsCount,
   };
 
   const upcomingPreview = useMemo(() => {
@@ -460,7 +393,7 @@ export default function UserPage() {
               <div className={styles.menuWrap}>
                 <button
                   type="button"
-                  className={styles.heroBtn}
+                  className={`${styles.heroBtn} noHoverGlow`}
                   onClick={() => setMenuOpen(v => !v)}
                   aria-label="Меню"
                   aria-expanded={menuOpen}
@@ -574,6 +507,19 @@ export default function UserPage() {
             <span className={styles.statNum}>{subsCount}</span>
             <span className={styles.statLabel}>подписки</span>
           </button>
+          <div className={`${styles.statItem} ${styles.statItemStatic}`}>
+            <div className={styles.statRating}>
+              {organizerRating != null && organizerRating > 0 ? (
+                <>
+                  <GradeBadge score={organizerRating} size="sm" />
+                  <span className={styles.ratingNum}>{organizerRating.toFixed(1)}</span>
+                </>
+              ) : (
+                <span className={styles.statNum}>—</span>
+              )}
+            </div>
+            <span className={styles.statLabel}>рейтинг организатора</span>
+          </div>
         </div>
 
         <div className={styles.mainGrid}>
@@ -631,24 +577,34 @@ export default function UserPage() {
 
           <section className={styles.rightPanel}>
             <TabBar
-              tabs={SCOPE_TABS.map(tab => ({
+              tabs={MAIN_TABS.map(tab => ({
                 id: tab.key,
                 label: tab.label,
-                count: scopeCounts[tab.key],
+                count: tabCounts[tab.key],
               }))}
               activeId={mainTab}
               onChange={id => setMainTab(id as MainTab)}
             />
 
-            <UserEventsPanel
-              events={activeEvents.events}
-              total={activeEvents.total}
-              isLoading={activeEvents.isLoading}
-              scope={mainTab}
-              phase={eventsPhase}
-              onPhaseChange={setEventsPhase}
-              onOpen={eventId => navigate(`/event/${eventId}`)}
-            />
+            {mainTab === 'albums' ? (
+              <div className={styles.tabContent}>
+                <EventAlbumsGroupsPanel
+                  accountId={profileAccountId}
+                  onOpenEvent={eventId => navigate(`/event/${eventId}`)}
+                  onTotalChange={setAlbumsCount}
+                />
+              </div>
+            ) : (
+              <UserEventsPanel
+                events={activeEvents.events}
+                total={activeEvents.total}
+                isLoading={activeEvents.isLoading}
+                scope={mainTab}
+                phase={eventsPhase}
+                onPhaseChange={setEventsPhase}
+                onOpen={eventId => navigate(`/event/${eventId}`)}
+              />
+            )}
           </section>
         </div>
       </div>
@@ -714,29 +670,10 @@ function Skeleton() {
   );
 }
 
-function ChevronLeft() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  );
-}
-
 function MenuIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
-    </svg>
-  );
-}
-
-function PeopleIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }
