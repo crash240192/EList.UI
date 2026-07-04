@@ -8,6 +8,10 @@ import { useFiltersStore } from '@/app/store';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
+import {
+  normalizeSearchStartTime,
+  searchStartTimeMinDate,
+} from '@/features/event-filters/searchStartTime';
 import type { ICity } from '@/features/auth/useGeoCity';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { cookies } from '@/shared/lib/cookies';
@@ -23,7 +27,12 @@ interface FilterBarProps {
   onSearch: () => void;
 }
 
-function todayRange()    { const d = new Date(); d.setHours(0,0,0,0); const e = new Date(d); e.setHours(23,59,59); return { s: d.toISOString(), e: e.toISOString() }; }
+function todayRange() {
+  const s = new Date();
+  const e = new Date();
+  e.setHours(23, 59, 59, 999);
+  return { s: s.toISOString(), e: e.toISOString() };
+}
 function tomorrowRange() { const d = new Date(); d.setDate(d.getDate()+1); d.setHours(0,0,0,0); const e = new Date(d); e.setHours(23,59,59); return { s: d.toISOString(), e: e.toISOString() }; }
 function weekendRange()  {
   const d = new Date(); const day = d.getDay();
@@ -249,8 +258,16 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
         <div className={styles.expandPanel}>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Дата от</span>
-            <DatePicker withTime value={filters.startTime ?? ''} placeholder="Любая"
-              onChange={iso => { setFilter('startTime', iso || undefined); setQuickDate(null); }} />
+            <DatePicker
+              withTime
+              value={filters.startTime ?? ''}
+              placeholder="Любая"
+              min={searchStartTimeMinDate()}
+              onChange={iso => {
+                setFilter('startTime', normalizeSearchStartTime(iso || undefined));
+                setQuickDate(null);
+              }}
+            />
           </div>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Дата до</span>

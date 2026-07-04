@@ -7,6 +7,10 @@ import { fetchEventTypes } from '@/entities/event';
 import { useFiltersStore } from '@/app/store';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { MobileFilterSheet } from '@/features/event-filters/MobileFilterSheet';
+import {
+  normalizeSearchStartTime,
+  searchStartTimeMinDate,
+} from '@/features/event-filters/searchStartTime';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import type { ICity } from '@/features/auth/useGeoCity';
@@ -58,13 +62,19 @@ interface FilterBarProps {
   onTabChange?: (key: string) => void;
 }
 
-function todayRange()    { const d = new Date(); d.setHours(0,0,0,0); const e = new Date(d); e.setHours(23,59,59); return { s: d.toISOString(), e: e.toISOString() }; }
+function todayRange() {
+  const s = new Date();
+  const e = new Date();
+  e.setHours(23, 59, 59, 999);
+  return { s: s.toISOString(), e: e.toISOString() };
+}
 function tomorrowRange() { const d = new Date(); d.setDate(d.getDate()+1); d.setHours(0,0,0,0); const e = new Date(d); e.setHours(23,59,59); return { s: d.toISOString(), e: e.toISOString() }; }
 function weekendRange()  {
   const d = new Date(); const day = d.getDay();
   const sat = new Date(d); sat.setDate(d.getDate() + ((6 - day + 7) % 7 || 7)); sat.setHours(0,0,0,0);
   const sun = new Date(sat); sun.setDate(sat.getDate()+1); sun.setHours(23,59,59);
-  return { s: sat.toISOString(), e: sun.toISOString() };
+  const s = sat.getTime() < Date.now() ? new Date() : sat;
+  return { s: s.toISOString(), e: sun.toISOString() };
 }
 
 export function FilterBar({
@@ -281,6 +291,12 @@ export function FilterBar({
   if (filters.price === 0)      chips.push({ label: 'Бесплатно', onRemove: () => setFilter('price', undefined) });
 
   const QUICK_TYPES = allTypes.slice(0, 5);
+  const searchStartMin = searchStartTimeMinDate();
+
+  const handleStartTimeChange = (iso: string) => {
+    setFilter('startTime', normalizeSearchStartTime(iso || undefined));
+    setQuickDate(null);
+  };
   const hasExpandedActive =
     (!quickDate && !!filters.endTime)
     || (!!filters.price && filters.price > 0);
@@ -432,8 +448,14 @@ export function FilterBar({
         <div className={styles.expandPanel}>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Дата от</span>
-            <DatePicker className={styles.epDatePicker} withTime value={filters.startTime ?? ''} placeholder="Любая"
-              onChange={iso => { setFilter('startTime', iso || undefined); setQuickDate(null); }} />
+            <DatePicker
+              className={styles.epDatePicker}
+              withTime
+              value={filters.startTime ?? ''}
+              placeholder="Любая"
+              min={searchStartMin}
+              onChange={handleStartTimeChange}
+            />
           </div>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Дата до</span>

@@ -10,6 +10,10 @@ import type { ICity } from '@/features/auth/useGeoCity';
 import type { IEventType } from '@/entities/event';
 import type { IEventsSearchParams } from '@/entities/event';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
+import {
+  normalizeSearchStartTime,
+  searchStartTimeMinDate,
+} from '@/features/event-filters/searchStartTime';
 import styles from './MobileFilterSheet.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
@@ -65,6 +69,8 @@ export function MobileFilterSheet({
   };
 
   if (!open) return null;
+
+  const searchStartMin = searchStartTimeMinDate();
 
   return createPortal(
     <div className={styles.backdrop} onClick={handleBackdrop}>
@@ -161,8 +167,16 @@ export function MobileFilterSheet({
             <div className={styles.grid}>
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>Дата от</span>
-                <DatePicker withTime value={filters.startTime ?? ''} placeholder="Любая"
-                  onChange={iso => { setFilter('startTime', iso || undefined); setQuickDate(null); }} />
+                <DatePicker
+                  withTime
+                  value={filters.startTime ?? ''}
+                  placeholder="Любая"
+                  min={searchStartMin}
+                  onChange={iso => {
+                    setFilter('startTime', normalizeSearchStartTime(iso || undefined));
+                    setQuickDate(null);
+                  }}
+                />
               </div>
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>Дата до</span>

@@ -305,9 +305,12 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     }
     const iso = digitsToIso(digits, withTime);
     if (!iso) return false;
+    if (!isInRange(iso, withTime, min, max) || !satisfiesMinTime(iso, withTime, min, minTime)) {
+      return false;
+    }
     onChange(iso);
     return true;
-  }, [withTime, onChange]);
+  }, [withTime, onChange, min, max, minTime]);
 
   const handleDigitsChange = (digits: string) => {
     setInputDigits(digits);
