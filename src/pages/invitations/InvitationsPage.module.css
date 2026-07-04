@@ -201,19 +201,6 @@
   color: var(--text-muted);
 }
 
-.emptyIllo {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
 .emptyTitle {
   font-size: 15px;
   font-weight: 600;
