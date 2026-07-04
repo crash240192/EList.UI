@@ -85,3 +85,10 @@ export async function voteEventRating(req: IRatingVoteRequest): Promise<void> {
 export async function deleteEventRating(ratingId: string): Promise<void> {
   await apiClient.delete(`/api/Rating/events/delete/${ratingId}`);
 }
+
+/** Суммарный рейтинг организатора */
+export async function fetchOrganizerRating(accountId: string): Promise<number> {
+  const res = await apiClient.get<number>(`/api/Rating/organizators/${accountId}`);
+  const value = (res as { result?: number }).result ?? res;
+  return typeof value === 'number' ? value : Number(value) || 0;
+}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
+import { fetchOrganizerRating } from '@/entities/event';
 import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
@@ -25,6 +26,7 @@ import { useAvatar } from '@/features/auth/useAvatar';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
 import { EventListItem, EventList } from '@/entities/event/ui/EventListItem';
 import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
+import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import {
   countUniqueUserEvents,
   formatContactHref,
@@ -256,6 +258,7 @@ export default function UserPage() {
   const [error, setError] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>('all');
   const [albumsCount, setAlbumsCount] = useState(0);
+  const [organizerRating, setOrganizerRating] = useState<number | null>(null);
   const [eventsPhase, setEventsPhase] = useState<UserEventsPhase>('upcoming');
   const [subsCount, setSubsCount] = useState(0);
   const [subscrCount, setSubscrCount] = useState(0);
@@ -293,6 +296,13 @@ export default function UserPage() {
       setSubsCount(s);
       setSubscrCount(sc);
     });
+  }, [profileAccountId]);
+
+  useEffect(() => {
+    if (!profileAccountId) return;
+    fetchOrganizerRating(profileAccountId)
+      .then(setOrganizerRating)
+      .catch(() => setOrganizerRating(null));
   }, [profileAccountId]);
 
   useEffect(() => {
@@ -501,6 +511,19 @@ export default function UserPage() {
             <span className={styles.statNum}>{subsCount}</span>
             <span className={styles.statLabel}>подписки</span>
           </button>
+          <div className={`${styles.statItem} ${styles.statItemStatic}`}>
+            <div className={styles.statRating}>
+              {organizerRating != null && organizerRating > 0 ? (
+                <>
+                  <GradeBadge score={organizerRating} size="sm" />
+                  <span className={styles.ratingNum}>{organizerRating.toFixed(1)}</span>
+                </>
+              ) : (
+                <span className={styles.statNum}>—</span>
+              )}
+            </div>
+            <span className={styles.statLabel}>рейтинг организатора</span>
+          </div>
         </div>
 
         <div className={styles.mainGrid}>

@@ -304,6 +304,15 @@
   border-right: none;
 }
 
+.statItemStatic {
+  cursor: default;
+}
+
+.statItemStatic:hover .statNum,
+.statItemStatic:hover .ratingNum {
+  color: var(--text-primary);
+}
+
 .statItem:hover .statNum,
 .statItemActive .statNum {
   color: var(--accent);
