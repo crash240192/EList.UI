@@ -2,6 +2,8 @@
 
 import { apiClient } from '@/shared/api/client';
 import type { PagedList } from '@/shared/api/types';
+import type { EventListItemData } from '@/entities/event/lib/eventListItemUtils';
+import { normalizeEventListItem } from '@/entities/event/normalizeEventListItem';
 
 export interface IAlbumParams {
   albumId?: string;
@@ -63,18 +65,20 @@ export async function getEventAlbums(eventId: string): Promise<IAlbum[]> {
   return ((res as any).result ?? res) as IAlbum[];
 }
 
-export interface IEventAlbumsEvent {
-  id: string;
-  startTime: string;
-  name: string;
-  latitude?: number;
-  longitude?: number;
-  colors?: string[];
+export interface IEventAlbumsGroup {
+  event: EventListItemData;
+  albums: IAlbum[];
 }
 
-export interface IEventAlbumsGroup {
-  event: IEventAlbumsEvent;
-  albums: IAlbum[];
+function normalizeAlbumsGroup(raw: unknown): IEventAlbumsGroup {
+  const row = (raw ?? {}) as Record<string, unknown>;
+  const event = row.event ?? row.Event;
+  const albumsRaw = row.albums ?? row.Albums;
+  const albums = Array.isArray(albumsRaw) ? albumsRaw as IAlbum[] : [];
+  return {
+    event: normalizeEventListItem(event),
+    albums,
+  };
 }
 
 /** Альбомы, сгруппированные по мероприятиям, доступные аккаунту */
@@ -86,7 +90,11 @@ export async function getAlbumsByEvents(
   const res = await apiClient.get<PagedList<IEventAlbumsGroup>>(
     `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}`,
   );
-  return ((res as { result?: PagedList<IEventAlbumsGroup> }).result ?? res) as PagedList<IEventAlbumsGroup>;
+  const data = ((res as { result?: PagedList<IEventAlbumsGroup> }).result ?? res) as PagedList<IEventAlbumsGroup>;
+  return {
+    ...data,
+    result: Array.isArray(data.result) ? data.result.map(normalizeAlbumsGroup) : [],
+  };
 }
 
 export interface IAlbumFile {
