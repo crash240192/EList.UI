@@ -244,7 +244,6 @@ export default function EventPage() {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.errorState}>
-          <span>😕</span>
           <p>Мероприятие не найдено</p>
           <button onClick={() => navigate(-1)}>← Назад</button>
         </div>
@@ -325,15 +324,15 @@ export default function EventPage() {
                     <>
                       <div className={styles.mobileMenuBackdrop} onClick={() => setMobileMenuOpen(false)} />
                       <div className={styles.mobileMenu}>
-                        <button className={styles.mobileMenuItem} onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>✏️ Редактировать</button>
-                        <button className={styles.mobileMenuItem} onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>👥 Добавить организатора</button>
+                        <button className={styles.mobileMenuItem} onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>Редактировать</button>
+                        <button className={styles.mobileMenuItem} onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>Добавить организатора</button>
                         <button className={styles.mobileMenuItem} onClick={() => { setBwListOpen(true); setMobileMenuOpen(false); }}>
-                          {event.parameters?.private ? '✅ Белый список' : '⛔ Черный список'}
+                          {event.parameters?.private ? 'Белый список' : 'Черный список'}
                         </button>
                         {event.active && (
                           <button className={`${styles.mobileMenuItem} ${styles.mobileMenuItemDanger}`}
                             onClick={() => { setCancelConfirm(true); setMobileMenuOpen(false); }}>
-                            ❌ Отменить мероприятие
+                            Отменить мероприятие
                           </button>
                         )}
                       </div>
@@ -677,7 +676,6 @@ function CancelConfirmDialog({ eventName, loading, onConfirm, onClose }: {
     <>
       <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',backdropFilter:'blur(2px)',zIndex:500 }} onClick={onClose} />
       <div style={{ position:'fixed',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'min(360px,90vw)',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:16,padding:'24px 20px',zIndex:501,textAlign:'center' }}>
-        <div style={{ fontSize:36,marginBottom:8 }}>❌</div>
         <h3 style={{ fontSize:16,fontWeight:700,color:'var(--text-primary)',margin:'0 0 8px' }}>Отменить мероприятие?</h3>
         <p style={{ fontSize:13,color:'var(--text-secondary)',margin:'0 0 20px',lineHeight:1.5 }}>
           «{eventName}» будет помечено как неактуальное. Участники увидят что мероприятие отменено.

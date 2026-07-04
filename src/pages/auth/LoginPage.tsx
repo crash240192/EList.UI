@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '@/features/auth/api';
+import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { storeActivationNotice, takeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
@@ -78,9 +79,11 @@ export default function LoginPage() {
                 value={form.password} onChange={set('password')} onKeyDown={onKey}
                 autoComplete="current-password"
               />
-              <button className={styles.eyeBtn} tabIndex={-1} onClick={() => setShow(s => !s)}>
-                {showPass ? '🙈' : '👁'}
-              </button>
+              <PasswordVisibilityButton
+                visible={showPass}
+                onToggle={() => setShow(s => !s)}
+                className={styles.eyeBtn}
+              />
             </div>
           </div>
 

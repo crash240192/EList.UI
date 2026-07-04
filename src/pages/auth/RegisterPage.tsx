@@ -20,6 +20,7 @@ import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import { validateContactValue, isRegexMask, resolveContactMaskTemplate, composeContactValue } from '@/shared/lib/contactMask';
+import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { ContactMaskField } from '@/shared/ui/ContactMaskField/ContactMaskField';
 import { Select, type SelectOption } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
@@ -302,10 +303,11 @@ export default function RegisterPage() {
                     placeholder="Не менее 6 символов" value={form1.password}
                     autoComplete="new-password" onChange={set1('password')}
                     onKeyDown={e => e.key === 'Enter' && handleStep1()} />
-                  <button className={styles.eyeBtn} type="button" tabIndex={-1}
-                    onClick={() => setShowPass(v => !v)}>
-                    {showPass ? '🙈' : '👁'}
-                  </button>
+                  <PasswordVisibilityButton
+                    visible={showPass}
+                    onToggle={() => setShowPass(v => !v)}
+                    className={styles.eyeBtn}
+                  />
                 </div>
               </Field>
 

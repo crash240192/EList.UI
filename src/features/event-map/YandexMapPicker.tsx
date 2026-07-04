@@ -43,8 +43,15 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
           onFocus={e => e.target.select()}
           onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleGeocode())}
         />
-        <button className={styles.searchBtn} type="button" onClick={handleGeocode} disabled={geocoding}>
-          {geocoding ? '⏳' : '🔍'}
+        <button className={styles.searchBtn} type="button" onClick={handleGeocode} disabled={geocoding} aria-label="Найти адрес">
+          {geocoding ? (
+            <span className={styles.searchSpinner} aria-hidden />
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3-3" />
+            </svg>
+          )}
         </button>
       </div>
       <button

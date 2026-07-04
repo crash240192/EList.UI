@@ -56,9 +56,27 @@
   font-size: 16px;
   transition: background 0.15s;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
 }
 .searchBtn:hover { background: var(--border); }
 .searchBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.searchSpinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: searchSpin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes searchSpin {
+  to { transform: rotate(360deg); }
+}
 
 .pickerMapWrap {
   position: relative;

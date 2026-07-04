@@ -220,7 +220,6 @@ export default function MyEventsPage() {
           </div>
         ) : events.length === 0 ? (
           <div className={styles.empty}>
-            <span>{tab === 'active' ? '📅' : '📦'}</span>
             <p>{tab === 'active' ? 'Нет активных событий' : 'Прошедшие пусты'}</p>
             {tab === 'active' && (
               <button className={styles.emptyBtn} onClick={() => navigate('/')}>

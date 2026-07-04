@@ -390,7 +390,7 @@ export function EventMap({
 
   if (error) return (
     <div className={styles.errorBox} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      ⚠️ {error}
+      {error}
     </div>
   );
 

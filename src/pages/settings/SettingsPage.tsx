@@ -18,6 +18,7 @@ import { Select } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { useFiltersStore } from '@/app/store';
+import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import styles from './SettingsPage.module.css';
 
 type SettingsTab = 'profile' | 'contacts' | 'location' | 'security';
@@ -156,7 +157,7 @@ function ProfileTab() {
         gender: form.gender || undefined,
         birthDate: form.birthDate ? new Date(form.birthDate).toISOString() : undefined,
       });
-      setMsg({ text: '✓ Изменения сохранены', ok: true });
+      setMsg({ text: 'Изменения сохранены', ok: true });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
     } finally {
@@ -307,7 +308,7 @@ function CitySection() {
       store.setFilter('latitude', selectedCity.lat);
       store.setFilter('longitude', selectedCity.lng);
       cookies.set('elist_city_decided', '1', 30);
-      setMsg({ text: `✓ Город изменён на ${selectedCity.name}`, ok: true });
+      setMsg({ text: `Город изменён на ${selectedCity.name}`, ok: true });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
     } finally {
@@ -323,7 +324,6 @@ function CitySection() {
       </div>
       {selectedCity && (
         <div className={styles.cityBlock}>
-          <div className={styles.cityEmoji}>📍</div>
           <div>
             <div className={styles.cityName}>{selectedCity.name}</div>
             <div className={styles.citySub}>
@@ -425,15 +425,6 @@ function ContactsSection() {
   );
 }
 
-function contactIcon(typeName: string): string {
-  const n = typeName.toLowerCase();
-  if (n.includes('email') || n.includes('почт')) return '📧';
-  if (n.includes('telegram')) return '💬';
-  if (n.includes('сайт') || n.includes('site') || n.includes('web')) return '🌐';
-  if (n.includes('тел') || n.includes('phone')) return '📱';
-  return '🔗';
-}
-
 function ContactRow({ contact, onEdit }: { contact: any; onEdit: () => void }) {
   const typeName = contact.contactType?.name
     ?? contact.contactType?.localizedName
@@ -441,7 +432,6 @@ function ContactRow({ contact, onEdit }: { contact: any; onEdit: () => void }) {
 
   return (
     <div className={styles.contactRow}>
-      <div className={styles.creIco}>{contactIcon(typeName)}</div>
       <div className={styles.creInfo}>
         <div className={styles.creType}>{typeName}</div>
         <div className={styles.creVal}>{contact.value}</div>
@@ -538,7 +528,7 @@ function PasswordSection() {
     setMsg(null);
     try {
       await changePassword(form);
-      setMsg({ text: '✓ Пароль изменён', ok: true });
+      setMsg({ text: 'Пароль изменён', ok: true });
       setForm({ oldPassword: '', newPassword: '', newPasswordConfirmation: '' });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
@@ -565,15 +555,11 @@ function PasswordSection() {
                 placeholder="Введите текущий пароль"
                 onFocus={e => e.target.select()}
               />
-              <button
-                type="button"
+              <PasswordVisibilityButton
+                visible={showPassword}
+                onToggle={() => setShowPassword(v => !v)}
                 className={styles.eyeBtn}
-                tabIndex={-1}
-                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
-                onClick={() => setShowPassword(v => !v)}
-              >
-                {showPassword ? '🙈' : '👁'}
-              </button>
+              />
             </div>
           </div>
         </div>

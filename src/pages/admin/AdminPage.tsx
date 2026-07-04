@@ -28,7 +28,7 @@ export default function AdminPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>⚙️ Администрирование</h1>
+        <h1 className={styles.title}>Администрирование</h1>
       </div>
 
       <div className={styles.tabs}>
@@ -129,16 +129,14 @@ function EventTypesTab() {
                   <span className={styles.itemSub}>{cat.localizationPath}</span>
                 </div>
                 <div className={styles.itemActions}>
-                  <button className={styles.iconBtn} onClick={() => setEditingCat(cat)} title="Редактировать">✏️</button>
-                  <button
-                    className={`${styles.iconBtn} ${styles.dangerBtn}`}
+                  <EditIconBtn onClick={() => setEditingCat(cat)} />
+                  <DeleteIconBtn
                     onClick={async () => {
                       if (!confirm(`Удалить категорию «${cat.name}»?`)) return;
                       await categoriesApi.delete(cat.id);
                       load();
                     }}
-                    title="Удалить"
-                  >🗑️</button>
+                  />
                 </div>
               </div>
 
@@ -157,16 +155,14 @@ function EventTypesTab() {
                         <span className={styles.itemSub}>{tp.localizationPath}</span>
                       </div>
                       <div className={styles.itemActions}>
-                        <button className={styles.iconBtn} onClick={() => setEditingType(tp)} title="Редактировать">✏️</button>
-                        <button
-                          className={`${styles.iconBtn} ${styles.dangerBtn}`}
+                        <EditIconBtn onClick={() => setEditingType(tp)} />
+                        <DeleteIconBtn
                           onClick={async () => {
                             if (!confirm(`Удалить тип «${tp.name}»?`)) return;
                             await typesApi.delete(tp.id);
                             load();
                           }}
-                          title="Удалить"
-                        >🗑️</button>
+                        />
                       </div>
                     </div>
                   ))}
@@ -229,7 +225,6 @@ function EventTypesTab() {
 
         {editingCat === null && editingType === null && (
           <div className={styles.emptyForm}>
-            <span>👆</span>
             <p>Выберите категорию или тип для редактирования</p>
           </div>
         )}
@@ -283,7 +278,7 @@ function CategoryForm({
         <textarea className={styles.textarea} rows={3} value={form.description ?? ''} onChange={set('description')} placeholder="Описание категории..." />
       </FormField>
       <FormField label="Иконка (URL или emoji)">
-        <input className={styles.input} value={form.ico ?? ''} onChange={set('ico')} placeholder="🎵" />
+        <input className={styles.input} value={form.ico ?? ''} onChange={set('ico')} placeholder="https://example.com/icon.png" />
       </FormField>
       <FormField label="Цвет категории">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -423,7 +418,7 @@ function TypeForm({
             }}
             title="Нажмите чтобы загрузить изображение"
           >
-            {icoPreview ?? <span style={{ fontSize: 22, opacity: 0.4 }}>🖼</span>}
+            {icoPreview ?? <span className={styles.icoPlaceholder}>Нет</span>}
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <button
@@ -515,7 +510,7 @@ function ContactTypesTab() {
                 {item.allowNotifications && <span className={styles.tag}>уведомления</span>}
               </div>
               <div className={styles.itemActions}>
-                <button className={styles.iconBtn} onClick={() => setEditing(item)} title="Редактировать">✏️</button>
+                <EditIconBtn onClick={() => setEditing(item)} />
               </div>
             </div>
           ))}
@@ -544,7 +539,6 @@ function ContactTypesTab() {
           />
         ) : (
           <div className={styles.emptyForm}>
-            <span>👆</span>
             <p>Выберите тип контакта для редактирования</p>
           </div>
         )}
@@ -652,7 +646,6 @@ function TariffsTab() {
         <div className={styles.itemList}>
           {tariffs.length === 0 && (
             <div className={styles.emptyForm} style={{ minHeight: 120 }}>
-              <span style={{ fontSize: 28 }}>📋</span>
               <p>Нет тарифов. Создайте первый.</p>
             </div>
           )}
@@ -668,9 +661,8 @@ function TariffsTab() {
                 </span>
               </div>
               <div className={styles.itemActions}>
-                <button className={styles.iconBtn} onClick={e => { e.stopPropagation(); setEditing(t); }}>✏️</button>
-                <button
-                  className={`${styles.iconBtn} ${styles.dangerBtn}`}
+                <EditIconBtn onClick={e => { e.stopPropagation(); setEditing(t); }} />
+                <DeleteIconBtn
                   title="Удалить тариф"
                   onClick={async e => {
                     e.stopPropagation();
@@ -685,7 +677,7 @@ function TariffsTab() {
                       alert(e instanceof Error ? e.message : 'Ошибка удаления');
                     }
                   }}
-                >🗑️</button>
+                />
               </div>
             </div>
           ))}
@@ -728,7 +720,6 @@ function TariffsTab() {
           />
         ) : (
           <div className={styles.emptyForm}>
-            <span>👆</span>
             <p>Выберите тариф для редактирования</p>
           </div>
         )}
@@ -907,5 +898,35 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
       <label className={styles.label}>{label}</label>
       {children}
     </div>
+  );
+}
+
+function EditIconBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
+  return (
+    <button type="button" className={styles.iconBtn} onClick={onClick} title="Редактировать">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+      </svg>
+    </button>
+  );
+}
+
+function DeleteIconBtn({
+  onClick,
+  title = 'Удалить',
+}: {
+  onClick: (e: React.MouseEvent) => void | Promise<void>;
+  title?: string;
+}) {
+  return (
+    <button type="button" className={`${styles.iconBtn} ${styles.dangerBtn}`} onClick={onClick} title={title}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+        <path d="M10 11v6M14 11v6" />
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      </svg>
+    </button>
   );
 }

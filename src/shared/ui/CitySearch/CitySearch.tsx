@@ -137,13 +137,12 @@ export function CitySearch({
           onFocus={handleFocus}
           autoComplete="off"
         />
-        {searching && <span className={styles.spinner}>📡</span>}
-        {!searching && detectedCoords && query && <span className={styles.ok}>✓</span>}
+        {searching && <span className={styles.spinner} aria-hidden />}
         {onAutoDetect && (
           <button type="button" className={styles.autoBtn} onClick={onAutoDetect}
             title="Определить автоматически">
             {geoLoading
-              ? <span className={styles.spinner}>📡</span>
+              ? <span className={styles.spinner} aria-hidden />
               : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="3"/>
                   <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>

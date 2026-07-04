@@ -184,7 +184,7 @@ export default function EventAlbumsPage() {
 
             {!loading && accountId && !error && groups.length === 0 && (
               <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>📷</div>
+                <div className={styles.emptyIcon} aria-hidden />
                 <p className={styles.emptyTitle}>Альбомов пока нет</p>
                 <p className={styles.emptySub}>Здесь появятся фотоальбомы мероприятий, к которым у вас есть доступ</p>
               </div>

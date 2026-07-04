@@ -10,14 +10,13 @@ import styles from './WalletPage.module.css';
 const HISTORY_STUB: {
   id: string;
   kind: 'in' | 'out' | 'tariff';
-  icon: string;
   name: string;
   meta: string;
   amount: string;
 }[] = [
-  { id: '1', kind: 'in', icon: '⬇', name: 'Пополнение кошелька', meta: '15 мая 2025 · Банковская карта', amount: '+ 2 000 ₽' },
-  { id: '2', kind: 'tariff', icon: '★', name: 'Тариф «Стандарт»', meta: '1 мая 2025 · Автопродление', amount: '− 490 ₽' },
-  { id: '3', kind: 'out', icon: '🎫', name: 'Startup Pitch Night', meta: '18 мар 2025 · Билет на мероприятие', amount: '− 1 000 ₽' },
+  { id: '1', kind: 'in', name: 'Пополнение кошелька', meta: '15 мая 2025 · Банковская карта', amount: '+ 2 000 ₽' },
+  { id: '2', kind: 'tariff', name: 'Тариф «Стандарт»', meta: '1 мая 2025 · Автопродление', amount: '− 490 ₽' },
+  { id: '3', kind: 'out', name: 'Startup Pitch Night', meta: '18 мар 2025 · Билет на мероприятие', amount: '− 1 000 ₽' },
 ];
 
 const HIST_ICO_CLASS = {
@@ -294,9 +293,7 @@ export default function WalletPage() {
                 <div className={styles.histList} aria-hidden>
                   {HISTORY_STUB.map(row => (
                     <div key={row.id} className={styles.histRow}>
-                      <div className={`${styles.histIco} ${HIST_ICO_CLASS[row.kind]}`}>
-                        {row.icon}
-                      </div>
+                      <div className={`${styles.histIco} ${HIST_ICO_CLASS[row.kind]}`} aria-hidden />
                       <div className={styles.histInfo}>
                         <div className={styles.histName}>{row.name}</div>
                         <div className={styles.histMeta}>{row.meta}</div>
@@ -344,7 +341,7 @@ function TariffCard({
   return (
     <div className={cardClass} onClick={isCurrent ? undefined : onSelect} role="button" tabIndex={0}
       onKeyDown={e => { if (e.key === 'Enter' && !isCurrent) onSelect(); }}>
-      {isCurrent && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>✓ Активен</div>}
+      {isCurrent && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>Активен</div>}
       <div className={styles.tcName}>{tariff.name}</div>
       <div className={`${styles.tcPrice} ${tariff.cost === 0 ? styles.tcPriceFree : ''}`}>
         {tariff.cost === 0 ? '0 ₽' : `${tariff.cost.toLocaleString('ru-RU')} ₽`}
@@ -357,9 +354,7 @@ function TariffCard({
         {!rows && <div className={styles.detailsLoader}>Нет данных об ограничениях</div>}
         {rows?.map(row => (
           <div key={row.label} className={styles.tcRow}>
-            <div className={`${styles.tcRowIcon} ${row.type === 'ok' ? styles.iconOk : row.type === 'warn' ? styles.iconWarn : styles.iconNo}`}>
-              {row.type === 'ok' ? '✓' : row.type === 'warn' ? '~' : '✗'}
-            </div>
+            <div className={`${styles.tcRowIcon} ${row.type === 'ok' ? styles.iconOk : row.type === 'warn' ? styles.iconWarn : styles.iconNo}`} aria-hidden />
             <div className={styles.tcRowText}>{row.label}: {row.value}</div>
           </div>
         ))}

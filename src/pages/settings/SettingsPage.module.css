@@ -344,11 +344,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.cityEmoji {
-  font-size: 28px;
-  flex-shrink: 0;
-}
-
 .cityName {
   font-size: 14px;
   font-weight: 600;
@@ -372,20 +367,6 @@
 
 .contactRow:last-of-type {
   border-bottom: none;
-}
-
-.creIco {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  flex-shrink: 0;
-  color: var(--text-secondary);
 }
 
 .creInfo {

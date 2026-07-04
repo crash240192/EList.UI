@@ -49,7 +49,7 @@ export function AvatarUpload({ initials, accountId, fileId: initialFileId, size 
               fallback={<span>{initials}</span>} />
           : <span>{initials}</span>}
         <div className={styles.overlay}>
-          {loading ? <span className={styles.spinner} /> : '📷'}
+          {loading ? <span className={styles.spinner} /> : <span className={styles.overlayText}>Фото</span>}
         </div>
       </div>
       {error && <div className={styles.error}>{error}</div>}

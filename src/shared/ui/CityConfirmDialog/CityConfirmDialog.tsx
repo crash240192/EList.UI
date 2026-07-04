@@ -15,7 +15,6 @@ export function CityConfirmDialog({ cityName, onConfirm, onKeep }: Props) {
     <>
       <div className={styles.backdrop} />
       <div className={styles.dialog} role="dialog" aria-modal>
-        <div className={styles.icon}>📍</div>
         <h3 className={styles.title}>Вы сменили город?</h3>
         <p className={styles.text}>
           Похоже, вы сейчас находитесь в другом городе:<br />
