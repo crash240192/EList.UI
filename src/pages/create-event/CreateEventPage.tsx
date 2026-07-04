@@ -412,8 +412,8 @@ export default function CreateEventPage() {
   })();
 
   const endDateTimeToast = ((): string => {
-    if (!form.endDate || !form.endTime) return '⚠️ Укажите дату и время окончания';
-    return '⚠️ Дата и время окончания не могут быть раньше начала';
+    if (!form.endDate || !form.endTime) return 'Укажите дату и время окончания';
+    return 'Дата и время окончания не могут быть раньше начала';
   })();
 
   // Проверки тарифа
@@ -527,16 +527,16 @@ export default function CreateEventPage() {
   const handleSubmit = async () => {
     const firstErr = validate();
     if (firstErr) {
-      showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
-        location:'⚠️ Укажите адрес на карте',
+      showToast({ name:'Укажите название', type:'Выберите тип мероприятия',
+        location:'Укажите адрес на карте',
         startDate: !form.startDate || !form.startTime
-          ? '⚠️ Укажите дату и время начала'
-          : '⚠️ Дата и время начала не могут быть в прошлом',
-        startTime:'⚠️ Укажите время начала', duration:'⚠️ Укажите длительность',
-        endDate: endDateTimeToast, endTime:'⚠️ Укажите время окончания',
-        cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
-        maxPersons: parseInt(form.maxPersons) < 0 ? '⚠️ Количество участников не может быть отрицательным' : `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: parseInt(form.ageLimit) < 0 ? '⚠️ Возрастное ограничение не может быть отрицательным' : `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
+          ? 'Укажите дату и время начала'
+          : 'Дата и время начала не могут быть в прошлом',
+        startTime:'Укажите время начала', duration:'Укажите длительность',
+        endDate: endDateTimeToast, endTime:'Укажите время окончания',
+        cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
+        maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
+        ageLimit: parseInt(form.ageLimit) < 0 ? 'Возрастное ограничение не может быть отрицательным' : `Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -614,7 +614,7 @@ export default function CreateEventPage() {
         navigate('/my-events');
       }
     } catch (err) {
-      showToast(`❌ ${err instanceof Error ? err.message : 'Ошибка сохранения'}`);
+      showToast(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally { setSaving(false); }
   };
 
@@ -624,16 +624,16 @@ export default function CreateEventPage() {
     if (isEditing) { handleSubmit(); return; }
     const firstErr = validate();
     if (firstErr) {
-      showToast({ name:'⚠️ Укажите название', type:'⚠️ Выберите тип мероприятия',
-        location:'⚠️ Укажите адрес на карте',
+      showToast({ name:'Укажите название', type:'Выберите тип мероприятия',
+        location:'Укажите адрес на карте',
         startDate: !form.startDate || !form.startTime
-          ? '⚠️ Укажите дату и время начала'
-          : '⚠️ Дата и время начала не могут быть в прошлом',
-        startTime:'⚠️ Укажите время начала', duration:'⚠️ Укажите длительность',
-        endDate: endDateTimeToast, endTime:'⚠️ Укажите время окончания',
-        cost: parseFloat(form.cost) < 0 ? '⚠️ Стоимость не может быть отрицательной' : `⚠️ Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
-        maxPersons: parseInt(form.maxPersons) < 0 ? '⚠️ Количество участников не может быть отрицательным' : `⚠️ Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: parseInt(form.ageLimit) < 0 ? '⚠️ Возрастное ограничение не может быть отрицательным' : `⚠️ Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
+          ? 'Укажите дату и время начала'
+          : 'Дата и время начала не могут быть в прошлом',
+        startTime:'Укажите время начала', duration:'Укажите длительность',
+        endDate: endDateTimeToast, endTime:'Укажите время окончания',
+        cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
+        maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
+        ageLimit: parseInt(form.ageLimit) < 0 ? 'Возрастное ограничение не может быть отрицательным' : `Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -1036,7 +1036,7 @@ export default function CreateEventPage() {
             <div className={styles.previewName}>{form.name || <span style={{color:'var(--text-muted)'}}>Название мероприятия</span>}</div>
             {(form.isPrivate || form.ageLimit) && (
               <div className={styles.previewBadges}>
-                {form.isPrivate && <span className={styles.badgePrivate}>🔒 Приватное</span>}
+                {form.isPrivate && <span className={styles.badgePrivate}>Приватное</span>}
                 {form.ageLimit  && <span className={styles.badgeAge}>{form.ageLimit}+</span>}
               </div>
             )}
@@ -1073,7 +1073,7 @@ export default function CreateEventPage() {
             <div key={c.label}
               className={`${styles.checkRow} ${c.done ? styles.checkDone : c.optional ? styles.checkOptional : ''} ${c.label === 'Обложка' ? styles.checklistCoverRow : ''}`}>
               <div className={`${styles.checkDot} ${c.done ? styles.checkDotOk : c.optional ? styles.checkDotOpt : styles.checkDotNo}`}>
-                {c.done ? '✓' : c.optional ? '·' : '·'}
+                {c.done ? '·' : c.optional ? '·' : '·'}
               </div>
               {c.label}{c.optional ? ' (необяз.)' : ''}
             </div>
@@ -1146,7 +1146,6 @@ export default function CreateEventPage() {
       {confirmOpen && (
         <div className={styles.confirmBackdrop} onClick={() => setConfirmOpen(false)}>
           <div className={styles.confirmDialog} onClick={e => e.stopPropagation()}>
-            <div className={styles.confirmIcon}>🚀</div>
             <h3 className={styles.confirmTitle}>Опубликовать мероприятие?</h3>
             <p className={styles.confirmText}>
               «{form.name}» станет видно всем пользователям.
@@ -1238,7 +1237,7 @@ function LockedInput({ locked, hint, suffix, hasError, ...props }: {
           style={suffix ? { flex: 1 } : undefined}
           onFocus={e => (e.target as HTMLInputElement).select()} />
         {suffix && <span className={styles.inputSuffix}>{suffix}</span>}
-        {locked && <span className={styles.lockBadge}>🔒 тариф</span>}
+        {locked && <span className={styles.lockBadge}>тариф</span>}
       </div>
       {hint && <div className={`${styles.fieldHint} ${hasError ? styles.fieldHintErr : locked ? styles.fieldHintWarn : ''}`}>{hint}</div>}
     </div>

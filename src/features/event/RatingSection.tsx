@@ -182,7 +182,7 @@ export function RatingSection({ eventId, eventStartTime, accountId }: Props) {
           )}
 
           {accountId && voted && (
-            <div className={styles.votedBadge}>✓ Вы уже оценили это мероприятие</div>
+            <div className={styles.votedBadge}>Вы уже оценили это мероприятие</div>
           )}
 
           {(data?.items.length ?? 0) > 0 && (

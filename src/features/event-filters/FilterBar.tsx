@@ -274,7 +274,7 @@ export function FilterBar({
 
   // Чипы
   const chips: { label: string; onRemove: () => void }[] = [];
-  if (cityName) chips.push({ label: `📍 ${cityName}`, onRemove: restoreHomeCity });
+  if (cityName) chips.push({ label: cityName, onRemove: restoreHomeCity });
   if (quickDate === 'today')    chips.push({ label: 'Сегодня',  onRemove: () => clearQuickDateFilter(setQuickDate, setFilter) });
   if (quickDate === 'tomorrow') chips.push({ label: 'Завтра',   onRemove: () => clearQuickDateFilter(setQuickDate, setFilter) });
   if (quickDate === 'weekend')  chips.push({ label: 'Выходные', onRemove: () => clearQuickDateFilter(setQuickDate, setFilter) });

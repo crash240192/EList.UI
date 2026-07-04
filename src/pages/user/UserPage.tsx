@@ -179,7 +179,7 @@ function EventCoverThumb({ event }: { event: IEvent }) {
       ) : event.coverUrl ? (
         <img src={event.coverUrl} alt="" className={styles.ecCoverImg} />
       ) : (
-        <span className={styles.ecCoverFallback} aria-hidden>📅</span>
+        <span className={styles.ecCoverFallback} aria-hidden />
       )}
     </div>
   );
@@ -432,7 +432,6 @@ export default function UserPage() {
   if (error || !profile) {
     return (
       <div className={styles.errorState}>
-        <span>😕</span>
         <p>{error ?? 'Пользователь не найден'}</p>
         <button type="button" onClick={() => navigate(-1)}>← Назад</button>
       </div>
@@ -483,7 +482,7 @@ export default function UserPage() {
                           role="menuitem"
                           onClick={() => { navigate('/settings'); setMenuOpen(false); }}
                         >
-                          ✏️ Редактировать
+                          Редактировать
                         </button>
                       )}
                       <button
@@ -492,7 +491,7 @@ export default function UserPage() {
                         role="menuitem"
                         onClick={() => { setShareOpen(true); setMenuOpen(false); }}
                       >
-                        🔗 Поделиться
+                        Поделиться
                       </button>
                     </div>
                   </>

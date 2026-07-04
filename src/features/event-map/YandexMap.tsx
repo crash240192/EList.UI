@@ -55,7 +55,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, zoom, label, draggable]);
 
-  if (error) return <div className={styles.errorBox}>⚠️ {error}</div>;
+  if (error) return <div className={styles.errorBox}>{error}</div>;
 
   return (
     <div ref={wrapRef} className={styles.mapViewWrap}>

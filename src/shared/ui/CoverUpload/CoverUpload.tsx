@@ -83,7 +83,6 @@ export function CoverUpload({ currentUrl, currentFileId, onUploaded }: CoverUplo
         />
       ) : (
         <div className={styles.placeholder}>
-          <span className={styles.icon}>🖼️</span>
           <span className={styles.hint}>Нажмите или перетащите изображение</span>
           <span className={styles.sub}>JPG, PNG, WEBP · до 10 МБ</span>
         </div>

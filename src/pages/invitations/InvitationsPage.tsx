@@ -211,7 +211,6 @@ export default function InvitationsPage() {
           <div className={styles.invList}>
             {!loading && !err && urgentInv && (
               <div className={styles.urgentStrip}>
-                <div className={styles.urgentIco}>⏰</div>
                 <div>
                   <div className={styles.urgentText}>
                     {getDaysUntil(urgentInv.event.startTime) <= 1
@@ -250,7 +249,6 @@ export default function InvitationsPage() {
             <div className={`${styles.tabPane} ${tab === 'sent' ? styles.tabPaneActive : ''}`}>
               <div className={styles.invList}>
                 <div className={styles.emptyState}>
-                  <div className={styles.emptyIllo}>📤</div>
                   <p className={styles.emptyTitle}>Отправленных приглашений нет</p>
                   <p className={styles.emptySub}>
                     Приглашения, которые вы отправили участникам своих событий, будут отображаться здесь
@@ -441,23 +439,23 @@ function AcceptDialog({
           )}
           <div className={styles.dialogMeta}>
             <div className={styles.dmetaRow}>
-              <div className={styles.dmetaIco}>📅</div>
               <div>
+                <div className={styles.dmetaLabel}>Дата</div>
                 <div className={styles.dmetaVal}>{formatInvitationEventDate(event.startTime)}</div>
                 {daysLabel && <div className={styles.dmetaSub}>{daysLabel}</div>}
               </div>
             </div>
             {event.address && (
               <div className={styles.dmetaRow}>
-                <div className={styles.dmetaIco}>📍</div>
                 <div>
+                  <div className={styles.dmetaLabel}>Место</div>
                   <div className={styles.dmetaVal}>{event.address}</div>
                 </div>
               </div>
             )}
             <div className={styles.dmetaRow}>
-              <div className={styles.dmetaIco}>🎫</div>
               <div>
+                <div className={styles.dmetaLabel}>Стоимость</div>
                 <div className={styles.dmetaVal} style={params.cost === 0 ? { color: 'var(--success)' } : undefined}>
                   {params.cost === 0 ? 'Бесплатно' : `${params.cost.toLocaleString('ru-RU')} ₽`}
                 </div>
@@ -471,7 +469,7 @@ function AcceptDialog({
           </div>
           <div className={styles.dialogBtns}>
             <button type="button" className={styles.dbtnLater} onClick={onClose}>Решу позже</button>
-            <button type="button" className={styles.dbtnAccept} onClick={onAccept}>✓ Принять приглашение</button>
+            <button type="button" className={styles.dbtnAccept} onClick={onAccept}>Принять приглашение</button>
           </div>
         </div>
       </div>

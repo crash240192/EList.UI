@@ -158,7 +158,7 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
 
   // Чипы
   const chips: { label: string; onRemove: () => void }[] = [];
-  if (cityName) chips.push({ label: `📍 ${cityName}`, onRemove: () => { setCityName(''); setFilter('latitude', undefined); setFilter('longitude', undefined); } });
+  if (cityName) chips.push({ label: cityName, onRemove: () => { setCityName(''); setFilter('latitude', undefined); setFilter('longitude', undefined); } });
   if (quickDate === 'today')    chips.push({ label: 'Сегодня',  onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
   if (quickDate === 'tomorrow') chips.push({ label: 'Завтра',   onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });
   if (quickDate === 'weekend')  chips.push({ label: 'Выходные', onRemove: () => { setQuickDate(null); setFilter('startTime', undefined); setFilter('endTime', undefined); } });

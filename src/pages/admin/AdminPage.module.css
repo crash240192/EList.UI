@@ -201,8 +201,13 @@
   height: 100%; gap: 12px;
   color: var(--text-muted);
 }
-.emptyForm span { font-size: 40px; }
-.emptyForm p    { font-size: 13px; margin: 0; }
+.emptyForm p { font-size: 13px; margin: 0; text-align: center; }
+
+.icoPlaceholder {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
 
 /* ---- Form ---- */
 .form {

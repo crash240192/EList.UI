@@ -70,6 +70,7 @@ src/
 - CSS Modules only — every component has a `.module.css` sibling
 - Theme toggled via `light-theme` class on `<body>` (dark is default)
 - Custom SVG icons inline — no icon library
+- Do not add emojis or decorative icons by default — only when explicitly requested
 
 ### Maps
 
