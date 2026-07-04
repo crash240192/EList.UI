@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, assignEventTypes } from '@/entities/event';
 import type { IEventType } from '@/entities/event';
 import {
@@ -675,9 +676,7 @@ export default function CreateEventPage() {
 
         {/* Хедер */}
         <div className={styles.header}>
-          <button className={styles.backBtn} onClick={() => navigate(-1)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
+          <HeroBackButton onClick={() => navigate(-1)} />
           <h1 className={styles.title}>{isEditing ? 'Редактировать мероприятие' : 'Новое мероприятие'}</h1>
         </div>
 

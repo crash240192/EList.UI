@@ -13,26 +13,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px 16px;
+  padding: var(--page-padding) 16px;
+  box-sizing: border-box;
 }
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-  width: 100%;
-  max-width: 960px;
+  composes: card from '../../shared/styles/pageShell.module.css';
 }
 
 .cardHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--border);
+  composes: cardHeader from '../../shared/styles/pageShell.module.css';
+}
+
+.cardTitle {
+  composes: cardTitle from '../../shared/styles/pageShell.module.css';
 }
 
 .cardHeaderMain {
@@ -40,13 +34,6 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
-}
-
-.cardTitle {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
 }
 
 .badge {
@@ -713,7 +700,7 @@
   background: rgba(239, 68, 68, 0.2);
 }
 
-@media (max-width: 540px) {
+@media (max-width: 639px) {
   .inner {
     padding: 0;
   }

@@ -24,6 +24,8 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useAvatar } from '@/features/auth/useAvatar';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
+import { TabBar } from '@/shared/ui/TabBar';
+import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import {
   countUniqueUserEvents,
   formatContactHref,
@@ -271,20 +273,16 @@ function UserEventsPanel({
   return (
     <div className={styles.tabContent}>
       <div className={styles.subtabs}>
-        <button
-          type="button"
-          className={`${styles.stab} ${phase === 'upcoming' ? styles.stabActive : ''}`}
-          onClick={() => onPhaseChange('upcoming')}
-        >
-          Предстоящие
-        </button>
-        <button
-          type="button"
-          className={`${styles.stab} ${phase === 'past' ? styles.stabActive : ''}`}
-          onClick={() => onPhaseChange('past')}
-        >
-          Прошедшие
-        </button>
+        <TabBar
+          variant="pill"
+          className={styles.phaseTabs}
+          tabs={[
+            { id: 'upcoming', label: 'Предстоящие' },
+            { id: 'past', label: 'Прошедшие' },
+          ]}
+          activeId={phase}
+          onChange={id => onPhaseChange(id as UserEventsPhase)}
+        />
       </div>
 
       {isLoading && (
@@ -457,9 +455,7 @@ export default function UserPage() {
           <div className={styles.coverOverlay} />
 
           <div className={styles.heroTop}>
-            <button type="button" className={styles.heroBtn} onClick={() => navigate(-1)} aria-label="Назад">
-              <ChevronLeft />
-            </button>
+            <HeroBackButton onClick={() => navigate(-1)} />
             <div className={styles.heroTopRight}>
               <div className={styles.menuWrap}>
                 <button
@@ -634,19 +630,15 @@ export default function UserPage() {
           </aside>
 
           <section className={styles.rightPanel}>
-            <div className={styles.tabsBar}>
-              {SCOPE_TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  className={`${styles.tabBtn} ${mainTab === tab.key ? styles.tabBtnActive : ''}`}
-                  onClick={() => setMainTab(tab.key)}
-                >
-                  {tab.label}
-                  <span className={styles.tabCnt}>{scopeCounts[tab.key]}</span>
-                </button>
-              ))}
-            </div>
+            <TabBar
+              tabs={SCOPE_TABS.map(tab => ({
+                id: tab.key,
+                label: tab.label,
+                count: scopeCounts[tab.key],
+              }))}
+              activeId={mainTab}
+              onChange={id => setMainTab(id as MainTab)}
+            />
 
             <UserEventsPanel
               events={activeEvents.events}

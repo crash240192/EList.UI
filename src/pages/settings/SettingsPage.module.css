@@ -1,32 +1,19 @@
 /* pages/settings/SettingsPage.module.css */
 
 .page {
-  height: 100%;
-  overflow-y: auto;
-  background: var(--bg);
-  padding: 20px;
-  box-sizing: border-box;
+  composes: page from '../../shared/styles/pageShell.module.css';
 }
 
 .card {
-  width: 100%;
-  max-width: 1080px;
-  margin: 0 auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: min(100%, calc(100vh - var(--header-h) - 40px));
+  composes: cardFlex from '../../shared/styles/pageShell.module.css';
 }
 
-
 .cardHeader {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  composes: cardHeader from '../../shared/styles/pageShell.module.css';
+}
+
+.cardTitle {
+  composes: cardTitle from '../../shared/styles/pageShell.module.css';
 }
 
 /* ── Табы ── */
@@ -50,13 +37,6 @@
 .sections {
   display: flex; flex-direction: column; gap: 16px;
   max-width: 560px; margin: 0 auto;
-}
-
-.cardTitle {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
 }
 
 .settingsLayout {
@@ -94,12 +74,12 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: var(--tab-pill-padding-y) 10px;
+  border-radius: var(--control-radius);
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--tab-pill-font-size);
+  font-weight: var(--tab-font-weight);
   transition: background 0.12s, color 0.12s, border-color 0.12s;
   border: 1px solid transparent;
   background: none;
@@ -543,7 +523,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 720px) {
+@media (max-width: 639px) {
   .page {
     padding: 0;
   }

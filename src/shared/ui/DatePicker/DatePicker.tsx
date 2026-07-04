@@ -248,7 +248,7 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     const popup = popupRef.current;
     if (!popup) return;
 
-    const mobile = window.innerWidth < 600;
+    const mobile = window.innerWidth < 640;
     setIsMobile(mobile);
 
     if (!open) {

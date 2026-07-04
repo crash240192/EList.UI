@@ -98,7 +98,7 @@
 }
 
 /* Мобиль — компактнее обложка */
-@media (max-width: 640px) {
+@media (max-width: 639px) {
   .cover { height: 120px; }
   .card { border-radius: 12px; }
 }

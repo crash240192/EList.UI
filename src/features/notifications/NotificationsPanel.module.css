@@ -16,7 +16,7 @@
 }
 
 /* На узком экране панель от viewport, не от кнопки — иначе обрезается слева */
-@media (max-width: 680px) {
+@media (max-width: 639px) {
   .panel {
     position: fixed;
     top: calc(var(--header-h, 56px) + 6px);

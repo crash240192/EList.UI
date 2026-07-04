@@ -17,6 +17,7 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { TabBar } from '@/shared/ui/TabBar';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import {
   findUrgentInvitation,
@@ -173,26 +174,14 @@ export default function InvitationsPage() {
             )}
           </div>
 
-          <div className={styles.tabsBar}>
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${tab === 'incoming' ? styles.tabBtnActive : ''}`}
-              onClick={() => setTab('incoming')}
-            >
-              Входящие
-              {!loading && items.length > 0 && (
-                <span className={styles.tabCnt}>{items.length}</span>
-              )}
-            </button>
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${tab === 'sent' ? styles.tabBtnActive : ''}`}
-              onClick={() => setTab('sent')}
-            >
-              Отправленные
-              <span className={styles.tabCnt}>0</span>
-            </button>
-          </div>
+          <TabBar
+            tabs={[
+              { id: 'incoming', label: 'Входящие', count: !loading ? items.length : undefined },
+              { id: 'sent', label: 'Отправленные', count: 0 },
+            ]}
+            activeId={tab}
+            onChange={id => setTab(id as typeof tab)}
+          />
 
           <div className={styles.cardBody}>
             <div className={`${styles.tabPane} ${tab === 'incoming' ? styles.tabPaneActive : ''}`}>

@@ -11,6 +11,7 @@ import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
 import type { IEventsSearchParams, EventViewMode } from '@/entities/event';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
+import { TabBar } from '@/shared/ui/TabBar';
 import styles from './MyEventsPage.module.css';
 
 type Tab = 'active' | 'archive';
@@ -190,12 +191,15 @@ export default function MyEventsPage() {
 
       {/* ── Кнопка создать + переключатель активные/прошедшие ── */}
       <div className={styles.subHeader}>
-        <div className={styles.tabs}>
-          <button className={`${styles.tab} ${tab === 'active'  ? styles.tabActive : ''}`}
-            onClick={() => setTab('active')}>Активные</button>
-          <button className={`${styles.tab} ${tab === 'archive' ? styles.tabActive : ''}`}
-            onClick={() => setTab('archive')}>Прошедшие</button>
-        </div>
+        <TabBar
+          className={styles.archiveTabs}
+          tabs={[
+            { id: 'active', label: 'Активные' },
+            { id: 'archive', label: 'Прошедшие' },
+          ]}
+          activeId={tab}
+          onChange={id => setTab(id as typeof tab)}
+        />
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {ownerFilter === 'mine' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>

@@ -24,24 +24,9 @@
 }
 
 /* ---- Top tabs ---- */
-.tabs {
-  display: flex;
+.topTabs {
   padding: 0 20px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
 }
-.tab {
-  background: none; border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 8px 8px 0 0;
-  padding: 11px 16px;
-  font-size: 13px; font-weight: 500;
-  color: var(--text-secondary); cursor: pointer;
-  margin-bottom: -1px;
-  transition: color 0.15s, background 0.15s;
-}
-.tab:hover { color: var(--text-primary); background: var(--surface-2); }
-.tabActive { color: var(--accent) !important; border-bottom-color: var(--accent); }
 
 /* ---- Content ---- */
 .content {
@@ -57,7 +42,7 @@
   overflow: hidden;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 639px) {
   .splitPane {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
@@ -278,7 +263,7 @@
 .mobileBackBtn {
   display: none;
 }
-@media (max-width: 767px) {
+@media (max-width: 639px) {
   .mobileBackBtn {
     display: flex; align-items: center; gap: 6px;
     background: none; border: none;

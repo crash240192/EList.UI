@@ -1,29 +1,15 @@
 /* pages/wallet/WalletPage.module.css */
 
 .page {
-  height: 100%;
-  overflow-y: auto;
-  background: var(--bg);
-  padding: 20px;
-  box-sizing: border-box;
+  composes: page from '../../shared/styles/pageShell.module.css';
 }
 
 .card {
-  width: 100%;
-  max-width: 1080px;
-  margin: 0 auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
+  composes: card from '../../shared/styles/pageShell.module.css';
 }
 
 .cardHead {
-  padding: 20px 20px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  composes: cardHead from '../../shared/styles/pageShell.module.css';
 }
 
 .loader {
@@ -58,16 +44,8 @@
 
 /* ── Bank card (page header) ── */
 .bankCard {
-  border-radius: 18px;
+  composes: heroBanner from '../../shared/styles/hero.module.css';
   padding: 24px 28px;
-  background: linear-gradient(135deg, #1a1040 0%, #312e81 45%, #1e3a5f 80%, #0d2818 100%);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 180px;
 }
 
 .bankCardStub {
@@ -75,28 +53,6 @@
   align-items: center;
   justify-content: center;
   min-height: 160px;
-}
-
-.bankCard::before {
-  content: '';
-  position: absolute;
-  width: 280px;
-  height: 280px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, transparent 70%);
-  top: -80px;
-  right: -60px;
-}
-
-.bankCard::after {
-  content: '';
-  position: absolute;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
-  bottom: -60px;
-  left: 40px;
 }
 
 .cardTop {
@@ -661,7 +617,7 @@
   line-height: 1.5;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 639px) {
   .page {
     padding: 0;
   }
@@ -698,7 +654,7 @@
   }
 }
 
-@media (min-width: 721px) and (max-width: 960px) {
+@media (min-width: 640px) and (max-width: 1023px) {
   .tariffGrid {
     grid-template-columns: repeat(2, 1fr);
   }

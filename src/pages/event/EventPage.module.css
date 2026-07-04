@@ -1,11 +1,12 @@
 /* EventPage.module.css */
 
-.page { height:100%; overflow-y:auto; background:var(--bg); padding:20px; box-sizing:border-box; }
+.page {
+  composes: page from '../../shared/styles/pageShell.module.css';
+}
+
 .card {
+  composes: card from '../../shared/styles/pageShell.module.css';
   position: relative;
-  width:100%; max-width:960px; margin:0 auto;
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:16px; box-shadow:0 2px 20px rgba(0,0,0,.15); overflow:hidden;
 }
 
 .deniedBackBtn {
@@ -13,21 +14,6 @@
   top: 14px;
   left: 14px;
   z-index: 10;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.deniedBackBtn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 .deniedPlaceholder {
@@ -36,8 +22,8 @@
 }
 
 .deniedHero {
-  height: 220px;
-  background: linear-gradient(135deg, var(--surface-2) 0%, color-mix(in srgb, var(--border) 40%, var(--surface-2)) 100%);
+  height: var(--hero-height);
+  background: var(--hero-gradient);
 }
 
 .deniedBody {
@@ -62,24 +48,29 @@
 }
 
 /* Hero */
-.hero { position:relative; height:220px; overflow:hidden; }
-.heroImg { width:100%; height:100%; object-fit:cover; display:block; }
+.hero {
+  composes: hero from '../../shared/styles/hero.module.css';
+}
+
+.heroImg {
+  composes: heroImg from '../../shared/styles/hero.module.css';
+}
+
 .heroOverlay {
-  position:absolute; inset:0; z-index:1;
-  background:linear-gradient(to bottom,rgba(0,0,0,.05) 30%,rgba(0,0,0,.6) 100%);
-  pointer-events:none;
+  composes: heroOverlay from '../../shared/styles/hero.module.css';
 }
+
 .heroTop {
-  position:absolute; top:14px; left:14px; right:14px; z-index:10;
-  display:flex; justify-content:space-between; align-items:center;
+  composes: heroTop from '../../shared/styles/hero.module.css';
 }
-.heroTopRight { display:flex; gap:8px; }
+
+.heroTopRight {
+  composes: heroTopRight from '../../shared/styles/hero.module.css';
+}
+
 .heroBottom {
-  position:absolute; bottom:14px; left:14px; z-index:4;
-  display:flex; gap:5px; flex-wrap:wrap;
+  composes: heroBottom from '../../shared/styles/hero.module.css';
 }
-.heroBtn { width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,.18); backdrop-filter:blur(8px); border:.5px solid rgba(255,255,255,.25); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s; }
-.heroBtn:hover { background:rgba(255,255,255,.3); }
 .tagType,.tagFree { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); display:inline-flex; align-items:center; gap:4px; }
 .tagFree { background:rgba(16,185,129,.65); color:#fff; border:.5px solid rgba(16,185,129,.4); }
 
@@ -88,28 +79,16 @@
 .actionTitle { flex:1; min-width:0; font-size:16px; font-weight:600; color:var(--text-primary); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .actionBtns { display:flex; gap:7px; flex-shrink:0; align-items:center; }
 .btnInvite {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  border-radius: 9px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  cursor: pointer;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: border-color 0.12s, background 0.12s;
+  composes: btnIcon from '../../shared/styles/actionButtons.module.css';
 }
-.btnInvite:hover {
-  border-color: var(--accent);
-  background: var(--surface);
+
+.btnJoin {
+  composes: btnPrimary from '../../shared/styles/actionButtons.module.css';
 }
-.btnJoin { height:36px; padding:0 20px; border-radius:9px; background:var(--accent); color:#fff; border:none; font-size:13px; font-weight:500; cursor:pointer; transition:background .15s; white-space:nowrap; }
-.btnJoin:hover:not(:disabled) { background:var(--accent-hover,#4f46e5); }
-.btnJoin:disabled { opacity:.5; cursor:not-allowed; }
-.btnLeave { background:var(--surface-2)!important; border:1px solid var(--border)!important; color:var(--text-secondary)!important; }
+
+.btnLeave {
+  composes: btnSecondary from '../../shared/styles/actionButtons.module.css';
+}
 
 .joinBtnWrap { position:relative; flex-shrink:0; }
 .joinLimitNotice {
@@ -317,7 +296,7 @@
 .errorState button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 18px; cursor:pointer; font-size:13px; }
 
 /* Mobile */
-@media (max-width:680px) {
+@media (max-width: 639px) {
   .page { padding:0; }
   .card { border-radius:0; border-left:none; border-right:none; }
   .mainGrid { grid-template-columns:1fr; }
@@ -382,7 +361,7 @@
   box-shadow: 0 10px 28px rgba(99, 102, 241, 0.18);
 }
 
-@media (max-width:680px) {
+@media (max-width: 639px) {
   .mapBlock { height:228px; }
   .scrollTopBtn {
     left: 16px;
@@ -391,7 +370,7 @@
   }
 }
 
-@media (max-width:767px) {
+@media (max-width: 639px) {
   .scrollTopBtn {
     left: 16px;
   }

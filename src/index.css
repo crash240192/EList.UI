@@ -1,3 +1,5 @@
+@import './shared/styles/tokens.css';
+
 /* src/index.css — глобальные стили и CSS-переменные */
 
 *,
@@ -109,7 +111,7 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
  * iOS Safari: при фокусе на input/textarea/select с font-size < 16px
  * страница автоматически зуммируется (на Android такого нет).
  */
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 639px) {
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='button']):not([type='submit']):not([type='reset']):not([type='hidden']):not([type='image']):not([type='color']),
   textarea,
   select {
@@ -117,8 +119,8 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
   }
 }
 
-/* ── Мобиль: карточки от края до края ── */
-@media (max-width: 640px) {
+/* ── Мобиль: карточки от края до края (legacy utility) ── */
+@media (max-width: 639px) {
   /* Страницы с одной центральной карточкой убираем боковые отступы */
   .page-card-mobile {
     padding-left: 0 !important;

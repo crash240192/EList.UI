@@ -176,17 +176,13 @@
   border-bottom: 1px solid var(--border);
 }
 .tabBtn {
-  padding: 6px 14px; border-radius: 8px 8px 0 0;
-  font-size: 13px; font-weight: 500;
-  border: none; background: none; cursor: pointer;
-  color: var(--text-secondary); transition: all 0.15s;
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  composes: tab from '../../shared/styles/tabs.module.css';
+  padding: 6px 14px;
 }
-.tabBtn:hover { color: var(--text-primary); background: var(--surface-2); }
+
 .tabBtnActive {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-  background: rgba(99,102,241,0.06);
+  composes: tabActive from '../../shared/styles/tabs.module.css';
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 /* ── Мобильная компактная строка ── */
@@ -215,7 +211,7 @@
   display: flex; align-items: center; justify-content: center;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639px) {
   .bar { display: none; } /* Прячем десктопный FilterBar */
   .mobileBar { display: flex; }
 }
@@ -237,7 +233,7 @@
 .mobileTab:hover { color: var(--text-primary); }
 .mobileTabActive { color: var(--accent) !important; border-bottom-color: var(--accent); }
 
-@media (max-width: 640px) {
+@media (max-width: 639px) {
   .mobileTabsRow { display: flex; }
   .mobileBar { border-radius: 14px 14px 0 0; border-bottom: none; }
 }

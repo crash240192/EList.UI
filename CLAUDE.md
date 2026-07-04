@@ -71,6 +71,10 @@ src/
 - Theme toggled via `light-theme` class on `<body>` (dark is default)
 - Custom SVG icons inline — no icon library
 - Do not add emojis or decorative icons by default — only when explicitly requested
+- Shared UI tokens: `src/shared/styles/tokens.css` (imported in `index.css`)
+- Shared layout: `pageShell.module.css`, hero: `hero.module.css`, buttons: `actionButtons.module.css`, tabs: `tabs.module.css`
+- Breakpoints: mobile ≤639px, tablet 640–1023px, desktop ≥1024px (`src/shared/lib/breakpoints.ts`)
+- Hero color standard: wallet gradient (`--hero-gradient`); event pages may use dynamic type-color gradients
 
 ### Maps
 

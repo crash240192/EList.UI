@@ -39,7 +39,7 @@
   max-width: 100%;
 }
 
-@media (max-width: 680px) {
+@media (max-width: 639px) {
   .grid,
   .gridCompact {
     gap: 10px;

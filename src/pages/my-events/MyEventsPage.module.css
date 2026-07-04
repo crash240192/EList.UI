@@ -8,11 +8,17 @@
   padding: 14px 16px 10px; flex-shrink: 0;
 }
 .title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
-.createBtn {
-  background: var(--accent); color: #fff; border: none; border-radius: 8px;
-  padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+.archiveTabs {
+  padding: 0 !important;
+  border-bottom: none !important;
+  flex: 1;
+  min-width: 0;
 }
-.createBtn:hover { background: var(--accent-hover); }
+
+.createBtn {
+  composes: btnPrimary from '../../shared/styles/actionButtons.module.css';
+  padding: 8px 14px;
+}
 
 /* ---- Owner filter chips ---- */
 .ownerFilter { display: flex; gap: 6px; padding: 0 16px 10px; flex-shrink: 0; }

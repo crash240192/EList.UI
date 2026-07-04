@@ -9,7 +9,7 @@
   scroll-margin-bottom: 240px;
 }
 
-@media (max-width: 680px) {
+@media (max-width: 639px) {
   .cardReplyTarget {
     scroll-margin-top: 56px;
     scroll-margin-bottom: 120px;

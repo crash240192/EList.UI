@@ -21,7 +21,7 @@
   animation: slideUp 0.22s ease;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 640px) {
   .modal {
     bottom: auto;
     top: 50%;
