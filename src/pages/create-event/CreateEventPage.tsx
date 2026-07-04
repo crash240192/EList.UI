@@ -675,7 +675,7 @@ export default function CreateEventPage() {
 
         {/* Хедер */}
         <div className={styles.header}>
-          <button className={styles.backBtn} onClick={() => navigate(-1)}>
+          <button className={`${styles.backBtn} noHoverGlow`} onClick={() => navigate(-1)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <h1 className={styles.title}>{isEditing ? 'Редактировать мероприятие' : 'Новое мероприятие'}</h1>
