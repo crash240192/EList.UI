@@ -199,7 +199,7 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
                   user={{
                     accountId: item.account.id,
                     login:     item.account.login,
-                    avatarId:  item.account.avatarId ?? null,
+                    avatarId:  item.account.avatarId,
                     firstName: item.personInfo?.firstName ?? null,
                     lastName:  item.personInfo?.lastName  ?? null,
                     isMe:      item.account.id === currentAccountId,

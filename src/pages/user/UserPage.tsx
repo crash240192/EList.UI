@@ -483,17 +483,17 @@ export default function UserPage() {
         </div>
 
         <div className={styles.statsBar}>
-          <button type="button" className={styles.statItem} onClick={() => { setMainTab('created'); }}>
+          <button type="button" className={`${styles.statItem} noHoverGlow`} onClick={() => { setMainTab('created'); }}>
             <span className={styles.statNum}>{createdEvents.total || createdEvents.events.length}</span>
             <span className={styles.statLabel}>организовал</span>
           </button>
-          <button type="button" className={styles.statItem} onClick={() => { setMainTab('participating'); }}>
+          <button type="button" className={`${styles.statItem} noHoverGlow`} onClick={() => { setMainTab('participating'); }}>
             <span className={styles.statNum}>{participatingEvents.total || participatingEvents.events.length}</span>
             <span className={styles.statLabel}>посетил</span>
           </button>
           <button
             type="button"
-            className={`${styles.statItem} ${listModal === 'subscribers' ? styles.statItemActive : ''}`}
+            className={`${styles.statItem} noHoverGlow ${listModal === 'subscribers' ? styles.statItemActive : ''}`}
             onClick={() => setListModal('subscribers')}
           >
             <span className={styles.statNum}>{subscrCount}</span>
@@ -501,13 +501,13 @@ export default function UserPage() {
           </button>
           <button
             type="button"
-            className={`${styles.statItem} ${listModal === 'subscriptions' ? styles.statItemActive : ''}`}
+            className={`${styles.statItem} noHoverGlow ${listModal === 'subscriptions' ? styles.statItemActive : ''}`}
             onClick={() => setListModal('subscriptions')}
           >
             <span className={styles.statNum}>{subsCount}</span>
             <span className={styles.statLabel}>подписки</span>
           </button>
-          <div className={`${styles.statItem} ${styles.statItemStatic}`}>
+          <div className={`${styles.statItem} ${styles.statItemStatic} ${styles.statItemRating}`}>
             <div className={styles.statRating}>
               {organizerRating != null && organizerRating > 0 ? (
                 <>

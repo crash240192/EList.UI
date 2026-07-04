@@ -10,6 +10,16 @@ export interface ISubscriptionAccount {
   avatarId?: string | null;
 }
 
+function mapSubscriptionAccount(raw: unknown): ISubscriptionAccount {
+  const acc = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const avatarId = acc.avatarId ?? acc.AvatarId;
+  return {
+    id: String(acc.id ?? ''),
+    login: String(acc.login ?? acc.Login ?? ''),
+    avatarId: avatarId === null || avatarId === '' ? null : (avatarId as string | undefined),
+  };
+}
+
 export interface ISubscriptionPersonInfo {
   firstName: string | null;
   lastName: string | null;
@@ -83,7 +93,7 @@ export async function fetchSubscriptions(
     const list: any[] = paged?.result ?? [];
     return {
       items: list.map(item => ({
-        account:    item.subscribedTo?.account    ?? item.account,
+        account:    mapSubscriptionAccount(item.subscribedTo?.account ?? item.account),
         personInfo: item.subscribedTo?.personInfo ?? item.personInfo ?? null,
         notifySettings: {
           notifyParticipated: Boolean(
@@ -128,7 +138,7 @@ export async function fetchSubscribers(
     const list: any[] = paged?.result ?? [];
     return {
       items: list.map(item => ({
-        account:    item.subscriber?.account    ?? item.account,
+        account:    mapSubscriptionAccount(item.subscriber?.account ?? item.account),
         personInfo: item.subscriber?.personInfo ?? item.personInfo ?? null,
         notifySettings: null,
       })),
