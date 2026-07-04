@@ -312,10 +312,22 @@ export default function RegisterPage() {
               </Field>
 
               <Field label="Подтверждение пароля">
-                <input className={styles.input} type={showPass ? 'text' : 'password'}
-                  placeholder="Повторите пароль" value={form1.passwordConfirmation}
-                  autoComplete="new-password" onChange={set1('passwordConfirmation')}
-                  onKeyDown={e => e.key === 'Enter' && handleStep1()} />
+                <div className={styles.inputWrap}>
+                  <input
+                    className={`${styles.input} ${styles.inputWithBtn}`}
+                    type={showPass ? 'text' : 'password'}
+                    placeholder="Повторите пароль"
+                    value={form1.passwordConfirmation}
+                    autoComplete="new-password"
+                    onChange={set1('passwordConfirmation')}
+                    onKeyDown={e => e.key === 'Enter' && handleStep1()}
+                  />
+                  <PasswordVisibilityButton
+                    visible={showPass}
+                    onToggle={() => setShowPass(v => !v)}
+                    className={styles.eyeBtn}
+                  />
+                </div>
               </Field>
 
               <Field label="Тип контакта">
