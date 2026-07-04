@@ -26,6 +26,7 @@
   --sidebar-w:      220px;
   --radius:         12px;
   --transition:     0.18s ease;
+  --hover-glow:     0 0 10px 2px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .light-theme {
@@ -79,6 +80,22 @@ input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; }
 button {
   border-radius: 8px;
   transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition);
+}
+
+/* Glow при hover на интерактивных элементах с подсветкой */
+button:hover:not(:disabled):not(.noHoverGlow),
+[role="button"]:hover:not(:disabled):not(.noHoverGlow),
+a.controlLink:hover {
+  box-shadow: var(--hover-glow);
+}
+
+/* Круглые иконки без прямоугольной подсветки — без glow */
+button.noHoverGlow:hover,
+[class*="avatar"]:hover,
+[class*="Avatar"]:hover,
+input[type="checkbox"]:hover,
+input[type="radio"]:hover {
+  box-shadow: none;
 }
 /* Но не для анимаций */
 *[class*='skeleton'],

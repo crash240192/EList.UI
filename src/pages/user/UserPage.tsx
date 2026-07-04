@@ -23,16 +23,12 @@ import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useAvatar } from '@/features/auth/useAvatar';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
-import { EventTypeChip } from '@/shared/ui/EventTypeChip';
+import { EventListItem, EventList } from '@/entities/event/ui/EventListItem';
 import {
   countUniqueUserEvents,
   formatContactHref,
-  formatEventListDate,
-  formatEventPrice,
   formatShortEventDate,
   getContactIconKind,
-  getEventCoverStyle,
-  getEventTypes,
   getUpcomingPreview,
   isContactLink,
   mergeUserEvents,
@@ -162,93 +158,6 @@ function ContactRow({ contact }: { contact: IContactDataItem }) {
   );
 }
 
-function EventCoverThumb({ event }: { event: IEvent }) {
-  return (
-    <div className={styles.ecCover} style={{ background: getEventCoverStyle(event) }}>
-      {event.coverImageId ? (
-        <AuthImage
-          fileId={event.coverImageId}
-          alt=""
-          className={styles.ecCoverImg}
-          fallback={
-            event.coverUrl
-              ? <img src={event.coverUrl} alt="" className={styles.ecCoverImg} />
-              : undefined
-          }
-        />
-      ) : event.coverUrl ? (
-        <img src={event.coverUrl} alt="" className={styles.ecCoverImg} />
-      ) : (
-        <span className={styles.ecCoverFallback} aria-hidden />
-      )}
-    </div>
-  );
-}
-
-function UserEventCard({
-  event,
-  onClick,
-}: {
-  event: IEvent;
-  onClick: () => void;
-}) {
-  const cost = event.parameters?.cost ?? 0;
-  const age = event.parameters?.ageLimit;
-  const price = formatEventPrice(cost);
-  const types = getEventTypes(event);
-
-  return (
-    <button type="button" className={styles.eventCard} onClick={onClick}>
-      <EventCoverThumb event={event} />
-      <div className={styles.ecInfo}>
-        <div className={styles.ecTop}>
-          <div className={styles.ecName}>{event.name}</div>
-          <div className={`${styles.ecPrice} ${price.free ? styles.ecPriceFree : styles.ecPricePaid}`}>
-            {price.label}
-          </div>
-        </div>
-        <div className={styles.ecMeta}>
-          {event.startTime && <span>{formatEventListDate(event.startTime)}</span>}
-          {event.address && (
-            <>
-              <span className={styles.ecDot} aria-hidden />
-              <span>{event.address}</span>
-            </>
-          )}
-          {age != null && age > 0 && (
-            <>
-              <span className={styles.ecDot} aria-hidden />
-              <span>{age}+</span>
-            </>
-          )}
-        </div>
-        {types.length > 0 && (
-          <div className={styles.ecTags}>
-            {types.map(t => (
-              <EventTypeChip
-                key={t.id}
-                type={t}
-                variant="overlay"
-                className={styles.ecTypeTag}
-                iconSize={10}
-              />
-            ))}
-          </div>
-        )}
-        {event.participantsCount != null && (
-          <div className={styles.ecStats}>
-            <span className={styles.ecStat}>
-              <PeopleIcon />
-              {event.participantsCount}
-              {event.parameters?.maxPersonsCount ? ` / ${event.parameters.maxPersonsCount}` : ''} участников
-            </span>
-          </div>
-        )}
-      </div>
-    </button>
-  );
-}
-
 function UserEventsPanel({
   events,
   total,
@@ -303,13 +212,17 @@ function UserEventsPanel({
         </p>
       )}
 
-      {!isLoading && filtered.map(event => (
-        <UserEventCard
-          key={event.id}
-          event={event}
-          onClick={() => onOpen(event.id)}
-        />
-      ))}
+      {!isLoading && filtered.length > 0 && (
+        <EventList className={styles.eventsList}>
+          {filtered.map(event => (
+            <EventListItem
+              key={event.id}
+              event={event}
+              onClick={() => onOpen(event.id)}
+            />
+          ))}
+        </EventList>
+      )}
 
       {!isLoading && total > events.length && filtered.length > 0 && (
         <p className={styles.moreHint}>Показано {events.length} из {total}</p>
@@ -457,14 +370,14 @@ export default function UserPage() {
           <div className={styles.coverOverlay} />
 
           <div className={styles.heroTop}>
-            <button type="button" className={styles.heroBtn} onClick={() => navigate(-1)} aria-label="Назад">
+            <button type="button" className={`${styles.heroBtn} noHoverGlow`} onClick={() => navigate(-1)} aria-label="Назад">
               <ChevronLeft />
             </button>
             <div className={styles.heroTopRight}>
               <div className={styles.menuWrap}>
                 <button
                   type="button"
-                  className={styles.heroBtn}
+                  className={`${styles.heroBtn} noHoverGlow`}
                   onClick={() => setMenuOpen(v => !v)}
                   aria-label="Меню"
                   aria-expanded={menuOpen}
@@ -734,17 +647,6 @@ function MenuIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
-    </svg>
-  );
-}
-
-function PeopleIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }

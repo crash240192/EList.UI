@@ -349,12 +349,6 @@
   gap: 4px;
 }
 
-.inviterChip {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
 .whoAvatar {
   flex-shrink: 0;
   border: 1px solid var(--border);
@@ -363,6 +357,8 @@
 .inviterText {
   font-size: 11px;
   color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
 }
 
 .inviterName {

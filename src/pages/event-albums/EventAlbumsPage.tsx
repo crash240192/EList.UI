@@ -9,22 +9,18 @@ import {
   type IEventAlbumsGroup,
 } from '@/entities/media/albumApi';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
+import { EventListItem } from '@/entities/event/ui/EventListItem';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { useInfiniteScroll } from '@/shared/hooks';
 import styles from './EventAlbumsPage.module.css';
 
 const PAGE_SIZE = 10;
 
-function formatEventDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function albumCountLabel(count: number): string {
+  if (count === 1) return '1 альбом';
+  if (count < 5) return `${count} альбома`;
+  return `${count} альбомов`;
 }
 
 function AlbumTile({ album, onOpen }: { album: IAlbum; onOpen: () => void }) {
@@ -80,23 +76,15 @@ function EventGroupSection({
   onOpenEvent: (eventId: string) => void;
 }) {
   const { event, albums } = group;
-  const coverBg = buildEventCoverBackground(event.id, event.colors);
 
   return (
     <section className={styles.eventGroup}>
-      <button type="button" className={styles.eventHeader} onClick={() => onOpenEvent(event.id)}>
-        <div className={styles.eventCover} style={{ background: coverBg }} aria-hidden />
-        <div className={styles.eventInfo}>
-          <div className={styles.eventName}>{event.name}</div>
-          <div className={styles.eventDate}>{formatEventDate(event.startTime)}</div>
-          <div className={styles.eventAlbumCount}>
-            {albums.length} {albums.length === 1 ? 'альбом' : albums.length < 5 ? 'альбома' : 'альбомов'}
-          </div>
-        </div>
-        <svg className={styles.eventChevron} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-      </button>
+      <EventListItem
+        event={event}
+        onClick={() => onOpenEvent(event.id)}
+        showChevron
+        footer={<span>{albumCountLabel(albums.length)}</span>}
+      />
       <div className={styles.albumGrid}>
         {albums.map(album => (
           <AlbumTile key={album.id} album={album} onOpen={() => onOpenAlbum(album)} />

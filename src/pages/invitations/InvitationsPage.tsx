@@ -14,14 +14,15 @@ import { apiClient } from '@/shared/api/client';
 import { isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
 import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
-import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { EventTypeChip } from '@/shared/ui/EventTypeChip';
+import { EventListItem } from '@/entities/event/ui/EventListItem';
+import listItemStyles from '@/entities/event/ui/EventListItem/EventListItem.module.css';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import {
   findUrgentInvitation,
   formatInvitationEventDate,
-  formatInvitationEventDateShort,
   formatRelativeInviteTime,
   getDaysUntil,
   getEventParams,
@@ -302,95 +303,51 @@ function InvitationRow({
   onDecline: () => void;
 }) {
   const event = inv.event;
-  const types = getEventTypes(event);
-  const params = getEventParams(event);
   const urgency = getEventUrgency(event.startTime);
   const unviewed = isInvitationUnviewed(inv);
-  const coverBg = getEventCoverBackground(event as Parameters<typeof getEventCoverBackground>[0]);
-
-  const urgClass = urgency?.kind === 'hot'
-    ? styles.urgHot
-    : urgency?.kind === 'soon'
-      ? styles.urgSoon
-      : styles.urgOk;
 
   return (
-    <div
-      className={[
-        styles.item,
-        urgency?.kind === 'hot' ? styles.itemUrgent : '',
-        unviewed ? styles.itemUnviewed : '',
-      ].filter(Boolean).join(' ')}
-    >
-      <div className={styles.itemLeft} onClick={onOpen}>
-        <div className={styles.cover}>
-          {event.coverImageId
-            ? <AuthImage fileId={event.coverImageId} alt="" className={styles.coverImg} />
-            : <div className={styles.coverPlaceholder} style={{ background: coverBg }} />}
-          {urgency && <span className={`${styles.urgBadge} ${urgClass}`}>{urgency.label}</span>}
-        </div>
-
-        <div className={styles.content}>
-          <div className={styles.inviterChip}>
-            <UserAvatar
-              accountId={inv.inviterAccountId}
-              avatarId={inv.inviter?.account?.avatarId ?? null}
-              initials={inviterInitials(inv)}
-              size={18}
-              className={styles.whoAvatar}
-            />
-            <span className={styles.inviterText}>
-              <span className={styles.inviterName}>{inviterName(inv)}</span> приглашает
-            </span>
-            <span className={styles.invTime}>{formatRelativeInviteTime(inv.creationDate)}</span>
-          </div>
-
-          <div className={styles.eName}>{event.name}</div>
-
-          <div className={styles.meta}>
-            <div className={styles.mi}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-              {formatInvitationEventDateShort(event.startTime)}
-            </div>
-            {event.address && (
-              <div className={styles.mi}>
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                {event.address}
-              </div>
-            )}
-            <div className={`${styles.mi} ${params.cost === 0 ? styles.miFree : styles.miPaid}`}>
-              {params.cost === 0 ? 'Бесплатно' : `${params.cost.toLocaleString('ru-RU')} ₽`}
-            </div>
-            {params.ageLimit != null && params.ageLimit > 0 && (
-              <div className={styles.mi}>{params.ageLimit}+</div>
-            )}
-          </div>
-
-          {types.length > 0 && (
-            <EventTypeTags types={types} className={styles.chips} />
-          )}
-        </div>
-      </div>
-
-      <div className={styles.itemActions}>
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnOk}`}
-          onClick={e => { e.stopPropagation(); onPreview(); }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-          Принять
-        </button>
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnNo}`}
-          onClick={e => { e.stopPropagation(); onDecline(); }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          Отклонить
-        </button>
-      </div>
-    </div>
+    <EventListItem
+      event={event}
+      onClick={onOpen}
+      urgency={urgency}
+      unviewed={unviewed}
+      header={(
+        <>
+          <UserAvatar
+            accountId={inv.inviterAccountId}
+            avatarId={inv.inviter?.account?.avatarId ?? null}
+            initials={inviterInitials(inv)}
+            size={18}
+            className={styles.whoAvatar}
+          />
+          <span className={styles.inviterText}>
+            <span className={styles.inviterName}>{inviterName(inv)}</span> приглашает
+          </span>
+          <span className={styles.invTime}>{formatRelativeInviteTime(inv.creationDate)}</span>
+        </>
+      )}
+      actions={(
+        <>
+          <button
+            type="button"
+            className={`${listItemStyles.actionBtn} ${listItemStyles.actionBtnOk}`}
+            onClick={e => { e.stopPropagation(); onPreview(); }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+            Принять
+          </button>
+          <button
+            type="button"
+            className={`${listItemStyles.actionBtn} ${listItemStyles.actionBtnNo}`}
+            onClick={e => { e.stopPropagation(); onDecline(); }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            Отклонить
+          </button>
+        </>
+      )}
+    />
   );
 }
 

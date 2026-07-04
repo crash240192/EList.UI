@@ -307,15 +307,15 @@ export default function EventPage() {
           <div className={styles.heroOverlay} />
 
           <div className={styles.heroTop}>
-            <button className={styles.heroBtn} onClick={() => navigate(-1)} aria-label="Назад"><ChevronLeft /></button>
+            <button className={`${styles.heroBtn} noHoverGlow`} onClick={() => navigate(-1)} aria-label="Назад"><ChevronLeft /></button>
             <div className={styles.heroTopRight}>
-              <button className={styles.heroBtn} onClick={() => void handleShare()} aria-label="Поделиться" title="Поделиться">
+              <button className={`${styles.heroBtn} noHoverGlow`} onClick={() => void handleShare()} aria-label="Поделиться" title="Поделиться">
                 <ShareIcon />
               </button>
               {/* Меню организатора */}
               {isOrganizer && (
                 <div className={styles.mobileMenuWrap}>
-                  <button className={styles.heroBtn} onClick={() => setMobileMenuOpen(v => !v)} aria-label="Меню">
+                  <button className={`${styles.heroBtn} noHoverGlow`} onClick={() => setMobileMenuOpen(v => !v)} aria-label="Меню">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
                       <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
                     </svg>
