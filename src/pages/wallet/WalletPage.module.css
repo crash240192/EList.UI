@@ -311,11 +311,68 @@
 .tcSelected {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 13%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .tcCurrent {
   border-color: rgba(34, 197, 94, 0.35);
   background: rgba(34, 197, 94, 0.05);
+  cursor: default;
+}
+
+.tariffCarousel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tariffCarouselTrack {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+.tariffCarouselTrack::-webkit-scrollbar {
+  display: none;
+}
+
+.tariffCarouselTrack .tc {
+  flex: 0 0 min(280px, calc(100% - 8px));
+  scroll-snap-align: start;
+}
+
+.tariffCarouselBtn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.tariffCarouselBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+}
+
+.tariffCarouselBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .tcBadge {
@@ -408,42 +465,6 @@
 .tcRowText {
   color: var(--text-secondary);
   line-height: 1.35;
-}
-
-.tcSelectBtn {
-  margin-top: 14px;
-  width: 100%;
-  padding: 8px;
-  background: var(--accent);
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s;
-  display: none;
-}
-
-.tcSelected .tcSelectBtn {
-  display: block;
-}
-
-.tcSelectBtn:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.tcCurrent .tcSelectBtn {
-  background: var(--surface-2);
-  color: var(--text-muted);
-  cursor: default;
-  display: block;
-}
-
-.tcSelectBtn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
 }
 
 .selectActions {
@@ -651,6 +672,10 @@
 
   .tariffGrid {
     grid-template-columns: 1fr;
+  }
+
+  .tariffCarouselTrack .tc {
+    flex-basis: min(100%, 300px);
   }
 }
 
