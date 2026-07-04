@@ -290,6 +290,16 @@ export function FilterBar({
   if (quickDate === 'weekend')  chips.push({ label: 'Выходные', onRemove: () => clearQuickDateFilter(setQuickDate, setFilter) });
   if (filters.price === 0)      chips.push({ label: 'Бесплатно', onRemove: () => setFilter('price', undefined) });
 
+  /** Счётчик для мобильного бейджа — без города (базовая геолокация, не пользовательский фильтр). */
+  const mobileFilterCount = [
+    quickDate,
+    filters.price === 0,
+    filters.price != null && filters.price > 0,
+    (filters.types?.length ?? 0) > 0,
+    (filters.categories?.length ?? 0) > 0,
+    !quickDate && !!filters.endTime,
+  ].filter(Boolean).length;
+
   const QUICK_TYPES = allTypes.slice(0, 5);
   const searchStartMin = searchStartTimeMinDate();
 
@@ -316,7 +326,7 @@ export function FilterBar({
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/>
         </svg>
-        {chips.length > 0 && <span className={styles.mobileFilterBadge}>{chips.length}</span>}
+        {mobileFilterCount > 0 && <span className={styles.mobileFilterBadge}>{mobileFilterCount}</span>}
       </button>
       {!hideViewToggle && (
         <button className={styles.viewToggle} onClick={() => onViewModeChange(viewMode === 'map' ? 'list' : 'map')}
