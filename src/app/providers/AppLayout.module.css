@@ -97,7 +97,7 @@
   display: block;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 639px) {
   .headerLeft {
     gap: 4px;
     min-width: 0;
@@ -162,7 +162,7 @@
 }
 
 /* Мобайл: полностью скрыт */
-@media (max-width: 767px) {
+@media (max-width: 639px) {
   .sidebar {
     width: 0;
     border-right: none;
@@ -265,7 +265,7 @@
 }
 
 /* Мобайл: main на всю ширину */
-@media (max-width: 767px) {
+@media (max-width: 639px) {
   .main { left: 0; }
 }
 

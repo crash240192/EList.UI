@@ -9,6 +9,7 @@ import {
   type ITariff, type ITariffValidator, type ITariffPeriod, type ITariffRequest,
 } from '@/entities/admin/adminApi';
 import { Select } from '@/shared/ui/Select/Select';
+import { TabBar } from '@/shared/ui/TabBar';
 import styles from './AdminPage.module.css';
 
 type AdminTab = 'eventTypes' | 'contactTypes' | 'tariffs';
@@ -31,26 +32,16 @@ export default function AdminPage() {
         <h1 className={styles.title}>Администрирование</h1>
       </div>
 
-      <div className={styles.tabs}>
-        <button
-          className={`${styles.tab} ${tab === 'eventTypes' ? styles.tabActive : ''}`}
-          onClick={() => setTab('eventTypes')}
-        >
-          Типы мероприятий
-        </button>
-        <button
-          className={`${styles.tab} ${tab === 'contactTypes' ? styles.tabActive : ''}`}
-          onClick={() => setTab('contactTypes')}
-        >
-          Типы контактов
-        </button>
-        <button
-          className={`${styles.tab} ${tab === 'tariffs' ? styles.tabActive : ''}`}
-          onClick={() => setTab('tariffs')}
-        >
-          Тарифы
-        </button>
-      </div>
+      <TabBar
+        className={styles.topTabs}
+        tabs={[
+          { id: 'eventTypes', label: 'Типы мероприятий' },
+          { id: 'contactTypes', label: 'Типы контактов' },
+          { id: 'tariffs', label: 'Тарифы' },
+        ]}
+        activeId={tab}
+        onChange={id => setTab(id as AdminTab)}
+      />
 
       <div className={styles.content}>
         {tab === 'eventTypes'   && <EventTypesTab />}

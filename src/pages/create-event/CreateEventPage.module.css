@@ -12,12 +12,12 @@
   grid-template-columns: 1fr 280px;
   gap: 20px;
   align-items: start;
-  max-width: 960px;
+  max-width: var(--page-card-max-width);
   margin: 0 auto;
   padding: 20px;
   box-sizing: border-box;
 }
-@media (max-width: 720px) {
+@media (max-width: 639px) {
   .pageInner { grid-template-columns: 1fr; padding: 0; gap: 0; }
   .card { border-radius: 0; border-left: none; border-right: none; }
   /* Отступ между основной формой и боковой панелью */
@@ -37,20 +37,13 @@
 
 /* ── Хедер ── */
 .header {
-  height: 80px;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 60%, #a855f7 100%);
-  border-radius: 15px 15px 0 0;
-  display: flex; align-items: center; gap: 14px; padding: 0 20px;
+  composes: heroCompact from '../../shared/styles/hero.module.css';
+  border-radius: var(--page-card-radius) var(--page-card-radius) 0 0;
 }
-.backBtn {
-  width: 34px; height: 34px; border-radius: 50%;
-  background: rgba(255,255,255,0.18); backdrop-filter: blur(6px);
-  border: 0.5px solid rgba(255,255,255,0.25); color: #fff;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: background 0.15s;
+
+.title {
+  composes: heroTitle from '../../shared/styles/hero.module.css';
 }
-.backBtn:hover { background: rgba(255,255,255,0.3); }
-.title { font-size: 18px; font-weight: 600; color: #fff; margin: 0; }
 
 /* ── Секции ── */
 .section {
@@ -100,7 +93,7 @@
 .fieldHintWarn { font-size: 11px; color: #b45309; margin-top: 3px; }
 
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-@media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+@media (max-width: 639px) { .row { grid-template-columns: 1fr; } }
 
 /* ── Тип — picker + чипы ── */
 .pickerBtn {
@@ -149,7 +142,7 @@
 
 /* ── Параметры grid ── */
 .paramGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-@media (max-width: 720px) { .paramGrid { grid-template-columns: 1fr; } }
+@media (max-width: 639px) { .paramGrid { grid-template-columns: 1fr; } }
 
 /* ── Тогглы ── */
 .toggles { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }

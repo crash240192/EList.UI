@@ -1,0 +1,102 @@
+/* Standard underline tab bar */
+
+.bar {
+  display: flex;
+  border-bottom: var(--tab-bar-border);
+  flex-shrink: 0;
+  padding: 0 var(--page-padding);
+  gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+  padding: var(--tab-padding-y) var(--tab-padding-x);
+  margin-bottom: -1px;
+  font-size: var(--tab-font-size);
+  font-weight: var(--tab-font-weight);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+}
+
+.tabActive {
+  color: var(--tab-active-color) !important;
+  border-bottom-color: var(--tab-active-color);
+}
+
+.count {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.tabActive .count {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+/* Pill variant (sub-filters, settings nav) */
+
+.pillBar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 var(--page-padding) 12px;
+  flex-shrink: 0;
+}
+
+.pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--tab-pill-radius);
+  padding: var(--tab-pill-padding-y) var(--tab-pill-padding-x);
+  font-size: var(--tab-pill-font-size);
+  font-weight: var(--tab-font-weight);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pillActive {
+  background: color-mix(in srgb, var(--accent) 12%, transparent) !important;
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent) !important;
+  color: var(--accent) !important;
+}
+
+@media (max-width: 639px) {
+  .bar,
+  .pillBar {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

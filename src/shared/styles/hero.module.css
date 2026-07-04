@@ -1,0 +1,181 @@
+/* Standard hero band — wallet color palette */
+
+.hero {
+  position: relative;
+  height: var(--hero-height);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.heroCompact {
+  position: relative;
+  height: var(--hero-compact-height);
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  background: var(--hero-gradient);
+  border-bottom: var(--hero-border);
+}
+
+.heroGradient {
+  position: absolute;
+  inset: 0;
+  background: var(--hero-gradient);
+}
+
+.heroBlobs::before {
+  content: '';
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, transparent 70%);
+  top: -80px;
+  right: -60px;
+  pointer-events: none;
+}
+
+.heroBlobs::after {
+  content: '';
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
+  bottom: -60px;
+  left: 40px;
+  pointer-events: none;
+}
+
+/* Wallet-style inner banner (cardHead area) */
+.heroBanner {
+  border-radius: var(--hero-inner-radius);
+  padding: 24px 28px;
+  background: var(--hero-gradient);
+  border: var(--hero-border);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: var(--hero-height);
+}
+
+.heroBanner::before {
+  content: '';
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, transparent 70%);
+  top: -80px;
+  right: -60px;
+  pointer-events: none;
+}
+
+.heroBanner::after {
+  content: '';
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
+  bottom: -60px;
+  left: 40px;
+  pointer-events: none;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--hero-overlay);
+  pointer-events: none;
+}
+
+.heroTop {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.heroTopInline {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.heroTopRight {
+  display: flex;
+  gap: 8px;
+}
+
+.heroBottom {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 4;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.heroTitle {
+  font-size: var(--card-title-size);
+  font-weight: var(--card-title-weight);
+  color: #fff;
+  margin: 0;
+}
+
+.heroImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.heroBtn {
+  width: var(--hero-btn-size);
+  height: var(--hero-btn-size);
+  border-radius: 50%;
+  background: var(--hero-btn-bg);
+  backdrop-filter: var(--hero-btn-blur);
+  border: var(--hero-btn-border);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  font-family: inherit;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.heroBtn:hover:not(:disabled) {
+  background: var(--hero-btn-bg-hover);
+}
+
+.heroBtnSolid {
+  background: var(--surface);
+  backdrop-filter: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.heroBtnSolid:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--accent);
+}

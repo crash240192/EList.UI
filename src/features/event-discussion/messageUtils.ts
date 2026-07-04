@@ -7,7 +7,7 @@ export const discussionMessageDomId = (messageId: string) => `discussion-msg-${m
 const DEFAULT_COMPOSER_HEIGHT = 220;
 const MOBILE_COMPOSER_HEIGHT_ESTIMATE = 168;
 const REPLY_GAP_PX = 16;
-const NARROW_REPLY_MEDIA = '(max-width: 680px)';
+const NARROW_REPLY_MEDIA = '(max-width: 639px)';
 
 export function isNarrowReplyViewport(): boolean {
   return window.matchMedia(NARROW_REPLY_MEDIA).matches;
