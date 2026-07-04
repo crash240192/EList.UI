@@ -1,10 +1,9 @@
-// features/auth/AuthGuard.tsx
+// features/auth/AuthGuard.tsx — только страницы login / register / activate
 
 import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/app/store';
 import { getOrCreateClientHash, isAuthenticated as hasAuthToken } from '@/shared/api/client';
-import { isPublicAuthRoute, requiresAuthRoute } from '@/shared/auth/routes';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -22,24 +21,16 @@ export function AuthGuard({ children }: AuthGuardProps) {
   useEffect(() => {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      const pathname = location.pathname;
-      const isPublic = isPublicAuthRoute(pathname);
-
-      if (!hasAuthToken()) {
-        if (requiresAuthRoute(pathname)) {
-          navigate('/login', { replace: true, state: { from: pathname } });
-        }
-        return;
-      }
+      if (!hasAuthToken()) return;
 
       if (needsActivation) {
-        if (pathname !== '/activate' && pathname !== '/login') {
+        if (location.pathname !== '/activate' && location.pathname !== '/login') {
           navigate('/activate', { replace: true });
         }
         return;
       }
 
-      if (isPublic && (pathname === '/login' || pathname === '/register')) {
+      if (location.pathname === '/login' || location.pathname === '/register') {
         navigate('/', { replace: true });
       }
     }, 50);

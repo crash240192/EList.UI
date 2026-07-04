@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
+import { RequireAuth } from '@/features/auth/RequireAuth';
 import { setApiErrorHandler } from '@/shared/api/client';
 import { isPublicAppRoute } from '@/shared/auth/unauthorized';
 import { registerSessionUnauthorizedHandler } from '@/shared/auth/sessionUnauthorized';
@@ -50,22 +51,22 @@ const router = createBrowserRouter([
   { path: '/activate', element: <AuthGuard>{S(ActivationPage)}</AuthGuard> },
   { path: '/register', element: <AuthGuard>{S(RegisterPage)}</AuthGuard> },
 
-  // ---- Защищённые маршруты (с AppLayout) ----
+  // ---- Основное приложение (гостевой доступ к поиску, событию, профилю) ----
   {
     path: '/',
-    element: <AuthGuard><AppLayout /></AuthGuard>,
+    element: <AppLayout />,
     children: [
       { index: true,              element: S(HomePage) },
       { path: 'event/:id',        element: S(EventPage) },
       { path: 'user/:id',         element: S(UserPage) },
-      { path: 'invitations',       element: S(InvitationsPage) },
-      { path: 'event-albums',      element: S(EventAlbumsPage) },
-      { path: 'my-events',        element: S(MyEventsPage) },
-      { path: 'create-event',     element: S(CreateEventPage) },
-      { path: 'edit-event/:id',   element: S(CreateEventPage) },
-      { path: 'admin',            element: S(AdminPage) },
-      { path: 'settings',         element: S(SettingsPage) },
-      { path: 'wallet',           element: S(WalletPage) },
+      { path: 'invitations',      element: <RequireAuth>{S(InvitationsPage)}</RequireAuth> },
+      { path: 'event-albums',     element: <RequireAuth>{S(EventAlbumsPage)}</RequireAuth> },
+      { path: 'my-events',        element: <RequireAuth>{S(MyEventsPage)}</RequireAuth> },
+      { path: 'create-event',     element: <RequireAuth>{S(CreateEventPage)}</RequireAuth> },
+      { path: 'edit-event/:id',   element: <RequireAuth>{S(CreateEventPage)}</RequireAuth> },
+      { path: 'admin',            element: <RequireAuth>{S(AdminPage)}</RequireAuth> },
+      { path: 'settings',         element: <RequireAuth>{S(SettingsPage)}</RequireAuth> },
+      { path: 'wallet',           element: <RequireAuth>{S(WalletPage)}</RequireAuth> },
       { path: '*',                element: <Navigate to="/" replace /> },
     ],
   },

@@ -15,6 +15,7 @@ import {
 } from '@/features/invitations/invitationsStore';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
+import { useActivationRedirect } from '@/features/auth/useActivationRedirect';
 import { AUTH_REQUIRED_NAV_PATHS } from '@/shared/auth/routes';
 import styles from './AppLayout.module.css';
 
@@ -42,6 +43,8 @@ export function AppLayout() {
   const { filters } = useFiltersStore();
   const { fileId: myAvatarFileId } = useMyAvatar();
   const navigate = useNavigate();
+
+  useActivationRedirect();
 
   const handleLogout = () => {
     logout();
