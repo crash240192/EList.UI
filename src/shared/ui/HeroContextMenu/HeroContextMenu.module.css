@@ -1,0 +1,42 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+}
+
+.menu {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  min-width: 200px;
+  z-index: 301;
+  overflow: hidden;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.item:hover {
+  background: var(--surface-2);
+}
+
+.itemDanger {
+  color: var(--danger) !important;
+}

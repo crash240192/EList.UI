@@ -18,7 +18,6 @@ import {
 } from '@/entities/user/subscriptionApi';
 import { SubscribeModal } from '@/features/subscriptions/SubscribeModal';
 import { SubscribersListModal } from '@/features/subscriptions/SubscribersListModal';
-import { UserShareMenu } from '@/features/user/UserShareMenu';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
@@ -29,6 +28,9 @@ import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel'
 import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { TabBar } from '@/shared/ui/TabBar';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
+import { buildUserProfileUrl, canUseNativeShare, shareLink } from '@/shared/lib/shareLink';
+import { useToastStore } from '@/app/store';
+import heroStyles from '@/shared/styles/hero.module.css';
 import {
   countUniqueUserEvents,
   formatContactHref,
@@ -264,8 +266,6 @@ export default function UserPage() {
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const createdEvents = useEvents(
     { organizatorId: profileAccountId },
@@ -326,6 +326,32 @@ export default function UserPage() {
     setIsSubscribed(false);
     setSubscrCount(c => Math.max(0, c - 1));
   }, [profileAccountId]);
+
+  const handleShare = useCallback(() => {
+    if (!profile?.account?.id) return;
+
+    const { account } = profile;
+    const url = buildUserProfileUrl(account.id);
+
+    void shareLink({
+      title: `Профиль @${account.login}`,
+      text: `Профиль @${account.login}`,
+      url,
+    })
+      .then((result) => {
+        const copiedMsg = canUseNativeShare()
+          ? 'Ссылка скопирована в буфер обмена'
+          : 'Ссылка скопирована (нужен HTTPS для системного шаринга)';
+        useToastStore.getState().add(
+          result === 'shared' ? 'Ссылка отправлена' : copiedMsg,
+          'success',
+        );
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        useToastStore.getState().add('Не удалось поделиться ссылкой', 'error');
+      });
+  }, [profile]);
 
   const allEvents = useMemo(
     () => mergeUserEvents(createdEvents.events, participatingEvents.events),
@@ -390,42 +416,15 @@ export default function UserPage() {
           <div className={styles.heroTop}>
             <HeroBackButton onClick={() => navigate(-1)} />
             <div className={styles.heroTopRight}>
-              <div className={styles.menuWrap}>
-                <button
-                  type="button"
-                  className={`${styles.heroBtn} noHoverGlow`}
-                  onClick={() => setMenuOpen(v => !v)}
-                  aria-label="Меню"
-                  aria-expanded={menuOpen}
-                >
-                  <MenuIcon />
-                </button>
-                {menuOpen && (
-                  <>
-                    <div className={styles.menuBackdrop} onClick={() => setMenuOpen(false)} />
-                    <div className={styles.menu} role="menu">
-                      {isOwnProfile && (
-                        <button
-                          type="button"
-                          className={styles.menuItem}
-                          role="menuitem"
-                          onClick={() => { navigate('/settings'); setMenuOpen(false); }}
-                        >
-                          Редактировать
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className={styles.menuItem}
-                        role="menuitem"
-                        onClick={() => { setShareOpen(true); setMenuOpen(false); }}
-                      >
-                        Поделиться
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+              <button
+                type="button"
+                className={`${heroStyles.heroBtn} noHoverGlow`}
+                onClick={() => void handleShare()}
+                aria-label="Поделиться"
+                title="Поделиться"
+              >
+                <ShareIcon />
+              </button>
             </div>
           </div>
         </div>
@@ -486,7 +485,7 @@ export default function UserPage() {
           <div className={styles.statGroup}>
             <button
               type="button"
-              className={`${styles.statItem} noHoverGlow ${mainTab === 'created' ? styles.statItemActive : ''}`}
+              className={`${styles.statItem} ${mainTab === 'created' ? styles.statItemActive : ''}`}
               onClick={() => { setMainTab('created'); }}
             >
               <span className={styles.statNum}>{createdEvents.total || createdEvents.events.length}</span>
@@ -494,7 +493,7 @@ export default function UserPage() {
             </button>
             <button
               type="button"
-              className={`${styles.statItem} noHoverGlow ${mainTab === 'participating' ? styles.statItemActive : ''}`}
+              className={`${styles.statItem} ${mainTab === 'participating' ? styles.statItemActive : ''}`}
               onClick={() => { setMainTab('participating'); }}
             >
               <span className={styles.statNum}>{participatingEvents.total || participatingEvents.events.length}</span>
@@ -507,7 +506,7 @@ export default function UserPage() {
           <div className={styles.statGroup}>
             <button
               type="button"
-              className={`${styles.statItem} noHoverGlow ${listModal === 'subscribers' ? styles.statItemActive : ''}`}
+              className={`${styles.statItem} ${listModal === 'subscribers' ? styles.statItemActive : ''}`}
               onClick={() => setListModal('subscribers')}
             >
               <span className={styles.statNum}>{subscrCount}</span>
@@ -515,7 +514,7 @@ export default function UserPage() {
             </button>
             <button
               type="button"
-              className={`${styles.statItem} noHoverGlow ${listModal === 'subscriptions' ? styles.statItemActive : ''}`}
+              className={`${styles.statItem} ${listModal === 'subscriptions' ? styles.statItemActive : ''}`}
               onClick={() => setListModal('subscriptions')}
             >
               <span className={styles.statNum}>{subsCount}</span>
@@ -660,13 +659,6 @@ export default function UserPage() {
           onClose={() => setLightboxFileIds(null)}
         />
       )}
-      {shareOpen && account.id && (
-        <UserShareMenu
-          accountId={account.id}
-          login={account.login}
-          onClose={() => setShareOpen(false)}
-        />
-      )}
     </div>
   );
 }
@@ -686,10 +678,11 @@ function Skeleton() {
   );
 }
 
-function MenuIcon() {
+function ShareIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
     </svg>
   );
 }

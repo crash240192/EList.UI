@@ -56,57 +56,6 @@
   composes: heroTopRight from '../../shared/styles/hero.module.css';
 }
 
-.heroBtn {
-  composes: heroBtn from '../../shared/styles/hero.module.css';
-}
-
-.menuWrap {
-  position: relative;
-  z-index: 11;
-}
-
-.menuBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-}
-
-.menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  min-width: 200px;
-  z-index: 201;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.menuItem {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 11px 14px;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-  color: var(--text-primary);
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.menuItem:last-child {
-  border-bottom: none;
-}
-
-.menuItem:hover {
-  background: var(--surface-2);
-}
-
 /* ── Profile header ── */
 .profileHeader {
   display: flex;
@@ -248,7 +197,7 @@
   border: none;
   cursor: pointer;
   font-family: inherit;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
   min-width: 0;
   flex-shrink: 0;
   border-radius: 8px;
@@ -260,6 +209,7 @@
 
 .statItem:hover {
   background: var(--surface-2);
+  box-shadow: var(--hover-glow);
 }
 
 .statItemRating {
@@ -274,6 +224,7 @@
 
 .statItemStatic:hover {
   background: none;
+  box-shadow: none;
 }
 
 .statItemStatic:hover .statNum,
@@ -420,7 +371,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   text-align: left;
   font-family: inherit;
   width: 100%;
@@ -428,6 +379,7 @@
 
 .nextEvent:hover {
   border-color: color-mix(in srgb, var(--border) 70%, var(--accent));
+  box-shadow: var(--hover-glow);
 }
 
 .neDotCol {

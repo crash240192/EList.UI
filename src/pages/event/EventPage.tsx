@@ -30,6 +30,7 @@ import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiE
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { buildEventShareUrl, canUseNativeShare, shareLink } from '@/shared/lib/shareLink';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
+import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import heroStyles from '@/shared/styles/hero.module.css';
 import styles from './EventPage.module.css';
 
@@ -58,6 +59,7 @@ export default function EventPage() {
   const [participantsDenied, setParticipantsDenied] = useState(false);
   const limitNoticeTimerRef = useRef<number | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const organizerMenuRef = useRef<HTMLButtonElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   const {
@@ -309,36 +311,44 @@ export default function EventPage() {
           <div className={styles.heroTop}>
             <HeroBackButton onClick={() => navigate(-1)} />
             <div className={styles.heroTopRight}>
-              <button className={heroStyles.heroBtn} onClick={() => void handleShare()} aria-label="Поделиться" title="Поделиться">
+              <button type="button" className={`${heroStyles.heroBtn} noHoverGlow`} onClick={() => void handleShare()} aria-label="Поделиться" title="Поделиться">
                 <ShareIcon />
               </button>
-              {/* Меню организатора */}
               {isOrganizer && (
-                <div className={styles.mobileMenuWrap}>
-                  <button className={heroStyles.heroBtn} onClick={() => setMobileMenuOpen(v => !v)} aria-label="Меню">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <>
+                  <button
+                    ref={organizerMenuRef}
+                    type="button"
+                    className={`${heroStyles.heroBtn} noHoverGlow`}
+                    onClick={() => setMobileMenuOpen(v => !v)}
+                    aria-label="Меню"
+                    aria-expanded={mobileMenuOpen}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                       <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
                     </svg>
                   </button>
-                  {mobileMenuOpen && (
-                    <>
-                      <div className={styles.mobileMenuBackdrop} onClick={() => setMobileMenuOpen(false)} />
-                      <div className={styles.mobileMenu}>
-                        <button className={styles.mobileMenuItem} onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>Редактировать</button>
-                        <button className={styles.mobileMenuItem} onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>Добавить организатора</button>
-                        <button className={styles.mobileMenuItem} onClick={() => { setBwListOpen(true); setMobileMenuOpen(false); }}>
-                          {event.parameters?.private ? 'Белый список' : 'Черный список'}
-                        </button>
-                        {event.active && (
-                          <button className={`${styles.mobileMenuItem} ${styles.mobileMenuItemDanger}`}
-                            onClick={() => { setCancelConfirm(true); setMobileMenuOpen(false); }}>
-                            Отменить мероприятие
-                          </button>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
+                  <HeroContextMenu
+                    open={mobileMenuOpen}
+                    onClose={() => setMobileMenuOpen(false)}
+                    anchorRef={organizerMenuRef}
+                  >
+                    <HeroContextMenuItem onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>
+                      Редактировать
+                    </HeroContextMenuItem>
+                    <HeroContextMenuItem onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>
+                      Добавить организатора
+                    </HeroContextMenuItem>
+                    <HeroContextMenuItem onClick={() => { setBwListOpen(true); setMobileMenuOpen(false); }}>
+                      {event.parameters?.private ? 'Белый список' : 'Черный список'}
+                    </HeroContextMenuItem>
+                    {event.active && (
+                      <HeroContextMenuItem danger onClick={() => { setCancelConfirm(true); setMobileMenuOpen(false); }}>
+                        Отменить мероприятие
+                      </HeroContextMenuItem>
+                    )}
+                  </HeroContextMenu>
+                </>
               )}
             </div>
           </div>
