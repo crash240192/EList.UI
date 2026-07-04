@@ -14,6 +14,8 @@ import {
   useInvitationsStore,
 } from '@/features/invitations/invitationsStore';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
+import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
+import { AUTH_REQUIRED_NAV_PATHS } from '@/shared/auth/routes';
 import styles from './AppLayout.module.css';
 
 const NAV_ITEMS = [
@@ -30,6 +32,7 @@ const NAV_ITEMS = [
 export function AppLayout() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
+  const [authDialogPath, setAuthDialogPath] = useState<string | null>(null);
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
   const authenticated = isAuthenticated();
@@ -44,7 +47,7 @@ export function AppLayout() {
     logout();
     resetInvitationsCount();
     setLogoutConfirm(false);
-    navigate('/login', { replace: true });
+    navigate('/', { replace: true });
   };
 
   useEffect(() => {
@@ -118,24 +121,46 @@ export function AppLayout() {
       {/* ---- Sidebar ---- */}
       <aside className={`${styles.sidebar} ${sidebarExpanded ? styles.sidebarExpanded : ''}`}>
         <nav className={styles.nav}>
-          {NAV_ITEMS.map(({ to, label, icon }) => (
-            <NavLink
-              key={to} to={to} end={to === '/'}
-              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-              title={label}
-              onClick={() => setSidebarExpanded(false)}
-            >
-              <span className={styles.navIcon}>
-                {icon}
-                {to === '/invitations' && notViewedInvitations > 0 && (
-                  <span className={styles.navCountBadge} aria-label={`Непросмотренных: ${notViewedInvitations}`}>
-                    {notViewedInvitations > 99 ? '99+' : notViewedInvitations}
-                  </span>
-                )}
-              </span>
-              <span className={styles.navLabel}>{label}</span>
-            </NavLink>
-          ))}
+          {NAV_ITEMS.map(({ to, label, icon }) => {
+            const locked = !authenticated && AUTH_REQUIRED_NAV_PATHS.has(to);
+            if (locked) {
+              return (
+                <button
+                  key={to}
+                  type="button"
+                  className={`${styles.navItem} ${styles.navItemLocked}`}
+                  title={`${label} — требуется вход`}
+                  onClick={() => {
+                    setAuthDialogPath(to);
+                    setSidebarExpanded(false);
+                  }}
+                >
+                  <span className={styles.navIcon}>{icon}</span>
+                  <span className={styles.navLabel}>{label}</span>
+                </button>
+              );
+            }
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+                title={label}
+                onClick={() => setSidebarExpanded(false)}
+              >
+                <span className={styles.navIcon}>
+                  {icon}
+                  {to === '/invitations' && notViewedInvitations > 0 && (
+                    <span className={styles.navCountBadge} aria-label={`Непросмотренных: ${notViewedInvitations}`}>
+                      {notViewedInvitations > 99 ? '99+' : notViewedInvitations}
+                    </span>
+                  )}
+                </span>
+                <span className={styles.navLabel}>{label}</span>
+              </NavLink>
+            );
+          })}
         </nav>
 
         {sidebarExpanded && (
@@ -164,6 +189,13 @@ export function AppLayout() {
       {logoutConfirm && (
         <LogoutConfirmModal onConfirm={handleLogout} onCancel={() => setLogoutConfirm(false)} />
       )}
+
+      <AuthRequiredDialog
+        open={authDialogPath !== null}
+        onClose={() => setAuthDialogPath(null)}
+        returnTo={authDialogPath ?? undefined}
+        message="Войдите в аккаунт, чтобы открыть этот раздел."
+      />
 
       {/* ---- Main ---- */}
       <main className={styles.main}>

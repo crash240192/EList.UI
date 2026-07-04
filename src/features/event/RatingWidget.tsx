@@ -19,6 +19,7 @@ interface WidgetProps {
   accountId: string | null;
   /** false — мероприятие отменено, новые оценки запрещены */
   eventActive?: boolean;
+  onAuthRequired?: () => void;
 }
 
 function getRatingType(startTime: string): RatingType {
@@ -436,6 +437,7 @@ export function RatingWidget({
   eventEndTime,
   accountId,
   eventActive = true,
+  onAuthRequired,
 }: WidgetProps) {
   const ratingType = getRatingType(eventStartTime);
   const eventFinished = isEventFinished(eventStartTime, eventEndTime);
@@ -457,6 +459,18 @@ export function RatingWidget({
   const hasRatings = score > 0 || data.total > 0;
   if (eventFinished && !hasRatings) return null;
 
+  const handleBadgeClick = () => {
+    if (!accountId) {
+      if (hasRatings) {
+        setModalOpen(true);
+        return;
+      }
+      onAuthRequired?.();
+      return;
+    }
+    setModalOpen(true);
+  };
+
   const badgeTitle = !eventActive
     ? 'Мероприятие отменено — оценки недоступны'
     : eventFinished
@@ -467,8 +481,8 @@ export function RatingWidget({
     <>
       <button
         type="button"
-        className={`${styles.badge} ${!allowVote ? styles.badgeDisabled : ''}`}
-        onClick={() => setModalOpen(true)}
+        className={`${styles.badge} ${!allowVote || !accountId ? styles.badgeDisabled : ''}`}
+        onClick={handleBadgeClick}
         title={badgeTitle}
       >
         {score > 0 ? (

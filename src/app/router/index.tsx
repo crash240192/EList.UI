@@ -5,7 +5,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
 import { setApiErrorHandler } from '@/shared/api/client';
-import { isPublicAuthRoute } from '@/shared/auth/unauthorized';
+import { isPublicAppRoute } from '@/shared/auth/unauthorized';
 import { registerSessionUnauthorizedHandler } from '@/shared/auth/sessionUnauthorized';
 import { useAuthStore, useToastStore } from '@/app/store';
 import { ToastContainer } from '@/shared/ui/Toast/Toast';
@@ -74,12 +74,12 @@ const router = createBrowserRouter([
 // 401 от API / WebSocket — сброс токена и редирект (кроме /login, /activate, /register)
 registerSessionUnauthorizedHandler(() => {
   useAuthStore.getState().logout();
-  if (!isPublicAuthRoute()) {
+  if (!isPublicAppRoute()) {
     const loginPath = '/login';
     router.navigate(loginPath, { replace: true });
     // Если SPA-навигация не сработала (вызов из fetch/WS вне React) — жёсткий переход
     window.setTimeout(() => {
-      if (!isPublicAuthRoute()) {
+      if (!isPublicAppRoute()) {
         window.location.replace(loginPath);
       }
     }, 150);

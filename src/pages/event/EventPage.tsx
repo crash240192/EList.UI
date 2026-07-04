@@ -9,7 +9,7 @@ import {
   MOCK_EVENTS,
 } from '@/entities/event';
 import { useEventOrganizers } from '@/features/event/useEventOrganizers';
-import { useToastStore } from '@/app/store';
+import { useToastStore, useAuthStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
@@ -31,6 +31,7 @@ import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { buildEventShareUrl, canUseNativeShare, shareLink } from '@/shared/lib/shareLink';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
+import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import heroStyles from '@/shared/styles/hero.module.css';
 import styles from './EventPage.module.css';
 
@@ -40,6 +41,7 @@ export default function EventPage() {
   const { id }   = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { accountId } = useAccountId();
+  const authenticated = useAuthStore(s => s.isAuthenticated());
 
   const [event,         setEvent]         = useState<IEvent | null>(null);
   const [participants,  setParticipants]  = useState<IParticipantView[]>([]);
@@ -61,6 +63,7 @@ export default function EventPage() {
   const pageRef = useRef<HTMLDivElement>(null);
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
 
   const {
     organizers,
@@ -262,17 +265,20 @@ export default function EventPage() {
   const eventFinished = isEventFinished(event.startTime, event.endTime);
   const allowUsersToInvite = event.parameters?.allowUsersToInvite;
   const canUsersInviteByEventPolicy = allowUsersToInvite === null || allowUsersToInvite === undefined || allowUsersToInvite === true;
-  const canOpenInviteModal = !eventFinished && !!accountId && !!event?.id
+  const canShowInviteButton = !eventFinished && !!event?.id
     && (isOrganizer || (isParticipating && canUsersInviteByEventPolicy));
   const joinDisabled =
     actionLoading ||
-    !accountId ||
-    isOrganizer ||
+    (authenticated && isOrganizer) ||
     (!isEventActive && !isParticipating) ||
-    isParticipantLimitFull;
+    (authenticated && isParticipantLimitFull);
   const fillPct = maxPersons ? Math.round((participants.length / maxPersons) * 100) : null;
 
   const onJoinClick = () => {
+    if (!authenticated) {
+      setAuthDialogOpen(true);
+      return;
+    }
     if (isParticipantLimitFull) {
       triggerParticipantLimitFeedback();
       return;
@@ -388,10 +394,21 @@ export default function EventPage() {
             eventEndTime={event.endTime}
             accountId={accountId}
             eventActive={isEventActive}
+            onAuthRequired={() => setAuthDialogOpen(true)}
           />
           <div className={styles.actionBtns}>
-            {canOpenInviteModal && (
-              <button className={styles.btnInvite} title="Пригласить" onClick={() => setInviteModalOpen(true)}>
+            {canShowInviteButton && (
+              <button
+                className={styles.btnInvite}
+                title="Пригласить"
+                onClick={() => {
+                  if (!authenticated) {
+                    setAuthDialogOpen(true);
+                    return;
+                  }
+                  setInviteModalOpen(true);
+                }}
+              >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round">
                   <circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/>
                   <line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/>
@@ -470,7 +487,12 @@ export default function EventPage() {
                   <button
                     type="button"
                     className={styles.buyTicketBtn}
-                    onClick={e => e.stopPropagation()}
+                    onClick={() => {
+                      if (!authenticated) {
+                        setAuthDialogOpen(true);
+                        return;
+                      }
+                    }}
                   >
                     Купить билет
                   </button>
@@ -661,6 +683,11 @@ export default function EventPage() {
           onClose={() => setMapModalOpen(false)}
         />
       )}
+
+      <AuthRequiredDialog
+        open={authDialogOpen}
+        onClose={() => setAuthDialogOpen(false)}
+      />
 
       <button
         type="button"

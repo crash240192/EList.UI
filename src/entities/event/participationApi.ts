@@ -103,7 +103,7 @@ export interface IBWListUser {
 }
 
 export async function getBWList(listType: BWListType, eventId: string): Promise<IBWListUser[]> {
-  const data = await apiClient.get<any>(`/api/participations/${listType}/${eventId}`);
+  const data = await apiClient.get<any>(`/api/participations/${listType}/get/${eventId}`);
   const result = data?.result;
   // Эндпоинт возвращает плоский массив (не пагинированный список)
   return Array.isArray(result) ? result : result?.result ?? [];
@@ -111,7 +111,7 @@ export async function getBWList(listType: BWListType, eventId: string): Promise<
 
 /** Краткий список: только id аккаунтов (без пагинации) */
 export async function getBWListShortIds(listType: BWListType, eventId: string): Promise<string[]> {
-  const data = await apiClient.get<string[]>(`/api/participations/${listType}/${eventId}/short`);
+  const data = await apiClient.get<string[]>(`/api/participations/${listType}/get/${eventId}/short`);
   const result = data?.result;
   if (!Array.isArray(result)) return [];
   return result.filter((id): id is string => typeof id === 'string' && id.length > 0);

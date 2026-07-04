@@ -36,7 +36,7 @@ export async function fetchConversationMessages(
 ): Promise<PagedList<IMessage>> {
   const qs = `pageIndex=${pageIndex}&pageSize=${pageSize}`;
   const data = await apiClient.get<PagedList<IMessage>>(
-    `/api/conversations/messages/${conversationId}?${qs}`,
+    `/api/conversations/messages/byConversationId/${conversationId}?${qs}`,
   );
   return data.result;
 }

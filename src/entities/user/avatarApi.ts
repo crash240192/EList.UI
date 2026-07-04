@@ -15,7 +15,7 @@ export async function setAvatar(fileId: string): Promise<void> {
 /** GET /api/media/account/avatars/{accountId} — история аватаров (просмотр на странице пользователя) */
 export async function getAvatarHistory(accountId: string): Promise<IAvatarInfo[]> {
   try {
-    const r = await apiClient.get<IAvatarInfo[]>(`/api/media/account/avatars/${accountId}`);
+    const r = await apiClient.get<IAvatarInfo[]>(`/api/media/account/avatars/getByAccountId/${accountId}`);
     return r.result ?? [];
   } catch { return []; }
 }

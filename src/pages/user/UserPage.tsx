@@ -28,6 +28,7 @@ import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel'
 import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { TabBar } from '@/shared/ui/TabBar';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
+import { useAuthStore } from '@/app/store';
 import { buildUserProfileUrl, canUseNativeShare, shareLink } from '@/shared/lib/shareLink';
 import { useToastStore } from '@/app/store';
 import heroStyles from '@/shared/styles/hero.module.css';
@@ -242,12 +243,20 @@ function UserEventsPanel({
 export default function UserPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const authenticated = useAuthStore(s => s.isAuthenticated());
+
+  useEffect(() => {
+    if (!authenticated && (id === 'me' || !id)) {
+      navigate('/login', { replace: true, state: { from: `/user/${id ?? 'me'}` } });
+    }
+  }, [authenticated, id, navigate]);
 
   const [myAccountId, setMyAccountId] = useState<string | null>(getStoredAccountId());
   useEffect(() => {
-    if (!myAccountId) getOrFetchAccountId().then(setMyAccountId).catch(() => {});
+    if (!authenticated || myAccountId) return;
+    getOrFetchAccountId().then(setMyAccountId).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authenticated]);
 
   const isOwnProfile = !id || id === 'me' || id === myAccountId;
   const targetId = isOwnProfile ? null : id;
@@ -466,7 +475,7 @@ export default function UserPage() {
             )}
           </div>
 
-          {!isOwnProfile && (
+          {!isOwnProfile && authenticated && (
             <div className={styles.profileActions}>
               {isSubscribed ? (
                 <button type="button" className={`${styles.btnJoin} ${styles.btnLeave}`} onClick={() => void handleUnsubscribe()}>

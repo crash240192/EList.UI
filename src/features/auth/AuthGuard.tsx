@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/app/store';
 import { getOrCreateClientHash, isAuthenticated as hasAuthToken } from '@/shared/api/client';
+import { isPublicAuthRoute, requiresAuthRoute } from '@/shared/auth/routes';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -19,29 +20,26 @@ export function AuthGuard({ children }: AuthGuardProps) {
   useEffect(() => { getOrCreateClientHash(); }, []);
 
   useEffect(() => {
-    // Небольшая задержка чтобы navigate() из LoginPage/RegisterPage
-    // успел выполниться раньше AuthGuard'а
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      const publicPaths = ['/login', '/activate', '/register'];
-      const isPublic    = publicPaths.some(p => location.pathname.startsWith(p));
+      const pathname = location.pathname;
+      const isPublic = isPublicAuthRoute(pathname);
 
       if (!hasAuthToken()) {
-        if (!isPublic) navigate('/login', { replace: true, state: { from: location.pathname } });
+        if (requiresAuthRoute(pathname)) {
+          navigate('/login', { replace: true, state: { from: pathname } });
+        }
         return;
       }
 
       if (needsActivation) {
-        // На /login остаёмся — LoginPage покажет уведомление и сам перейдёт на /activate
-        if (location.pathname !== '/activate' && location.pathname !== '/login') {
+        if (pathname !== '/activate' && pathname !== '/login') {
           navigate('/activate', { replace: true });
         }
         return;
       }
 
-      // Авторизован и активирован — публичные страницы отдаём главной
-      // но НЕ /activate (туда попасть без needsActivation нельзя в нормальном потоке)
-      if (location.pathname === '/login' || location.pathname === '/register') {
+      if (isPublic && (pathname === '/login' || pathname === '/register')) {
         navigate('/', { replace: true });
       }
     }, 50);

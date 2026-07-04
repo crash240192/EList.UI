@@ -203,6 +203,16 @@
   min-width: 0;
 }
 .navItem:hover { background: var(--surface-2); color: var(--text-primary); }
+
+.navItemLocked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.navItemLocked:hover {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
 .navActive     { background: rgba(99,102,241,0.12) !important; color: var(--accent) !important; }
 
 .navIcon {

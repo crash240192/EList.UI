@@ -126,12 +126,29 @@ export function useUserLocation(): UseUserLocationResult {
 
       if (!accountCoords) {
         const cached = readUserCoords();
-        if (cached) { setCoords(cached); return; }
+        if (cached) {
+          setCoords(cached);
+          if (!cookies.get(COOKIE_CITY_NAME)) {
+            getCityName(cached).then(name => {
+              if (isCancelled() || !name) return;
+              cookies.set(COOKIE_CITY_NAME, name, 30);
+              notifyHomeCityChanged(cached, name);
+            }).catch(() => {});
+          }
+          return;
+        }
         const detected = await detectCurrentCoords();
         if (cancelled) return;
         const fallback = detected ?? MOSCOW;
         setCoords(fallback);
         storeUserCoords(fallback);
+        if (!cookies.get(COOKIE_CITY_NAME)) {
+          getCityName(fallback).then(name => {
+            if (isCancelled() || !name) return;
+            cookies.set(COOKIE_CITY_NAME, name, 30);
+            notifyHomeCityChanged(fallback, name);
+          }).catch(() => {});
+        }
         return;
       }
 

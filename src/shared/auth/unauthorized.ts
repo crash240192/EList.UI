@@ -1,12 +1,9 @@
 // shared/auth/unauthorized.ts
 
 import { ApiErrorCode } from '@/shared/api/errorCodes';
+import { isPublicAppRoute, isPublicAuthRoute } from './routes';
 
-export const PUBLIC_AUTH_ROUTES = ['/login', '/activate', '/register'] as const;
-
-export function isPublicAuthRoute(pathname = window.location.pathname): boolean {
-  return PUBLIC_AUTH_ROUTES.some(route => pathname.startsWith(route));
-}
+export { PUBLIC_AUTH_ROUTES, isPublicAuthRoute, isPublicAppRoute } from './routes';
 
 /** API активации — без принудительного выхода (страницы /login, /activate, /register) */
 export function isActivationApiPath(path: string): boolean {
@@ -21,7 +18,7 @@ export function isActivationApiPath(path: string): boolean {
 
 /** Нужно ли при 401 сбрасывать сессию для этого запроса */
 export function shouldForceLogoutForApi(path: string): boolean {
-  if (isPublicAuthRoute()) return false;
+  if (isPublicAppRoute()) return false;
   if (isActivationApiPath(path)) return false;
   return true;
 }
