@@ -24,6 +24,7 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useAvatar } from '@/features/auth/useAvatar';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
 import { EventListItem, EventList } from '@/entities/event/ui/EventListItem';
+import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
 import {
   countUniqueUserEvents,
   formatContactHref,
@@ -39,13 +40,18 @@ import {
 } from './userPageUtils';
 import styles from './UserPage.module.css';
 
-type MainTab = UserEventsScope;
+type MainTab = UserEventsScope | 'albums';
 type ListModal = 'subscriptions' | 'subscribers' | null;
 
-const SCOPE_TABS: { key: MainTab; label: string }[] = [
+const SCOPE_TABS: { key: UserEventsScope; label: string }[] = [
   { key: 'all', label: 'Все' },
   { key: 'created', label: 'Организует' },
   { key: 'participating', label: 'Участвует' },
+];
+
+const MAIN_TABS: { key: MainTab; label: string }[] = [
+  ...SCOPE_TABS,
+  { key: 'albums', label: 'Альбомы' },
 ];
 
 function UserCoverBackground({
@@ -249,6 +255,7 @@ export default function UserPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>('all');
+  const [albumsCount, setAlbumsCount] = useState(0);
   const [eventsPhase, setEventsPhase] = useState<UserEventsPhase>('upcoming');
   const [subsCount, setSubsCount] = useState(0);
   const [subscrCount, setSubscrCount] = useState(0);
@@ -325,12 +332,15 @@ export default function UserPage() {
     ? { events: allEvents, total: allEventsTotal, isLoading: createdEvents.isLoading || participatingEvents.isLoading }
     : mainTab === 'created'
       ? createdEvents
-      : participatingEvents;
+      : mainTab === 'participating'
+        ? participatingEvents
+        : { events: [], total: 0, isLoading: false };
 
-  const scopeCounts: Record<MainTab, number> = {
+  const tabCounts: Record<MainTab, number> = {
     all: allEventsTotal || allEvents.length,
     created: createdEvents.total || createdEvents.events.length,
     participating: participatingEvents.total || participatingEvents.events.length,
+    albums: albumsCount,
   };
 
   const upcomingPreview = useMemo(() => {
@@ -548,7 +558,7 @@ export default function UserPage() {
 
           <section className={styles.rightPanel}>
             <div className={styles.tabsBar}>
-              {SCOPE_TABS.map(tab => (
+              {MAIN_TABS.map(tab => (
                 <button
                   key={tab.key}
                   type="button"
@@ -556,20 +566,30 @@ export default function UserPage() {
                   onClick={() => setMainTab(tab.key)}
                 >
                   {tab.label}
-                  <span className={styles.tabCnt}>{scopeCounts[tab.key]}</span>
+                  <span className={styles.tabCnt}>{tabCounts[tab.key]}</span>
                 </button>
               ))}
             </div>
 
-            <UserEventsPanel
-              events={activeEvents.events}
-              total={activeEvents.total}
-              isLoading={activeEvents.isLoading}
-              scope={mainTab}
-              phase={eventsPhase}
-              onPhaseChange={setEventsPhase}
-              onOpen={eventId => navigate(`/event/${eventId}`)}
-            />
+            {mainTab === 'albums' ? (
+              <div className={styles.tabContent}>
+                <EventAlbumsGroupsPanel
+                  accountId={profileAccountId}
+                  onOpenEvent={eventId => navigate(`/event/${eventId}`)}
+                  onTotalChange={setAlbumsCount}
+                />
+              </div>
+            ) : (
+              <UserEventsPanel
+                events={activeEvents.events}
+                total={activeEvents.total}
+                isLoading={activeEvents.isLoading}
+                scope={mainTab}
+                phase={eventsPhase}
+                onPhaseChange={setEventsPhase}
+                onOpen={eventId => navigate(`/event/${eventId}`)}
+              />
+            )}
           </section>
         </div>
       </div>
