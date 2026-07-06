@@ -196,7 +196,7 @@ export function MobileFilterSheet({
                   onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
               </div>
               <div className={styles.field}>
-                <span className={styles.fieldLabel}>Возраст, от</span>
+                <span className={styles.fieldLabel}>Возраст</span>
                 <input className={styles.input} type="number" min={0}
                   placeholder="Любой" value={filters.ageLimit ?? ''}
                   onFocus={e => e.currentTarget.select()}
