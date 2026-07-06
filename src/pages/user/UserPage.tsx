@@ -44,6 +44,7 @@ import {
   type UserEventsPhase,
   type UserEventsScope,
 } from './userPageUtils';
+import { formatAge } from '@/shared/lib/datetime';
 import styles from './UserPage.module.css';
 
 type MainTab = UserEventsScope | 'albums';
@@ -385,9 +386,7 @@ export default function UserPage() {
 
   const { account, contacts, person } = profile;
   const fullName = [person?.lastName, person?.firstName].filter(Boolean).join(' ');
-  const age = person?.birthDate
-    ? Math.floor((Date.now() - new Date(person.birthDate).getTime()) / 31_557_600_000)
-    : null;
+  const ageLabel = person?.birthDate ? formatAge(person.birthDate) : null;
   const visibleContacts = contacts.filter(c => isOwnProfile || c.show);
   const initials = (fullName || account.login).slice(0, 2).toUpperCase();
 
@@ -445,10 +444,10 @@ export default function UserPage() {
               {fullName && <h1 className={styles.fullName}>{fullName}</h1>}
             </div>
             <div className={styles.loginLine}>@{account.login}</div>
-            {(age !== null || person?.gender) && (
+            {(ageLabel || person?.gender) && (
               <div className={styles.profileMeta}>
-                {age !== null && <span>{age} лет</span>}
-                {age !== null && person?.gender && <span className={styles.profileMetaDot} aria-hidden>·</span>}
+                {ageLabel && <span>{ageLabel}</span>}
+                {ageLabel && person?.gender && <span className={styles.profileMetaDot} aria-hidden>·</span>}
                 {person?.gender && <span>{person.gender === 'Male' ? 'Мужской' : 'Женский'}</span>}
               </div>
             )}

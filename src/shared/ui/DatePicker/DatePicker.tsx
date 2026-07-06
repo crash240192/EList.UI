@@ -10,6 +10,7 @@ import {
   isTimeAtOrAfter,
 } from '@/shared/lib/dateTimeMask';
 import { DateTimeMaskField } from './MaskField';
+import { parseLocalDateString } from '@/shared/lib/datetime';
 import styles from './DatePicker.module.css';
 
 interface DatePickerProps {
@@ -112,6 +113,10 @@ function TimeWheel({ items, selected, onSelect, open }: {
 
 function parseValue(value: string): Date | null {
   if (!value) return null;
+  if (!value.includes('T')) {
+    const local = parseLocalDateString(value.slice(0, 10));
+    if (local) return local;
+  }
   const d = new Date(value);
   return isNaN(d.getTime()) ? null : d;
 }

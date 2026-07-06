@@ -1,4 +1,4 @@
-// shared/lib/dateTimeMask.ts — маски дд.мм.гггг и чч:мм с проверкой допустимых значений
+import { parseLocalDateString } from './datetime';
 
 export const DATE_DIGITS = 8;
 export const TIME_DIGITS = 4;
@@ -168,6 +168,18 @@ export function buildTimeMaskSegments(digits: string): MaskSegment[] {
 
 export function isoToDigits(iso: string, withTime: boolean): string {
   if (!iso) return '';
+
+  const dateOnly = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly && !withTime) {
+    return `${dateOnly[3]}${dateOnly[2]}${dateOnly[1]}`;
+  }
+
+  const localDate = parseLocalDateString(iso.slice(0, 10));
+  if (localDate && !withTime && !iso.includes('T')) {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(localDate.getDate())}${pad(localDate.getMonth() + 1)}${localDate.getFullYear()}`;
+  }
+
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');

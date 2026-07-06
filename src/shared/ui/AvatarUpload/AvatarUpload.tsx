@@ -1,6 +1,6 @@
 // shared/ui/AvatarUpload/AvatarUpload.tsx
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { uploadFile } from '@/shared/api/fileStorageClient';
 import { setAvatar } from '@/entities/user/avatarApi';
 import { seedAvatarCache } from '@/features/auth/useAvatar';
@@ -20,6 +20,12 @@ export function AvatarUpload({ initials, accountId, fileId: initialFileId, size 
   const [fileId,  setFileId]  = useState<string | null>(initialFileId ?? null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
+
+  useEffect(() => {
+    setFileId(initialFileId ?? null);
+  }, [initialFileId]);
+
+  const displayFileId = fileId ?? initialFileId ?? null;
 
   const handleFile = async (file: File) => {
     setLoading(true); setError(null);
@@ -44,8 +50,8 @@ export function AvatarUpload({ initials, accountId, fileId: initialFileId, size 
         onClick={() => !loading && inputRef.current?.click()}
         title="Нажмите чтобы сменить фото"
       >
-        {fileId
-          ? <AuthImage fileId={fileId} alt="Аватар" className={styles.img}
+        {displayFileId
+          ? <AuthImage fileId={displayFileId} alt="Аватар" className={styles.img}
               fallback={<span>{initials}</span>} />
           : <span>{initials}</span>}
         <div className={styles.overlay}>

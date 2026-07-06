@@ -24,6 +24,7 @@ import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { ContactMaskField } from '@/shared/ui/ContactMaskField/ContactMaskField';
 import { Select, type SelectOption } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
+import { birthDateToApiIso, todayLocalDateString } from '@/shared/lib/datetime';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import type { Gender } from '@/shared/api/types';
 import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
@@ -219,7 +220,7 @@ export default function RegisterPage() {
             patronymic: personData.patronymic.trim() || undefined,
             gender:     personData.gender            || undefined,
             birthDate:  personData.birthDate
-              ? new Date(personData.birthDate).toISOString()
+              ? birthDateToApiIso(personData.birthDate)
               : undefined,
           }
         : null;
@@ -411,9 +412,9 @@ export default function RegisterPage() {
                 <DatePicker
                   value={form2.birthDate}
                   onChange={iso => setForm2(f => ({ ...f, birthDate: iso }))}
-                  placeholder="Выберите дату рождения"
+                  placeholder="дд.мм.гггг"
                   min="1900-01-01"
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={todayLocalDateString()}
                 />
               </Field>
             </div>

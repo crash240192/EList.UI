@@ -16,6 +16,7 @@ import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
 import { Select } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
+import { birthDateToApiIso, parseBirthDateFromApi, todayLocalDateString } from '@/shared/lib/datetime';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { useFiltersStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
@@ -141,7 +142,7 @@ function ProfileTab() {
         lastName: p.lastName ?? '',
         patronymic: p.patronymic ?? '',
         gender: (p.gender as 'Male' | 'Female' | '') ?? '',
-        birthDate: p.birthDate ? p.birthDate.slice(0, 10) : '',
+        birthDate: p.birthDate ? parseBirthDateFromApi(p.birthDate) : '',
       });
     }).finally(() => setLoading(false));
   }, []);
@@ -155,7 +156,7 @@ function ProfileTab() {
         lastName: form.lastName || undefined,
         patronymic: form.patronymic || undefined,
         gender: form.gender || undefined,
-        birthDate: form.birthDate ? new Date(form.birthDate).toISOString() : undefined,
+        birthDate: birthDateToApiIso(form.birthDate),
       });
       setMsg({ text: 'Изменения сохранены', ok: true });
     } catch (e) {
@@ -237,7 +238,7 @@ function ProfileTab() {
                 onChange={iso => setForm(f => ({ ...f, birthDate: iso }))}
                 placeholder="дд.мм.гггг"
                 min="1900-01-01"
-                max={new Date().toISOString().slice(0, 10)}
+                max={todayLocalDateString()}
               />
             </div>
           </div>

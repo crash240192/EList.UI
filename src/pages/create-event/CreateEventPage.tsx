@@ -30,6 +30,12 @@ import { InviteModal } from '@/features/event/InviteModal';
 import { createConversation } from '@/entities/conversation';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
+import {
+  addDaysLocalDateString,
+  apiIsoToLocalParts,
+  localPartsToApiIso,
+  todayLocalDateString,
+} from '@/shared/lib/datetime';
 import type { Gender } from '@/shared/api/types';
 import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
@@ -222,16 +228,16 @@ export default function CreateEventPage() {
     const loadTypes = USE_MOCK ? Promise.resolve([]) : fetchEventTypesByEvent(id!);
 
     Promise.all([loadEvent, loadTypes]).then(([ev, evTypes]) => {
-      const toDate = (s: string) => s.slice(0, 10);
-      const toTime = (s: string) => s.slice(11, 16);
+      const startParts = ev.startTime ? apiIsoToLocalParts(ev.startTime) : { date: '', time: '' };
+      const endParts = ev.endTime ? apiIsoToLocalParts(ev.endTime) : { date: '', time: '' };
       setForm({
         name:               ev.name ?? '',
         description:        ev.description ?? '',
         address:            ev.address ?? '',
-        startDate:          ev.startTime ? toDate(ev.startTime) : '',
-        startTime:          ev.startTime ? toTime(ev.startTime) : '',
-        endDate:            ev.endTime   ? toDate(ev.endTime)   : '',
-        endTime:            ev.endTime   ? toTime(ev.endTime)   : '',
+        startDate:          startParts.date,
+        startTime:          startParts.time,
+        endDate:            endParts.date,
+        endTime:            endParts.time,
         cost:               String(ev.parameters?.cost ?? 0),
         ageLimit:           String(ev.parameters?.ageLimit ?? ''),
         isPrivate:          ev.parameters?.private ?? false,
@@ -543,12 +549,12 @@ export default function CreateEventPage() {
     }
     setSaving(true);
     try {
-      const startDt = new Date(`${form.startDate}T${form.startTime}`);
-      const endDt = endMode === 'duration'
-        ? new Date(startDt.getTime() + (parseInt(durationH)||0)*3600000 + (parseInt(durationM)||0)*60000)
-        : new Date(`${form.endDate}T${form.endTime}`);
-      const startTime = startDt.toISOString();
-      const endTime   = endDt.toISOString();
+      const startTime = localPartsToApiIso(form.startDate, form.startTime);
+      const endTime = endMode === 'duration'
+        ? new Date(new Date(`${form.startDate}T${form.startTime}`).getTime()
+          + (parseInt(durationH) || 0) * 3600000
+          + (parseInt(durationM) || 0) * 60000).toISOString()
+        : localPartsToApiIso(form.endDate, form.endTime);
 
       if (isEditing) {
         await apiClient.put(`/api/events/update/${id}`, {
@@ -787,9 +793,9 @@ export default function CreateEventPage() {
                   }}
                   placeholder="Дата и время начала"
                   hasError={hasErr('startDate') || hasErr('startTime')}
-                  min={!isEditing ? new Date().toISOString().slice(0, 10) : undefined}
+                  min={!isEditing ? todayLocalDateString() : undefined}
                   max={tariffValidator?.createDateMaxPeriod != null
-                    ? (() => { const d = new Date(); d.setDate(d.getDate() + tariffValidator!.createDateMaxPeriod!); return d.toISOString().slice(0,10); })()
+                    ? addDaysLocalDateString(tariffValidator!.createDateMaxPeriod!)
                     : undefined}
                 />
               </div>
@@ -831,7 +837,7 @@ export default function CreateEventPage() {
                     }}
                     placeholder="Дата и время окончания"
                     hasError={hasErr('endDate') || hasErr('endTime')}
-                    min={form.startDate || new Date().toISOString().slice(0, 10)}
+                    min={form.startDate || todayLocalDateString()}
                     minTime={form.startDate && form.endDate && form.startDate === form.endDate ? form.startTime : undefined}
                   />
                 </div>
