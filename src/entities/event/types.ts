@@ -96,6 +96,7 @@ export interface IEventsSearchParams {
   organizatorId?: string;
   participantId?: string;
   price?: number;
+  ageLimit?: number;
   allowedGender?: Gender;
   pageIndex?: number;
   pageSize?: number;

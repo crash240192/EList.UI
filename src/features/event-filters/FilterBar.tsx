@@ -289,12 +289,16 @@ export function FilterBar({
   if (quickDate === 'tomorrow') chips.push({ label: 'Завтра',   onRemove: () => clearQuickDateFilter(setQuickDate, setFilter) });
   if (quickDate === 'weekend')  chips.push({ label: 'Выходные', onRemove: () => clearQuickDateFilter(setQuickDate, setFilter) });
   if (filters.price === 0)      chips.push({ label: 'Бесплатно', onRemove: () => setFilter('price', undefined) });
+  if (filters.ageLimit != null && filters.ageLimit > 0) {
+    chips.push({ label: `${filters.ageLimit}+`, onRemove: () => setFilter('ageLimit', undefined) });
+  }
 
   /** Счётчик для мобильного бейджа — без города (базовая геолокация, не пользовательский фильтр). */
   const mobileFilterCount = [
     quickDate,
     filters.price === 0,
     filters.price != null && filters.price > 0,
+    filters.ageLimit != null && filters.ageLimit > 0,
     (filters.types?.length ?? 0) > 0,
     (filters.categories?.length ?? 0) > 0,
     !quickDate && !!filters.endTime,
@@ -309,7 +313,8 @@ export function FilterBar({
   };
   const hasExpandedActive =
     (!quickDate && !!filters.endTime)
-    || (!!filters.price && filters.price > 0);
+    || (!!filters.price && filters.price > 0)
+    || (filters.ageLimit != null && filters.ageLimit > 0);
 
   return (
     <>
@@ -478,6 +483,16 @@ export function FilterBar({
               placeholder="Любая" value={filters.price ?? ''}
               onFocus={e => e.currentTarget.select()}
               onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
+          </div>
+          <div className={styles.epBlock}>
+            <span className={styles.epLabel}>Возраст, от</span>
+            <input type="number" className={styles.epInput} min={0}
+              placeholder="Любой" value={filters.ageLimit ?? ''}
+              onFocus={e => e.currentTarget.select()}
+              onChange={e => {
+                const raw = e.target.value.replace(/[^0-9]/g, '');
+                setFilter('ageLimit', raw !== '' ? Number(raw) : undefined);
+              }} />
           </div>
         </div>
       )}

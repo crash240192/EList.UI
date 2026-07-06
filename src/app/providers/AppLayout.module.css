@@ -264,6 +264,17 @@
 }
 .logoutBtn:hover { background: rgba(239,68,68,0.1); }
 
+.loginNavBtn {
+  display: flex; align-items: center; gap: 12px;
+  margin: 6px; padding: 9px 10px;
+  border: none; border-radius: 10px;
+  background: var(--accent); color: #fff;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; overflow: hidden;
+  transition: background var(--transition);
+}
+.loginNavBtn:hover { background: var(--accent-hover); }
+
 /* ---- Main ---- */
 .main {
   position: absolute;

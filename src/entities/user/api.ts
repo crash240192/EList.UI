@@ -1,6 +1,6 @@
 // entities/user/api.ts
 
-import { apiClient } from '@/shared/api/client';
+import { apiClient, isAuthenticated } from '@/shared/api/client';
 import { cookies } from '@/shared/lib/cookies';
 
 const COOKIE_ACCOUNT_ID = 'elist_account_id';
@@ -43,6 +43,10 @@ export function clearAccountId(): void {
 export async function getOrFetchAccountId(): Promise<string> {
   const cached = getStoredAccountId();
   if (cached) return cached;
+
+  if (!isAuthenticated()) {
+    throw new Error('Not authenticated');
+  }
 
   const data = await apiClient.get<AccountDataResult>('/api/accounts/getData');
   const id = data.result.id;

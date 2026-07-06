@@ -14,9 +14,7 @@ import {
   useInvitationsStore,
 } from '@/features/invitations/invitationsStore';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
-import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import { useActivationRedirect } from '@/features/auth/useActivationRedirect';
-import { AUTH_REQUIRED_NAV_PATHS } from '@/shared/auth/routes';
 import styles from './AppLayout.module.css';
 
 const NAV_ITEMS = [
@@ -33,7 +31,6 @@ const NAV_ITEMS = [
 export function AppLayout() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
-  const [authDialogPath, setAuthDialogPath] = useState<string | null>(null);
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
   const authenticated = isAuthenticated();
@@ -41,10 +38,16 @@ export function AppLayout() {
   const resetInvitationsCount = useInvitationsStore(s => s.reset);
   useInvitationsNotViewedCount(authenticated);
   const { filters } = useFiltersStore();
-  const { fileId: myAvatarFileId } = useMyAvatar();
   const navigate = useNavigate();
 
+  const visibleNavItems = authenticated
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter(({ to }) => to === '/');
+
   useActivationRedirect();
+
+  const myAvatar = useMyAvatar();
+  const myAvatarFileId = authenticated ? myAvatar.fileId : null;
 
   const handleLogout = () => {
     logout();
@@ -103,7 +106,7 @@ export function AppLayout() {
               <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
             </svg>
           </button>
-          {isAuthenticated() ? (
+          {authenticated && (
             <>
             <NotificationBell />
             <button className={styles.avatarBtn} onClick={() => navigate('/user/me')} aria-label="Профиль">
@@ -115,8 +118,6 @@ export function AppLayout() {
               }
             </button>
             </>
-          ) : (
-            <button className={styles.loginBtn} onClick={() => navigate('/login')}>Войти</button>
           )}
         </div>
       </header>
@@ -124,46 +125,26 @@ export function AppLayout() {
       {/* ---- Sidebar ---- */}
       <aside className={`${styles.sidebar} ${sidebarExpanded ? styles.sidebarExpanded : ''}`}>
         <nav className={styles.nav}>
-          {NAV_ITEMS.map(({ to, label, icon }) => {
-            const locked = !authenticated && AUTH_REQUIRED_NAV_PATHS.has(to);
-            if (locked) {
-              return (
-                <button
-                  key={to}
-                  type="button"
-                  className={`${styles.navItem} ${styles.navItemLocked}`}
-                  title={`${label} — требуется вход`}
-                  onClick={() => {
-                    setAuthDialogPath(to);
-                    setSidebarExpanded(false);
-                  }}
-                >
-                  <span className={styles.navIcon}>{icon}</span>
-                  <span className={styles.navLabel}>{label}</span>
-                </button>
-              );
-            }
-            return (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === '/'}
-                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-                title={label}
-                onClick={() => setSidebarExpanded(false)}
-              >
-                <span className={styles.navIcon}>
-                  {icon}
-                  {to === '/invitations' && notViewedInvitations > 0 && (
-                    <span className={styles.navCountBadge} aria-label={`Непросмотренных: ${notViewedInvitations}`}>
-                      {notViewedInvitations > 99 ? '99+' : notViewedInvitations}
-                    </span>
-                  )}
-                </span>
-                <span className={styles.navLabel}>{label}</span>
-              </NavLink>
-            );
-          })}
+          {visibleNavItems.map(({ to, label, icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+              title={label}
+              onClick={() => setSidebarExpanded(false)}
+            >
+              <span className={styles.navIcon}>
+                {icon}
+                {authenticated && to === '/invitations' && notViewedInvitations > 0 && (
+                  <span className={styles.navCountBadge} aria-label={`Непросмотренных: ${notViewedInvitations}`}>
+                    {notViewedInvitations > 99 ? '99+' : notViewedInvitations}
+                  </span>
+                )}
+              </span>
+              <span className={styles.navLabel}>{label}</span>
+            </NavLink>
+          ))}
         </nav>
 
         {sidebarExpanded && (
@@ -172,10 +153,19 @@ export function AppLayout() {
           </div>
         )}
 
-        {isAuthenticated() && (
+        {authenticated ? (
           <button className={styles.logoutBtn} onClick={() => setLogoutConfirm(true)} title="Выйти">
             <span className={styles.navIcon}><LogoutIcon /></span>
             <span className={styles.navLabel}>Выйти</span>
+          </button>
+        ) : (
+          <button
+            className={styles.loginNavBtn}
+            onClick={() => { navigate('/login'); setSidebarExpanded(false); }}
+            title="Войти"
+          >
+            <span className={styles.navIcon}><LoginIcon /></span>
+            <span className={styles.navLabel}>Войти</span>
           </button>
         )}
       </aside>
@@ -193,13 +183,6 @@ export function AppLayout() {
         <LogoutConfirmModal onConfirm={handleLogout} onCancel={() => setLogoutConfirm(false)} />
       )}
 
-      <AuthRequiredDialog
-        open={authDialogPath !== null}
-        onClose={() => setAuthDialogPath(null)}
-        returnTo={authDialogPath ?? undefined}
-        message="Войдите в аккаунт, чтобы открыть этот раздел."
-      />
-
       {/* ---- Main ---- */}
       <main className={styles.main}>
         <Outlet />
@@ -215,6 +198,7 @@ function CalendarIcon() { return <svg width="18" height="18" viewBox="0 0 24 24"
 function PlusIcon()     { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>; }
 function WalletIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 3H8l-2 4h12z"/><circle cx="16" cy="14" r="1" fill="currentColor"/></svg>; }
 function LogoutIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>; }
+function LoginIcon()    { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>; }
 function HamburgerIcon(){ return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>; }
 function InviteIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/><line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/></svg>; }
 function AlbumsIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/></svg>; }

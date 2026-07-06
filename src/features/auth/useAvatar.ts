@@ -3,8 +3,9 @@
 // Если avatarId неизвестен — один запрос GET /api/accounts/getData/{accountId}.
 
 import { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '@/shared/api/client';
+import { apiClient, isAuthenticated } from '@/shared/api/client';
 import { fetchAccountById, getOrFetchAccountId } from '@/entities/user/api';
+import { useAuthStore } from '@/app/store';
 
 // null = у пользователя нет аватара; отсутствие ключа = ещё не известно
 const cache: Map<string, string | null> = new Map();
@@ -101,10 +102,16 @@ export function useAvatar(
 }
 
 export function useMyAvatar(): { fileId: string | null; refresh: () => void } {
+  const token = useAuthStore(s => s.token);
   const [fileId, setFileId] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    if (!isAuthenticated()) {
+      setFileId(null);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -120,7 +127,7 @@ export function useMyAvatar(): { fileId: string | null; refresh: () => void } {
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
+  }, [tick, token]);
 
   const refresh = useCallback(() => setTick(t => t + 1), []);
 

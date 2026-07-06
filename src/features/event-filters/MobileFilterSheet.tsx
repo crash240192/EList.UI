@@ -190,6 +190,16 @@ export function MobileFilterSheet({
                   onFocus={e => e.currentTarget.select()}
                   onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
               </div>
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Возраст, от</span>
+                <input className={styles.input} type="number" min={0}
+                  placeholder="Любой" value={filters.ageLimit ?? ''}
+                  onFocus={e => e.currentTarget.select()}
+                  onChange={e => {
+                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                    setFilter('ageLimit', raw !== '' ? Number(raw) : undefined);
+                  }} />
+              </div>
             </div>
           </div>
         </div>
