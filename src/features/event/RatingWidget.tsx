@@ -387,14 +387,29 @@ function RatingModal({
                   onChange={e => handleCommentChange(e.target.value)}
                   rows={3}
                   maxLength={RATING_COMMENT_MAX_LENGTH}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === 'Enter' &&
+                      (e.ctrlKey || e.metaKey) &&
+                      voteValue !== 0 &&
+                      !submitting &&
+                      comment.length <= RATING_COMMENT_MAX_LENGTH
+                    ) {
+                      e.preventDefault();
+                      void handleSubmit();
+                    }
+                  }}
                 />
                 {submitError && <div className={styles.voteError}>{submitError}</div>}
                 <div className={styles.voteFormBtns}>
-                  <TextLengthHint
-                    length={comment.length}
-                    maxLength={RATING_COMMENT_MAX_LENGTH}
-                    className={styles.lengthHint}
-                  />
+                  <div className={styles.voteFormBtnsLeft}>
+                    <span className={styles.keyboardHint}>Ctrl+Enter — отправить</span>
+                    <TextLengthHint
+                      length={comment.length}
+                      maxLength={RATING_COMMENT_MAX_LENGTH}
+                      className={styles.lengthHint}
+                    />
+                  </div>
                   <button type="button" className={styles.cancelBtn} onClick={handleCancel}>
                     Отмена
                   </button>

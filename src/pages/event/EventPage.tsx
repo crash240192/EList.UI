@@ -28,7 +28,8 @@ import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
-import { buildEventShareUrl, canUseNativeShare, shareLink } from '@/shared/lib/shareLink';
+import { buildEventShareUrl } from '@/shared/lib/shareLink';
+import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
@@ -64,6 +65,7 @@ export default function EventPage() {
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
 
   const {
     organizers,
@@ -193,29 +195,8 @@ export default function EventPage() {
 
   const handleShare = useCallback(() => {
     if (!event?.id) return;
-
-    const url = buildEventShareUrl(event.id);
-    const shareText = [
-      event.name,
-      event.address,
-      formatDateFull(event.startTime, event.endTime),
-    ].filter(Boolean).join(' · ');
-
-    void shareLink({ title: event.name, text: shareText, url })
-      .then((result) => {
-        const copiedMsg = canUseNativeShare()
-          ? 'Ссылка скопирована в буфер обмена'
-          : 'Ссылка скопирована (нужен HTTPS для системного шаринга)';
-        useToastStore.getState().add(
-          result === 'shared' ? 'Ссылка отправлена' : copiedMsg,
-          'success',
-        );
-      })
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        useToastStore.getState().add('Не удалось поделиться ссылкой', 'error');
-      });
-  }, [event]);
+    setShowShareMenu(true);
+  }, [event?.id]);
 
   const participantChips = useMemo(() => {
     const sorted = [
@@ -688,6 +669,22 @@ export default function EventPage() {
         open={authDialogOpen}
         onClose={() => setAuthDialogOpen(false)}
       />
+
+      {showShareMenu && event && (
+        <ShareMenu
+          subtitle={`Выберите способ передачи «${event.name}»`}
+          url={buildEventShareUrl(event.id)}
+          shareTitle={event.name}
+          shareText={[
+            event.name,
+            event.address,
+            formatDateFull(event.startTime, event.endTime),
+          ].filter(Boolean).join(' · ')}
+          qrTitle="QR-код мероприятия"
+          qrSubtitle={`Отсканируйте камерой, чтобы открыть «${event.name}»`}
+          onClose={() => setShowShareMenu(false)}
+        />
+      )}
 
       <button
         type="button"

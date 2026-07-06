@@ -29,8 +29,7 @@ import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { TabBar } from '@/shared/ui/TabBar';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { useAuthStore } from '@/app/store';
-import { buildUserProfileUrl, canUseNativeShare, shareLink } from '@/shared/lib/shareLink';
-import { useToastStore } from '@/app/store';
+import { UserShareMenu } from '@/features/user/UserShareMenu';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   countUniqueUserEvents,
@@ -275,6 +274,7 @@ export default function UserPage() {
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
+  const [showShareMenu, setShowShareMenu] = useState(false);
 
   const createdEvents = useEvents(
     { organizatorId: profileAccountId },
@@ -338,29 +338,8 @@ export default function UserPage() {
 
   const handleShare = useCallback(() => {
     if (!profile?.account?.id) return;
-
-    const { account } = profile;
-    const url = buildUserProfileUrl(account.id);
-
-    void shareLink({
-      title: `Профиль @${account.login}`,
-      text: `Профиль @${account.login}`,
-      url,
-    })
-      .then((result) => {
-        const copiedMsg = canUseNativeShare()
-          ? 'Ссылка скопирована в буфер обмена'
-          : 'Ссылка скопирована (нужен HTTPS для системного шаринга)';
-        useToastStore.getState().add(
-          result === 'shared' ? 'Ссылка отправлена' : copiedMsg,
-          'success',
-        );
-      })
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        useToastStore.getState().add('Не удалось поделиться ссылкой', 'error');
-      });
-  }, [profile]);
+    setShowShareMenu(true);
+  }, [profile?.account?.id]);
 
   const allEvents = useMemo(
     () => mergeUserEvents(createdEvents.events, participatingEvents.events),
@@ -666,6 +645,14 @@ export default function UserPage() {
           fileIds={lightboxFileIds}
           initials={initials}
           onClose={() => setLightboxFileIds(null)}
+        />
+      )}
+
+      {showShareMenu && profile?.account && (
+        <UserShareMenu
+          accountId={profile.account.id}
+          login={profile.account.login}
+          onClose={() => setShowShareMenu(false)}
         />
       )}
     </div>

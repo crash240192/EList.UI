@@ -41,7 +41,13 @@ export function normalizeEventListItem(raw: unknown): EventListItemData {
   const e = (raw ?? {}) as Record<string, unknown>;
   const types = normalizeEventTypes(e.Types ?? e.types ?? e.eventTypes);
   const single = normalizeEventType(e.eventType ?? e.EventType) ?? types[0] ?? null;
-  const params = (e.parameters ?? e.Parameters ?? null) as Record<string, unknown> | null;
+  const params = (
+    e.parameters ??
+    e.Parameters ??
+    e.eventParameters ??
+    e.EventParameters ??
+    null
+  ) as Record<string, unknown> | null;
   const colorsRaw = e.colors ?? e.Colors;
   const colors = Array.isArray(colorsRaw)
     ? colorsRaw.filter((c): c is string => typeof c === 'string' && c.length > 0)
@@ -59,7 +65,13 @@ export function normalizeEventListItem(raw: unknown): EventListItemData {
     parameters: params
       ? {
           cost: Number(params.cost ?? params.Cost ?? 0),
-          ageLimit: (params.ageLimit ?? params.AgeLimit ?? null) as number | null,
+          ageLimit: (
+            params.ageLimit ??
+            params.AgeLimit ??
+            e.ageLimit ??
+            e.AgeLimit ??
+            null
+          ) as number | null,
           maxPersonsCount: (params.maxPersonsCount ?? params.MaxPersonsCount ?? null) as number | null,
         }
       : null,

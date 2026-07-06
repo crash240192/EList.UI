@@ -153,7 +153,7 @@ export default function WalletPage() {
         tariffApi.getAll().catch(() => []),
         getMyPersonInfo().catch(() => null),
       ]);
-      setAllTariffs(tariffs);
+      setAllTariffs([...tariffs].sort((a, b) => a.cost - b.cost));
 
       if (person) {
         const name = [person.firstName, person.lastName].filter(Boolean).join(' ');

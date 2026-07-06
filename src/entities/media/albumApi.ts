@@ -4,6 +4,7 @@ import { apiClient } from '@/shared/api/client';
 import type { PagedList } from '@/shared/api/types';
 import type { EventListItemData } from '@/entities/event/lib/eventListItemUtils';
 import { normalizeEventListItem } from '@/entities/event/normalizeEventListItem';
+import { fetchEventParameters } from '@/entities/event/eventExtrasApi';
 
 export interface IAlbumParams {
   albumId?: string;
@@ -81,6 +82,37 @@ function normalizeAlbumsGroup(raw: unknown): IEventAlbumsGroup {
   };
 }
 
+async function enrichAlbumGroupsWithParameters(groups: IEventAlbumsGroup[]): Promise<IEventAlbumsGroup[]> {
+  const missing = groups.filter(g => g.event.id && g.event.parameters?.ageLimit == null);
+  if (missing.length === 0) return groups;
+
+  const eventIds = [...new Set(missing.map(g => g.event.id))];
+  const paramsByEvent = new Map<string, Awaited<ReturnType<typeof fetchEventParameters>>>();
+
+  await Promise.all(eventIds.map(async eventId => {
+    paramsByEvent.set(eventId, await fetchEventParameters(eventId));
+  }));
+
+  return groups.map(group => {
+    if (group.event.parameters?.ageLimit != null) return group;
+
+    const params = paramsByEvent.get(group.event.id);
+    if (!params) return group;
+
+    return {
+      ...group,
+      event: {
+        ...group.event,
+        parameters: {
+          cost: params.cost ?? group.event.parameters?.cost ?? 0,
+          ageLimit: params.ageLimit,
+          maxPersonsCount: params.maxPersonsCount ?? group.event.parameters?.maxPersonsCount ?? null,
+        },
+      },
+    };
+  });
+}
+
 /** Альбомы, сгруппированные по мероприятиям, доступные аккаунту */
 export async function getAlbumsByEvents(
   accountId: string,
@@ -91,9 +123,11 @@ export async function getAlbumsByEvents(
     `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}`,
   );
   const data = ((res as { result?: PagedList<IEventAlbumsGroup> }).result ?? res) as PagedList<IEventAlbumsGroup>;
+  const groups = Array.isArray(data.result) ? data.result.map(normalizeAlbumsGroup) : [];
+  const enriched = await enrichAlbumGroupsWithParameters(groups);
   return {
     ...data,
-    result: Array.isArray(data.result) ? data.result.map(normalizeAlbumsGroup) : [],
+    result: enriched,
   };
 }
 
