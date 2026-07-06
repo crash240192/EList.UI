@@ -145,6 +145,16 @@ export function AppLayout() {
               <span className={styles.navLabel}>{label}</span>
             </NavLink>
           ))}
+          {!authenticated && (
+            <button
+              className={styles.loginNavBtn}
+              onClick={() => { navigate('/login'); setSidebarExpanded(false); }}
+              title="Войти"
+            >
+              <span className={styles.navIcon}><LoginIcon /></span>
+              <span className={styles.navLabel}>Войти</span>
+            </button>
+          )}
         </nav>
 
         {sidebarExpanded && (
@@ -153,19 +163,10 @@ export function AppLayout() {
           </div>
         )}
 
-        {authenticated ? (
+        {authenticated && (
           <button className={styles.logoutBtn} onClick={() => setLogoutConfirm(true)} title="Выйти">
             <span className={styles.navIcon}><LogoutIcon /></span>
             <span className={styles.navLabel}>Выйти</span>
-          </button>
-        ) : (
-          <button
-            className={styles.loginNavBtn}
-            onClick={() => { navigate('/login'); setSidebarExpanded(false); }}
-            title="Войти"
-          >
-            <span className={styles.navIcon}><LoginIcon /></span>
-            <span className={styles.navLabel}>Войти</span>
           </button>
         )}
       </aside>
