@@ -142,7 +142,7 @@ export function EventListItem({
               {price.label}
             </span>
             {params.ageLimit != null && params.ageLimit > 0 && (
-              <span className={styles.metaItem}>{params.ageLimit}+</span>
+              <span className={`${styles.metaItem} ${styles.metaAge}`}>{params.ageLimit}+</span>
             )}
           </div>
 

@@ -138,6 +138,11 @@ export function MobileFilterSheet({
                 onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>
                 Бесплатно
               </button>
+              <button
+                className={`${styles.pill} ${filters.ageLimit === 18 ? styles.pillOn : ''}`}
+                onClick={() => filters.ageLimit === 18 ? setFilter('ageLimit', undefined) : setFilter('ageLimit', 18)}>
+                18+
+              </button>
             </div>
           </div>
 
