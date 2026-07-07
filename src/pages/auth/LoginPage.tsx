@@ -1,7 +1,7 @@
 // pages/auth/LoginPage.tsx
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { login } from '@/features/auth/api';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { storeActivationNotice, takeActivationNotice } from '@/features/auth/activationNotice';
@@ -12,11 +12,14 @@ import styles from './AuthPage.module.css';
 
 export default function LoginPage() {
   const navigate     = useNavigate();
+  const location     = useLocation();
   const { setAuth }  = useAuthStore();
+
+  const resetError = (location.state as { passwordResetError?: string } | null)?.passwordResetError;
 
   const [form, setForm]     = useState({ login: '', password: '' });
   const [loading, setLoad]  = useState(false);
-  const [error, setError]   = useState<string | null>(null);
+  const [error, setError]   = useState<string | null>(resetError ?? null);
   const [showPass, setShow] = useState(false);
   const [activationNotice, setActivationNotice] = useState<string | null>(null);
 
@@ -84,6 +87,15 @@ export default function LoginPage() {
                 onToggle={() => setShow(s => !s)}
                 className={styles.eyeBtn}
               />
+            </div>
+            <div className={styles.forgotLinkRow}>
+              <button
+                type="button"
+                className={styles.forgotLink}
+                onClick={() => navigate('/forgot-password')}
+              >
+                Забыли пароль?
+              </button>
             </div>
           </div>
 

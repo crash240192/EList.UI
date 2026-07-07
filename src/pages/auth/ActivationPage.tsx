@@ -6,10 +6,10 @@ import { activateAccount } from '@/features/auth/api';
 import { apiClient } from '@/shared/api/client';
 import { setPersonInfo } from '@/features/auth/registrationApi';
 import { loadPendingPersonData, clearPendingPersonData } from '@/features/auth/pendingPersonData';
-import { getAuthorizationContact, type IAuthorizationContact } from '@/entities/user/settingsApi';
 import { takeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
+import { OtpCodeInput } from '@/shared/ui/OtpCodeInput';
 import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
 import styles from './AuthPage.module.css';
 import actStyles from './ActivationPage.module.css';
@@ -29,7 +29,7 @@ export default function ActivationPage() {
   const navigate = useNavigate();
   const { confirmActivation, logout } = useAuthStore();
 
-  const [digits, setDigits]     = useState<string[]>(Array(CODE_LENGTH).fill(''));
+  const [code, setCode]         = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
   const [success, setSuccess]   = useState(false);
@@ -37,13 +37,8 @@ export default function ActivationPage() {
   const [resending, setResending]     = useState(false);
   const [resendMsg, setResendMsg]     = useState<string | null>(null);
   const [entryNotice, setEntryNotice] = useState<string | null>(() => takeActivationNotice());
-  const [authContact, setAuthContact] = useState<IAuthorizationContact | null>(null);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const timerRef  = useRef<ReturnType<typeof setInterval>>();
 
-  const code = digits.join('');
-
-  // Запускаем таймер при монтировании
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setResendTimer(t => {
@@ -62,7 +57,6 @@ export default function ActivationPage() {
         readActivationSendMessage(data.result)
         ?? (data.message?.trim() || 'Код отправлен повторно'),
       );
-      // Перезапускаем таймер
       setResendTimer(RESEND_TIMEOUT);
       clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
@@ -74,28 +68,6 @@ export default function ActivationPage() {
     } catch (e) {
       setResendMsg(e instanceof Error ? e.message : 'Ошибка отправки');
     } finally { setResending(false); }
-  };
-
-  const handleDigit = (index: number, value: string) => {
-    const clean = value.replace(/\s/g, '').slice(-1);
-    const next  = [...digits];
-    next[index] = clean;
-    setDigits(next);
-    if (clean && index < CODE_LENGTH - 1) inputRefs.current[index + 1]?.focus();
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !digits[index] && index > 0) inputRefs.current[index - 1]?.focus();
-    if (e.key === 'Enter' && code.length === CODE_LENGTH) handleSubmit();
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, CODE_LENGTH);
-    const next = Array(CODE_LENGTH).fill('');
-    pasted.split('').forEach((ch, i) => { next[i] = ch; });
-    setDigits(next);
-    inputRefs.current[Math.min(pasted.length, CODE_LENGTH - 1)]?.focus();
   };
 
   const handleSubmit = async () => {
@@ -110,8 +82,7 @@ export default function ActivationPage() {
       setTimeout(() => navigate('/', { replace: true }), 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Неверный код активации');
-      setDigits(Array(CODE_LENGTH).fill(''));
-      inputRefs.current[0]?.focus();
+      setCode('');
     } finally { setLoading(false); }
   };
 
@@ -139,18 +110,13 @@ export default function ActivationPage() {
           На ваш контакт отправлен код подтверждения. Введите его ниже.
         </p>
 
-        <div className={actStyles.codeRow} onPaste={handlePaste}>
-          {digits.map((d, i) => (
-            <input key={i}
-              ref={el => { inputRefs.current[i] = el; }}
-              className={`${actStyles.codeInput} ${error ? actStyles.codeError : d ? actStyles.codeFilled : ''}`}
-              type="text" inputMode="numeric" maxLength={1}
-              value={d} autoFocus={i === 0}
-              onChange={e => handleDigit(i, e.target.value)}
-              onKeyDown={e => handleKeyDown(i, e)}
-            />
-          ))}
-        </div>
+        <OtpCodeInput
+          value={code}
+          onChange={next => { setCode(next); setError(null); }}
+          error={!!error}
+          disabled={loading}
+          onSubmit={() => void handleSubmit()}
+        />
 
         {error && (
           <div className={styles.error}>
@@ -164,7 +130,6 @@ export default function ActivationPage() {
           {loading ? <span className={styles.spinner} /> : 'Подтвердить →'}
         </button>
 
-        {/* Повторная отправка */}
         <div className={actStyles.resendRow}>
           {resendTimer > 0 ? (
             <span className={actStyles.resendHint}>

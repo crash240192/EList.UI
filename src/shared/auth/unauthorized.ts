@@ -5,12 +5,15 @@ import { isPublicAppRoute, isPublicAuthRoute } from './routes';
 
 export { PUBLIC_AUTH_ROUTES, isPublicAuthRoute, isPublicAppRoute } from './routes';
 
-/** API активации — без принудительного выхода (страницы /login, /activate, /register) */
+/** API активации и восстановления пароля — без принудительного выхода */
 export function isActivationApiPath(path: string): boolean {
   const p = path.toLowerCase();
   return (
     p.includes('/authorization/activate')
     || p.includes('sendactivationcode')
+    || p.includes('forgotpassword')
+    || p.includes('verifyresetcode')
+    || p.includes('resetpassword')
     || /\/activate(?:\?|$|\/)/.test(p)
     || /\/activation(?:\?|$|\/)/.test(p)
   );

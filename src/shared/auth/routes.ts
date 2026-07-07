@@ -1,6 +1,6 @@
 // shared/auth/routes.ts — маршруты без авторизации и требующие входа
 
-export const PUBLIC_AUTH_ROUTES = ['/login', '/activate', '/register'] as const;
+export const PUBLIC_AUTH_ROUTES = ['/login', '/activate', '/register', '/forgot-password'] as const;
 
 /** Доступны без JWT (гостевой режим) */
 export const PUBLIC_APP_ROUTE_PREFIXES = ['/', '/event/', '/user/'] as const;

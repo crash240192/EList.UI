@@ -1,4 +1,4 @@
-// features/auth/AuthGuard.tsx — только страницы login / register / activate
+// features/auth/AuthGuard.tsx — страницы login / register / activate / forgot-password
 
 import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -30,7 +30,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
         return;
       }
 
-      if (location.pathname === '/login' || location.pathname === '/register') {
+      if (location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/forgot-password') {
         navigate('/', { replace: true });
       }
     }, 50);

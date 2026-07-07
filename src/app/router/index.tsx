@@ -24,6 +24,7 @@ const WalletPage      = lazyWithRetry(() => import('@/pages/wallet/WalletPage'))
 const LoginPage       = lazyWithRetry(() => import('@/pages/auth/LoginPage'));
 const ActivationPage  = lazyWithRetry(() => import('@/pages/auth/ActivationPage'));
 const RegisterPage    = lazyWithRetry(() => import('@/pages/auth/RegisterPage'));
+const ForgotPasswordPage = lazyWithRetry(() => import('@/pages/auth/ForgotPasswordPage'));
 const InvitationsPage = lazyWithRetry(() => import('@/pages/invitations/InvitationsPage'));
 const EventAlbumsPage = lazyWithRetry(() => import('@/pages/event-albums/EventAlbumsPage'));
 
@@ -50,6 +51,7 @@ const router = createBrowserRouter([
   { path: '/login',    element: <AuthGuard>{S(LoginPage)}</AuthGuard> },
   { path: '/activate', element: <AuthGuard>{S(ActivationPage)}</AuthGuard> },
   { path: '/register', element: <AuthGuard>{S(RegisterPage)}</AuthGuard> },
+  { path: '/forgot-password', element: <AuthGuard>{S(ForgotPasswordPage)}</AuthGuard> },
 
   // ---- Основное приложение (гостевой доступ к поиску, событию, профилю) ----
   {
@@ -72,7 +74,7 @@ const router = createBrowserRouter([
   },
 ]);
 
-// 401 от API / WebSocket — сброс токена и редирект (кроме /login, /activate, /register)
+// 401 от API / WebSocket — сброс токена и редирект (кроме публичных auth-страниц)
 registerSessionUnauthorizedHandler(() => {
   useAuthStore.getState().logout();
   if (!isPublicAppRoute()) {
