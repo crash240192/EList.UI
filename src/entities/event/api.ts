@@ -16,6 +16,7 @@ import type {
   ICreateEventRequest,
   IEventParametersRequest,
 } from './types';
+import { sortByNameRu } from './lib/sortByNameRu';
 
 // ---- Вспомогательная функция сборки query string ----
 
@@ -165,7 +166,7 @@ export async function updateEventParameters(
 
 export async function fetchEventCategories(): Promise<IEventCategory[]> {
   const data = await apiClient.get<IEventCategory[]>('/api/events/eventCategories/getAll');
-  return data.result;
+  return sortByNameRu(data.result ?? []);
 }
 
 // ---- Типы мероприятий ----
@@ -175,7 +176,7 @@ export async function fetchEventTypes(
 ): Promise<IEventType[]> {
   const qs = buildQuery({ categoryId });
   const data = await apiClient.get<IEventType[]>(`/api/events/eventTypes/getAll${qs}`);
-  return data.result;
+  return sortByNameRu(data.result ?? []);
 }
 
 // ---- Мок-данные для разработки (используйте пока нет реального API) ----

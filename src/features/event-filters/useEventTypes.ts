@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { fetchEventCategories, fetchEventTypes } from '@/entities/event';
 import type { IEventCategory, IEventType } from '@/entities/event';
+import { sortByNameRu } from '@/entities/event/lib/sortByNameRu';
 
 export interface CategoryWithTypes {
   category: IEventCategory;
@@ -30,9 +31,9 @@ export function useEventTypes(): UseEventTypesResult {
     setLoading(true);
     Promise.all([fetchEventCategories(), fetchEventTypes()])
       .then(([categories, types]) => {
-        const result: CategoryWithTypes[] = categories.map(cat => ({
+        const result: CategoryWithTypes[] = sortByNameRu(categories).map(cat => ({
           category: cat,
-          types: types.filter(t => t.eventCategoryId === cat.id),
+          types: sortByNameRu(types.filter(t => t.eventCategoryId === cat.id)),
         })).filter(g => g.types.length > 0);
         cache = result;
         setGroups(result);
