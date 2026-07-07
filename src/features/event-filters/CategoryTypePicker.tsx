@@ -2,8 +2,9 @@
 // Всплывающее окно выбора категорий и типов мероприятий.
 // Категории → группы, внутри каждой — типы с чекбоксами.
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEventTypes } from './useEventTypes';
+import type { CategoryWithTypes } from './useEventTypes';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 import styles from './CategoryTypePicker.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -17,6 +18,23 @@ interface CategoryTypePickerProps {
   onClose: () => void;
 }
 
+function buildInitialExpanded(
+  groups: CategoryWithTypes[],
+  selectedCategories: string[],
+  selectedTypes: string[],
+): Set<string> {
+  const ids = new Set<string>();
+  for (const { category, types } of groups) {
+    if (
+      selectedCategories.includes(category.id) ||
+      types.some(t => selectedTypes.includes(t.id))
+    ) {
+      ids.add(category.id);
+    }
+  }
+  return ids;
+}
+
 export function CategoryTypePicker({
   selectedCategories,
   selectedTypes,
@@ -25,6 +43,23 @@ export function CategoryTypePicker({
 }: CategoryTypePickerProps) {
   useModalBackButton(onClose);
   const { groups, loading, error } = useEventTypes();
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const initExpandedRef = useRef(false);
+
+  useEffect(() => {
+    if (initExpandedRef.current || loading || groups.length === 0) return;
+    initExpandedRef.current = true;
+    setExpandedIds(buildInitialExpanded(groups, selectedCategories, selectedTypes));
+  }, [loading, groups, selectedCategories, selectedTypes]);
+
+  const toggleExpanded = (catId: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(catId)) next.delete(catId);
+      else next.add(catId);
+      return next;
+    });
+  };
 
   // Закрытие по Escape
   useEffect(() => {
@@ -117,6 +152,7 @@ export function CategoryTypePicker({
             const catSelected  = selectedCategories.includes(category.id);
             const someTypeSel  = types.some(t => selectedTypes.includes(t.id));
             const isIndeterminate = !catSelected && someTypeSel;
+            const expanded = expandedIds.has(category.id);
             // Цвет категории или дефолтный акцент приложения
             const catColor = category.color || 'var(--accent)';
 
@@ -126,20 +162,34 @@ export function CategoryTypePicker({
                 <div className={styles.catBar} style={{ background: catColor }} />
 
                 {/* Category row */}
-                <label className={`${styles.categoryRow} ${catSelected ? styles.categorySelected : ''}`}>
-                  <span className={styles.checkboxWrap}>
-                    <input
-                      type="checkbox"
-                      checked={catSelected}
-                      ref={el => { if (el) el.indeterminate = isIndeterminate; }}
-                      onChange={() => toggleCategory(category.id)}
-                    />
-                  </span>
-                  <span className={styles.categoryName}>{category.name}</span>
+                <div className={`${styles.categoryRow} ${catSelected ? styles.categorySelected : ''}`}>
+                  <button
+                    type="button"
+                    className={`${styles.expandBtn} ${expanded ? styles.expandBtnOpen : ''}`}
+                    onClick={() => toggleExpanded(category.id)}
+                    aria-expanded={expanded}
+                    aria-label={expanded ? 'Свернуть типы' : 'Развернуть типы'}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+                  <label className={styles.categoryLabel}>
+                    <span className={styles.checkboxWrap}>
+                      <input
+                        type="checkbox"
+                        checked={catSelected}
+                        ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                        onChange={() => toggleCategory(category.id)}
+                      />
+                    </span>
+                    <span className={styles.categoryName}>{category.name}</span>
+                  </label>
                   <span className={styles.typeCount}>{types.length}</span>
-                </label>
+                </div>
 
                 {/* Type rows */}
+                {expanded && (
                 <div className={styles.types}>
                   {types.map(type => {
                     const typeSelected = catSelected || selectedTypes.includes(type.id);
@@ -174,6 +224,7 @@ export function CategoryTypePicker({
                     );
                   })}
                 </div>
+                )}
               </div>
             );
           })}

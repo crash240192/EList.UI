@@ -133,9 +133,8 @@
 .categoryRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 18px 11px 22px; /* увеличен левый отступ для полосы */
-  cursor: pointer;
+  gap: 8px;
+  padding: 11px 18px 11px 14px;
   transition: background 0.15s;
   user-select: none;
 }
@@ -143,6 +142,39 @@
 .categoryRow:hover { background: var(--surface-2); }
 
 .categorySelected { background: rgba(99,102,241,0.06); }
+
+.expandBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+
+.expandBtn:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.expandBtnOpen {
+  transform: rotate(90deg);
+}
+
+.categoryLabel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
 
 .checkboxWrap {
   flex-shrink: 0;
