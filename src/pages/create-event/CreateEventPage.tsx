@@ -216,6 +216,32 @@ export default function CreateEventPage() {
     allTypesRef.current = allTypes;
   }, [allTypes]);
 
+  // Сброс формы при переходе из редактирования в создание (тот же компонент, React не размонтирует)
+  useEffect(() => {
+    if (isEditing) return;
+
+    setForm(EMPTY);
+    setLoading(false);
+    setSaving(false);
+    setFieldErrors(new Set());
+    setLat(null);
+    setLng(null);
+    setCoverUrl(null);
+    setCoverImageId(null);
+    setSelectedCategories([]);
+    setSelectedTypes([]);
+    setPickerOpen(false);
+    setEndMode('duration');
+    setDurationH('2');
+    setDurationM('0');
+    setWhitelist([]);
+    setBlacklist([]);
+    setListModalOpen(false);
+    loadedBWListsRef.current = new Set();
+    initialEventTypeIdsRef.current = null;
+    initialTypesAppliedRef.current = false;
+  }, [isEditing, id]);
+
   // Загрузка события для редактирования
   useEffect(() => {
     if (!isEditing) return;
