@@ -37,8 +37,8 @@ import heroStyles from '@/shared/styles/hero.module.css';
 import {
   calcEventPageExpandedHeroHeight,
   calcEventPageHeroHeight,
-  EVENT_HERO_COLLAPSE_SCROLL_RANGE,
   EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
+  scrollToHeroCollapse,
 } from '@/shared/lib/eventHeroSize';
 import styles from './EventPage.module.css';
 
@@ -106,7 +106,7 @@ export default function EventPage() {
 
     const onScroll = () => {
       setShowScrollTop(el.scrollTop > 360);
-      const t = Math.min(1, Math.max(0, el.scrollTop / EVENT_HERO_COLLAPSE_SCROLL_RANGE));
+      const t = scrollToHeroCollapse(el.scrollTop);
       setHeroCollapse(t);
     };
 
