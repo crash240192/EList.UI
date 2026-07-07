@@ -39,6 +39,7 @@ import {
   calcEventPageHeroHeight,
   EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
   scrollToHeroCollapse,
+  type CoverNaturalSize,
 } from '@/shared/lib/eventHeroSize';
 import styles from './EventPage.module.css';
 
@@ -72,6 +73,7 @@ export default function EventPage() {
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedHeroHeight, setExpandedHeroHeight] = useState(EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
+  const [coverNaturalSize, setCoverNaturalSize] = useState<CoverNaturalSize | null>(null);
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -86,19 +88,37 @@ export default function EventPage() {
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
 
+  const hasCover = !!(event?.coverImageId || event?.coverUrl);
+
+  const handleCoverLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      setCoverNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+    }
+  }, []);
+
+  useEffect(() => {
+    setCoverNaturalSize(null);
+  }, [event?.id, event?.coverImageId, event?.coverUrl]);
+
   useEffect(() => {
     const hero = heroRef.current;
-    if (!hero) return;
+    if (!hero || !event) return;
 
     const syncWidth = () => {
-      setExpandedHeroHeight(calcEventPageExpandedHeroHeight(hero.offsetWidth));
+      setExpandedHeroHeight(
+        calcEventPageExpandedHeroHeight(hero.offsetWidth, {
+          hasCover: !!(event.coverImageId || event.coverUrl),
+          coverNaturalSize,
+        }),
+      );
     };
 
     syncWidth();
     const ro = new ResizeObserver(syncWidth);
     ro.observe(hero);
     return () => ro.disconnect();
-  }, [event?.id]);
+  }, [event, event?.id, event?.coverImageId, event?.coverUrl, coverNaturalSize]);
 
   useEffect(() => {
     const el = pageRef.current;
@@ -297,7 +317,10 @@ export default function EventPage() {
     pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const heroHeight = calcEventPageHeroHeight(expandedHeroHeight, heroCollapse);
+  const heroHeight = calcEventPageHeroHeight(
+    expandedHeroHeight,
+    hasCover ? heroCollapse : 1,
+  );
 
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
@@ -322,10 +345,31 @@ export default function EventPage() {
           }}
         >
           {event.coverImageId ? (
-            <AuthImage fileId={event.coverImageId} fullSize imageFit="cover" alt={event.name} className={styles.heroImg}
-              fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.heroImg} /> : undefined} />
+            <AuthImage
+              fileId={event.coverImageId}
+              fullSize
+              imageFit="cover"
+              alt={event.name}
+              className={styles.heroImg}
+              onLoad={handleCoverLoad}
+              fallback={
+                event.coverUrl ? (
+                  <img
+                    src={event.coverUrl}
+                    alt={event.name}
+                    className={styles.heroImg}
+                    onLoad={handleCoverLoad}
+                  />
+                ) : undefined
+              }
+            />
           ) : event.coverUrl ? (
-            <img src={event.coverUrl} alt={event.name} className={styles.heroImg} />
+            <img
+              src={event.coverUrl}
+              alt={event.name}
+              className={styles.heroImg}
+              onLoad={handleCoverLoad}
+            />
           ) : null}
           <div className={styles.heroOverlay} />
 

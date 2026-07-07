@@ -47,7 +47,7 @@ interface AuthImageProps {
   className?: string;
   style?:    React.CSSProperties;
   fallback?: React.ReactNode;
-  onLoad?:   () => void;
+  onLoad?:   React.ReactEventHandler<HTMLImageElement>;
   onError?:  () => void;
 }
 

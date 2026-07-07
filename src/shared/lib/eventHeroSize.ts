@@ -18,10 +18,45 @@ export function scrollToHeroCollapse(scrollTop: number): number {
   return easeInOutQuad(linear);
 }
 
+export interface CoverNaturalSize {
+  width: number;
+  height: number;
+}
+
+export interface EventPageExpandedHeroOptions {
+  hasCover?: boolean;
+  coverNaturalSize?: CoverNaturalSize | null;
+}
+
+/** Высота обложки при вписывании по ширине контейнера с сохранением пропорций */
+export function calcCoverFitHeight(containerWidth: number, naturalSize: CoverNaturalSize): number {
+  if (naturalSize.width <= 0) return 0;
+  return containerWidth * (naturalSize.height / naturalSize.width);
+}
+
 /** Высота хиро в развёрнутом состоянии — как у превью при той же ширине */
-export function calcEventPageExpandedHeroHeight(width: number): number {
-  if (width <= EVENT_PREVIEW_HERO_WIDTH) return EVENT_PREVIEW_HERO_HEIGHT;
-  return (width / EVENT_PREVIEW_HERO_WIDTH) * EVENT_PREVIEW_HERO_HEIGHT;
+export function calcEventPageExpandedHeroHeight(
+  width: number,
+  options?: EventPageExpandedHeroOptions,
+): number {
+  if (!options?.hasCover) {
+    return EVENT_PAGE_HERO_COLLAPSED_HEIGHT;
+  }
+
+  const maxExpanded =
+    width <= EVENT_PREVIEW_HERO_WIDTH
+      ? EVENT_PREVIEW_HERO_HEIGHT
+      : (width / EVENT_PREVIEW_HERO_WIDTH) * EVENT_PREVIEW_HERO_HEIGHT;
+
+  const coverNaturalSize = options.coverNaturalSize;
+  if (coverNaturalSize && coverNaturalSize.width > 0) {
+    const coverFitHeight = calcCoverFitHeight(width, coverNaturalSize);
+    if (coverFitHeight < maxExpanded) {
+      return coverFitHeight;
+    }
+  }
+
+  return maxExpanded;
 }
 
 export function calcEventPageHeroHeight(expandedHeight: number, scrollCollapse: number): number {
