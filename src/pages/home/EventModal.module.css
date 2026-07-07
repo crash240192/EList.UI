@@ -35,7 +35,9 @@
 /* Ручка */
 /* Cover */
 .cover {
-  position: relative; height: 148px; flex-shrink: 0;
+  position: relative;
+  height: var(--event-preview-hero-height);
+  flex-shrink: 0;
 }
 .coverImg { width: 100%; height: 100%; object-fit: cover; display: block; }
 .coverGrad {

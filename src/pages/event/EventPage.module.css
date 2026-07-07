@@ -50,6 +50,8 @@
 /* Hero */
 .hero {
   composes: hero from '../../shared/styles/hero.module.css';
+  height: var(--event-hero-height, var(--hero-height));
+  overflow: hidden;
 }
 
 .heroImg {

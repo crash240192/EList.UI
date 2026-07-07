@@ -34,6 +34,12 @@ import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import heroStyles from '@/shared/styles/hero.module.css';
+import {
+  calcEventPageExpandedHeroHeight,
+  calcEventPageHeroHeight,
+  EVENT_HERO_COLLAPSE_SCROLL_RANGE,
+  EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
+} from '@/shared/lib/eventHeroSize';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -62,8 +68,11 @@ export default function EventPage() {
   const [participantsDenied, setParticipantsDenied] = useState(false);
   const limitNoticeTimerRef = useRef<number | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [expandedHeroHeight, setExpandedHeroHeight] = useState(EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
+  const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
@@ -78,11 +87,27 @@ export default function EventPage() {
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
 
   useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+
+    const syncWidth = () => {
+      setExpandedHeroHeight(calcEventPageExpandedHeroHeight(hero.offsetWidth));
+    };
+
+    syncWidth();
+    const ro = new ResizeObserver(syncWidth);
+    ro.observe(hero);
+    return () => ro.disconnect();
+  }, [event?.id]);
+
+  useEffect(() => {
     const el = pageRef.current;
     if (!el || !event) return;
 
     const onScroll = () => {
       setShowScrollTop(el.scrollTop > 360);
+      const t = Math.min(1, Math.max(0, el.scrollTop / EVENT_HERO_COLLAPSE_SCROLL_RANGE));
+      setHeroCollapse(t);
     };
 
     onScroll();
@@ -93,6 +118,7 @@ export default function EventPage() {
   useEffect(() => {
     if (!loading) return;
     setShowScrollTop(false);
+    setHeroCollapse(0);
   }, [loading]);
 
   useEffect(() => {
@@ -271,6 +297,8 @@ export default function EventPage() {
     pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const heroHeight = calcEventPageHeroHeight(expandedHeroHeight, heroCollapse);
+
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
     ...participants.filter(p => p.accountId === accountId),
@@ -284,9 +312,15 @@ export default function EventPage() {
       <div className={styles.card}>
 
         {/* ── Hero ── */}
-        <div className={styles.hero} style={!(event.coverImageId || event.coverUrl) ? {
-          background: getEventCoverBackground(event),
-        } : undefined}>
+        <div
+          ref={heroRef}
+          className={styles.hero}
+          style={{
+            ...(event.coverImageId || event.coverUrl ? {} : { background: getEventCoverBackground(event) }),
+            ['--event-hero-height' as string]: `${heroHeight}px`,
+            height: heroHeight,
+          }}
+        >
           {event.coverImageId ? (
             <AuthImage fileId={event.coverImageId} fullSize imageFit="cover" alt={event.name} className={styles.heroImg}
               fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.heroImg} /> : undefined} />

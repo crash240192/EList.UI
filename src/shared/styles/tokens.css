@@ -26,6 +26,10 @@
   --hero-overlay: linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 30%, rgba(0, 0, 0, 0.6) 100%);
   --hero-compact-height: 80px;
 
+  /* Event preview modal cover — эталон пропорций хиро на странице мероприятия */
+  --event-preview-hero-width: 400px;
+  --event-preview-hero-height: 148px;
+
   /* Hero navigation controls */
   --hero-btn-size: 34px;
   --hero-btn-bg: rgba(255, 255, 255, 0.18);
