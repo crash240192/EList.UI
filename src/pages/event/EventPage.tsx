@@ -36,10 +36,10 @@ import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   calcEventPageExpandedHeroHeight,
+  calcEventPageHeroHeight,
   EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
-  type CoverNaturalSize,
+  scrollToHeroCollapse,
 } from '@/shared/lib/eventHeroSize';
-import { useEventPageHeroScroll } from '@/features/event/useEventPageHeroScroll';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -69,10 +69,10 @@ export default function EventPage() {
   const limitNoticeTimerRef = useRef<number | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
-  const pageBodyRef = useRef<HTMLDivElement>(null);
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedHeroHeight, setExpandedHeroHeight] = useState(EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
-  const [coverNaturalSize, setCoverNaturalSize] = useState<CoverNaturalSize | null>(null);
+  const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
@@ -86,47 +86,40 @@ export default function EventPage() {
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
 
-  const hasCover = !!(event?.coverImageId || event?.coverUrl);
-
-  const { heroVisibleHeight, showScrollTop, scrollToTop } = useEventPageHeroScroll({
-    pageRef,
-    heroRef,
-    pageBodyRef,
-    hasCover,
-    expandedHeroHeight,
-    enabled: !!event && !loading,
-    resetKey: event?.id ?? null,
-  });
-
-  const handleCoverLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-      setCoverNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
-    }
-  }, []);
-
-  useEffect(() => {
-    setCoverNaturalSize(null);
-  }, [event?.id, event?.coverImageId, event?.coverUrl]);
-
   useEffect(() => {
     const hero = heroRef.current;
-    if (!hero || !event) return;
+    if (!hero) return;
 
     const syncWidth = () => {
-      setExpandedHeroHeight(
-        calcEventPageExpandedHeroHeight(hero.offsetWidth, {
-          hasCover: !!(event.coverImageId || event.coverUrl),
-          coverNaturalSize,
-        }),
-      );
+      setExpandedHeroHeight(calcEventPageExpandedHeroHeight(hero.offsetWidth));
     };
 
     syncWidth();
     const ro = new ResizeObserver(syncWidth);
     ro.observe(hero);
     return () => ro.disconnect();
-  }, [event, event?.id, event?.coverImageId, event?.coverUrl, coverNaturalSize]);
+  }, [event?.id]);
+
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el || !event) return;
+
+    const onScroll = () => {
+      setShowScrollTop(el.scrollTop > 360);
+      const t = scrollToHeroCollapse(el.scrollTop);
+      setHeroCollapse(t);
+    };
+
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [event?.id]);
+
+  useEffect(() => {
+    if (!loading) return;
+    setShowScrollTop(false);
+    setHeroCollapse(0);
+  }, [loading]);
 
   useEffect(() => {
     if (!id) return;
@@ -300,7 +293,11 @@ export default function EventPage() {
     void handleParticipate();
   };
 
-  const heroHeight = heroVisibleHeight;
+  const scrollToTop = () => {
+    pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const heroHeight = calcEventPageHeroHeight(expandedHeroHeight, heroCollapse);
 
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
@@ -325,31 +322,10 @@ export default function EventPage() {
           }}
         >
           {event.coverImageId ? (
-            <AuthImage
-              fileId={event.coverImageId}
-              fullSize
-              imageFit="cover"
-              alt={event.name}
-              className={styles.heroImg}
-              onLoad={handleCoverLoad}
-              fallback={
-                event.coverUrl ? (
-                  <img
-                    src={event.coverUrl}
-                    alt={event.name}
-                    className={styles.heroImg}
-                    onLoad={handleCoverLoad}
-                  />
-                ) : undefined
-              }
-            />
+            <AuthImage fileId={event.coverImageId} fullSize imageFit="cover" alt={event.name} className={styles.heroImg}
+              fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.heroImg} /> : undefined} />
           ) : event.coverUrl ? (
-            <img
-              src={event.coverUrl}
-              alt={event.name}
-              className={styles.heroImg}
-              onLoad={handleCoverLoad}
-            />
+            <img src={event.coverUrl} alt={event.name} className={styles.heroImg} />
           ) : null}
           <div className={styles.heroOverlay} />
 
@@ -424,15 +400,6 @@ export default function EventPage() {
           </div>
         </div>
 
-        <div
-          ref={pageBodyRef}
-          className={styles.pageBody}
-          style={{
-            marginTop: hasCover && expandedHeroHeight > EVENT_PAGE_HERO_COLLAPSED_HEIGHT
-              ? expandedHeroHeight
-              : EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
-          }}
-        >
         {/* ── Action row ── */}
         <div className={styles.actionRow}>
           <h1 className={styles.actionTitle}>{event.name}</h1>
@@ -688,7 +655,6 @@ export default function EventPage() {
 
           </div>
         </div>{/* end mainGrid */}
-        </div>{/* end pageBody */}
       </div>{/* end card */}
 
       {cancelConfirm && (

@@ -2,7 +2,6 @@
 
 .page {
   composes: page from '../../shared/styles/pageShell.module.css';
-  overscroll-behavior-y: contain;
 }
 
 .card {
@@ -51,20 +50,8 @@
 /* Hero */
 .hero {
   composes: hero from '../../shared/styles/hero.module.css';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 0;
   height: var(--event-hero-height, var(--hero-height));
   overflow: hidden;
-}
-
-.pageBody {
-  position: relative;
-  z-index: 1;
-  background: var(--surface);
-  will-change: transform;
 }
 
 .heroImg {
