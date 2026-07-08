@@ -37,6 +37,7 @@ import heroStyles from '@/shared/styles/hero.module.css';
 import {
   calcEventPageExpandedHeroHeight,
   calcEventPageHeroHeight,
+  calcHeroCollapseRange,
   EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
   scrollToHeroCollapse,
 } from '@/shared/lib/eventHeroSize';
@@ -298,6 +299,8 @@ export default function EventPage() {
   };
 
   const heroHeight = calcEventPageHeroHeight(expandedHeroHeight, heroCollapse);
+  const heroCollapseRange = calcHeroCollapseRange(expandedHeroHeight);
+  const heroSlotHeight = heroCollapseRange > 0 ? expandedHeroHeight : heroHeight;
 
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
@@ -312,15 +315,16 @@ export default function EventPage() {
       <div className={styles.card}>
 
         {/* ── Hero ── */}
-        <div
-          ref={heroRef}
-          className={styles.hero}
-          style={{
-            ...(event.coverImageId || event.coverUrl ? {} : { background: getEventCoverBackground(event) }),
-            ['--event-hero-height' as string]: `${heroHeight}px`,
-            height: heroHeight,
-          }}
-        >
+        <div className={styles.heroSlot} style={{ height: heroSlotHeight }}>
+          <div
+            ref={heroRef}
+            className={styles.hero}
+            style={{
+              ...(event.coverImageId || event.coverUrl ? {} : { background: getEventCoverBackground(event) }),
+              ['--event-hero-height' as string]: `${heroHeight}px`,
+              height: heroHeight,
+            }}
+          >
           {event.coverImageId ? (
             <AuthImage fileId={event.coverImageId} fullSize imageFit="cover" alt={event.name} className={styles.heroImg}
               fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.heroImg} /> : undefined} />
@@ -399,7 +403,9 @@ export default function EventPage() {
             {!isEventActive && <span className={styles.tagCancelled}>Отменено</span>}
           </div>
         </div>
+        </div>
 
+        <div className={styles.belowHero}>
         {/* ── Action row ── */}
         <div className={styles.actionRow}>
           <h1 className={styles.actionTitle}>{event.name}</h1>
@@ -655,6 +661,7 @@ export default function EventPage() {
 
           </div>
         </div>{/* end mainGrid */}
+        </div>{/* end belowHero */}
       </div>{/* end card */}
 
       {cancelConfirm && (

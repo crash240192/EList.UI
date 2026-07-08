@@ -12,6 +12,11 @@ function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
 
+/** Диапазон (px), на который визуально сжимается хиро */
+export function calcHeroCollapseRange(expandedHeight: number): number {
+  return Math.max(0, expandedHeight - EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
+}
+
 /** Прогресс сворачивания 0…1 по позиции прокрутки */
 export function scrollToHeroCollapse(scrollTop: number): number {
   const linear = Math.min(1, Math.max(0, scrollTop / EVENT_HERO_COLLAPSE_SCROLL_RANGE));
