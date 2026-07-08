@@ -36,11 +36,9 @@ import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   calcEventPageExpandedHeroHeight,
-  calcEventPageHeroHeight,
-  calcHeroCollapseRange,
   EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
-  scrollToHeroCollapse,
 } from '@/shared/lib/eventHeroSize';
+import { useEventHeroOverlayScroll } from '@/features/event/useEventHeroOverlayScroll';
 import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -70,10 +68,9 @@ export default function EventPage() {
   const limitNoticeTimerRef = useRef<number | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
+  const pageBodyRef = useRef<HTMLDivElement>(null);
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedHeroHeight, setExpandedHeroHeight] = useState(EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
-  const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
@@ -86,6 +83,20 @@ export default function EventPage() {
   } = useEventOrganizers(id, accountId);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
+
+  const {
+    initialHeroHeight,
+    initialBodyMarginTop,
+    showScrollTop,
+    scrollToTop,
+  } = useEventHeroOverlayScroll({
+    pageRef,
+    heroRef,
+    pageBodyRef,
+    expandedHeroHeight,
+    enabled: !!event && !loading,
+    resetKey: event?.id ?? null,
+  });
 
   useEffect(() => {
     const hero = heroRef.current;
@@ -100,27 +111,6 @@ export default function EventPage() {
     ro.observe(hero);
     return () => ro.disconnect();
   }, [event?.id]);
-
-  useEffect(() => {
-    const el = pageRef.current;
-    if (!el || !event) return;
-
-    const onScroll = () => {
-      setShowScrollTop(el.scrollTop > 360);
-      const t = scrollToHeroCollapse(el.scrollTop);
-      setHeroCollapse(t);
-    };
-
-    onScroll();
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, [event?.id]);
-
-  useEffect(() => {
-    if (!loading) return;
-    setShowScrollTop(false);
-    setHeroCollapse(0);
-  }, [loading]);
 
   useEffect(() => {
     if (!id) return;
@@ -294,13 +284,7 @@ export default function EventPage() {
     void handleParticipate();
   };
 
-  const scrollToTop = () => {
-    pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const heroHeight = calcEventPageHeroHeight(expandedHeroHeight, heroCollapse);
-  const heroCollapseRange = calcHeroCollapseRange(expandedHeroHeight);
-  const heroSlotHeight = heroCollapseRange > 0 ? expandedHeroHeight : heroHeight;
+  const heroHeight = initialHeroHeight;
 
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
@@ -315,16 +299,15 @@ export default function EventPage() {
       <div className={styles.card}>
 
         {/* ── Hero ── */}
-        <div className={styles.heroSlot} style={{ height: heroSlotHeight }}>
-          <div
-            ref={heroRef}
-            className={styles.hero}
-            style={{
-              ...(event.coverImageId || event.coverUrl ? {} : { background: getEventCoverBackground(event) }),
-              ['--event-hero-height' as string]: `${heroHeight}px`,
-              height: heroHeight,
-            }}
-          >
+        <div
+          ref={heroRef}
+          className={styles.hero}
+          style={{
+            ...(event.coverImageId || event.coverUrl ? {} : { background: getEventCoverBackground(event) }),
+            ['--event-hero-height' as string]: `${heroHeight}px`,
+            height: heroHeight,
+          }}
+        >
           {event.coverImageId ? (
             <AuthImage fileId={event.coverImageId} fullSize imageFit="cover" alt={event.name} className={styles.heroImg}
               fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.heroImg} /> : undefined} />
@@ -403,9 +386,12 @@ export default function EventPage() {
             {!isEventActive && <span className={styles.tagCancelled}>Отменено</span>}
           </div>
         </div>
-        </div>
 
-        <div className={styles.belowHero}>
+        <div
+          ref={pageBodyRef}
+          className={styles.pageBody}
+          style={{ marginTop: initialBodyMarginTop }}
+        >
         {/* ── Action row ── */}
         <div className={styles.actionRow}>
           <h1 className={styles.actionTitle}>{event.name}</h1>
@@ -661,7 +647,7 @@ export default function EventPage() {
 
           </div>
         </div>{/* end mainGrid */}
-        </div>{/* end belowHero */}
+        </div>{/* end pageBody */}
       </div>{/* end card */}
 
       {cancelConfirm && (
