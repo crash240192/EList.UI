@@ -2,6 +2,7 @@
 
 .page {
   composes: page from '../../shared/styles/pageShell.module.css';
+  overscroll-behavior-y: contain;
 }
 
 .card {

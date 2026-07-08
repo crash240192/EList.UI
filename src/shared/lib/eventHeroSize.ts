@@ -5,16 +5,20 @@ export const EVENT_PREVIEW_HERO_HEIGHT = 148;
 /** Высота хиро на странице мероприятия в свёрнутом состоянии */
 export const EVENT_PAGE_HERO_COLLAPSED_HEIGHT = 180;
 
-/** Диапазон прокрутки (px), за который хиро сворачивается полностью */
-export const EVENT_HERO_COLLAPSE_SCROLL_RANGE = 280;
-
 function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
 
-/** Прогресс сворачивания 0…1 по позиции прокрутки */
-export function scrollToHeroCollapse(scrollTop: number): number {
-  const linear = Math.min(1, Math.max(0, scrollTop / EVENT_HERO_COLLAPSE_SCROLL_RANGE));
+/** Диапазон (px), на который хиро сжимается от развёрнутого до свёрнутого */
+export function calcHeroCollapseRange(expandedHeight: number): number {
+  return Math.max(0, expandedHeight - EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
+}
+
+/** Прогресс сворачивания 0…1 по накопленному смещению (px) */
+export function calcHeroCollapseProgress(collapseOffset: number, expandedHeight: number): number {
+  const range = calcHeroCollapseRange(expandedHeight);
+  if (range <= 0) return 1;
+  const linear = Math.min(1, Math.max(0, collapseOffset / range));
   return easeInOutQuad(linear);
 }
 
