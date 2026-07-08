@@ -49,10 +49,24 @@
 }
 
 /* Hero */
+.heroBlock {
+  position: relative;
+  flex-shrink: 0;
+}
+
 .hero {
   composes: hero from '../../shared/styles/hero.module.css';
+  position: sticky;
+  top: 0;
+  z-index: 0;
   height: var(--event-hero-height, var(--hero-height));
   overflow: hidden;
+}
+
+.pageBody {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
 }
 
 .heroImg {

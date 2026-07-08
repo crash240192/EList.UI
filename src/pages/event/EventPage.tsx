@@ -36,7 +36,6 @@ import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   calcEventPageExpandedHeroHeight,
-  calcEventPageHeroHeight,
   EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
   type CoverNaturalSize,
 } from '@/shared/lib/eventHeroSize';
@@ -88,8 +87,9 @@ export default function EventPage() {
 
   const hasCover = !!(event?.coverImageId || event?.coverUrl);
 
-  const { heroCollapse, showScrollTop, scrollToTop } = useEventPageHeroScroll({
+  const { heroBlockHeight, heroVisibleHeight, showScrollTop, scrollToTop } = useEventPageHeroScroll({
     pageRef,
+    heroRef,
     hasCover,
     expandedHeroHeight,
     enabled: !!event && !loading,
@@ -298,10 +298,7 @@ export default function EventPage() {
     void handleParticipate();
   };
 
-  const heroHeight = calcEventPageHeroHeight(
-    expandedHeroHeight,
-    hasCover ? heroCollapse : 1,
-  );
+  const heroHeight = heroVisibleHeight;
 
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
@@ -317,14 +314,18 @@ export default function EventPage() {
 
         {/* ── Hero ── */}
         <div
-          ref={heroRef}
-          className={styles.hero}
-          style={{
-            ...(event.coverImageId || event.coverUrl ? {} : { background: getEventCoverBackground(event) }),
-            ['--event-hero-height' as string]: `${heroHeight}px`,
-            height: heroHeight,
-          }}
+          className={styles.heroBlock}
+          style={{ height: heroBlockHeight }}
         >
+          <div
+            ref={heroRef}
+            className={styles.hero}
+            style={{
+              ...(event.coverImageId || event.coverUrl ? {} : { background: getEventCoverBackground(event) }),
+              ['--event-hero-height' as string]: `${heroHeight}px`,
+              height: heroHeight,
+            }}
+          >
           {event.coverImageId ? (
             <AuthImage
               fileId={event.coverImageId}
@@ -424,7 +425,9 @@ export default function EventPage() {
             {!isEventActive && <span className={styles.tagCancelled}>Отменено</span>}
           </div>
         </div>
+        </div>
 
+        <div className={styles.pageBody}>
         {/* ── Action row ── */}
         <div className={styles.actionRow}>
           <h1 className={styles.actionTitle}>{event.name}</h1>
@@ -680,6 +683,7 @@ export default function EventPage() {
 
           </div>
         </div>{/* end mainGrid */}
+        </div>{/* end pageBody */}
       </div>{/* end card */}
 
       {cancelConfirm && (
