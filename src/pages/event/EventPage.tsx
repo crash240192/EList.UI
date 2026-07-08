@@ -69,6 +69,7 @@ export default function EventPage() {
   const limitNoticeTimerRef = useRef<number | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
+  const pageBodyRef = useRef<HTMLDivElement>(null);
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
   const [expandedHeroHeight, setExpandedHeroHeight] = useState(EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
   const [coverNaturalSize, setCoverNaturalSize] = useState<CoverNaturalSize | null>(null);
@@ -87,9 +88,10 @@ export default function EventPage() {
 
   const hasCover = !!(event?.coverImageId || event?.coverUrl);
 
-  const { heroBlockHeight, heroVisibleHeight, showScrollTop, scrollToTop } = useEventPageHeroScroll({
+  const { heroVisibleHeight, showScrollTop, scrollToTop } = useEventPageHeroScroll({
     pageRef,
     heroRef,
+    pageBodyRef,
     hasCover,
     expandedHeroHeight,
     enabled: !!event && !loading,
@@ -314,18 +316,14 @@ export default function EventPage() {
 
         {/* ── Hero ── */}
         <div
-          className={styles.heroBlock}
-          style={{ height: heroBlockHeight }}
+          ref={heroRef}
+          className={styles.hero}
+          style={{
+            ...(event.coverImageId || event.coverUrl ? {} : { background: getEventCoverBackground(event) }),
+            ['--event-hero-height' as string]: `${heroHeight}px`,
+            height: heroHeight,
+          }}
         >
-          <div
-            ref={heroRef}
-            className={styles.hero}
-            style={{
-              ...(event.coverImageId || event.coverUrl ? {} : { background: getEventCoverBackground(event) }),
-              ['--event-hero-height' as string]: `${heroHeight}px`,
-              height: heroHeight,
-            }}
-          >
           {event.coverImageId ? (
             <AuthImage
               fileId={event.coverImageId}
@@ -425,9 +423,16 @@ export default function EventPage() {
             {!isEventActive && <span className={styles.tagCancelled}>Отменено</span>}
           </div>
         </div>
-        </div>
 
-        <div className={styles.pageBody}>
+        <div
+          ref={pageBodyRef}
+          className={styles.pageBody}
+          style={{
+            marginTop: hasCover && expandedHeroHeight > EVENT_PAGE_HERO_COLLAPSED_HEIGHT
+              ? expandedHeroHeight
+              : EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
+          }}
+        >
         {/* ── Action row ── */}
         <div className={styles.actionRow}>
           <h1 className={styles.actionTitle}>{event.name}</h1>
