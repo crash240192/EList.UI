@@ -7,7 +7,6 @@ import {
   forgotPassword,
   verifyResetCode,
   resetPassword,
-  clearPasswordResetClientJwt,
 } from '@/features/auth/passwordResetApi';
 import { useAuthStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
@@ -112,7 +111,6 @@ export default function ForgotPasswordPage() {
       setInfo(null);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Неверный или просроченный код';
-      clearPasswordResetClientJwt();
       navigate('/login', { replace: true, state: { passwordResetError: message } });
     } finally {
       setLoading(false);

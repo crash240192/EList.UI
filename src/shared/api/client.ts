@@ -36,30 +36,6 @@ export function getOrCreateClientHash(): string {
   return hash;
 }
 
-/** Неактивный клиентский JWT для потока восстановления пароля (authorization-jwt) */
-const COOKIE_PASSWORD_RESET_CLIENT_JWT = 'elist_password_reset_client_jwt';
-
-export function getPasswordResetClientJwt(): string | null {
-  return cookies.get(COOKIE_PASSWORD_RESET_CLIENT_JWT);
-}
-
-export function getOrCreatePasswordResetClientJwt(): string {
-  let jwt = cookies.get(COOKIE_PASSWORD_RESET_CLIENT_JWT);
-  if (!jwt) {
-    jwt = generateClientHash();
-    cookies.set(COOKIE_PASSWORD_RESET_CLIENT_JWT, jwt, 1);
-  }
-  return jwt;
-}
-
-export function setPasswordResetClientJwt(jwt: string): void {
-  cookies.set(COOKIE_PASSWORD_RESET_CLIENT_JWT, jwt, 1);
-}
-
-export function clearPasswordResetClientJwt(): void {
-  cookies.delete(COOKIE_PASSWORD_RESET_CLIENT_JWT);
-}
-
 export function getAuthToken(): string | null { return cookies.get(COOKIE_AUTH_TOKEN); }
 export function setAuthToken(token: string): void { cookies.set(COOKIE_AUTH_TOKEN, token, 30); }
 export function clearAuthToken(): void { cookies.delete(COOKIE_AUTH_TOKEN); }
@@ -118,15 +94,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
   return withTimeout(fetchPromise);
 }
 
-/** Запрос с кастомным authorization-jwt (без Authorization и без client hash) */
-async function requestWithAuthorizationJwt<T>(
+/** Запрос только с authorization-jwt клиента (без Authorization) */
+async function requestWithClientJwtOnly<T>(
   path: string,
-  authorizationJwt: string,
   options: RequestInit = {},
 ): Promise<CommandResult<T>> {
+  const clientHash = getOrCreateClientHash();
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'authorization-jwt': authorizationJwt,
+    'authorization-jwt': clientHash,
     ...(options.headers as Record<string, string>),
   };
 
@@ -157,8 +134,8 @@ export const apiClient = {
   post:   <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST',   body: body !== undefined ? JSON.stringify(body) : undefined }),
   put:    <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT',    body: body !== undefined ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string)                 => request<T>(path, { method: 'DELETE' }),
-  postWithAuthorizationJwt: <T>(path: string, authorizationJwt: string, body?: unknown) =>
-    requestWithAuthorizationJwt<T>(path, authorizationJwt, {
+  postWithClientJwt: <T>(path: string, body?: unknown) =>
+    requestWithClientJwtOnly<T>(path, {
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
