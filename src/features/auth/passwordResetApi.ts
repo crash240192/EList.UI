@@ -1,7 +1,13 @@
 // features/auth/passwordResetApi.ts
 // Восстановление пароля: код на контакт → проверка → новый пароль + автологин
 
-import { apiClient, setAuthToken } from '@/shared/api/client';
+import {
+  apiClient,
+  clearPasswordResetClientJwt,
+  getOrCreatePasswordResetClientJwt,
+  setAuthToken,
+  setPasswordResetClientJwt,
+} from '@/shared/api/client';
 import type { AuthResponse } from './api';
 import { setActivationRequired } from './api';
 
@@ -36,25 +42,50 @@ function readResultMessage(result: unknown, fallbackMessage?: string | null): st
   return fallbackMessage?.trim() || null;
 }
 
-/** POST /api/authorization/forgotPassword */
+function readResetClientJwt(result: unknown): string | null {
+  if (typeof result === 'string') {
+    const text = result.trim();
+    return text || null;
+  }
+  if (result && typeof result === 'object') {
+    const r = result as Record<string, unknown>;
+    const token = r.token ?? r.Token ?? r.jwt ?? r.Jwt;
+    if (typeof token === 'string' && token.trim()) return token.trim();
+  }
+  return null;
+}
+
+function postWithResetClientJwt<T>(path: string, body: unknown) {
+  const resetJwt = getOrCreatePasswordResetClientJwt();
+  return apiClient.postWithAuthorizationJwt<T>(path, resetJwt, body);
+}
+
+/** POST /api/authorization/forgotPassword — регистрирует неактивный клиентский JWT */
 export async function forgotPassword(payload: ForgotPasswordPayload): Promise<string | null> {
-  const data = await apiClient.post<unknown>('/api/authorization/forgotPassword', {
-    login: payload.login.trim(),
-  });
+  const resetJwt = getOrCreatePasswordResetClientJwt();
+  const data = await apiClient.postWithAuthorizationJwt<unknown>(
+    '/api/authorization/forgotPassword',
+    resetJwt,
+    { login: payload.login.trim() },
+  );
+
+  const jwtFromResult = readResetClientJwt(data.result);
+  if (jwtFromResult) setPasswordResetClientJwt(jwtFromResult);
+
   return readResultMessage(data.result, data.message);
 }
 
 /** POST /api/authorization/verifyResetCode */
 export async function verifyResetCode(payload: VerifyResetCodePayload): Promise<void> {
-  await apiClient.post('/api/authorization/verifyResetCode', {
+  await postWithResetClientJwt('/api/authorization/verifyResetCode', {
     login: payload.login.trim(),
     code: payload.code.trim(),
   });
 }
 
-/** POST /api/authorization/resetPassword — новый JWT, старые сессии инвалидируются на бэкенде */
+/** POST /api/authorization/resetPassword — активный JWT, старые сессии инвалидируются на бэкенде */
 export async function resetPassword(payload: ResetPasswordPayload): Promise<ResetPasswordResult> {
-  const data = await apiClient.post<AuthResponse>('/api/authorization/resetPassword', {
+  const data = await postWithResetClientJwt<AuthResponse>('/api/authorization/resetPassword', {
     login: payload.login.trim(),
     code: payload.code.trim(),
     newPassword: payload.newPassword,
@@ -62,8 +93,11 @@ export async function resetPassword(payload: ResetPasswordPayload): Promise<Rese
   });
 
   const { token, activationRequired } = data.result;
+  clearPasswordResetClientJwt();
   setAuthToken(token);
   setActivationRequired(activationRequired);
 
   return data.result;
 }
+
+export { clearPasswordResetClientJwt } from '@/shared/api/client';

@@ -36,6 +36,30 @@ export function getOrCreateClientHash(): string {
   return hash;
 }
 
+/** Неактивный клиентский JWT для потока восстановления пароля (authorization-jwt) */
+const COOKIE_PASSWORD_RESET_CLIENT_JWT = 'elist_password_reset_client_jwt';
+
+export function getPasswordResetClientJwt(): string | null {
+  return cookies.get(COOKIE_PASSWORD_RESET_CLIENT_JWT);
+}
+
+export function getOrCreatePasswordResetClientJwt(): string {
+  let jwt = cookies.get(COOKIE_PASSWORD_RESET_CLIENT_JWT);
+  if (!jwt) {
+    jwt = generateClientHash();
+    cookies.set(COOKIE_PASSWORD_RESET_CLIENT_JWT, jwt, 1);
+  }
+  return jwt;
+}
+
+export function setPasswordResetClientJwt(jwt: string): void {
+  cookies.set(COOKIE_PASSWORD_RESET_CLIENT_JWT, jwt, 1);
+}
+
+export function clearPasswordResetClientJwt(): void {
+  cookies.delete(COOKIE_PASSWORD_RESET_CLIENT_JWT);
+}
+
 export function getAuthToken(): string | null { return cookies.get(COOKIE_AUTH_TOKEN); }
 export function setAuthToken(token: string): void { cookies.set(COOKIE_AUTH_TOKEN, token, 30); }
 export function clearAuthToken(): void { cookies.delete(COOKIE_AUTH_TOKEN); }
@@ -94,9 +118,48 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
   return withTimeout(fetchPromise);
 }
 
+/** Запрос с кастомным authorization-jwt (без Authorization и без client hash) */
+async function requestWithAuthorizationJwt<T>(
+  path: string,
+  authorizationJwt: string,
+  options: RequestInit = {},
+): Promise<CommandResult<T>> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'authorization-jwt': authorizationJwt,
+    ...(options.headers as Record<string, string>),
+  };
+
+  const fetchPromise = fetch(`${BASE_URL}${path}`, { ...options, headers }).then(async response => {
+    if (response.status === 401) {
+      if (shouldForceLogoutForApi(path)) notifyUnauthorized();
+      throw new ApiError(401, 'Необходима авторизация');
+    }
+    if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+    const data: CommandResult<T> = await response.json();
+    if (!data.success) {
+      const code = data.errorCode ?? 0;
+      const msg = data.message || 'Ошибка API';
+      if (shouldForceLogoutForApi(path) && isUnauthorizedApiErrorCode(code)) {
+        notifyUnauthorized();
+      }
+      if (data.message && !isAccessDeniedApiCode(code)) onApiError?.(data.message);
+      throw new ApiError(code, msg, data.message);
+    }
+    return data;
+  });
+
+  return withTimeout(fetchPromise);
+}
+
 export const apiClient = {
   get:    <T>(path: string)                 => request<T>(path, { method: 'GET' }),
   post:   <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST',   body: body !== undefined ? JSON.stringify(body) : undefined }),
   put:    <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT',    body: body !== undefined ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string)                 => request<T>(path, { method: 'DELETE' }),
+  postWithAuthorizationJwt: <T>(path: string, authorizationJwt: string, body?: unknown) =>
+    requestWithAuthorizationJwt<T>(path, authorizationJwt, {
+      method: 'POST',
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }),
 };
