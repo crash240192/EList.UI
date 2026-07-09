@@ -19,10 +19,13 @@ export function isActivationApiPath(path: string): boolean {
   );
 }
 
-/** Нужно ли при 401 сбрасывать сессию для этого запроса */
-export function shouldForceLogoutForApi(path: string): boolean {
-  if (isPublicAppRoute()) return false;
+/** Нужно ли при 401 / ошибке авторизации сбрасывать сессию */
+export function shouldForceLogoutForApi(path: string, hasAuthToken = false): boolean {
   if (isActivationApiPath(path)) return false;
+  // Была активная сессия — любая ошибка авторизации завершает её (в т.ч. на гостевых страницах)
+  if (hasAuthToken) return true;
+  // Гость на публичных страницах — не редиректим
+  if (isPublicAppRoute()) return false;
   return true;
 }
 
@@ -32,6 +35,7 @@ export function isUnauthorizedApiErrorCode(code: number): boolean {
     code === 401
     || code === ApiErrorCode.AuthenticationError
     || code === ApiErrorCode.AuthorizationDataNotFound
+    || code === ApiErrorCode.AuthorizationDataInactive
   );
 }
 

@@ -73,7 +73,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
 
   const fetchPromise = fetch(`${BASE_URL}${path}`, { ...options, headers }).then(async response => {
     if (response.status === 401) {
-      if (shouldForceLogoutForApi(path)) notifyUnauthorized();
+      const hadAuthToken = Boolean(authToken);
+      if (shouldForceLogoutForApi(path, hadAuthToken)) notifyUnauthorized();
       throw new ApiError(401, 'Необходима авторизация');
     }
     if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
@@ -81,7 +82,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
     if (!data.success) {
       const code = data.errorCode ?? 0;
       const msg = data.message || 'Ошибка API';
-      if (shouldForceLogoutForApi(path) && isUnauthorizedApiErrorCode(code)) {
+      if (shouldForceLogoutForApi(path, Boolean(authToken)) && isUnauthorizedApiErrorCode(code)) {
         notifyUnauthorized();
       }
       // Ошибки доступа показываем в UI блока/страницы, без тоста
@@ -100,6 +101,7 @@ async function requestWithClientJwtOnly<T>(
   options: RequestInit = {},
 ): Promise<CommandResult<T>> {
   const clientHash = getOrCreateClientHash();
+  const hadAuthToken = Boolean(getAuthToken());
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -109,7 +111,7 @@ async function requestWithClientJwtOnly<T>(
 
   const fetchPromise = fetch(`${BASE_URL}${path}`, { ...options, headers }).then(async response => {
     if (response.status === 401) {
-      if (shouldForceLogoutForApi(path)) notifyUnauthorized();
+      if (shouldForceLogoutForApi(path, hadAuthToken)) notifyUnauthorized();
       throw new ApiError(401, 'Необходима авторизация');
     }
     if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
@@ -117,7 +119,7 @@ async function requestWithClientJwtOnly<T>(
     if (!data.success) {
       const code = data.errorCode ?? 0;
       const msg = data.message || 'Ошибка API';
-      if (shouldForceLogoutForApi(path) && isUnauthorizedApiErrorCode(code)) {
+      if (shouldForceLogoutForApi(path, hadAuthToken) && isUnauthorizedApiErrorCode(code)) {
         notifyUnauthorized();
       }
       if (data.message && !isAccessDeniedApiCode(code)) onApiError?.(data.message);

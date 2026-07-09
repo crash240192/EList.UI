@@ -2,7 +2,8 @@
 // Клиент для сервиса файлохранилища
 // basePath: /elist/filestorage
 
-import { getOrCreateClientHash, getAuthToken } from './client';
+import { getOrCreateClientHash, getAuthToken, notifyUnauthorized } from './client';
+import { shouldForceLogoutForApi } from '@/shared/auth/unauthorized';
 
 const FILE_STORAGE_BASE = import.meta.env.VITE_FILE_STORAGE_URL ?? '/elist/filestorage';
 
@@ -17,6 +18,14 @@ export interface IFileInfo {
   title:       string | null;
   description: string | null;
   url:         string;
+}
+
+function handleFileStorageUnauthorized(status: number): void {
+  if (status !== 401) return;
+  const hadAuthToken = Boolean(getAuthToken());
+  if (shouldForceLogoutForApi('/api/filestorage', hadAuthToken)) {
+    notifyUnauthorized();
+  }
 }
 
 function authHeaders(): Record<string, string> {
@@ -43,7 +52,10 @@ export async function uploadFile(file: File): Promise<IUploadResult> {
     body: formData,
   });
 
-  if (!res.ok) throw new Error(`Ошибка загрузки файла: ${res.status}`);
+  if (!res.ok) {
+    handleFileStorageUnauthorized(res.status);
+    throw new Error(`Ошибка загрузки файла: ${res.status}`);
+  }
   const data = await res.json();
   if (!data.success) throw new Error(data.message ?? 'Ошибка загрузки файла');
 
@@ -63,7 +75,10 @@ export async function attachFileContext(fileId: string, context: string): Promis
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ context }),
   });
-  if (!res.ok) throw new Error(`Ошибка привязки контекста: ${res.status}`);
+  if (!res.ok) {
+    handleFileStorageUnauthorized(res.status);
+    throw new Error(`Ошибка привязки контекста: ${res.status}`);
+  }
 }
 
 /**
@@ -108,7 +123,10 @@ export async function fetchAuthedImage(
   options?: { fullSize?: boolean },
 ): Promise<string> {
   const res = await fetch(fileUrl(fileId), { headers: downloadHeaders(options) });
-  if (!res.ok) throw new Error(`Файл не найден: ${res.status}`);
+  if (!res.ok) {
+    handleFileStorageUnauthorized(res.status);
+    throw new Error(`Файл не найден: ${res.status}`);
+  }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }
