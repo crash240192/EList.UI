@@ -20,6 +20,8 @@ export interface ImageLightboxProps {
   deleteMessage?: string;
   onDelete?: (fileId: string) => Promise<void>;
   onDeleted?: (fileId: string) => void | Promise<void>;
+  /** После удаления: новый индекс и число оставшихся фото (для синхронизации с родителем) */
+  onAfterDelete?: (info: { currentIndex: number; remainingCount: number }) => void;
   fallback?: ReactNode;
 }
 
@@ -57,6 +59,7 @@ export function ImageLightbox({
   deleteMessage,
   onDelete,
   onDeleted,
+  onAfterDelete,
   fallback,
 }: ImageLightboxProps) {
   const [ids, setIds] = useState(fileIds);
@@ -127,6 +130,7 @@ export function ImageLightbox({
 
       if (nextIds.length === 0) {
         await onDeleted?.(fileId);
+        onAfterDelete?.({ currentIndex: -1, remainingCount: 0 });
         setDeleteConfirm(false);
         setMenuOpen(false);
         onClose();
@@ -138,6 +142,7 @@ export function ImageLightbox({
       setIdx(newIdx);
       setSlideDir(null);
       await onDeleted?.(fileId);
+      onAfterDelete?.({ currentIndex: newIdx, remainingCount: nextIds.length });
       setDeleteConfirm(false);
       setMenuOpen(false);
     } catch {

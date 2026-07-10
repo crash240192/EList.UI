@@ -427,7 +427,7 @@ export function AlbumGridModal({
         />
       </div>
 
-      {lightboxIdx !== null && fileIds.length > 0 && (
+      {lightboxIdx !== null && (
         <ImageLightbox
           fileIds={fileIds}
           startIndex={lightboxIdx}
@@ -440,6 +440,9 @@ export function AlbumGridModal({
           onDeleted={fileId => {
             setFiles(prev => prev.filter(f => f.fileId !== fileId));
             dirtyRef.current = true;
+          }}
+          onAfterDelete={({ currentIndex, remainingCount }) => {
+            setLightboxIdx(remainingCount === 0 ? null : currentIndex);
           }}
         />
       )}
