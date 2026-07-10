@@ -3,6 +3,7 @@ import type { IConversation } from '@/entities/conversation';
 import { fetchEventConversations } from '@/entities/conversation';
 import { MessageThread } from './MessageThread';
 import { DiscussionFormModal } from './DiscussionFormModal';
+import { DiscussionsManageModal } from './DiscussionsManageModal';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { EventDiscussionsPanelSkeleton } from './EventDiscussionsPanelSkeleton';
@@ -27,6 +28,7 @@ export function EventDiscussionsPanel({
   const [error, setError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [fadeRight, setFadeRight] = useState(false);
   const layoutBoundsRef = useRef<HTMLDivElement>(null);
@@ -57,6 +59,7 @@ export function EventDiscussionsPanel({
         if (prev && list.some((c) => c.id === prev)) return prev;
         return list[0]?.id ?? null;
       });
+      return list;
     } catch (e: unknown) {
       if (isAccessDeniedError(e)) {
         setAccessDenied(true);
@@ -64,6 +67,7 @@ export function EventDiscussionsPanel({
       } else {
         setError(e instanceof Error ? e.message : 'Не удалось загрузить обсуждения');
       }
+      return [];
     } finally {
       setLoading(false);
     }
@@ -107,6 +111,11 @@ export function EventDiscussionsPanel({
     setActiveId(conversationId);
   };
 
+  const handleDiscussionsChanged = async () => {
+    const list = await loadConversations();
+    if (list.length === 0) setManageOpen(false);
+  };
+
   if (accessDenied) {
     return (
       <AccessDeniedGate denied variant="section" className={styles.panel}>
@@ -135,38 +144,49 @@ export function EventDiscussionsPanel({
 
   return (
     <div className={styles.panel}>
-      <div className={styles.tabsWrap}>
-        <div ref={tabsRef} className={styles.tabs} role="tablist">
-          {conversations.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              role="tab"
-              aria-selected={active ? c.id === active.id : false}
-              className={`${styles.tab} ${active && c.id === active.id ? styles.tabActive : ''}`}
-              onClick={() => setActiveId(c.id)}
-            >
-              {c.name}
-            </button>
-          ))}
-          {canManage && (
-            <button
-              type="button"
-              className={styles.addTabBtn}
-              onClick={() => setFormOpen(true)}
-              aria-label="Добавить обсуждение"
-            >
-              <span className={styles.addTabIcon}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-              </span>
-              Добавить
-            </button>
-          )}
+      <div className={styles.tabsRow}>
+        <div className={styles.tabsWrap}>
+          <div ref={tabsRef} className={styles.tabs} role="tablist">
+            {conversations.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="tab"
+                aria-selected={active ? c.id === active.id : false}
+                className={`${styles.tab} ${active && c.id === active.id ? styles.tabActive : ''}`}
+                onClick={() => setActiveId(c.id)}
+              >
+                {c.name}
+              </button>
+            ))}
+            {canManage && (
+              <button
+                type="button"
+                className={styles.addTabBtn}
+                onClick={() => setFormOpen(true)}
+                aria-label="Добавить обсуждение"
+              >
+                <span className={styles.addTabIcon}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                </span>
+                Добавить
+              </button>
+            )}
+          </div>
+          {fadeLeft && <div className={`${styles.tabsFade} ${styles.tabsFadeLeft}`} aria-hidden />}
+          {fadeRight && <div className={`${styles.tabsFade} ${styles.tabsFadeRight}`} aria-hidden />}
         </div>
-        {fadeLeft && <div className={`${styles.tabsFade} ${styles.tabsFadeLeft}`} aria-hidden />}
-        {fadeRight && <div className={`${styles.tabsFade} ${styles.tabsFadeRight}`} aria-hidden />}
+        {canManage && conversations.length > 0 && (
+          <button
+            type="button"
+            className={styles.editTabsBtn}
+            onClick={() => setManageOpen(true)}
+          >
+            Редактировать
+          </button>
+        )}
       </div>
 
       {active ? (
@@ -187,6 +207,15 @@ export function EventDiscussionsPanel({
           eventId={eventId}
           onClose={() => setFormOpen(false)}
           onCreated={conversationId => void handleCreated(conversationId)}
+        />
+      )}
+
+      {manageOpen && (
+        <DiscussionsManageModal
+          eventId={eventId}
+          conversations={conversations}
+          onClose={() => setManageOpen(false)}
+          onChanged={() => void handleDiscussionsChanged()}
         />
       )}
     </div>

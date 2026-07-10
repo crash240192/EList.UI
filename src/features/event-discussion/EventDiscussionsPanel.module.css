@@ -7,11 +7,19 @@
   --discussion-tabs-fade: var(--surface);
 }
 
-.tabsWrap {
-  position: relative;
+.tabsRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
   min-width: 0;
   border-bottom: 1px solid var(--border);
   padding-bottom: 8px;
+}
+
+.tabsWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
 .tabs {
@@ -110,6 +118,27 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.editTabsBtn {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.editTabsBtn:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
 }
 
 .body {
