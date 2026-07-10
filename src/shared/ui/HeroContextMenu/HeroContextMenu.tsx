@@ -8,6 +8,7 @@ interface HeroContextMenuProps {
   anchorRef: RefObject<HTMLElement | null>;
   children: ReactNode;
   'aria-label'?: string;
+  zIndexBase?: number;
 }
 
 export function HeroContextMenu({
@@ -16,6 +17,7 @@ export function HeroContextMenu({
   anchorRef,
   children,
   'aria-label': ariaLabel = 'Меню',
+  zIndexBase = 300,
 }: HeroContextMenuProps) {
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
 
@@ -45,8 +47,13 @@ export function HeroContextMenu({
 
   return createPortal(
     <>
-      <div className={styles.backdrop} onClick={onClose} aria-hidden />
-      <div className={styles.menu} style={menuStyle} role="menu" aria-label={ariaLabel}>
+      <div className={styles.backdrop} style={{ zIndex: zIndexBase }} onClick={onClose} aria-hidden />
+      <div
+        className={styles.menu}
+        style={{ ...menuStyle, zIndex: zIndexBase + 1 }}
+        role="menu"
+        aria-label={ariaLabel}
+      >
         {children}
       </div>
     </>,

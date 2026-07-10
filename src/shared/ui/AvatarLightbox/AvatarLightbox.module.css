@@ -15,18 +15,35 @@
   width: min(90vmin, 1080px);
 }
 
-.closeBtn {
-  position: absolute; top: -44px; right: 0;
+.topBar {
+  position: absolute;
+  top: -44px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.iconBtn {
   width: 36px; height: 36px; border-radius: 50%;
   background: rgba(255,255,255,0.15); border: none;
   color: #fff; font-size: 16px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.15s;
+  flex-shrink: 0;
 }
-.closeBtn:hover { background: rgba(255,255,255,0.25); }
+.iconBtn:hover { background: rgba(255,255,255,0.25); }
 
 .counter {
-  position: absolute; top: -44px; left: 0;
   font-size: 13px; color: rgba(255,255,255,0.7);
   line-height: 36px;
 }

@@ -21,7 +21,7 @@ import { SubscribersListModal } from '@/features/subscriptions/SubscribersListMo
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { useAvatar } from '@/features/auth/useAvatar';
+import { useAvatar, seedAvatarCache } from '@/features/auth/useAvatar';
 import { getAvatarHistory } from '@/entities/user/avatarApi';
 import { EventListItem, EventList } from '@/entities/event/ui/EventListItem';
 import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
@@ -342,6 +342,23 @@ export default function UserPage() {
     setShowShareMenu(true);
   }, [profile?.account?.id]);
 
+  const handleAvatarDeleted = useCallback(async (fileId: string) => {
+    setLightboxFileIds(prev => {
+      if (!prev) return null;
+      const next = prev.filter(id => id !== fileId);
+      return next.length > 0 ? next : null;
+    });
+
+    if (!profileAccountId) return;
+    try {
+      const refreshed = await fetchFullProfile(targetId);
+      setProfile(refreshed);
+      seedAvatarCache(profileAccountId, refreshed.account.avatarId ?? null);
+    } catch {
+      // ignore
+    }
+  }, [profileAccountId, targetId]);
+
   const allEvents = useMemo(
     () => mergeUserEvents(createdEvents.events, participatingEvents.events),
     [createdEvents.events, participatingEvents.events],
@@ -644,6 +661,8 @@ export default function UserPage() {
           fileIds={lightboxFileIds}
           initials={initials}
           onClose={() => setLightboxFileIds(null)}
+          canDelete={isOwnProfile}
+          onDeleted={handleAvatarDeleted}
         />
       )}
 
