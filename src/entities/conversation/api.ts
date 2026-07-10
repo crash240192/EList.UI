@@ -6,6 +6,27 @@ import type { IConversation, IConversationRequest, IMessage, IMessageRequest } f
 
 const PAGE_SIZE_DEFAULT = 20;
 
+type RawPagedList<T> = PagedList<T> & {
+  Total?: number;
+  Result?: T[];
+  PageIndex?: number;
+  PageSize?: number;
+};
+
+function normalizePagedList<T>(
+  raw: RawPagedList<T> | null | undefined,
+  pageIndex: number,
+  pageSize: number,
+): PagedList<T> {
+  const items = raw?.result ?? raw?.Result ?? [];
+  return {
+    pageIndex: raw?.pageIndex ?? raw?.PageIndex ?? pageIndex,
+    pageSize: raw?.pageSize ?? raw?.PageSize ?? pageSize,
+    total: raw?.total ?? raw?.Total ?? items.length,
+    result: items,
+  };
+}
+
 export async function createConversation(request: IConversationRequest): Promise<string> {
   const data = await apiClient.post<string>('/api/conversations/create', request);
   return data.result;
@@ -38,7 +59,7 @@ export async function fetchConversationMessages(
   const data = await apiClient.get<PagedList<IMessage>>(
     `/api/conversations/messages/byConversationId/${conversationId}?${qs}`,
   );
-  return data.result;
+  return normalizePagedList(data.result, pageIndex, pageSize);
 }
 
 export async function fetchMessageReplies(
@@ -50,7 +71,7 @@ export async function fetchMessageReplies(
   const data = await apiClient.get<PagedList<IMessage>>(
     `/api/conversations/messages/replies/${messageId}?${qs}`,
   );
-  return data.result;
+  return normalizePagedList(data.result, pageIndex, pageSize);
 }
 
 export async function createMessage(request: IMessageRequest): Promise<string> {

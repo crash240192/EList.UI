@@ -35,15 +35,14 @@ export function DiscussionsManageModal({
 
   const handleModalBack = useCallback(() => {
     if (deleteTarget) {
-      if (deleteStage === 'messages') setDeleteStage('confirm');
-      else closeDeleteDialog();
+      closeDeleteDialog();
       return;
     }
     if (editingId) {
       setEditingId(null);
       setEditName('');
     } else onClose();
-  }, [deleteStage, deleteTarget, editingId, onClose]);
+  }, [deleteTarget, editingId, onClose]);
 
   useModalBackButton(handleModalBack);
 
@@ -104,7 +103,7 @@ export function DiscussionsManageModal({
     let hasMessages = false;
     try {
       const paged = await fetchConversationMessages(deleteTarget.id, 0, 1);
-      hasMessages = (paged.total ?? 0) > 0;
+      hasMessages = (paged.total ?? 0) > 0 || (paged.result?.length ?? 0) > 0;
     } catch {
       /* если проверку не удалось выполнить — удаляем напрямую */
     } finally {
@@ -220,24 +219,24 @@ export function DiscussionsManageModal({
         </div>
       </div>
 
-      {deleteTarget && deleteStage === 'confirm' && (
+      {deleteTarget && (
         <ConfirmDialog
-          title="Удалить обсуждение?"
-          message={`Обсуждение «${deleteTarget.name}» будет удалено.`}
-          confirmLabel={checkingMessages ? 'Проверка…' : 'Да'}
-          cancelLabel="Нет"
-          onConfirm={() => void handleConfirmDelete()}
-          onCancel={closeDeleteDialog}
-        />
-      )}
-
-      {deleteTarget && deleteStage === 'messages' && (
-        <ConfirmDialog
-          title="В обсуждении есть комментарии"
-          message="Все комментарии в обсуждении будут удалены безвозвратно. Всё равно удалить?"
-          confirmLabel={deletingId ? 'Удаление…' : 'Всё равно удалить'}
-          cancelLabel="Отмена"
-          onConfirm={() => void performDelete()}
+          title={deleteStage === 'confirm' ? 'Удалить обсуждение?' : 'В обсуждении есть комментарии'}
+          message={
+            deleteStage === 'confirm'
+              ? `Обсуждение «${deleteTarget.name}» будет удалено.`
+              : 'Все комментарии в обсуждении будут удалены безвозвратно. Всё равно удалить?'
+          }
+          confirmLabel={
+            deleteStage === 'confirm'
+              ? (checkingMessages ? 'Проверка…' : 'Да')
+              : (deletingId ? 'Удаление…' : 'Всё равно удалить')
+          }
+          cancelLabel={deleteStage === 'confirm' ? 'Нет' : 'Отмена'}
+          onConfirm={() => {
+            if (deleteStage === 'confirm') void handleConfirmDelete();
+            else void performDelete();
+          }}
           onCancel={closeDeleteDialog}
         />
       )}
