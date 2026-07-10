@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { IConversation } from '@/entities/conversation';
-import { deleteConversation, updateConversation } from '@/entities/conversation';
+import { deleteConversation, fetchConversationMessages, updateConversation } from '@/entities/conversation';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import styles from './DiscussionsManageModal.module.css';
@@ -23,6 +23,7 @@ export function DiscussionsManageModal({
   const [editName, setEditName] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [checkingDeleteId, setCheckingDeleteId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<IConversation | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,19 +71,40 @@ export function DiscussionsManageModal({
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTarget || deletingId) return;
-    setDeletingId(deleteTarget.id);
+  const confirmDelete = async (conversation?: IConversation) => {
+    const target = conversation ?? deleteTarget;
+    if (!target || deletingId) return;
+    setDeletingId(target.id);
     setError(null);
     try {
-      await deleteConversation(deleteTarget.id);
+      await deleteConversation(target.id);
       setDeleteTarget(null);
-      if (editingId === deleteTarget.id) cancelRename();
+      if (editingId === target.id) cancelRename();
       await onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось удалить обсуждение');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const requestDelete = async (conversation: IConversation) => {
+    if (deletingId || checkingDeleteId || editingId) return;
+
+    setCheckingDeleteId(conversation.id);
+    setError(null);
+    try {
+      const paged = await fetchConversationMessages(conversation.id, 0, 1);
+      const hasMessages = (paged.total ?? 0) > 0;
+      if (hasMessages) {
+        setDeleteTarget(conversation);
+      } else {
+        await confirmDelete(conversation);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось проверить обсуждение');
+    } finally {
+      setCheckingDeleteId(null);
     }
   };
 
@@ -107,7 +129,7 @@ export function DiscussionsManageModal({
           ) : (
             conversations.map(c => {
               const isEditing = editingId === c.id;
-              const busy = savingId === c.id || deletingId === c.id;
+              const busy = savingId === c.id || deletingId === c.id || checkingDeleteId === c.id;
 
               return (
                 <div key={c.id} className={styles.row}>
@@ -168,10 +190,14 @@ export function DiscussionsManageModal({
                       <button
                         type="button"
                         className={styles.deleteBtn}
-                        disabled={busy || !!editingId}
-                        onClick={() => setDeleteTarget(c)}
+                        disabled={busy || !!editingId || !!checkingDeleteId}
+                        onClick={() => void requestDelete(c)}
                       >
-                        {deletingId === c.id ? 'Удаление…' : 'Удалить'}
+                        {checkingDeleteId === c.id
+                          ? 'Проверка…'
+                          : deletingId === c.id
+                            ? 'Удаление…'
+                            : 'Удалить'}
                       </button>
                     </div>
                   )}
@@ -185,8 +211,8 @@ export function DiscussionsManageModal({
       {deleteTarget && (
         <ConfirmDialog
           title="Удалить обсуждение?"
-          message={`«${deleteTarget.name}» и все комментарии в нём будут удалены без возможности восстановления.`}
-          confirmLabel="Удалить"
+          message="Все комментарии в обсуждении будут удалены без возможности восстановления. Вы уверены?"
+          confirmLabel={deletingId ? 'Удаление…' : 'Удалить'}
           cancelLabel="Отмена"
           onConfirm={() => void confirmDelete()}
           onCancel={() => setDeleteTarget(null)}
