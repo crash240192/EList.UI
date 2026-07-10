@@ -23,17 +23,27 @@ export function DiscussionsManageModal({
   const [editName, setEditName] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [checkingDeleteId, setCheckingDeleteId] = useState<string | null>(null);
+  const [checkingMessages, setCheckingMessages] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<IConversation | null>(null);
+  const [deleteStage, setDeleteStage] = useState<'confirm' | 'messages'>('confirm');
   const [error, setError] = useState<string | null>(null);
 
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null);
+    setDeleteStage('confirm');
+  };
+
   const handleModalBack = useCallback(() => {
-    if (deleteTarget) setDeleteTarget(null);
-    else if (editingId) {
+    if (deleteTarget) {
+      if (deleteStage === 'messages') setDeleteStage('confirm');
+      else closeDeleteDialog();
+      return;
+    }
+    if (editingId) {
       setEditingId(null);
       setEditName('');
     } else onClose();
-  }, [deleteTarget, editingId, onClose]);
+  }, [deleteStage, deleteTarget, editingId, onClose]);
 
   useModalBackButton(handleModalBack);
 
@@ -71,15 +81,14 @@ export function DiscussionsManageModal({
     }
   };
 
-  const confirmDelete = async (conversation?: IConversation) => {
-    const target = conversation ?? deleteTarget;
-    if (!target || deletingId) return;
-    setDeletingId(target.id);
+  const performDelete = async () => {
+    if (!deleteTarget || deletingId) return;
+    setDeletingId(deleteTarget.id);
     setError(null);
     try {
-      await deleteConversation(target.id);
-      setDeleteTarget(null);
-      if (editingId === target.id) cancelRename();
+      await deleteConversation(deleteTarget.id);
+      if (editingId === deleteTarget.id) cancelRename();
+      closeDeleteDialog();
       await onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось удалить обсуждение');
@@ -88,24 +97,31 @@ export function DiscussionsManageModal({
     }
   };
 
-  const requestDelete = async (conversation: IConversation) => {
-    if (deletingId || checkingDeleteId || editingId) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || checkingMessages || deletingId) return;
 
-    setCheckingDeleteId(conversation.id);
-    setError(null);
+    setCheckingMessages(true);
+    let hasMessages = false;
     try {
-      const paged = await fetchConversationMessages(conversation.id, 0, 1);
-      const hasMessages = (paged.total ?? 0) > 0;
-      if (hasMessages) {
-        setDeleteTarget(conversation);
-      } else {
-        await confirmDelete(conversation);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось проверить обсуждение');
+      const paged = await fetchConversationMessages(deleteTarget.id, 0, 1);
+      hasMessages = (paged.total ?? 0) > 0;
+    } catch {
+      /* если проверку не удалось выполнить — удаляем напрямую */
     } finally {
-      setCheckingDeleteId(null);
+      setCheckingMessages(false);
     }
+
+    if (hasMessages) {
+      setDeleteStage('messages');
+    } else {
+      await performDelete();
+    }
+  };
+
+  const requestDelete = (conversation: IConversation) => {
+    if (deletingId || checkingMessages || editingId || deleteTarget) return;
+    setDeleteTarget(conversation);
+    setDeleteStage('confirm');
   };
 
   return createPortal(
@@ -129,7 +145,7 @@ export function DiscussionsManageModal({
           ) : (
             conversations.map(c => {
               const isEditing = editingId === c.id;
-              const busy = savingId === c.id || deletingId === c.id || checkingDeleteId === c.id;
+              const busy = savingId === c.id || deletingId === c.id;
 
               return (
                 <div key={c.id} className={styles.row}>
@@ -190,14 +206,10 @@ export function DiscussionsManageModal({
                       <button
                         type="button"
                         className={styles.deleteBtn}
-                        disabled={busy || !!editingId || !!checkingDeleteId}
-                        onClick={() => void requestDelete(c)}
+                        disabled={busy || !!editingId || !!deleteTarget}
+                        onClick={() => requestDelete(c)}
                       >
-                        {checkingDeleteId === c.id
-                          ? 'Проверка…'
-                          : deletingId === c.id
-                            ? 'Удаление…'
-                            : 'Удалить'}
+                        {deletingId === c.id ? 'Удаление…' : 'Удалить'}
                       </button>
                     </div>
                   )}
@@ -208,14 +220,25 @@ export function DiscussionsManageModal({
         </div>
       </div>
 
-      {deleteTarget && (
+      {deleteTarget && deleteStage === 'confirm' && (
         <ConfirmDialog
           title="Удалить обсуждение?"
-          message="Все комментарии в обсуждении будут удалены без возможности восстановления. Вы уверены?"
-          confirmLabel={deletingId ? 'Удаление…' : 'Удалить'}
+          message={`Обсуждение «${deleteTarget.name}» будет удалено.`}
+          confirmLabel={checkingMessages ? 'Проверка…' : 'Да'}
+          cancelLabel="Нет"
+          onConfirm={() => void handleConfirmDelete()}
+          onCancel={closeDeleteDialog}
+        />
+      )}
+
+      {deleteTarget && deleteStage === 'messages' && (
+        <ConfirmDialog
+          title="В обсуждении есть комментарии"
+          message="Все комментарии в обсуждении будут удалены безвозвратно. Всё равно удалить?"
+          confirmLabel={deletingId ? 'Удаление…' : 'Всё равно удалить'}
           cancelLabel="Отмена"
-          onConfirm={() => void confirmDelete()}
-          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => void performDelete()}
+          onCancel={closeDeleteDialog}
         />
       )}
     </>,
