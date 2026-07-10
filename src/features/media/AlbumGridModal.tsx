@@ -345,7 +345,7 @@ export function AlbumGridModal({
           onClose={() => setLightboxIdx(null)}
           zIndexBase={900}
           canDelete={canManage}
-          onDelete={deleteAlbumFile}
+          onDelete={fileId => deleteAlbumFile(fileId, album.id)}
           deleteMessage="Фотография будет удалена из альбома без возможности восстановления."
           onDeleted={fileId => {
             setFiles(prev => prev.filter(f => f.fileId !== fileId));

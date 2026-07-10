@@ -13,9 +13,10 @@ export async function linkFilesToAlbum(albumId: string, fileIds: string[]): Prom
   });
 }
 
-/** Удалить файл из альбома */
-export async function deleteAlbumFile(fileId: string): Promise<void> {
-  await apiClient.delete(`/api/media/albums/deleteFile/${fileId}`);
+/** DELETE /api/media/albums/deleteFile?fileId=...&albumId=... */
+export async function deleteAlbumFile(fileId: string, albumId: string): Promise<void> {
+  const params = new URLSearchParams({ fileId, albumId });
+  await apiClient.delete(`/api/media/albums/deleteFile?${params}`);
 }
 
 /** Привязать один файл к альбому */
