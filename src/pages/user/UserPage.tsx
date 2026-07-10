@@ -342,13 +342,7 @@ export default function UserPage() {
     setShowShareMenu(true);
   }, [profile?.account?.id]);
 
-  const handleAvatarDeleted = useCallback(async (fileId: string) => {
-    setLightboxFileIds(prev => {
-      if (!prev) return null;
-      const next = prev.filter(id => id !== fileId);
-      return next.length > 0 ? next : null;
-    });
-
+  const handleAvatarDeleted = useCallback(async () => {
     if (!profileAccountId) return;
     try {
       const refreshed = await fetchFullProfile(targetId);

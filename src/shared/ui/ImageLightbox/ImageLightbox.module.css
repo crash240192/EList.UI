@@ -1,15 +1,13 @@
-/* AvatarLightbox.module.css */
+/* ImageLightbox.module.css */
 
 .backdrop {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
-  z-index: 600;
 }
 
 .lightbox {
   position: fixed; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 601;
   display: flex; flex-direction: column;
   align-items: center;
   width: min(90vmin, 1080px);
@@ -53,7 +51,6 @@
   display: flex; align-items: center; justify-content: center;
   border-radius: 16px; overflow: hidden;
   background: rgba(255,255,255,0.08);
-  display: flex; align-items: center; justify-content: center;
 }
 
 .image {
@@ -62,14 +59,18 @@
   border-radius: 12px;
 }
 
-.fallbackAvatar {
-  width: 100%; height: 100%;
+.fallback {
+  width: 100%; min-height: 200px;
   background: var(--accent);
   display: flex; align-items: center; justify-content: center;
   font-size: 96px; font-weight: 600; color: #fff;
 }
 
-/* Стрелки */
+.fallbackText {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
 .arrow {
   position: absolute; top: 50%;
   transform: translateY(-50%);
@@ -88,7 +89,6 @@
   .arrowRight { right: 8px; }
 }
 
-/* Точки */
 .dots {
   display: flex; gap: 6px; margin-top: 16px;
 }

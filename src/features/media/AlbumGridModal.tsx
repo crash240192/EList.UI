@@ -7,12 +7,12 @@ import {
   type IAlbum,
   type IAlbumFile,
 } from '@/entities/media/albumApi';
-import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
+import { uploadPhotoToAlbum, deleteAlbumFile } from '@/entities/media/albumFileApi';
 import { canAddPhotosToAlbum } from '@/entities/media/albumPermissions';
 import { filterImageFiles } from '@/shared/lib/imageFile';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
-import { AlbumPhotoLightbox } from './AlbumPhotoLightbox';
+import { ImageLightbox } from '@/shared/ui/ImageLightbox';
 import { AlbumPhotoUploadZone } from './AlbumPhotoUploadZone';
 import styles from './AlbumGridModal.module.css';
 
@@ -338,11 +338,19 @@ export function AlbumGridModal({
       </div>
 
       {lightboxIdx !== null && fileIds.length > 0 && (
-        <AlbumPhotoLightbox
+        <ImageLightbox
           fileIds={fileIds}
-          initialIdx={lightboxIdx}
-          title={album.name}
+          startIndex={lightboxIdx}
+          alt={`Фото ${lightboxIdx + 1}`}
           onClose={() => setLightboxIdx(null)}
+          zIndexBase={900}
+          canDelete={canManage}
+          onDelete={deleteAlbumFile}
+          deleteMessage="Фотография будет удалена из альбома без возможности восстановления."
+          onDeleted={fileId => {
+            setFiles(prev => prev.filter(f => f.fileId !== fileId));
+            dirtyRef.current = true;
+          }}
         />
       )}
     </>,

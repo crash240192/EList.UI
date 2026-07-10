@@ -9,6 +9,7 @@ interface ConfirmDialogProps {
   /** Одна кнопка подтверждения; клик по фону тоже вызывает onConfirm */
   hideCancel?: boolean;
   variant?: 'danger' | 'accent';
+  zIndex?: number;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -20,6 +21,7 @@ export function ConfirmDialog({
   cancelLabel = 'Нет',
   hideCancel = false,
   variant = 'danger',
+  zIndex = 600,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -30,8 +32,19 @@ export function ConfirmDialog({
 
   return (
     <>
-      <div className={styles.backdrop} onClick={hideCancel ? onConfirm : onCancel} aria-hidden />
-      <div className={styles.modal} role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+      <div
+        className={styles.backdrop}
+        style={{ zIndex }}
+        onClick={hideCancel ? onConfirm : onCancel}
+        aria-hidden
+      />
+      <div
+        className={styles.modal}
+        style={{ zIndex: zIndex + 1 }}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+      >
         <p id="confirm-dialog-title" className={styles.title}>
           {title}
         </p>
