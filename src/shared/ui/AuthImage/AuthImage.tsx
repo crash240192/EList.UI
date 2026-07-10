@@ -8,6 +8,8 @@ import { fetchAuthedImage } from '@/shared/api/fileStorageClient';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import styles from './AuthImage.module.css';
 
+const DEFAULT_PRELOADER_DELAY_MS = 300;
+
 function cacheKey(fileId: string, fullSize: boolean): string {
   return `${fileId}\0${fullSize ? 'full' : 'thumb'}`;
 }
@@ -29,6 +31,35 @@ async function getOrFetchBlob(fileId: string, fullSize: boolean): Promise<string
   return inFlight.get(key)!;
 }
 
+/** Предзагрузка в кэш (соседние кадры в лайтбоксе) */
+export function prefetchAuthImage(fileId: string, fullSize = true): void {
+  if (!fileId) return;
+  const key = cacheKey(fileId, fullSize);
+  if (blobCache.has(key)) return;
+  void getOrFetchBlob(fileId, fullSize).catch(() => {});
+  if (fullSize) {
+    const thumbKey = cacheKey(fileId, false);
+    if (!blobCache.has(thumbKey)) {
+      void getOrFetchBlob(fileId, false).catch(() => {});
+    }
+  }
+}
+
+function useDelayedVisible(active: boolean, delayMs: number): boolean {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setVisible(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setVisible(true), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [active, delayMs]);
+
+  return visible;
+}
+
 function ImagePreloader() {
   return (
     <div className={styles.preloaderSlot} aria-hidden>
@@ -43,6 +74,8 @@ interface AuthImageProps {
   fullSize?: boolean;
   /** object-fit для слоёв в режиме fullSize (превью и полный кадр) */
   imageFit?: 'contain' | 'cover';
+  /** Показывать прелоадер только если загрузка дольше этого порога (мс) */
+  preloaderDelayMs?: number;
   alt?:      string;
   className?: string;
   style?:    React.CSSProperties;
@@ -55,6 +88,7 @@ interface AuthImageProps {
 function AuthImageSingle({
   fileId,
   fullSize = false,
+  preloaderDelayMs = DEFAULT_PRELOADER_DELAY_MS,
   alt,
   className,
   style,
@@ -63,8 +97,10 @@ function AuthImageSingle({
   onError: onErrorProp,
 }: AuthImageProps) {
   const key = cacheKey(fileId, fullSize);
-  const [src,   setSrc]   = useState<string | null>(() => blobCache.get(key) ?? null);
+  const [src, setSrc] = useState<string | null>(() => blobCache.get(key) ?? null);
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(() => !blobCache.has(key));
+  const showPreloader = useDelayedVisible(loading && !src && !error, preloaderDelayMs);
 
   useEffect(() => {
     if (!fileId) return;
@@ -72,24 +108,32 @@ function AuthImageSingle({
     setError(false);
     if (blobCache.has(k)) {
       setSrc(blobCache.get(k)!);
+      setLoading(false);
       return;
     }
-    setSrc(null);
+    setLoading(true);
     let cancelled = false;
     getOrFetchBlob(fileId, fullSize)
       .then(url => {
-        if (!cancelled) setSrc(url);
+        if (!cancelled) {
+          setSrc(url);
+          setLoading(false);
+        }
       })
       .catch(() => {
         if (!cancelled) {
           setError(true);
+          setLoading(false);
           onErrorProp?.();
         }
       });
     return () => { cancelled = true; };
   }, [fileId, fullSize]);
 
-  if (error || !src) return <>{fallback ?? null}</>;
+  if (error) return <>{fallback ?? null}</>;
+  if (!src) {
+    return showPreloader ? <ImagePreloader /> : <>{fallback ?? null}</>;
+  }
   return <img src={src} alt={alt} className={className} style={style} onLoad={onLoad} />;
 }
 
@@ -105,32 +149,44 @@ function AuthImageProgressiveFull({
   onLoad,
   onError: onErrorProp,
   imageFit = 'contain',
+  preloaderDelayMs = DEFAULT_PRELOADER_DELAY_MS,
 }: AuthImageProps) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [fullUrl, setFullUrl]       = useState<string | null>(null);
-  const [error, setError]           = useState(false);
+  const kFull = cacheKey(fileId, true);
+  const kThumb = cacheKey(fileId, false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(() => blobCache.get(kThumb) ?? null);
+  const [fullUrl, setFullUrl] = useState<string | null>(() => blobCache.get(kFull) ?? null);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(() => !blobCache.has(kFull));
 
   useEffect(() => {
     if (!fileId) return;
     let cancelled = false;
     setError(false);
-    setPreviewUrl(null);
-    setFullUrl(null);
 
-    const kFull = cacheKey(fileId, true);
-    if (blobCache.has(kFull)) {
-      setFullUrl(blobCache.get(kFull)!);
+    const fullKey = cacheKey(fileId, true);
+    const thumbKey = cacheKey(fileId, false);
+
+    if (blobCache.has(fullKey)) {
+      setFullUrl(blobCache.get(fullKey)!);
+      setPreviewUrl(blobCache.get(thumbKey) ?? null);
+      setLoading(false);
       return;
     }
 
+    setLoading(true);
+    setPreviewUrl(blobCache.get(thumbKey) ?? null);
+    setFullUrl(null);
+
     void (async () => {
       try {
-        try {
-          const thumb = await getOrFetchBlob(fileId, false);
-          if (cancelled) return;
-          setPreviewUrl(thumb);
-        } catch {
-          // превью недоступно — этап 1 до прихода полного файла
+        if (!blobCache.has(thumbKey)) {
+          try {
+            const thumb = await getOrFetchBlob(fileId, false);
+            if (cancelled) return;
+            setPreviewUrl(thumb);
+          } catch {
+            // превью недоступно
+          }
         }
 
         if (cancelled) return;
@@ -138,9 +194,11 @@ function AuthImageProgressiveFull({
         const full = await getOrFetchBlob(fileId, true);
         if (cancelled) return;
         setFullUrl(full);
+        setLoading(false);
       } catch {
         if (!cancelled) {
           setError(true);
+          setLoading(false);
           onErrorProp?.();
         }
       }
@@ -154,8 +212,10 @@ function AuthImageProgressiveFull({
       ? { objectFit: 'cover', width: '100%', height: '100%', maxHeight: 'none' }
       : { objectFit: 'contain' };
 
-  const showPreloader = !fullUrl && !(error && previewUrl);
+  const needsPreloader = loading && !fullUrl && !(error && previewUrl);
+  const showPreloader = useDelayedVisible(needsPreloader, preloaderDelayMs);
   const showBlurredPreview = !!previewUrl && !fullUrl;
+  const showInstantFull = !!fullUrl && blobCache.has(cacheKey(fileId, true));
 
   if (error && !previewUrl && !fullUrl) return <>{fallback ?? null}</>;
 
@@ -174,7 +234,7 @@ function AuthImageProgressiveFull({
         <img
           src={fullUrl}
           alt={alt}
-          className={styles.fullLayer}
+          className={showInstantFull ? styles.fullLayerInstant : styles.fullLayer}
           style={layerFitStyle}
           onLoad={onLoad}
           onError={() => {
