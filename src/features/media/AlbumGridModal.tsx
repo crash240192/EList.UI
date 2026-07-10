@@ -7,10 +7,11 @@ import {
   type IAlbum,
   type IAlbumFile,
 } from '@/entities/media/albumApi';
-import { uploadPhotoToAlbum, deleteAlbumFile } from '@/entities/media/albumFileApi';
+import { uploadPhotoToAlbum, deleteAlbumFile, deleteAlbumFiles } from '@/entities/media/albumFileApi';
 import { canAddPhotosToAlbum } from '@/entities/media/albumPermissions';
 import { filterImageFiles } from '@/shared/lib/imageFile';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { ImageLightbox } from '@/shared/ui/ImageLightbox';
 import { AlbumPhotoUploadZone } from './AlbumPhotoUploadZone';
@@ -44,10 +45,14 @@ interface UploadingItem {
 function GridThumbnail({
   fileId,
   alt,
+  selected = false,
+  selectMode = false,
   onClick,
 }: {
   fileId: string;
   alt: string;
+  selected?: boolean;
+  selectMode?: boolean;
   onClick: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
@@ -59,7 +64,13 @@ function GridThumbnail({
   }, [fileId]);
 
   return (
-    <button type="button" className={styles.gridItem} onClick={onClick} aria-label={alt}>
+    <button
+      type="button"
+      className={`${styles.gridItem} ${selected ? styles.gridItemSelected : ''} ${selectMode ? styles.gridItemSelectMode : ''}`}
+      onClick={onClick}
+      aria-label={alt}
+      aria-pressed={selectMode ? selected : undefined}
+    >
       {!loaded && !error && <div className={styles.gridSpinner} aria-hidden />}
       {error ? (
         <div className={styles.gridError} aria-hidden>
@@ -76,6 +87,15 @@ function GridThumbnail({
           onLoad={() => setLoaded(true)}
           onError={() => setError(true)}
         />
+      )}
+      {selectMode && (
+        <span className={`${styles.gridCheck} ${selected ? styles.gridCheckOn : ''}`} aria-hidden>
+          {selected && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
+        </span>
       )}
     </button>
   );
@@ -126,6 +146,10 @@ export function AlbumGridModal({
   const [initialLoading, setInitialLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadingRef = useRef<UploadingItem[]>([]);
   const dirtyRef = useRef(false);
@@ -138,6 +162,9 @@ export function AlbumGridModal({
 
   const handleClose = useCallback(() => {
     setLightboxIdx(null);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setDeleteConfirm(false);
     if (dirtyRef.current && album) {
       onChanged?.(album.id);
       dirtyRef.current = false;
@@ -181,6 +208,9 @@ export function AlbumGridModal({
   useEffect(() => {
     if (open) return;
     setLightboxIdx(null);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setDeleteConfirm(false);
     uploadChainRef.current = Promise.resolve();
     revokeUploadingPreviews(uploadingRef.current);
     setUploadingItems([]);
@@ -247,6 +277,37 @@ export function AlbumGridModal({
     }).catch(() => {});
   }, [album, canManage, isParticipating, clearUploadingPlaceholders]);
 
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const toggleFileSelection = useCallback((fileId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(fileId)) next.delete(fileId);
+      else next.add(fileId);
+      return next;
+    });
+  }, []);
+
+  const handleBulkDelete = useCallback(async () => {
+    if (!album || selectedIds.size === 0 || bulkDeleting) return;
+    setBulkDeleting(true);
+    try {
+      const ids = [...selectedIds];
+      await deleteAlbumFiles(album.id, ids);
+      setFiles(prev => prev.filter(f => !selectedIds.has(f.fileId)));
+      dirtyRef.current = true;
+      exitSelectMode();
+      setDeleteConfirm(false);
+    } catch {
+      // ошибка API покажется через глобальный обработчик
+    } finally {
+      setBulkDeleting(false);
+    }
+  }, [album, selectedIds, bulkDeleting, exitSelectMode]);
+
   if (!open || !album) return null;
 
   const canUploadPhotos = canAddPhotosToAlbum(album, {
@@ -258,6 +319,8 @@ export function AlbumGridModal({
   const uploadingCount = uploadingItems.filter(u => !u.error).length;
   const showSkeleton = initialLoading && uploadingItems.length === 0 && files.length === 0;
   const fileIds = files.map(f => f.fileId);
+  const selectedCount = selectedIds.size;
+  const canSelectPhotos = canManage && files.length > 0;
 
   return createPortal(
     <>
@@ -269,7 +332,29 @@ export function AlbumGridModal({
             {album.description && <p className={styles.desc}>{album.description}</p>}
           </div>
           <div className={styles.headerActions}>
-            {canUploadPhotos && (
+            {selectMode && selectedCount > 0 && (
+              <button
+                type="button"
+                className={styles.deleteBtn}
+                disabled={bulkDeleting}
+                onClick={() => setDeleteConfirm(true)}
+              >
+                {bulkDeleting ? 'Удаление…' : `Удалить (${selectedCount})`}
+              </button>
+            )}
+            {canSelectPhotos && (
+              <button
+                type="button"
+                className={selectMode ? styles.selectModeBtnActive : styles.selectModeBtn}
+                onClick={() => {
+                  if (selectMode) exitSelectMode();
+                  else setSelectMode(true);
+                }}
+              >
+                {selectMode ? 'Отмена' : 'Выбрать'}
+              </button>
+            )}
+            {canUploadPhotos && !selectMode && (
               <button
                 type="button"
                 className={styles.uploadBtn}
@@ -314,7 +399,12 @@ export function AlbumGridModal({
                   key={f.fileId}
                   fileId={f.fileId}
                   alt={`Фото ${i + 1}`}
-                  onClick={() => setLightboxIdx(i)}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(f.fileId)}
+                  onClick={() => {
+                    if (selectMode) toggleFileSelection(f.fileId);
+                    else setLightboxIdx(i);
+                  }}
                 />
               ))}
               {uploadingItems.map(item => (
@@ -351,6 +441,18 @@ export function AlbumGridModal({
             setFiles(prev => prev.filter(f => f.fileId !== fileId));
             dirtyRef.current = true;
           }}
+        />
+      )}
+
+      {deleteConfirm && selectedCount > 0 && (
+        <ConfirmDialog
+          title={selectedCount === 1 ? 'Удалить фото?' : `Удалить ${selectedCount} фото?`}
+          message="Фотографии будут удалены из альбома без возможности восстановления."
+          confirmLabel="Удалить"
+          cancelLabel="Отмена"
+          zIndex={910}
+          onConfirm={() => void handleBulkDelete()}
+          onCancel={() => setDeleteConfirm(false)}
         />
       )}
     </>,
