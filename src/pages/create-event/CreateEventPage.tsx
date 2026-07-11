@@ -40,6 +40,12 @@ import type { Gender } from '@/shared/api/types';
 import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import {
+  formatAgeLimitLabel,
+  getAvailableAgeLimitOptions,
+  normalizeAgeLimitValue,
+  type EventAgeLimit,
+} from '@/shared/lib/ageLimit';
 import styles from './CreateEventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -65,7 +71,7 @@ interface FormState {
 const EMPTY: FormState = {
   name: '', description: '', address: '',
   startDate: '', startTime: '', endDate: '', endTime: '',
-  cost: '0', ageLimit: '', isPrivate: false,
+  cost: '0', ageLimit: '0', isPrivate: false,
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
 };
 
@@ -265,7 +271,7 @@ export default function CreateEventPage() {
         endDate:            endParts.date,
         endTime:            endParts.time,
         cost:               String(ev.parameters?.cost ?? 0),
-        ageLimit:           String(ev.parameters?.ageLimit ?? ''),
+        ageLimit:           normalizeAgeLimitValue(ev.parameters?.ageLimit, null, false),
         isPrivate:          ev.parameters?.private ?? false,
         maxPersons:         String(ev.parameters?.maxPersonsCount ?? ''),
         allowUsersToInvite: ev.parameters?.allowUsersToInvite ?? true,
@@ -457,14 +463,34 @@ export default function CreateEventPage() {
   const maxCost      = tv?.costLimit    ?? null;
   const maxPersons   = tv?.personsLimit ?? null;
   const maxAge       = tv?.ageLimit     ?? null;
-  // Поле заблокировано только если тариф явно запрещает (лимит = 0, не null)
+  const ageLimitOptions = useMemo(
+    () => getAvailableAgeLimitOptions(maxAge, hasTariff),
+    [maxAge, hasTariff],
+  );
   const canSetCost       = !hasTariff || maxCost    === null || maxCost    > 0;
   const canSetMaxPersons = !hasTariff || maxPersons === null || maxPersons > 0;
-  const canSetAge        = !hasTariff || maxAge     === null || maxAge     > 0;
+  const canSetAge        = ageLimitOptions.length > 1;
   const canSetPrivate    = hasTariff ? !!tv!.allowPrivate : false;
   const canSetGender     = hasTariff ? !!tv!.allowGenderSegregation : false;
   const hasTariffWarning = hasWallet && (!canSetPrivate || !canSetGender);
   const tariffName       = tariff?.name ?? 'текущем';
+
+  useEffect(() => {
+    if (loading || hasWallet === null) return;
+    const normalized = normalizeAgeLimitValue(
+      form.ageLimit !== '' ? parseInt(form.ageLimit, 10) : null,
+      maxAge,
+      hasTariff,
+    );
+    if (normalized !== form.ageLimit) {
+      setForm(f => ({ ...f, ageLimit: normalized }));
+    }
+  }, [hasTariff, maxAge, hasWallet, loading, form.ageLimit]);
+
+  const parseAgeLimit = (): number | null => {
+    const age = parseInt(form.ageLimit, 10);
+    return Number.isNaN(age) || age <= 0 ? null : age;
+  };
 
   // Validation
   const validate = (): FieldError | null => {
@@ -497,11 +523,15 @@ export default function CreateEventPage() {
     // Проверяем отрицательные значения
     if (form.cost && parseFloat(form.cost) < 0)                                           errs.add('cost');
     if (form.maxPersons && parseInt(form.maxPersons) < 0)                                 errs.add('maxPersons');
-    if (form.ageLimit && parseInt(form.ageLimit) < 0)                                     errs.add('ageLimit');
+    if (form.ageLimit) {
+      const age = parseInt(form.ageLimit, 10);
+      if (Number.isNaN(age) || !ageLimitOptions.includes(age as EventAgeLimit)) {
+        errs.add('ageLimit');
+      }
+    }
     // Проверяем ограничения тарифа
     if (maxCost != null && parseFloat(form.cost) > maxCost)                               errs.add('cost');
     if (maxPersons != null && form.maxPersons && parseInt(form.maxPersons) > maxPersons)  errs.add('maxPersons');
-    if (maxAge != null && form.ageLimit && parseInt(form.ageLimit) > maxAge)              errs.add('ageLimit');
 
     setFieldErrors(errs);
     if (!errs.size) return null;
@@ -569,7 +599,7 @@ export default function CreateEventPage() {
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: parseInt(form.ageLimit) < 0 ? 'Возрастное ограничение не может быть отрицательным' : `Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
+        ageLimit: `Выберите возрастное ограничение из списка (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -594,7 +624,7 @@ export default function CreateEventPage() {
           cost:               parseFloat(form.cost) || 0,
           private:            form.isPrivate,
           maxPersonsCount:    form.maxPersons ? parseInt(form.maxPersons) : null,
-          ageLimit:           form.ageLimit   ? parseInt(form.ageLimit)   : null,
+          ageLimit:           parseAgeLimit(),
           allowedGender:      form.allowedGender || null,
           allowUsersToInvite: form.allowUsersToInvite,
         });
@@ -614,7 +644,7 @@ export default function CreateEventPage() {
             cost:               parseFloat(form.cost) || 0,
             private:            form.isPrivate,
             maxPersonsCount:    form.maxPersons ? parseInt(form.maxPersons) : undefined,
-            ageLimit:           form.ageLimit   ? parseInt(form.ageLimit)   : undefined,
+            ageLimit:           parseAgeLimit() ?? undefined,
             allowedGender:      form.allowedGender || undefined,
             allowUsersToInvite: form.allowUsersToInvite,
           },
@@ -666,7 +696,7 @@ export default function CreateEventPage() {
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: parseInt(form.ageLimit) < 0 ? 'Возрастное ограничение не может быть отрицательным' : `Возрастное ограничение превышает лимит тарифа (до ${maxAge}+)`,
+        ageLimit: `Выберите возрастное ограничение из списка (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -920,14 +950,17 @@ export default function CreateEventPage() {
             </div>
 
             <Field label="Возрастное ограничение">
-              <LockedInput
+              <LockedSelect
                 locked={!canSetAge}
-                value={form.ageLimit} placeholder="0+"
-                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setForm(f => ({ ...f, ageLimit: v })); }}
-                type="number" min="0"
+                value={form.ageLimit}
+                onChange={v => setForm(f => ({ ...f, ageLimit: v }))}
+                options={ageLimitOptions.map(age => ({
+                  value: String(age),
+                  label: formatAgeLimitLabel(age),
+                }))}
                 hasError={hasErr('ageLimit')}
                 hint={hasErr('ageLimit')
-                  ? `Превышает лимит тарифа (до ${maxAge}+)`
+                  ? `Превышает лимит тарифа (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`
                   : !canSetAge ? 'Недоступно в тарифе — только 0+'
                   : maxAge ? `до ${maxAge}+` : undefined}
               />
@@ -1065,10 +1098,12 @@ export default function CreateEventPage() {
               </div>
             )}
             <div className={styles.previewName}>{form.name || <span style={{color:'var(--text-muted)'}}>Название мероприятия</span>}</div>
-            {(form.isPrivate || form.ageLimit) && (
+            {(form.isPrivate || parseInt(form.ageLimit, 10) > 0) && (
               <div className={styles.previewBadges}>
                 {form.isPrivate && <span className={styles.badgePrivate}>Приватное</span>}
-                {form.ageLimit  && <span className={styles.badgeAge}>{form.ageLimit}+</span>}
+                {parseInt(form.ageLimit, 10) > 0 && (
+                  <span className={styles.badgeAge}>{form.ageLimit}+</span>
+                )}
               </div>
             )}
             {previewTime && (
@@ -1268,6 +1303,32 @@ function LockedInput({ locked, hint, suffix, hasError, ...props }: {
           style={suffix ? { flex: 1 } : undefined}
           onFocus={e => (e.target as HTMLInputElement).select()} />
         {suffix && <span className={styles.inputSuffix}>{suffix}</span>}
+        {locked && <span className={styles.lockBadge}>тариф</span>}
+      </div>
+      {hint && <div className={`${styles.fieldHint} ${hasError ? styles.fieldHintErr : locked ? styles.fieldHintWarn : ''}`}>{hint}</div>}
+    </div>
+  );
+}
+
+function LockedSelect({ locked, hint, hasError, value, onChange, options }: {
+  locked?: boolean; hint?: string; hasError?: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
+        <select
+          className={`${styles.input} ${styles.select} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''}`}
+          disabled={locked}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+        >
+          {options.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
         {locked && <span className={styles.lockBadge}>тариф</span>}
       </div>
       {hint && <div className={`${styles.fieldHint} ${hasError ? styles.fieldHintErr : locked ? styles.fieldHintWarn : ''}`}>{hint}</div>}
