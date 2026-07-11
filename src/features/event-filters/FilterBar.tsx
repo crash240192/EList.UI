@@ -215,11 +215,15 @@ export function FilterBar({
     onSearch();
   };
 
-  const syncDraftFiltersFromPicker = () => {
-    setFilter('categories', draftCats.length  ? draftCats  : undefined);
-    setFilter('types',      draftTypes.length ? draftTypes : undefined);
-    setExpanded(false);
+  const applyDraftTypeFilters = () => {
+    setFilter('categories', draftCats.length ? draftCats : undefined);
+    setFilter('types', draftTypes.length ? draftTypes : undefined);
     onSearch();
+  };
+
+  const syncDraftFiltersFromPicker = () => {
+    applyDraftTypeFilters();
+    setExpanded(false);
   };
 
   // Вспомогательная функция — возврат к родному городу
@@ -540,6 +544,7 @@ export function FilterBar({
       allTypes={allTypes}
       pickerOpen={pickerOpen}
       setPickerOpen={setPickerOpen}
+      onPickerApply={applyDraftTypeFilters}
       chips={chips}
       handleCitySelect={handleCitySelect}
       handleQuickDate={handleQuickDate}
