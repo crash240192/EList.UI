@@ -10,6 +10,7 @@ import { isPublicAppRoute } from '@/shared/auth/unauthorized';
 import { registerSessionUnauthorizedHandler } from '@/shared/auth/sessionUnauthorized';
 import { useAuthStore, useToastStore } from '@/app/store';
 import { ToastContainer } from '@/shared/ui/Toast/Toast';
+import { TestModeBanner } from '@/shared/ui/TestModeBanner';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { lazyWithRetry } from '@/shared/lib/lazyWithRetry';
 
@@ -97,6 +98,7 @@ setApiErrorHandler((message) => {
 export function AppRouter() {
   return (
     <>
+      <TestModeBanner />
       <RouterProvider router={router} />
       <ToastContainer />
     </>
