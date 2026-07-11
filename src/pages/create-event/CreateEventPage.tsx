@@ -1114,10 +1114,10 @@ export default function CreateEventPage() {
               </div>
             )}
             <div className={styles.previewName}>{form.name || <span style={{color:'var(--text-muted)'}}>Название мероприятия</span>}</div>
-            {(form.isPrivate || parseInt(form.ageLimit, 10) > 0) && (
+            {(form.isPrivate || form.ageLimit !== '') && (
               <div className={styles.previewBadges}>
                 {form.isPrivate && <span className={styles.badgePrivate}>Приватное</span>}
-                {parseInt(form.ageLimit, 10) > 0 && (
+                {form.ageLimit !== '' && (
                   <span className={styles.badgeAge}>{form.ageLimit}+</span>
                 )}
               </div>

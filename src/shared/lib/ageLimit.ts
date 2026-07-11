@@ -34,3 +34,13 @@ export function normalizeAgeLimitValue(
 export function formatAgeLimitLabel(age: number): string {
   return `${age}+`;
 }
+
+/** Показывать ли плашку возраста (включая 0+) */
+export function hasAgeLimitBadge(age: number | null | undefined): boolean {
+  return age != null && !Number.isNaN(age);
+}
+
+export function formatAgeLimitBadge(age: number | null | undefined): string | null {
+  if (!hasAgeLimitBadge(age)) return null;
+  return formatAgeLimitLabel(age!);
+}

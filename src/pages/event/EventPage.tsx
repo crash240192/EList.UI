@@ -429,7 +429,7 @@ export default function EventPage() {
               />
             ))}
             {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
-            {event.parameters?.ageLimit && (
+            {event.parameters?.ageLimit != null && (
               <span className={styles.tagAge}>{event.parameters.ageLimit}+</span>
             )}
             {event.parameters?.private && (
