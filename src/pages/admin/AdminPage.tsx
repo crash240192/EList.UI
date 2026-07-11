@@ -8,6 +8,7 @@ import {
   tariffApi, tariffValidatorApi,
   type ITariff, type ITariffValidator, type ITariffPeriod, type ITariffRequest,
 } from '@/entities/admin/adminApi';
+import { sortByNameRu } from '@/entities/event/lib/sortByNameRu';
 import { Select } from '@/shared/ui/Select/Select';
 import { TabBar } from '@/shared/ui/TabBar';
 import styles from './AdminPage.module.css';
@@ -75,7 +76,7 @@ function EventTypesTab() {
     setLoading(true);
     try {
       const [cats, tps] = await Promise.all([categoriesApi.getAll(), typesApi.getAll()]);
-      setCategories(cats);
+      setCategories(sortByNameRu(cats));
       setTypes(tps);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
@@ -86,7 +87,8 @@ function EventTypesTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  const typesForCat = (catId: string) => types.filter(t => t.eventCategoryId === catId);
+  const typesForCat = (catId: string) =>
+    sortByNameRu(types.filter(t => t.eventCategoryId === catId));
 
   if (loading) return <div className={styles.loader}>Загрузка...</div>;
   if (error)   return <div className={styles.errorMsg}>{error}</div>;
@@ -384,7 +386,7 @@ function TypeForm({
         value={form.eventCategoryId}
         onChange={v => set('eventCategoryId')({ target: { value: v } } as any)}
         placeholder="Выберите категорию"
-        options={categories.map(cat => ({ value: cat.id, label: cat.name }))}
+        options={sortByNameRu(categories).map(cat => ({ value: cat.id, label: cat.name }))}
       />
       </FormField>
       <FormField label="Название *">
