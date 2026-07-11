@@ -57,6 +57,10 @@ export default function AdminPage() {
 // ВКЛАДКА: Типы мероприятий (категории + типы)
 // =============================================================================
 
+function sortTariffsByCost(tariffs: ITariff[]): ITariff[] {
+  return [...tariffs].sort((a, b) => a.cost - b.cost);
+}
+
 function EventTypesTab() {
   const [categories, setCategories] = useState<IEventCategory[]>([]);
   const [types,      setTypes]      = useState<IEventType[]>([]);
@@ -87,6 +91,16 @@ function EventTypesTab() {
 
   useEffect(() => { load(); }, [load]);
 
+  const editingCatId = editingCat && editingCat !== 'new' ? editingCat.id : null;
+  const editingTypeId = editingType && editingType !== 'new' ? editingType.id : null;
+  const editingTypeCatId = editingType && editingType !== 'new'
+    ? editingType.eventCategoryId
+    : newTypeCatId;
+
+  useEffect(() => {
+    if (editingTypeCatId) setExpandedCat(editingTypeCatId);
+  }, [editingTypeCatId]);
+
   const typesForCat = (catId: string) =>
     sortByNameRu(types.filter(t => t.eventCategoryId === catId));
 
@@ -108,7 +122,7 @@ function EventTypesTab() {
           {categories.map(cat => (
             <div key={cat.id} className={styles.itemGroup}>
               <div
-                className={`${styles.categoryRow} ${expandedCat === cat.id ? styles.categoryRowActive : ''}`}
+                className={`${styles.categoryRow} ${editingCatId === cat.id ? styles.listRowActive : ''}`}
               >
                 <button
                   className={styles.expandBtn}
@@ -117,7 +131,11 @@ function EventTypesTab() {
                 >
                   {expandedCat === cat.id ? '▾' : '▸'}
                 </button>
-                <div className={styles.itemInfo} onClick={() => { setEditingCat(cat); setEditingType(null); setNewTypeCatId(null); }}>
+                <div className={styles.itemInfo} onClick={() => {
+                  setEditingCat(cat);
+                  setEditingType(null);
+                  setNewTypeCatId(null);
+                }}>
                   <span className={styles.itemName}>{cat.name}</span>
                   <span className={styles.itemSub}>{cat.localizationPath}</span>
                 </div>
@@ -137,8 +155,16 @@ function EventTypesTab() {
               {expandedCat === cat.id && (
                 <div className={styles.typesList}>
                   {typesForCat(cat.id).map(tp => (
-                    <div key={tp.id} className={styles.typeRow}>
-                      <div className={styles.itemInfo} onClick={() => { setEditingType(tp); setEditingCat(null); }}>
+                    <div
+                      key={tp.id}
+                      className={`${styles.typeRow} ${editingTypeId === tp.id ? styles.listRowActive : ''}`}
+                    >
+                      <div className={styles.itemInfo} onClick={() => {
+                        setEditingType(tp);
+                        setEditingCat(null);
+                        setNewTypeCatId(null);
+                        setExpandedCat(cat.id);
+                      }}>
                         {tp.ico && (
                           icoToDisplayUrl(tp.ico).startsWith('data:') || icoToDisplayUrl(tp.ico).startsWith('http')
                             ? <img src={icoToDisplayUrl(tp.ico)} alt="" className="event-type-ico" style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />
@@ -148,7 +174,12 @@ function EventTypesTab() {
                         <span className={styles.itemSub}>{tp.localizationPath}</span>
                       </div>
                       <div className={styles.itemActions}>
-                        <EditIconBtn onClick={() => setEditingType(tp)} />
+                        <EditIconBtn onClick={() => {
+                          setEditingType(tp);
+                          setEditingCat(null);
+                          setNewTypeCatId(null);
+                          setExpandedCat(cat.id);
+                        }} />
                         <DeleteIconBtn
                           onClick={async () => {
                             if (!confirm(`Удалить тип «${tp.name}»?`)) return;
@@ -161,7 +192,11 @@ function EventTypesTab() {
                   ))}
                   <button
                     className={styles.addTypeBtn}
-                    onClick={() => { setNewTypeCatId(cat.id); setEditingType('new'); }}
+                    onClick={() => {
+                      setNewTypeCatId(cat.id);
+                      setEditingType('new');
+                      setExpandedCat(cat.id);
+                    }}
                   >
                     + Добавить тип
                   </button>
@@ -481,6 +516,8 @@ function ContactTypesTab() {
 
   useEffect(() => { load(); }, [load]);
 
+  const editingId = editing && editing !== 'new' ? editing.id : null;
+
   if (loading) return <div className={styles.loader}>Загрузка...</div>;
   if (error)   return <div className={styles.errorMsg}>{error}</div>;
 
@@ -494,7 +531,10 @@ function ContactTypesTab() {
         </div>
         <div className={styles.itemList}>
           {items.map(item => (
-            <div key={item.id} className={styles.categoryRow}>
+            <div
+              key={item.id}
+              className={`${styles.categoryRow} ${editingId === item.id ? styles.listRowActive : ''}`}
+            >
               <div className={styles.itemInfo} onClick={() => setEditing(item)}>
                 <span className={styles.itemName}>{item.name}</span>
                 <span className={styles.itemSub}>{item.mask ?? item.localizationPath}</span>
@@ -618,12 +658,14 @@ function TariffsTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setTariffs(await tariffApi.getAll()); }
+    try { setTariffs(sortTariffsByCost(await tariffApi.getAll())); }
     catch (e) { setError(e instanceof Error ? e.message : 'Ошибка загрузки'); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const editingId = editing && editing !== 'new' ? editing.id : null;
 
   if (loading) return <div className={styles.loader}>Загрузка...</div>;
   if (error)   return <div className={styles.errorMsg}>{error}</div>;
@@ -643,8 +685,12 @@ function TariffsTab() {
             </div>
           )}
           {tariffs.map(t => (
-            <div key={t.id} className={styles.categoryRow}
-              onClick={() => setEditing(t)} style={{ cursor: 'pointer' }}>
+            <div
+              key={t.id}
+              className={`${styles.categoryRow} ${editingId === t.id ? styles.listRowActive : ''}`}
+              onClick={() => setEditing(t)}
+              style={{ cursor: 'pointer' }}
+            >
               <div className={styles.itemInfo}>
                 <span className={styles.itemName}>{t.name}</span>
                 <span className={styles.itemSub}>

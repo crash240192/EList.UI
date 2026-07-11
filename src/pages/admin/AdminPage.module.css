@@ -103,7 +103,10 @@
   transition: background 0.15s;
 }
 .categoryRow:hover { background: var(--surface-2); }
-.categoryRowActive { background: rgba(99,102,241,0.08); }
+.listRowActive {
+  background: rgba(99, 102, 241, 0.08);
+}
+.listRowActive:hover { background: rgba(99, 102, 241, 0.12); }
 
 .expandBtn {
   background: none; border: none; cursor: pointer;
@@ -138,8 +141,9 @@
   display: flex; gap: 4px; flex-shrink: 0;
   opacity: 0; transition: opacity 0.15s;
 }
-.categoryRow:hover .itemActions { opacity: 1; }
-.typeRow:hover .itemActions     { opacity: 1; }
+.categoryRow:hover .itemActions,
+.typeRow:hover .itemActions,
+.listRowActive .itemActions { opacity: 1; }
 
 .iconBtn {
   background: none; border: none; cursor: pointer;
