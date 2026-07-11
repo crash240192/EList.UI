@@ -71,7 +71,7 @@ interface FormState {
 const EMPTY: FormState = {
   name: '', description: '', address: '',
   startDate: '', startTime: '', endDate: '', endTime: '',
-  cost: '0', ageLimit: '0', isPrivate: false,
+  cost: '0', ageLimit: '', isPrivate: false,
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
 };
 
@@ -271,7 +271,7 @@ export default function CreateEventPage() {
         endDate:            endParts.date,
         endTime:            endParts.time,
         cost:               String(ev.parameters?.cost ?? 0),
-        ageLimit:           normalizeAgeLimitValue(ev.parameters?.ageLimit, null, false),
+        ageLimit:           '',
         isPrivate:          ev.parameters?.private ?? false,
         maxPersons:         String(ev.parameters?.maxPersonsCount ?? ''),
         allowUsersToInvite: ev.parameters?.allowUsersToInvite ?? true,
@@ -476,9 +476,9 @@ export default function CreateEventPage() {
   const tariffName       = tariff?.name ?? 'текущем';
 
   useEffect(() => {
-    if (loading || hasWallet === null) return;
+    if (loading || hasWallet === null || form.ageLimit === '') return;
     const normalized = normalizeAgeLimitValue(
-      form.ageLimit !== '' ? parseInt(form.ageLimit, 10) : null,
+      parseInt(form.ageLimit, 10),
       maxAge,
       hasTariff,
     );
@@ -488,8 +488,9 @@ export default function CreateEventPage() {
   }, [hasTariff, maxAge, hasWallet, loading, form.ageLimit]);
 
   const parseAgeLimit = (): number | null => {
+    if (form.ageLimit === '') return null;
     const age = parseInt(form.ageLimit, 10);
-    return Number.isNaN(age) || age <= 0 ? null : age;
+    return Number.isNaN(age) ? null : age;
   };
 
   // Validation
@@ -523,10 +524,14 @@ export default function CreateEventPage() {
     // Проверяем отрицательные значения
     if (form.cost && parseFloat(form.cost) < 0)                                           errs.add('cost');
     if (form.maxPersons && parseInt(form.maxPersons) < 0)                                 errs.add('maxPersons');
-    if (form.ageLimit) {
-      const age = parseInt(form.ageLimit, 10);
-      if (Number.isNaN(age) || !ageLimitOptions.includes(age as EventAgeLimit)) {
+    if (hasWallet) {
+      if (!form.ageLimit) {
         errs.add('ageLimit');
+      } else {
+        const age = parseInt(form.ageLimit, 10);
+        if (Number.isNaN(age) || !ageLimitOptions.includes(age as EventAgeLimit)) {
+          errs.add('ageLimit');
+        }
       }
     }
     // Проверяем ограничения тарифа
@@ -599,7 +604,9 @@ export default function CreateEventPage() {
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: `Выберите возрастное ограничение из списка (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`,
+        ageLimit: !form.ageLimit
+          ? 'Выберите возрастное ограничение'
+          : `Возрастное ограничение превышает лимит тарифа (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -696,7 +703,9 @@ export default function CreateEventPage() {
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: `Выберите возрастное ограничение из списка (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`,
+        ageLimit: !form.ageLimit
+          ? 'Выберите возрастное ограничение'
+          : `Возрастное ограничение превышает лимит тарифа (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -949,18 +958,25 @@ export default function CreateEventPage() {
               </Field>
             </div>
 
-            <Field label="Возрастное ограничение">
+            <Field
+              label="Возрастное ограничение *"
+              error={hasErr('ageLimit') ? (!form.ageLimit ? 'Обязательное поле' : 'Недопустимое значение') : undefined}
+            >
               <LockedSelect
                 locked={!canSetAge}
                 value={form.ageLimit}
-                onChange={v => setForm(f => ({ ...f, ageLimit: v }))}
+                placeholder="Выберите..."
+                onChange={v => {
+                  setForm(f => ({ ...f, ageLimit: v }));
+                  setFieldErrors(p => { const n = new Set(p); n.delete('ageLimit'); return n; });
+                }}
                 options={ageLimitOptions.map(age => ({
                   value: String(age),
                   label: formatAgeLimitLabel(age),
                 }))}
                 hasError={hasErr('ageLimit')}
                 hint={hasErr('ageLimit')
-                  ? `Превышает лимит тарифа (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`
+                  ? (!form.ageLimit ? undefined : `Превышает лимит тарифа (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`)
                   : !canSetAge ? 'Недоступно в тарифе — только 0+'
                   : maxAge ? `до ${maxAge}+` : undefined}
               />
@@ -1310,21 +1326,25 @@ function LockedInput({ locked, hint, suffix, hasError, ...props }: {
   );
 }
 
-function LockedSelect({ locked, hint, hasError, value, onChange, options }: {
+function LockedSelect({ locked, hint, hasError, value, onChange, options, placeholder }: {
   locked?: boolean; hint?: string; hasError?: boolean;
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
+  placeholder?: string;
 }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
         <select
-          className={`${styles.input} ${styles.select} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''}`}
+          className={`${styles.input} ${styles.select} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''} ${!value ? styles.selectPlaceholder : ''}`}
           disabled={locked}
           value={value}
           onChange={e => onChange(e.target.value)}
         >
+          {placeholder && (
+            <option value="" disabled={value !== ''}>{placeholder}</option>
+          )}
           {options.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}

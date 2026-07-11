@@ -10,6 +10,7 @@ import {
 } from '@/entities/admin/adminApi';
 import { sortByNameRu } from '@/entities/event/lib/sortByNameRu';
 import { Select } from '@/shared/ui/Select/Select';
+import { EVENT_AGE_LIMIT_OPTIONS, formatAgeLimitLabel } from '@/shared/lib/ageLimit';
 import { TabBar } from '@/shared/ui/TabBar';
 import styles from './AdminPage.module.css';
 
@@ -880,9 +881,17 @@ function TariffForm({ tariff, onSave, onCancel }: {
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Макс. возрастное ограничение (пусто = без ограничений)</label>
-          <input className={styles.input} type="number" min={0} max={99}
-            value={validatorStr.ageLimit} placeholder="не задано"
-            onChange={e => setValidatorStr(v => ({ ...v, ageLimit: e.target.value }))} />
+          <Select
+            value={validatorStr.ageLimit}
+            onChange={v => setValidatorStr(s => ({ ...s, ageLimit: v }))}
+            options={[
+              { value: '', label: 'не задано' },
+              ...EVENT_AGE_LIMIT_OPTIONS.map(age => ({
+                value: String(age),
+                label: formatAgeLimitLabel(age),
+              })),
+            ]}
+          />
         </div>
         <label className={styles.checkboxLabel}>
           <input type="checkbox" checked={validatorStr.allowPrivate}
