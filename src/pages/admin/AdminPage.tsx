@@ -800,9 +800,9 @@ function TariffForm({ tariff, onSave, onCancel }: {
     tariffValidatorApi.getByTariff(tariff.id).then(v => {
       if (v) {
         setValidatorStr({
-          costLimit:           v.costLimit    ? String(v.costLimit)    : '',
-          personsLimit:        v.personsLimit ? String(v.personsLimit) : '',
-          ageLimit:            v.ageLimit     ? String(v.ageLimit)     : '',
+          costLimit:           v.costLimit    != null ? String(v.costLimit)    : '',
+          personsLimit:        v.personsLimit != null ? String(v.personsLimit) : '',
+          ageLimit:            v.ageLimit     != null ? String(v.ageLimit)     : '',
           maxEventsCount:      v.maxEventsCount      != null ? String(v.maxEventsCount)      : '',
           createDateMaxPeriod: v.createDateMaxPeriod != null ? String(v.createDateMaxPeriod) : '',
           allowPrivate:            !!v.allowPrivate,
