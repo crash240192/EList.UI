@@ -24,6 +24,8 @@ interface DatePickerProps {
   minTime?: string; // 'HH:MM' — блокируем время если дата = дата начала
   className?: string;
   hasError?: boolean;
+  autoComplete?: string;
+  name?: string;
 }
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
@@ -188,7 +190,7 @@ function isInRange(iso: string, withTime: boolean, min?: string, max?: string): 
 
 const MASK_EMPTY_LABELS = new Set(['Любая']);
 
-export function DatePicker({ value, onChange, withTime = false, placeholder, min, max, minTime, className, hasError }: DatePickerProps) {
+export function DatePicker({ value, onChange, withTime = false, placeholder, min, max, minTime, className, hasError, autoComplete, name }: DatePickerProps) {
   const [open, setOpen]       = useState(false);
   const wrapRef               = useRef<HTMLDivElement>(null);
   const fieldRef              = useRef<HTMLDivElement>(null);
@@ -554,6 +556,8 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
           emptyLabel={emptyLabel}
           ariaLabel={ariaLabel}
           processRaw={processDateTimeRaw}
+          autoComplete={autoComplete}
+          name={name}
         />
         <span className={styles.clearBtnSlot}>
           {inputDigits.length > 0 && (

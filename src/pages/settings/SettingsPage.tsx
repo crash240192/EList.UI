@@ -101,18 +101,26 @@ export default function SettingsPage() {
         </nav>
 
         <div className={styles.scontent}>
-          <div className={`${styles.stab} ${tab === 'profile' ? styles.stabActive : ''}`}>
-            <ProfileTab />
-          </div>
-          <div className={`${styles.stab} ${tab === 'contacts' ? styles.stabActive : ''}`}>
-            <ContactsSection />
-          </div>
-          <div className={`${styles.stab} ${tab === 'location' ? styles.stabActive : ''}`}>
-            <CitySection />
-          </div>
-          <div className={`${styles.stab} ${tab === 'security' ? styles.stabActive : ''}`}>
-            <PasswordSection />
-          </div>
+          {tab === 'profile' && (
+            <div className={`${styles.stab} ${styles.stabActive}`}>
+              <ProfileTab />
+            </div>
+          )}
+          {tab === 'contacts' && (
+            <div className={`${styles.stab} ${styles.stabActive}`}>
+              <ContactsSection />
+            </div>
+          )}
+          {tab === 'location' && (
+            <div className={`${styles.stab} ${styles.stabActive}`}>
+              <CitySection />
+            </div>
+          )}
+          {tab === 'security' && (
+            <div className={`${styles.stab} ${styles.stabActive}`}>
+              <PasswordSection />
+            </div>
+          )}
         </div>
         </div>
       </div>
@@ -239,6 +247,8 @@ function ProfileTab() {
                 placeholder="дд.мм.гггг"
                 min="1900-01-01"
                 max={todayLocalDateString()}
+                autoComplete="bday"
+                name="bday"
               />
             </div>
           </div>
@@ -554,6 +564,7 @@ function PasswordSection() {
                 value={form.oldPassword}
                 onChange={set('oldPassword')}
                 placeholder="Введите текущий пароль"
+                autoComplete="current-password"
                 onFocus={e => e.target.select()}
               />
               <PasswordVisibilityButton
@@ -574,6 +585,7 @@ function PasswordSection() {
                 value={form.newPassword}
                 onChange={set('newPassword')}
                 placeholder="Минимум 6 символов"
+                autoComplete="new-password"
                 onFocus={e => e.target.select()}
               />
               <PasswordVisibilityButton
@@ -594,6 +606,7 @@ function PasswordSection() {
                 value={form.newPasswordConfirmation}
                 onChange={set('newPasswordConfirmation')}
                 placeholder="Повторите новый пароль"
+                autoComplete="new-password"
                 onFocus={e => e.target.select()}
               />
               <PasswordVisibilityButton

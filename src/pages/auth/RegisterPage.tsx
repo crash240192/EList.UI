@@ -415,6 +415,8 @@ export default function RegisterPage() {
                   placeholder="дд.мм.гггг"
                   min="1900-01-01"
                   max={todayLocalDateString()}
+                  autoComplete="bday"
+                  name="bday"
                 />
               </Field>
             </div>

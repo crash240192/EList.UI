@@ -40,6 +40,8 @@ function MaskCapture({
   onFocus,
   ariaLabel,
   processRaw,
+  autoComplete,
+  name,
 }: {
   digits: string;
   onDigitsChange: (digits: string) => void;
@@ -47,6 +49,8 @@ function MaskCapture({
   onFocus?: () => void;
   ariaLabel?: string;
   processRaw: (raw: string) => string;
+  autoComplete?: string;
+  name?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -71,7 +75,8 @@ function MaskCapture({
       ref={inputRef}
       type="text"
       inputMode="numeric"
-      autoComplete="off"
+      name={name}
+      autoComplete={autoComplete ?? 'off'}
       className={styles.maskCapture}
       onKeyDown={handleKeyDown}
       onChange={handleChange}
@@ -89,6 +94,8 @@ interface MaskFieldBaseProps {
   emptyLabel?: string;
   ariaLabel?: string;
   className?: string;
+  autoComplete?: string;
+  name?: string;
 }
 
 /** Поле дд.мм.гггг [ чч:мм] с фиксированными разделителями */
@@ -101,6 +108,8 @@ export function DateTimeMaskField({
   ariaLabel,
   className,
   processRaw,
+  autoComplete,
+  name,
 }: MaskFieldBaseProps & {
   withTime: boolean;
   processRaw: (raw: string) => string;
@@ -118,6 +127,8 @@ export function DateTimeMaskField({
         digits={digits}
         ariaLabel={ariaLabel}
         processRaw={processRaw}
+        autoComplete={autoComplete}
+        name={name}
         onDigitsChange={onDigitsChange}
         onFocus={() => setFocused(true)}
         onBlur={() => { setFocused(false); onBlur?.(); }}
