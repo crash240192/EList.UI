@@ -16,6 +16,10 @@ interface CategoryTypePickerProps {
   selectedTypes: string[];
   onChange: (categories: string[], types: string[]) => void;
   onClose: () => void;
+  /** Подтверждение выбора; по умолчанию вызывается onClose */
+  onApply?: () => void;
+  /** Внутри другой модалки — не дублируем history.pushState */
+  nested?: boolean;
 }
 
 function buildInitialExpanded(
@@ -40,8 +44,10 @@ export function CategoryTypePicker({
   selectedTypes,
   onChange,
   onClose,
+  onApply,
+  nested = false,
 }: CategoryTypePickerProps) {
-  useModalBackButton(onClose);
+  useModalBackButton(onClose, !nested);
   const { groups, loading, error } = useEventTypes();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const initExpandedRef = useRef(false);
@@ -232,7 +238,7 @@ export function CategoryTypePicker({
 
         {/* Footer */}
         <div className={styles.footer}>
-          <button className={styles.applyBtn} onClick={onClose}>
+          <button className={styles.applyBtn} onClick={() => (onApply ?? onClose)()}>
             Применить {totalSelected > 0 && `(${totalSelected})`}
           </button>
         </div>

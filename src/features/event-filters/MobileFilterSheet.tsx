@@ -38,6 +38,7 @@ interface MobileFilterSheetProps {
   allTypes: IEventType[];
   pickerOpen: boolean;
   setPickerOpen: (v: boolean) => void;
+  onPickerApply: () => void;
   chips: { label: string; onRemove: () => void }[];
   handleCitySelect: (city: ICity) => void;
   handleQuickDate: (key: 'today'|'tomorrow'|'weekend') => void;
@@ -48,10 +49,13 @@ export function MobileFilterSheet({
   filters, setFilter, cityName, setCityName,
   quickDate, setQuickDate,
   draftTypes, setDraftTypes, draftCats, setDraftCats,
-  allTypes, pickerOpen, setPickerOpen, chips,
+  allTypes, pickerOpen, setPickerOpen, onPickerApply, chips,
   handleCitySelect, handleQuickDate,
 }: MobileFilterSheetProps) {
-  useModalBackButton(onClose, open);
+  useModalBackButton(() => {
+    if (pickerOpen) setPickerOpen(false);
+    else onClose();
+  }, open);
   const sheetRef = useRef<HTMLDivElement>(null);
   // Блокируем прокрутку body когда шторка открыта
   useEffect(() => {
@@ -221,9 +225,11 @@ export function MobileFilterSheet({
       {/* CategoryTypePicker внутри шторки */}
       {pickerOpen && (
         <CategoryTypePicker
+          nested
           selectedCategories={draftCats}
           selectedTypes={draftTypes}
           onChange={(cats, types) => { setDraftCats(cats); setDraftTypes(types); }}
+          onApply={() => { onPickerApply(); setPickerOpen(false); }}
           onClose={() => setPickerOpen(false)}
         />
       )}
