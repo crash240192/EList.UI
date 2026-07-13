@@ -9,6 +9,7 @@ import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
 import { useEvents } from '@/features/event-list/useEvents';
 import { usePageTitle } from '@/shared/hooks';
+import { useSafeBack } from '@/shared/lib/useSafeBack';
 import {
   fetchSubscriptionsCount,
   fetchSubscribersCount,
@@ -244,6 +245,7 @@ function UserEventsPanel({
 export default function UserPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useSafeBack('/');
   const authenticated = useAuthStore(s => s.isAuthenticated());
 
   useEffect(() => {
@@ -397,7 +399,7 @@ export default function UserPage() {
     return (
       <div className={styles.errorState}>
         <p>{error ?? 'Пользователь не найден'}</p>
-        <button type="button" onClick={() => navigate(-1)}>← Назад</button>
+        <button type="button" onClick={goBack}>← Назад</button>
       </div>
     );
   }
@@ -419,7 +421,7 @@ export default function UserPage() {
           <div className={styles.coverOverlay} />
 
           <div className={styles.heroTop}>
-            <HeroBackButton onClick={() => navigate(-1)} />
+            <HeroBackButton onClick={goBack} />
             <div className={styles.heroTopRight}>
               <button
                 type="button"

@@ -20,6 +20,7 @@ import { birthDateToApiIso, parseBirthDateFromApi, todayLocalDateString } from '
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { useFiltersStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
+import { Button } from '@/shared/ui/Button';
 import { usePageTitle } from '@/shared/hooks';
 import styles from './SettingsPage.module.css';
 
@@ -258,9 +259,7 @@ function ProfileTab() {
         <div className={styles.scardFooter}>
           {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
           {!msg && <span />}
-          <button type="button" className={styles.saveBtn} onClick={handleSave} disabled={saving}>
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </button>
+          <Button onClick={handleSave} loading={saving}>Сохранить</Button>
         </div>
       </div>
     </>
@@ -360,9 +359,7 @@ function CitySection() {
       <div className={styles.scardFooter}>
         {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
         {!msg && <span />}
-        <button type="button" className={styles.saveBtn} onClick={handleSave} disabled={saving || !selectedCity}>
-          {saving ? 'Сохранение...' : 'Сохранить'}
-        </button>
+        <Button onClick={handleSave} loading={saving} disabled={!selectedCity}>Сохранить</Button>
       </div>
     </div>
   );
@@ -428,10 +425,10 @@ function ContactsSection() {
         )}
       </div>
       <div className={styles.scardFooter}>
-        <button type="button" className={styles.addContactBtn}
+        <Button variant="ghost" size="sm"
           onClick={() => { setAddingNew(true); setEditingId(null); }}>
           + Добавить контакт
-        </button>
+        </Button>
         <span />
       </div>
     </div>
@@ -503,10 +500,10 @@ function ContactForm({ types, initial, onSave, onCancel }: {
         </label>
       </div>
       <div className={styles.contactFormActions}>
-        <button type="button" className={styles.cancelBtnSm} onClick={onCancel}>Отмена</button>
-        <button type="button" className={styles.saveBtnSm} onClick={handleSave} disabled={saving}>
-          {saving ? '...' : initial ? 'Сохранить' : 'Добавить'}
-        </button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>Отмена</Button>
+        <Button size="sm" onClick={handleSave} loading={saving}>
+          {initial ? 'Сохранить' : 'Добавить'}
+        </Button>
       </div>
     </div>
   );
@@ -623,9 +620,7 @@ function PasswordSection() {
       <div className={styles.scardFooter}>
         {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
         {!msg && <span />}
-        <button type="button" className={styles.saveBtn} onClick={handleSave} disabled={saving}>
-          {saving ? 'Сохранение...' : 'Изменить пароль'}
-        </button>
+        <Button onClick={handleSave} loading={saving}>Изменить пароль</Button>
       </div>
     </div>
   );

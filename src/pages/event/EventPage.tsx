@@ -34,6 +34,8 @@ import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import { usePageTitle } from '@/shared/hooks';
+import { useSafeBack } from '@/shared/lib/useSafeBack';
+import { Button } from '@/shared/ui/Button';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   calcEventPageExpandedHeroHeight,
@@ -49,6 +51,7 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 export default function EventPage() {
   const { id }   = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack   = useSafeBack('/');
   const { accountId } = useAccountId();
   const authenticated = useAuthStore(s => s.isAuthenticated());
 
@@ -267,7 +270,7 @@ export default function EventPage() {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
-          <HeroBackButton className={styles.deniedBackBtn} variant="solid" onClick={() => navigate(-1)} />
+          <HeroBackButton className={styles.deniedBackBtn} variant="solid" onClick={goBack} />
           <AccessDeniedGate denied variant="page">
             <EventCardDeniedPlaceholder />
           </AccessDeniedGate>
@@ -280,7 +283,7 @@ export default function EventPage() {
       <div className={styles.card}>
         <div className={styles.errorState}>
           <p>Мероприятие не найдено</p>
-          <button onClick={() => navigate(-1)}>← Назад</button>
+          <button onClick={goBack}>← Назад</button>
         </div>
       </div>
     </div>
@@ -377,7 +380,7 @@ export default function EventPage() {
           <div className={styles.heroOverlay} />
 
           <div className={styles.heroTop}>
-            <HeroBackButton onClick={() => navigate(-1)} />
+            <HeroBackButton onClick={goBack} />
             <div className={styles.heroTopRight}>
               <button type="button" className={`${heroStyles.heroBtn} noHoverGlow`} onClick={() => void handleShare()} aria-label="Поделиться" title="Поделиться">
                 <ShareIcon />
@@ -484,9 +487,10 @@ export default function EventPage() {
                     Достигнут лимит участников ({participantCap})
                   </div>
                 )}
-                <button
-                  type="button"
-                  className={`${styles.btnJoin} ${isParticipating ? styles.btnLeave : ''} ${joinShake ? styles.btnJoinShake : ''}`}
+                <Button
+                  variant={isParticipating ? 'secondary' : 'primary'}
+                  loading={actionLoading}
+                  className={joinShake ? styles.btnJoinShake : undefined}
                   onClick={onJoinClick}
                   disabled={joinDisabled}
                   title={
@@ -495,8 +499,8 @@ export default function EventPage() {
                       : undefined
                   }
                 >
-                  {actionLoading ? '...' : isParticipating ? 'Покинуть' : 'Участвовать'}
-                </button>
+                  {isParticipating ? 'Покинуть' : 'Участвовать'}
+                </Button>
               </div>
             )}
           </div>

@@ -188,6 +188,18 @@
 }
 .navActive     { background: rgba(99,102,241,0.12) !important; color: var(--accent) !important; }
 
+/* Акцентная кнопка «Создать событие» — главное продуктовое действие */
+.navCreate {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.navCreate:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+}
+.navCreate .navIcon { color: var(--accent); }
+
 .navIcon {
   position: relative;
   width: 20px; display: flex; align-items: center;
@@ -256,11 +268,18 @@
   bottom: 0;
   overflow: hidden;
   left: var(--sidebar-icons);
+  transition: left var(--transition);
 }
 
 /* Мобайл: main на всю ширину */
 @media (max-width: 639px) {
   .main { left: 0; }
+}
+
+/* Широкий десктоп: раскрытое меню docked — сдвигает контент, не оверлеит */
+@media (min-width: 1280px) {
+  .sidebarExpanded { box-shadow: none; }
+  .sidebarExpanded ~ .main { left: var(--sidebar-full); }
 }
 
 /* ── Тогл темы ── */

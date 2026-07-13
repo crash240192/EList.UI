@@ -78,18 +78,10 @@
 
 /* Action row */
 .actionRow { display:flex; align-items:center; gap:10px; padding:12px 20px; border-bottom:1px solid var(--border); min-height:58px; }
-.actionTitle { flex:1; min-width:0; font-size:16px; font-weight:600; color:var(--text-primary); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.actionTitle { flex:1; min-width:0; font-size:var(--font-lg); font-weight:600; color:var(--text-primary); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .actionBtns { display:flex; gap:7px; flex-shrink:0; align-items:center; }
 .btnInvite {
   composes: btnIcon from '../../shared/styles/actionButtons.module.css';
-}
-
-.btnJoin {
-  composes: btnPrimary from '../../shared/styles/actionButtons.module.css';
-}
-
-.btnLeave {
-  composes: btnSecondary from '../../shared/styles/actionButtons.module.css';
 }
 
 .joinBtnWrap { position:relative; flex-shrink:0; }

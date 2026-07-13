@@ -25,6 +25,23 @@ export function usePageTitle(title?: string | null) {
   }, [title]);
 }
 
+// ---- useMediaQuery ----
+
+/** Реактивно следит за медиазапросом (например media.wide из breakpoints). */
+export function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    setMatches(mql.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, [query]);
+  return matches;
+}
+
 // ---- useLocalStorage ----
 
 export function useLocalStorage<T>(

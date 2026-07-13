@@ -2,11 +2,13 @@
 
 import { useNavigate } from 'react-router-dom';
 import { usePageTitle } from '@/shared/hooks';
+import { useSafeBack } from '@/shared/lib/useSafeBack';
 import styles from './NotFoundPage.module.css';
 
 export default function NotFoundPage() {
   usePageTitle('Страница не найдена');
   const navigate = useNavigate();
+  const goBack = useSafeBack('/');
 
   return (
     <div className={styles.page}>
@@ -19,7 +21,7 @@ export default function NotFoundPage() {
         <button className={styles.primaryBtn} onClick={() => navigate('/')}>
           К поиску событий
         </button>
-        <button className={styles.secondaryBtn} onClick={() => navigate(-1)}>
+        <button className={styles.secondaryBtn} onClick={goBack}>
           Назад
         </button>
       </div>

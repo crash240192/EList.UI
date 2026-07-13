@@ -1,0 +1,126 @@
+/* shared/ui/Button/Button.module.css */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--control-radius);
+  font-family: inherit;
+  font-weight: var(--control-font-weight);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+}
+
+.content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.leftIcon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+/* ── Sizes ── */
+.md {
+  height: var(--control-height);
+  padding: 0 var(--control-padding-x);
+  font-size: var(--control-font-size);
+}
+.sm {
+  height: 30px;
+  padding: 0 14px;
+  font-size: var(--font-sm);
+}
+
+/* ── Variants ── */
+.primary {
+  background: var(--accent);
+  color: #fff;
+}
+.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: var(--hover-glow);
+}
+.primary:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.secondary {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+.secondary:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.secondary:disabled {
+  opacity: 0.55;
+}
+
+.ghost {
+  background: none;
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+.ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.ghost:disabled {
+  opacity: 0.55;
+}
+
+.danger {
+  background: var(--danger);
+  color: #fff;
+}
+.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 82%, #000);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.danger:disabled {
+  opacity: 0.55;
+}
+
+/* ── Loading ── */
+.loading .content {
+  opacity: 0;
+}
+.spinner {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: currentColor;
+  animation: btnSpin 0.7s linear infinite;
+}
+.secondary .spinner,
+.ghost .spinner {
+  border-color: color-mix(in srgb, var(--text-secondary) 30%, transparent);
+  border-top-color: var(--accent);
+}
+
+@keyframes btnSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1.4s; }
+}

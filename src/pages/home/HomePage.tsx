@@ -11,6 +11,7 @@ import { useFiltersStore } from '@/app/store';
 import { useInfiniteScroll, useDebounce, usePageTitle } from '@/shared/hooks';
 import { EventModal } from './EventModal';
 import { FilterBar } from '@/features/event-filters/FilterBar';
+import { useHomeFilterUrlSync } from '@/features/event-filters/filterUrlSync';
 import { EventMap } from '@/features/event-map/EventMap';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { CityConfirmDialog } from '@/shared/ui/CityConfirmDialog/CityConfirmDialog';
@@ -61,6 +62,9 @@ export default function HomePage() {
     keepOldCity,
     triggerCityCheck,
   } = useUserLocation();
+
+  // Двусторонняя синхронизация поиска с URL (deep-link, шаринг результатов)
+  useHomeFilterUrlSync(searchName, setSearchName);
 
   // Центр карты из профиля — не ждём только FilterBar
   useEffect(() => {

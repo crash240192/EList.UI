@@ -15,6 +15,8 @@ import {
 } from '@/features/invitations/invitationsStore';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { useActivationRedirect } from '@/features/auth/useActivationRedirect';
+import { useMediaQuery } from '@/shared/hooks';
+import { media } from '@/shared/lib/breakpoints';
 import styles from './AppLayout.module.css';
 
 const NAV_ITEMS = [
@@ -29,7 +31,9 @@ const NAV_ITEMS = [
 ];
 
 export function AppLayout() {
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const isWide = useMediaQuery(media.wide);
+  // На широком десктопе меню закреплено раскрытым (docked), на узких — оверлей.
+  const [sidebarExpanded, setSidebarExpanded] = useState(isWide);
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
@@ -60,12 +64,19 @@ export function AppLayout() {
     document.body.classList.toggle('light-theme', theme === 'light');
   }, [theme]);
 
-  // Закрытие sidebar по Escape
+  // Смена режима при пересечении широкого брейкпоинта:
+  // на десктопе раскрываем docked-меню, на узких — сворачиваем в оверлей.
   useEffect(() => {
+    setSidebarExpanded(isWide);
+  }, [isWide]);
+
+  // Закрытие sidebar по Escape (только в режиме оверлея)
+  useEffect(() => {
+    if (isWide) return;
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setSidebarExpanded(false); };
     document.addEventListener('keydown', fn);
     return () => document.removeEventListener('keydown', fn);
-  }, []);
+  }, [isWide]);
 
   return (
     <div className={styles.root}>
@@ -135,9 +146,10 @@ export function AppLayout() {
               key={to}
               to={to}
               end={to === '/'}
-              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+              className={({ isActive }) =>
+                `${styles.navItem} ${to === '/create-event' ? styles.navCreate : ''} ${isActive ? styles.navActive : ''}`}
               title={label}
-              onClick={() => setSidebarExpanded(false)}
+              onClick={() => { if (!isWide) setSidebarExpanded(false); }}
             >
               <span className={styles.navIcon}>
                 {icon}
@@ -176,8 +188,8 @@ export function AppLayout() {
         )}
       </aside>
 
-      {/* Backdrop — закрывает sidebar при клике вне */}
-      {sidebarExpanded && (
+      {/* Backdrop — закрывает sidebar при клике вне (только в режиме оверлея) */}
+      {sidebarExpanded && !isWide && (
         <div
           className={styles.backdrop}
           onClick={() => setSidebarExpanded(false)}

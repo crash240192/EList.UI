@@ -38,6 +38,7 @@ import {
 } from '@/shared/lib/datetime';
 import type { Gender } from '@/shared/api/types';
 import { usePageTitle } from '@/shared/hooks';
+import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
@@ -136,6 +137,7 @@ export default function CreateEventPage() {
   const navigate  = useNavigate();
   const { id }    = useParams<{ id: string }>();
   const isEditing = !!id;
+  const goBack    = useSafeBack('/');
   usePageTitle(isEditing ? 'Редактирование события' : 'Создать событие');
   const { accountId } = useAccountId();
 
@@ -749,7 +751,7 @@ export default function CreateEventPage() {
 
         {/* Хедер */}
         <div className={styles.header}>
-          <HeroBackButton onClick={() => navigate(-1)} />
+          <HeroBackButton onClick={goBack} />
           <h1 className={styles.title}>{isEditing ? 'Редактировать мероприятие' : 'Новое мероприятие'}</h1>
         </div>
 
@@ -1166,7 +1168,7 @@ export default function CreateEventPage() {
 
         {/* Кнопки */}
         <div className={styles.actions}>
-          <button className={styles.cancelBtn} onClick={() => navigate(-1)}>Отмена</button>
+          <button className={styles.cancelBtn} onClick={goBack}>Отмена</button>
           <button className={styles.saveBtn} onClick={handlePublishClick} disabled={saving}>
             {saving ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Опубликовать'}
           </button>
