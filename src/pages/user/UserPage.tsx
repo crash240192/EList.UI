@@ -8,6 +8,7 @@ import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
 import { useEvents } from '@/features/event-list/useEvents';
+import { usePageTitle } from '@/shared/hooks';
 import {
   fetchSubscriptionsCount,
   fetchSubscribersCount,
@@ -384,6 +385,12 @@ export default function UserPage() {
       .sort((a, b) => new Date(a.event.startTime).getTime() - new Date(b.event.startTime).getTime())
       .slice(0, 3);
   }, [createdEvents.events, participatingEvents.events]);
+
+  const pageTitle = profile
+    ? ([profile.person?.lastName, profile.person?.firstName].filter(Boolean).join(' ')
+        || `@${profile.account.login}`)
+    : null;
+  usePageTitle(pageTitle);
 
   if (loading) return <Skeleton />;
   if (error || !profile) {

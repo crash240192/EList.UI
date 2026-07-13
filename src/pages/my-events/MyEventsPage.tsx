@@ -7,7 +7,7 @@ import { useMyEvents, type OwnerFilter } from '@/features/event-list/useMyEvents
 import { FilterBar } from '@/features/event-filters/FilterBar';
 import { useMyEventsFiltersStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
-import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
+import { useInfiniteScroll, useDebounce, usePageTitle } from '@/shared/hooks';
 import type { IEventsSearchParams, EventViewMode } from '@/entities/event';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
@@ -53,6 +53,7 @@ const OWNER_TABS = [
 ];
 
 export default function MyEventsPage() {
+  usePageTitle('Мои события');
   const navigate = useNavigate();
   const { accountId, loading: accountLoading } = useAccountId();
   const { filters, setFilter, resetFilters } = useMyEventsFiltersStore();

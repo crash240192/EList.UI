@@ -7,10 +7,12 @@ import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { storeActivationNotice, takeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
+import { usePageTitle } from '@/shared/hooks';
 import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
 import styles from './AuthPage.module.css';
 
 export default function LoginPage() {
+  usePageTitle('Вход');
   const navigate     = useNavigate();
   const location     = useLocation();
   const { setAuth }  = useAuthStore();

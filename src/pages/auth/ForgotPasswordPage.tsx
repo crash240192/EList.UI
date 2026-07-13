@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { OtpCodeInput } from '@/shared/ui/OtpCodeInput';
+import { usePageTitle } from '@/shared/hooks';
 import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
 import styles from './AuthPage.module.css';
 import fpStyles from './ForgotPasswordPage.module.css';
@@ -21,6 +22,7 @@ const RESEND_TIMEOUT = 15;
 type Step = 'login' | 'code' | 'password' | 'success';
 
 export default function ForgotPasswordPage() {
+  usePageTitle('Восстановление пароля');
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
 

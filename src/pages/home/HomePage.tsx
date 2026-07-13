@@ -8,7 +8,7 @@ import { EventCard, fetchEventById, EVENTS_MAP_SHORT_PAGE_SIZE } from '@/entitie
 import { useEvents } from '@/features/event-list/useEvents';
 import { useEventsMapShort } from '@/features/event-list/useEventsMapShort';
 import { useFiltersStore } from '@/app/store';
-import { useInfiniteScroll, useDebounce } from '@/shared/hooks';
+import { useInfiniteScroll, useDebounce, usePageTitle } from '@/shared/hooks';
 import { EventModal } from './EventModal';
 import { FilterBar } from '@/features/event-filters/FilterBar';
 import { EventMap } from '@/features/event-map/EventMap';
@@ -36,6 +36,7 @@ function readStoredListUi(): StoredListUi | null {
 }
 
 export default function HomePage() {
+  usePageTitle('Поиск событий');
   const [selectedEvent, setSelectedEvent] = useState<IEvent | null>(null);
   const [searchName, setSearchName] = useState(() => {
     try {

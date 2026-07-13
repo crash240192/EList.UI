@@ -12,6 +12,7 @@ import { sortByNameRu } from '@/entities/event/lib/sortByNameRu';
 import { Select } from '@/shared/ui/Select/Select';
 import { EVENT_AGE_LIMIT_OPTIONS, formatAgeLimitLabel, normalizeAgeLimitValue, type EventAgeLimit } from '@/shared/lib/ageLimit';
 import { TabBar } from '@/shared/ui/TabBar';
+import { usePageTitle } from '@/shared/hooks';
 import styles from './AdminPage.module.css';
 
 type AdminTab = 'eventTypes' | 'contactTypes' | 'tariffs';
@@ -26,6 +27,7 @@ function icoToDisplayUrl(ico: string): string {
 }
 
 export default function AdminPage() {
+  usePageTitle('Администрирование');
   const [tab, setTab] = useState<AdminTab>('eventTypes');
 
   return (

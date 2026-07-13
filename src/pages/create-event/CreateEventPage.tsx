@@ -37,6 +37,7 @@ import {
   todayLocalDateString,
 } from '@/shared/lib/datetime';
 import type { Gender } from '@/shared/api/types';
+import { usePageTitle } from '@/shared/hooks';
 import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
@@ -135,6 +136,7 @@ export default function CreateEventPage() {
   const navigate  = useNavigate();
   const { id }    = useParams<{ id: string }>();
   const isEditing = !!id;
+  usePageTitle(isEditing ? 'Редактирование события' : 'Создать событие');
   const { accountId } = useAccountId();
 
   const [form,        setForm]        = useState<FormState>(EMPTY);

@@ -429,6 +429,11 @@ export function FilterBar({
         {/* Группа: цена */}
         <span className={styles.groupLabel}>Цена</span>
         <button className={`${styles.quickBtn} ${filters.price === 0 ? styles.quickBtnOn : ''}`} onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>Бесплатно</button>
+
+        <div className={styles.sep}/>
+
+        {/* Группа: возраст */}
+        <span className={styles.groupLabel}>Возраст</span>
         <button
           className={`${styles.quickBtn} ${filters.ageLimit === 18 ? styles.quickBtnOn : ''}`}
           onClick={() => filters.ageLimit === 18 ? setFilter('ageLimit', undefined) : setFilter('ageLimit', 18)}

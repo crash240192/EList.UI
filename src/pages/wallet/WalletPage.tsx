@@ -5,6 +5,7 @@ import { createWallet, getWalletByAccount, setWalletTariff, type IWallet } from 
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
 import { getOrFetchAccountId } from '@/entities/user/api';
+import { usePageTitle } from '@/shared/hooks';
 import styles from './WalletPage.module.css';
 
 const HISTORY_STUB: {
@@ -131,6 +132,7 @@ function TariffPlansCarousel({ children, count }: { children: ReactNode; count: 
 }
 
 export default function WalletPage() {
+  usePageTitle('Кошелёк');
   const [wallet, setWallet] = useState<IWallet | null>(null);
   const [tariff, setTariff] = useState<ITariff | null>(null);
   const [holderName, setHolderName] = useState('');

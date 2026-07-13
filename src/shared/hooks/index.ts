@@ -13,6 +13,18 @@ export function useDebounce<T>(value: T, delay = 300): T {
   return debounced;
 }
 
+// ---- usePageTitle ----
+
+const BASE_TITLE = 'EList — События города';
+
+/** Заголовок вкладки: «{title} — EList». Без аргумента / с пустым — базовый. */
+export function usePageTitle(title?: string | null) {
+  useEffect(() => {
+    document.title = title ? `${title} — EList` : BASE_TITLE;
+    return () => { document.title = BASE_TITLE; };
+  }, [title]);
+}
+
 // ---- useLocalStorage ----
 
 export function useLocalStorage<T>(

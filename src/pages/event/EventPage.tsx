@@ -33,6 +33,7 @@ import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
+import { usePageTitle } from '@/shared/hooks';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   calcEventPageExpandedHeroHeight,
@@ -77,6 +78,8 @@ export default function EventPage() {
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+
+  usePageTitle(event?.name ?? null);
 
   const {
     organizers,

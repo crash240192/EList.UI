@@ -1,0 +1,81 @@
+/* pages/not-found/NotFoundPage.module.css */
+
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: var(--page-padding);
+  text-align: center;
+  overflow-y: auto;
+}
+
+.code {
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 2px;
+  background: var(--hero-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* В тёмной теме градиент почти сливается с фоном — подсветим */
+  filter: brightness(1.9);
+}
+
+.light-theme .code,
+:global(.light-theme) .code {
+  filter: none;
+}
+
+.title {
+  font-size: var(--font-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.text {
+  font-size: var(--font-md);
+  color: var(--text-secondary);
+  max-width: 380px;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.primaryBtn {
+  height: var(--control-height);
+  padding: 0 var(--control-padding-x);
+  border: none;
+  border-radius: var(--control-radius);
+  background: var(--accent);
+  color: #fff;
+  font-size: var(--control-font-size);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.primaryBtn:hover { background: var(--accent-hover); }
+
+.secondaryBtn {
+  height: var(--control-height);
+  padding: 0 var(--control-padding-x);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--control-font-size);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.secondaryBtn:hover { color: var(--text-primary); background: var(--surface-2); }

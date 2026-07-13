@@ -10,6 +10,7 @@ import { takeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { OtpCodeInput } from '@/shared/ui/OtpCodeInput';
+import { usePageTitle } from '@/shared/hooks';
 import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
 import styles from './AuthPage.module.css';
 import actStyles from './ActivationPage.module.css';
@@ -26,6 +27,7 @@ function readActivationSendMessage(result: unknown): string | null {
 }
 
 export default function ActivationPage() {
+  usePageTitle('Активация аккаунта');
   const navigate = useNavigate();
   const { confirmActivation, logout } = useAuthStore();
 

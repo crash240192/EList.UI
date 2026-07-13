@@ -21,6 +21,7 @@ import { EventListItem } from '@/entities/event/ui/EventListItem';
 import listItemStyles from '@/entities/event/ui/EventListItem/EventListItem.module.css';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import { usePageTitle } from '@/shared/hooks';
 import {
   findUrgentInvitation,
   formatInvitationEventDate,
@@ -64,6 +65,7 @@ function EventTypeTags({ types, className }: { types: IEventType[]; className?: 
 }
 
 export default function InvitationsPage() {
+  usePageTitle('Приглашения');
   const navigate = useNavigate();
   const refreshNotViewedCount = useInvitationsStore(s => s.refreshNotViewedCount);
   const [tab, setTab] = useState<Tab>('incoming');

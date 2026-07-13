@@ -1,32 +1,5 @@
-/* AppLayout.module.css */
-
-:root {
-  --bg:             #0f0f0f;
-  --surface:        #1a1a1a;
-  --surface-2:      #222222;
-  --border:         #2a2a2a;
-  --accent:         #6366f1;
-  --accent-hover:   #4f46e5;
-  --text-primary:   #e0e0e0;
-  --text-secondary: #888888;
-  --text-muted:     #555555;
-  --success:        #22c55e;
-  --danger:         #ef4444;
-  --warning:        #f59e0b;
-  --header-h:       56px;
-  --sidebar-icons:  52px;
-  --sidebar-full:   220px;
-  --transition:     0.22s ease;
-}
-:global(.light-theme) {
-  --bg:             #dfe3ea;
-  --surface:        #f0f2f6;
-  --surface-2:      #e6e9f0;
-  --border:         #ccd2dc;
-  --text-primary:   #1a1f2e;
-  --text-secondary: #5c6370;
-  --text-muted:     #8a919d;
-}
+/* AppLayout.module.css
+   Токены (палитра, --header-h, --sidebar-*) объявлены в src/index.css. */
 
 /* ---- Root ---- */
 .root {
@@ -129,8 +102,8 @@
 
 .loginBtn {
   background: var(--accent); color: #fff; border: none;
-  border-radius: 8px; padding: 6px 12px;
-  font-size: 13px; font-weight: 600; cursor: pointer;
+  border-radius: 8px; padding: 6px 14px;
+  font-size: var(--font-md); font-weight: 600; cursor: pointer;
   transition: background var(--transition);
 }
 .loginBtn:hover { background: var(--accent-hover); }
@@ -197,7 +170,7 @@
   display: flex; align-items: center; gap: 12px;
   padding: 10px; border-radius: 10px;
   color: var(--text-secondary); text-decoration: none;
-  font-size: 13px; font-weight: 500;
+  font-size: var(--font-md); font-weight: 500;
   white-space: nowrap;
   transition: background var(--transition), color var(--transition), box-shadow var(--transition);
   min-width: 0;
@@ -258,7 +231,7 @@
   display: flex; align-items: center; gap: 12px;
   margin: 6px; padding: 9px 10px;
   border: none; border-radius: 10px; background: none;
-  color: var(--danger); font-size: 13px; font-weight: 500;
+  color: var(--danger); font-size: var(--font-md); font-weight: 500;
   cursor: pointer; white-space: nowrap; overflow: hidden;
   transition: background var(--transition);
 }
@@ -269,7 +242,7 @@
   width: 100%;
   padding: 10px; border: none; border-radius: 10px;
   background: var(--accent); color: #fff;
-  font-size: 13px; font-weight: 600;
+  font-size: var(--font-md); font-weight: 600;
   cursor: pointer; white-space: nowrap; overflow: hidden;
   transition: background var(--transition);
 }

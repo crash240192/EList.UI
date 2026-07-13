@@ -21,6 +21,7 @@ import { cookies } from '@/shared/lib/cookies';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import { validateContactValue, isRegexMask, resolveContactMaskTemplate, composeContactValue } from '@/shared/lib/contactMask';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
+import { usePageTitle } from '@/shared/hooks';
 import { ContactMaskField } from '@/shared/ui/ContactMaskField/ContactMaskField';
 import { Select, type SelectOption } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
@@ -82,6 +83,7 @@ function contactSubmitValue(ct: IContactType | undefined, raw: string): string {
 }
 
 export default function RegisterPage() {
+  usePageTitle('Регистрация');
   const navigate    = useNavigate();
   const { setAuth } = useAuthStore();
 

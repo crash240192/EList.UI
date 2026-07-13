@@ -10,6 +10,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@fontsource-variable/manrope": "^5.2.8",
     "flatpickr": "^4.6.13",
     "html5-qrcode": "^2.3.8",
     "qrcode": "^1.5.4",

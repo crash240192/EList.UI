@@ -1,6 +1,16 @@
 /* Shared layout & UI tokens — import via index.css */
 
 :root {
+  /* Type scale — размеры текста только из шкалы; ниже 11px не опускаемся */
+  --font-2xs:  11px;  /* бейджи, счётчики */
+  --font-xs:   12px;  /* мета, подписи */
+  --font-sm:   13px;  /* вторичный текст, компактные контролы */
+  --font-md:   14px;  /* навигация, кнопки, инпуты */
+  --font-base: 15px;  /* основной текст, заголовки карточек */
+  --font-lg:   16px;
+  --font-xl:   20px;
+  --font-2xl:  24px;
+
   /* Breakpoints (documented; use same values in @media) */
   --bp-mobile-max: 639px;
   --bp-tablet-min: 640px;
@@ -40,13 +50,13 @@
   /* Action / nav buttons */
   --control-radius: 9px;
   --control-height: 36px;
-  --control-font-size: 13px;
+  --control-font-size: var(--font-md);
   --control-font-weight: 500;
   --control-padding-x: 20px;
   --control-icon-size: 36px;
 
   /* Underline tabs */
-  --tab-font-size: 13px;
+  --tab-font-size: var(--font-md);
   --tab-font-weight: 500;
   --tab-padding-y: 11px;
   --tab-padding-x: 16px;

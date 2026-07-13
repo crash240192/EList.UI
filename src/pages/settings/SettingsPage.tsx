@@ -20,6 +20,7 @@ import { birthDateToApiIso, parseBirthDateFromApi, todayLocalDateString } from '
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { useFiltersStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
+import { usePageTitle } from '@/shared/hooks';
 import styles from './SettingsPage.module.css';
 
 type SettingsTab = 'profile' | 'contacts' | 'location' | 'security';
@@ -71,6 +72,7 @@ const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: React
 ];
 
 export default function SettingsPage() {
+  usePageTitle('Настройки');
   const [tab, setTab] = useState<SettingsTab>('profile');
   const sections = [...new Set(NAV_ITEMS.map(i => i.section))];
 

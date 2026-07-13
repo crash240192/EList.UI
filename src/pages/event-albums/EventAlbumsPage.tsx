@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
+import { usePageTitle } from '@/shared/hooks';
 import styles from './EventAlbumsPage.module.css';
 
 export default function EventAlbumsPage() {
+  usePageTitle('Альбомы мероприятий');
   const navigate = useNavigate();
   const { accountId, loading } = useAccountId();
 

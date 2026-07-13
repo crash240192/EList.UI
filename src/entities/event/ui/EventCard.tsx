@@ -15,8 +15,13 @@ function useEventCard() {
   return ctx;
 }
 
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+/** «сб, 18 июл.» → «Сб, 18 июл» — якорь сканирования списка */
+function formatDateBadge(iso: string) {
+  const s = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(iso));
+  return (s.charAt(0).toUpperCase() + s.slice(1)).replace(/\./g, '');
+}
+function formatTime(iso: string) {
+  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 function formatPrice(cost: number) {
   return cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`;
@@ -70,14 +75,17 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
       {(event.parameters?.ageLimit ?? 0) > 0 && (
         <span className={styles.ageBadge}>{event.parameters!.ageLimit}+</span>
       )}
-      {event.parameters?.private && (
-        <span className={styles.privateBadge} aria-label="Приватное">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-            <rect x="3" y="11" width="18" height="11" rx="2" />
-            <path d="M7 11V7a5 5 0 0110 0v4" />
-          </svg>
-        </span>
-      )}
+      <div className={styles.coverTopLeft}>
+        <span className={styles.dateBadge}>{formatDateBadge(event.startTime)}</span>
+        {event.parameters?.private && (
+          <span className={styles.privateBadge} aria-label="Приватное">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" />
+            </svg>
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -92,12 +100,12 @@ function Meta() {
   return (
     <div className={styles.meta}>
       <span className={styles.metaItem}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        {formatDate(event.startTime)}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        {formatTime(event.startTime)}
       </span>
       {event.address && (
         <span className={styles.metaItem}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
           {event.address}
         </span>
       )}

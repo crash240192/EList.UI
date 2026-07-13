@@ -1,7 +1,7 @@
 // app/router/index.tsx
 
 import { Suspense } from 'react';
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
 import { RequireAuth } from '@/features/auth/RequireAuth';
@@ -27,6 +27,7 @@ const RegisterPage    = lazyWithRetry(() => import('@/pages/auth/RegisterPage'))
 const ForgotPasswordPage = lazyWithRetry(() => import('@/pages/auth/ForgotPasswordPage'));
 const InvitationsPage = lazyWithRetry(() => import('@/pages/invitations/InvitationsPage'));
 const EventAlbumsPage = lazyWithRetry(() => import('@/pages/event-albums/EventAlbumsPage'));
+const NotFoundPage    = lazyWithRetry(() => import('@/pages/not-found/NotFoundPage'));
 
 const Loader = () => (
   <div
@@ -69,7 +70,7 @@ const router = createBrowserRouter([
       { path: 'admin',            element: <RequireAuth>{S(AdminPage)}</RequireAuth> },
       { path: 'settings',         element: <RequireAuth>{S(SettingsPage)}</RequireAuth> },
       { path: 'wallet',           element: <RequireAuth>{S(WalletPage)}</RequireAuth> },
-      { path: '*',                element: <Navigate to="/" replace /> },
+      { path: '*',                element: S(NotFoundPage) },
     ],
   },
 ]);

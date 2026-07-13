@@ -106,6 +106,11 @@ export function AppLayout() {
               <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
             </svg>
           </button>
+          {!authenticated && (
+            <button className={styles.loginBtn} onClick={() => navigate('/login')}>
+              Войти
+            </button>
+          )}
           {authenticated && (
             <>
             <NotificationBell />
