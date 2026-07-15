@@ -512,6 +512,7 @@ export default function EventPage() {
           <div className={styles.leftPanel}>
 
             {/* Дата */}
+            <div className={styles.blockDate}>
             <div className={styles.metaRow}>
               <div className={styles.metaIco}><CalendarIcon /></div>
               <div className={styles.metaContent}>
@@ -529,19 +530,10 @@ export default function EventPage() {
                 )}
               </div>
             </div>
-
-            {/* Адрес */}
-            {event.address && (
-              <div className={styles.metaRow}>
-                <div className={styles.metaIco}><PinIcon /></div>
-                <div className={styles.metaContent}>
-                  <div className={styles.metaLbl}>Место</div>
-                  <div className={styles.metaVal}>{event.address}</div>
-                </div>
-              </div>
-            )}
+            </div>
 
             {/* Цена */}
+            <div className={styles.blockPrice}>
             <div className={styles.priceBlock}>
               <div className={cost === 0 ? styles.priceVal : styles.priceValPaid}>
                 {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
@@ -563,8 +555,10 @@ export default function EventPage() {
                   </button>
                 )}
             </div>
+            </div>
 
             {showParticipantsBlock && (
+              <div className={styles.blockParticipants}>
               <AccessDeniedGate denied={participantsDenied} variant="section">
                 {participantsDenied ? (
                   <SectionDeniedPlaceholder lines={3} />
@@ -601,19 +595,12 @@ export default function EventPage() {
                   </button>
                 )}
               </AccessDeniedGate>
+              </div>
             )}
-
-            {/* Альбомы */}
-            <EventAlbums
-              eventId={id!}
-              compact
-              canManage={isOrganizer}
-              isParticipating={isParticipating}
-              accountId={accountId}
-            />
 
             {/* Организаторы */}
             {(organizers.length > 0 || organizersDenied) && (
+              <div className={styles.blockOrgs}>
               <AccessDeniedGate denied={organizersDenied} variant="section">
                 {organizersDenied ? (
                   <SectionDeniedPlaceholder lines={3} />
@@ -640,7 +627,19 @@ export default function EventPage() {
                   </div>
                 )}
               </AccessDeniedGate>
+              </div>
             )}
+
+            {/* Альбомы */}
+            <div className={styles.blockAlbums}>
+            <EventAlbums
+              eventId={id!}
+              compact
+              canManage={isOrganizer}
+              isParticipating={isParticipating}
+              accountId={accountId}
+            />
+            </div>
 
           </div>
 
@@ -648,7 +647,7 @@ export default function EventPage() {
           <div className={styles.rightPanel}>
 
             {/* Описание */}
-            <div>
+            <div className={styles.blockDesc}>
               <div className={styles.secLabel}>О мероприятии</div>
               <p className={`${styles.desc} ${descExpanded ? '' : styles.descClamped}`}>
                 {event.description ?? 'Описание отсутствует'}
@@ -674,33 +673,53 @@ export default function EventPage() {
               )}
             </div>
 
-            {/* Карта */}
-            {event.latitude != null && event.longitude != null && (
-              <div>
+            {/* Место проведения: адрес + карта единым блоком */}
+            {(event.address || (event.latitude != null && event.longitude != null)) && (
+              <div className={styles.blockPlace}>
                 <div className={styles.secLabel}>Место проведения</div>
-                <div className={styles.mapBlock}>
-                  <button
-                    type="button"
-                    className={styles.mapExpandBtn}
-                    onClick={() => setMapModalOpen(true)}
-                    aria-label="Развернуть карту"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" />
-                    </svg>
-                    Развернуть
-                  </button>
-                  <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} draggable={false} />
-                </div>
+                {event.address && (
+                  <div className={styles.placeAddress}>
+                    <PinIcon />
+                    <span className={styles.placeAddressText}>{event.address}</span>
+                    {event.latitude != null && event.longitude != null && (
+                      <a
+                        className={styles.routeLink}
+                        href={`https://yandex.ru/maps/?rtext=~${event.latitude},${event.longitude}&rtt=auto`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Маршрут
+                      </a>
+                    )}
+                  </div>
+                )}
+                {event.latitude != null && event.longitude != null && (
+                  <div className={styles.mapBlock}>
+                    <button
+                      type="button"
+                      className={styles.mapExpandBtn}
+                      onClick={() => setMapModalOpen(true)}
+                      aria-label="Развернуть карту"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" />
+                      </svg>
+                      Развернуть
+                    </button>
+                    <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} draggable={false} />
+                  </div>
+                )}
               </div>
             )}
 
             {id && (
-              <EventDiscussionsPanel
-                eventId={id}
-                currentAccountId={accountId}
-                canManage={isOrganizer}
-              />
+              <div className={styles.blockDiscuss}>
+                <EventDiscussionsPanel
+                  eventId={id}
+                  currentAccountId={accountId}
+                  canManage={isOrganizer}
+                />
+              </div>
             )}
 
           </div>
