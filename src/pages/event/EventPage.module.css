@@ -170,7 +170,7 @@
 
 /* Main grid */
 .mainGrid { display:grid; grid-template-columns:280px 1fr; align-items:start; }
-.leftPanel { border-right:1px solid var(--border); padding:16px 14px 24px; display:flex; flex-direction:column; min-width:0; }
+.leftPanel { border-right:1px solid var(--border); padding:16px 14px 24px; display:flex; flex-direction:column; gap:8px; min-width:0; }
 .rightPanel { padding:18px 20px 28px; display:flex; flex-direction:column; gap:16px; min-width:0; }
 
 /* Left meta */
@@ -183,7 +183,7 @@
 .metaValSub { font-size:11px; color:var(--text-secondary); font-weight:400; }
 
 /* Price */
-.priceBlock { display:flex; align-items:center; justify-content:space-between; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin:0 0 8px; }
+.priceBlock { display:flex; align-items:center; justify-content:space-between; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin:0; }
 .priceVal { font-size:17px; font-weight:600; color:#10b981; }
 .priceBadge { background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); color:#10b981; border-radius:20px; padding:2px 9px; font-size:10px; font-weight:600; }
 .priceValPaid { color:var(--text-primary); }
@@ -214,7 +214,7 @@
 .participantsBlock {
   display: block;
   width: 100%;
-  margin: 0 0 6px;
+  margin: 0;
   padding: 10px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -272,7 +272,6 @@
 }
 
 /* Albums in left */
-.albumsSection { margin-top:14px; }
 .albumsGrid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
 .albumThumb { border-radius:8px; overflow:hidden; aspect-ratio:1.4; cursor:pointer; position:relative; border:1px solid var(--border); background:var(--surface-2); transition:border-color .12s; display:flex; align-items:center; justify-content:center; }
 .albumThumb:hover { border-color:var(--accent); }
@@ -282,7 +281,7 @@
 .albumPrivBadge { position:absolute; top:5px; right:5px; background:rgba(0,0,0,.5); border-radius:5px; padding:2px 4px; display:flex; align-items:center; }
 
 /* Organizers */
-.orgsSection { margin-top: 6px; }
+.orgsSection { margin: 0; }
 .orgChip { display:flex; align-items:center; gap:9px; padding:8px 10px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; cursor:pointer; margin-bottom:6px; transition:border-color .12s; }
 .orgChip:last-child { margin-bottom: 0; }
 .orgChip:hover { border-color:var(--accent); }

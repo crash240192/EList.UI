@@ -20,9 +20,10 @@ export function AccessDeniedGate({
 }: AccessDeniedGateProps) {
   const stampSize: AccessDeniedStampSize = variant === 'page' ? 'lg' : 'sm';
   const variantClass = variant === 'page' ? styles.gatePage : styles.gateSection;
+  const deniedClass = denied ? styles.denied : '';
 
   return (
-    <div className={`${styles.gate} ${variantClass} ${className ?? ''}`}>
+    <div className={`${styles.gate} ${variantClass} ${deniedClass} ${className ?? ''}`.trim()}>
       <div className={`${styles.content} ${denied ? styles.contentBlurred : ''}`}>{children}</div>
       {denied && (
         <div className={styles.overlay} role="status" aria-live="polite" aria-label="Доступ запрещён">

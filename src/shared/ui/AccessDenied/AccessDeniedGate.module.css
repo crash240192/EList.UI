@@ -27,10 +27,11 @@
   border-radius: inherit;
 }
 
-.gatePage {
+/* Min-height only when denied — otherwise empty space breaks section rhythm */
+.gatePage.denied {
   min-height: min(72vh, 640px);
 }
 
-.gateSection {
+.gateSection.denied {
   min-height: 120px;
 }
