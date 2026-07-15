@@ -298,6 +298,25 @@ export function EventMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // При сворачивании/разворачивании сайдбара контейнер меняет ширину —
+  // без fitToViewport карта остаётся со старым размером (пустая полоса справа).
+  useEffect(() => {
+    if (!ready || !mapRef.current || !containerRef.current) return;
+    const map = mapRef.current;
+    const el = containerRef.current;
+    const fit = () => {
+      try {
+        map.container.fitToViewport();
+      } catch {
+        /* ignore */
+      }
+    };
+    fit();
+    const observer = new ResizeObserver(() => fit());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ready]);
+
   // Следим за центром из пропа (родной город / фильтр) после инициализации карты
   useEffect(() => {
     if (!ready || !mapRef.current) return;
