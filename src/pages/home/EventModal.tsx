@@ -7,6 +7,7 @@ import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import styles from './EventModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
@@ -56,9 +57,7 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
 
           {/* Бейджи сверху */}
           <div className={styles.topBadges}>
-            {ageLimit && ageLimit > 0 && (
-              <span className={styles.ageBadge}>{ageLimit}+</span>
-            )}
+            <span className={styles.ageBadge}>{resolveAgeLimitBadge(ageLimit)}</span>
             {isPrivate && (
               <span className={styles.privateBadge}>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

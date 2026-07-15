@@ -9,6 +9,7 @@ import {
   getEventListTypes,
   type EventListItemData,
 } from '@/entities/event/lib/eventListItemUtils';
+import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import styles from './EventListItem.module.css';
 
 export type EventListUrgencyKind = 'hot' | 'soon' | 'ok';
@@ -141,9 +142,9 @@ export function EventListItem({
             <span className={`${styles.metaItem} ${price.free ? styles.metaFree : styles.metaPaid}`}>
               {price.label}
             </span>
-            {params.ageLimit != null && params.ageLimit > 0 && (
-              <span className={`${styles.metaItem} ${styles.metaAge}`}>{params.ageLimit}+</span>
-            )}
+            <span className={`${styles.metaItem} ${styles.metaAge}`}>
+              {resolveAgeLimitBadge(params.ageLimit)}
+            </span>
           </div>
 
           {types.length > 0 && (

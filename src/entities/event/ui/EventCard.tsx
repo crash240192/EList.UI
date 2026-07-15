@@ -5,6 +5,7 @@ import type { IEvent } from '../types';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import styles from './EventCard.module.css';
 
 interface EventCardContextValue { event: IEvent; }
@@ -72,9 +73,7 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
           />
         ))}
       </div>
-      {(event.parameters?.ageLimit ?? 0) > 0 && (
-        <span className={styles.ageBadge}>{event.parameters!.ageLimit}+</span>
-      )}
+      <span className={styles.ageBadge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
       <div className={styles.coverTopLeft}>
         <span className={styles.dateBadge}>{formatDateBadge(event.startTime)}</span>
         {event.parameters?.private && (

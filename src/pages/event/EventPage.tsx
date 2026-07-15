@@ -28,6 +28,7 @@ import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
@@ -435,9 +436,7 @@ export default function EventPage() {
               />
             ))}
             {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
-            {event.parameters?.ageLimit != null && (
-              <span className={styles.tagAge}>{event.parameters.ageLimit}+</span>
-            )}
+            <span className={styles.tagAge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
             {event.parameters?.private && (
               <span className={styles.tagPrivate}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

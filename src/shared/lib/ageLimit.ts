@@ -35,12 +35,16 @@ export function formatAgeLimitLabel(age: number): string {
   return `${age}+`;
 }
 
-/** Показывать ли плашку возраста (включая 0+) */
-export function hasAgeLimitBadge(age: number | null | undefined): boolean {
-  return age != null && !Number.isNaN(age);
+/**
+ * Текст плашки возраста для превью.
+ * 0, null и пустое значение показываем как 0+.
+ */
+export function resolveAgeLimitBadge(
+  age: number | string | null | undefined,
+): string {
+  if (age === '' || age == null) return '0+';
+  const n = typeof age === 'number' ? age : parseInt(String(age), 10);
+  if (Number.isNaN(n) || n < 0) return '0+';
+  return formatAgeLimitLabel(n);
 }
 
-export function formatAgeLimitBadge(age: number | null | undefined): string | null {
-  if (!hasAgeLimitBadge(age)) return null;
-  return formatAgeLimitLabel(age!);
-}

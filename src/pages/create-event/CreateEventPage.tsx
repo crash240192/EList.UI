@@ -46,6 +46,7 @@ import {
   formatAgeLimitLabel,
   getAvailableAgeLimitOptions,
   normalizeAgeLimitValue,
+  resolveAgeLimitBadge,
   type EventAgeLimit,
 } from '@/shared/lib/ageLimit';
 import styles from './CreateEventPage.module.css';
@@ -1118,14 +1119,10 @@ export default function CreateEventPage() {
               </div>
             )}
             <div className={styles.previewName}>{form.name || <span style={{color:'var(--text-muted)'}}>Название мероприятия</span>}</div>
-            {(form.isPrivate || form.ageLimit !== '') && (
-              <div className={styles.previewBadges}>
-                {form.isPrivate && <span className={styles.badgePrivate}>Приватное</span>}
-                {form.ageLimit !== '' && (
-                  <span className={styles.badgeAge}>{form.ageLimit}+</span>
-                )}
-              </div>
-            )}
+            <div className={styles.previewBadges}>
+              {form.isPrivate && <span className={styles.badgePrivate}>Приватное</span>}
+              <span className={styles.badgeAge}>{resolveAgeLimitBadge(form.ageLimit)}</span>
+            </div>
             {previewTime && (
               <div className={styles.previewRow}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
