@@ -78,15 +78,34 @@
   right: 14px;
   max-width: calc(100% - 28px);
 }
+.heroBottom::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  right: -14px;
+  bottom: -14px;
+  height: calc(100% + 56px);
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(0, 0, 0, 0.38) 42%,
+    rgba(0, 0, 0, 0.12) 72%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
 .heroTitle {
   composes: heroTitle from '../../shared/styles/hero.module.css';
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+  position: relative;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 2px 12px rgba(0, 0, 0, 0.4);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 .heroTags {
+  position: relative;
   display: flex;
   gap: 5px;
   flex-wrap: wrap;
