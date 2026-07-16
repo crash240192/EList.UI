@@ -431,6 +431,7 @@ export default function EventPage() {
                 key={t.id}
                 type={t}
                 variant="overlay"
+                invert
                 className={styles.tagType}
                 iconSize={10}
               />
