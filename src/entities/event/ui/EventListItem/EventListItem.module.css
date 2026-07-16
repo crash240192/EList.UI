@@ -179,6 +179,9 @@
 
 .chip {
   font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
 }
 
 .footer {

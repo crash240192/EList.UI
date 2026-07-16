@@ -78,6 +78,7 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
                     key={t.id}
                     type={t}
                     variant="overlay"
+                    invert
                     className={styles.typeChip}
                     iconSize={12}
                   />
