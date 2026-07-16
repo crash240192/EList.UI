@@ -209,6 +209,7 @@ export function useNotificationsWebSocket(enabled: boolean): void {
       document.removeEventListener('visibilitychange', onVisibility);
       clearReconnect();
       closeSocketSilently();
+      reset();
     };
   }, [enabled, token, setWsStatus, pushNotification, reset]);
 }

@@ -37,7 +37,7 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
       <div className={styles.backdrop} onClick={onClose} />
       <div className={styles.modal} role="dialog" aria-modal aria-label={event.name}>
 
-        {/* Cover */}
+        {/* Cover / Hero */}
         <div className={styles.cover}
           style={{ background: hasCover ? '#111' : getEventCoverBackground(event) }}>
           {event.coverImageId ? (
@@ -68,33 +68,31 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
             )}
           </div>
 
-          {/* Типы снизу обложки */}
-          {((event.eventTypes?.length ?? 0) > 0 || event.eventType) && (
-            <div className={styles.typeRow}>
-              {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : [event.eventType!]).map(t => {
-                if (!t) return null;
-                return (
-                  <EventTypeChip
-                    key={t.id}
-                    type={t}
-                    variant="overlay"
-                    invert
-                    className={styles.typeChip}
-                    iconSize={12}
-                  />
-                );
-              })}
-            </div>
-          )}
+          {/* Название + типы снизу обложки */}
+          <div className={styles.heroBottom}>
+            <h2 className={styles.heroTitle}>{event.name}</h2>
+            {((event.eventTypes?.length ?? 0) > 0 || event.eventType) && (
+              <div className={styles.typeRow}>
+                {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : [event.eventType!]).map(t => {
+                  if (!t) return null;
+                  return (
+                    <EventTypeChip
+                      key={t.id}
+                      type={t}
+                      variant="overlay"
+                      invert
+                      className={styles.typeChip}
+                      iconSize={12}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Body */}
         <div className={styles.body}>
-          {/* Заголовок */}
-          <div className={styles.titleRow}>
-            <h2 className={styles.title}>{event.name}</h2>
-          </div>
-
           {/* Мета */}
           <div className={styles.meta}>
             <div className={styles.metaRow}>

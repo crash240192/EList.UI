@@ -10,6 +10,8 @@ import {
 } from '@/shared/api/client';
 import { getActivationRequired, setActivationRequired, logout as apiLogout } from '@/features/auth/api';
 import { clearLocationSession } from '@/features/auth/locationSession';
+import { useInvitationsStore } from '@/features/invitations/invitationsStore';
+import { useNotificationsStore } from '@/features/notifications/notificationsStore';
 
 // ---- Theme Store ----
 
@@ -107,6 +109,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     apiLogout();
     clearLocationSession();
     useFiltersStore.getState().setMapCenter(null);
+    useNotificationsStore.getState().reset();
+    useInvitationsStore.getState().reset();
     set({ token: null, accountId: null, activationRequired: false });
   },
 

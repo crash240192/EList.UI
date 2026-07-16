@@ -72,13 +72,68 @@
 
 .heroBottom {
   composes: heroBottom from '../../shared/styles/hero.module.css';
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  right: 14px;
+  max-width: calc(100% - 28px);
+}
+.heroBottom::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  right: -14px;
+  bottom: -14px;
+  height: calc(100% + 56px);
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(0, 0, 0, 0.38) 42%,
+    rgba(0, 0, 0, 0.12) 72%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+.heroTitle {
+  composes: heroTitle from '../../shared/styles/hero.module.css';
+  position: relative;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 2px 12px rgba(0, 0, 0, 0.4);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.heroTags {
+  position: relative;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
 }
 .tagType,.tagFree { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); display:inline-flex; align-items:center; gap:4px; }
 .tagFree { background:rgba(16,185,129,.65); color:#fff; border:.5px solid rgba(16,185,129,.4); }
 
 /* Action row */
 .actionRow { display:flex; align-items:center; gap:10px; padding:12px 20px; border-bottom:1px solid var(--border); min-height:58px; }
-.actionTitle { flex:1; min-width:0; font-size:var(--font-lg); font-weight:600; color:var(--text-primary); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.actionMeta { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.actionMetaPrimary {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.actionMetaSecondary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.actionMetaDot { margin: 0 5px; color: var(--text-muted); font-weight: 500; }
 .actionBtns { display:flex; gap:7px; flex-shrink:0; align-items:center; }
 .btnInvite {
   composes: btnIcon from '../../shared/styles/actionButtons.module.css';
@@ -115,7 +170,7 @@
 
 /* Main grid */
 .mainGrid { display:grid; grid-template-columns:280px 1fr; align-items:start; }
-.leftPanel { border-right:1px solid var(--border); padding:16px 14px 24px; display:flex; flex-direction:column; min-width:0; }
+.leftPanel { border-right:1px solid var(--border); padding:16px 14px 24px; display:flex; flex-direction:column; gap:8px; min-width:0; }
 .rightPanel { padding:18px 20px 28px; display:flex; flex-direction:column; gap:16px; min-width:0; }
 
 /* Left meta */
@@ -128,7 +183,7 @@
 .metaValSub { font-size:11px; color:var(--text-secondary); font-weight:400; }
 
 /* Price */
-.priceBlock { display:flex; align-items:center; justify-content:space-between; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin:10px 0; }
+.priceBlock { display:flex; align-items:center; justify-content:space-between; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin:0; }
 .priceVal { font-size:17px; font-weight:600; color:#10b981; }
 .priceBadge { background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); color:#10b981; border-radius:20px; padding:2px 9px; font-size:10px; font-weight:600; }
 .priceValPaid { color:var(--text-primary); }
@@ -159,7 +214,7 @@
 .participantsBlock {
   display: block;
   width: 100%;
-  margin: 10px 0 4px;
+  margin: 0;
   padding: 10px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -169,6 +224,16 @@
   font-family: inherit;
   color: inherit;
   transition: border-color .12s, background .12s;
+}
+.participantsBlockEmpty {
+  padding-bottom: 10px;
+}
+.participantsBlockEmpty .participantsBlockHead {
+  margin-bottom: 0;
+}
+.participantsBlockEmpty .participantsFillTrack {
+  margin-top: 8px;
+  margin-bottom: 0;
 }
 .participantsBlock:hover {
   border-color: var(--accent);
@@ -207,7 +272,6 @@
 }
 
 /* Albums in left */
-.albumsSection { margin-top:14px; }
 .albumsGrid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
 .albumThumb { border-radius:8px; overflow:hidden; aspect-ratio:1.4; cursor:pointer; position:relative; border:1px solid var(--border); background:var(--surface-2); transition:border-color .12s; display:flex; align-items:center; justify-content:center; }
 .albumThumb:hover { border-color:var(--accent); }
@@ -217,8 +281,9 @@
 .albumPrivBadge { position:absolute; top:5px; right:5px; background:rgba(0,0,0,.5); border-radius:5px; padding:2px 4px; display:flex; align-items:center; }
 
 /* Organizers */
-.orgsSection { margin-top:14px; }
+.orgsSection { margin: 0; }
 .orgChip { display:flex; align-items:center; gap:9px; padding:8px 10px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; cursor:pointer; margin-bottom:6px; transition:border-color .12s; }
+.orgChip:last-child { margin-bottom: 0; }
 .orgChip:hover { border-color:var(--accent); }
 .orgChipAvatar { width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#6366f1,#8b5cf6); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff; flex-shrink:0; }
 .orgChipName { font-size:12px; font-weight:500; color:var(--text-primary); }
@@ -266,7 +331,7 @@
 .detailVal { font-size:12px; font-weight:500; color:var(--text-primary); margin-top:2px; }
 
 /* Блоки-обёртки: нейтральны на десктопе, задают порядок на мобиле */
-.blockDate, .blockPrice, .blockParticipants, .blockOrgs, .blockAlbums,
+.blockPrice, .blockParticipants, .blockOrgs, .blockAlbums,
 .blockDesc, .blockPlace, .blockDiscuss { min-width:0; }
 
 /* Место проведения: адрес + карта единым блоком */
@@ -339,7 +404,8 @@
   .orgsSection, .albumsSection { margin-top:0; }
 
   .detailsGrid { grid-template-columns:repeat(2,1fr); }
-  .actionTitle { font-size:14px; }
+  .actionMetaPrimary { font-size:13px; }
+  .actionMetaSecondary { font-size:11px; }
 }
 .errorIcon { font-size: 36px; }
 

@@ -276,7 +276,7 @@ export default function CreateEventPage() {
         endDate:            endParts.date,
         endTime:            endParts.time,
         cost:               String(ev.parameters?.cost ?? 0),
-        ageLimit:           '',
+        ageLimit:           normalizeAgeLimitValue(ev.parameters?.ageLimit, null, true),
         isPrivate:          ev.parameters?.private ?? false,
         maxPersons:         String(ev.parameters?.maxPersonsCount ?? ''),
         allowUsersToInvite: ev.parameters?.allowUsersToInvite ?? true,

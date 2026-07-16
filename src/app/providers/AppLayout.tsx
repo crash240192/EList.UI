@@ -39,7 +39,6 @@ export function AppLayout() {
   const { isAuthenticated, logout } = useAuthStore();
   const authenticated = isAuthenticated();
   const notViewedInvitations = useInvitationsStore(s => s.notViewedCount);
-  const resetInvitationsCount = useInvitationsStore(s => s.reset);
   useInvitationsNotViewedCount(authenticated);
   const { filters } = useFiltersStore();
   const navigate = useNavigate();
@@ -55,7 +54,6 @@ export function AppLayout() {
 
   const handleLogout = () => {
     logout();
-    resetInvitationsCount();
     setLogoutConfirm(false);
     navigate('/', { replace: true });
   };
