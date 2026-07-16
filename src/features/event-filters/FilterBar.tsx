@@ -13,10 +13,12 @@ import {
 } from '@/features/event-filters/searchStartTime';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
+import { AgeConfirmDialog } from '@/shared/ui/AgeConfirmDialog';
 import type { ICity } from '@/features/auth/useGeoCity';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { cookies } from '@/shared/lib/cookies';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
+import { useAnonymousAgeGate } from '@/features/event-filters/useAnonymousAgeGate';
 import styles from './FilterBar.module.css';
 
 const DEFAULT_RADIUS_M = 25000; // запасной радиус до первой синхронизации с картой
@@ -84,6 +86,13 @@ export function FilterBar({
   const storeDefault = useFiltersStore();
   const storeOverride = useStoreOverride?.();
   const { filters, setFilter, resetFilters, setMapCenter, setMapZoom } = storeOverride ?? storeDefault;
+  const {
+    setAgeLimit,
+    ageDialogOpen,
+    ageDialogBusy,
+    onAgeConfirm,
+    onAgeDecline,
+  } = useAnonymousAgeGate(filters, setFilter);
   const [allTypes,       setAllTypes]       = useState<IEventType[]>([]);
   const [expanded,       setExpanded]       = useState(false);
   const [pickerOpen,     setPickerOpen]     = useState(false);
@@ -436,7 +445,10 @@ export function FilterBar({
         <span className={styles.groupLabel}>Возраст</span>
         <button
           className={`${styles.quickBtn} ${filters.ageLimit === 18 ? styles.quickBtnOn : ''}`}
-          onClick={() => filters.ageLimit === 18 ? setFilter('ageLimit', undefined) : setFilter('ageLimit', 18)}
+          onClick={() => {
+            if (filters.ageLimit === 18) setAgeLimit(undefined);
+            else void setAgeLimit(18);
+          }}
         >
           18+
         </button>
@@ -506,7 +518,7 @@ export function FilterBar({
               onFocus={e => e.currentTarget.select()}
               onChange={e => {
                 const raw = e.target.value.replace(/[^0-9]/g, '');
-                setFilter('ageLimit', raw !== '' ? Number(raw) : undefined);
+                void setAgeLimit(raw !== '' ? Number(raw) : undefined);
               }} />
           </div>
         </div>
@@ -538,6 +550,7 @@ export function FilterBar({
       onResetCity={restoreHomeCity}
       filters={filters}
       setFilter={setFilter}
+      setAgeLimit={setAgeLimit}
       cityName={cityName}
       setCityName={setCityName}
       quickDate={quickDate}
@@ -553,6 +566,13 @@ export function FilterBar({
       chips={chips}
       handleCitySelect={handleCitySelect}
       handleQuickDate={handleQuickDate}
+    />
+
+    <AgeConfirmDialog
+      open={ageDialogOpen}
+      busy={ageDialogBusy}
+      onConfirm={() => { void onAgeConfirm(); }}
+      onDecline={onAgeDecline}
     />
     </>
   );

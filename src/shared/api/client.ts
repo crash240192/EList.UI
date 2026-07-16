@@ -131,14 +131,42 @@ async function requestWithClientJwtOnly<T>(
   return withTimeout(fetchPromise);
 }
 
+/**
+ * GET только с client JWT. Не бросает при success:false и не показывает тост —
+ * удобно для статусных проверок (например, согласие 18+).
+ */
+async function getStatusWithClientJwt(path: string): Promise<boolean> {
+  const clientHash = getOrCreateClientHash();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'authorization-jwt': clientHash,
+  };
+
+  const fetchPromise = fetch(`${BASE_URL}${path}`, { method: 'GET', headers }).then(async response => {
+    if (!response.ok) return false;
+    try {
+      const data: CommandResult<unknown> = await response.json();
+      return Boolean(data.success);
+    } catch {
+      return false;
+    }
+  });
+
+  return withTimeout(fetchPromise);
+}
+
 export const apiClient = {
   get:    <T>(path: string)                 => request<T>(path, { method: 'GET' }),
   post:   <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST',   body: body !== undefined ? JSON.stringify(body) : undefined }),
   put:    <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT',    body: body !== undefined ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string, body?: unknown) => request<T>(path, { method: 'DELETE', body: body !== undefined ? JSON.stringify(body) : undefined }),
+  getWithClientJwt: <T>(path: string) =>
+    requestWithClientJwtOnly<T>(path, { method: 'GET' }),
   postWithClientJwt: <T>(path: string, body?: unknown) =>
     requestWithClientJwtOnly<T>(path, {
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
+  /** GET client-JWT: возвращает data.success, без тоста и без throw на success:false */
+  getStatusWithClientJwt,
 };

@@ -27,6 +27,8 @@ interface MobileFilterSheetProps {
   // Данные
   filters: IEventsSearchParams;
   setFilter: <K extends keyof IEventsSearchParams>(key: K, value: IEventsSearchParams[K]) => void;
+  /** Установка возраста с проверкой анонимного согласия 18+ */
+  setAgeLimit: (value: number | undefined) => void | Promise<void>;
   cityName: string;
   setCityName: (v: string) => void;
   quickDate: 'today'|'tomorrow'|'weekend'|null;
@@ -46,7 +48,7 @@ interface MobileFilterSheetProps {
 
 export function MobileFilterSheet({
   open, onClose, onApply, onReset, onResetCity,
-  filters, setFilter, cityName, setCityName,
+  filters, setFilter, setAgeLimit, cityName, setCityName,
   quickDate, setQuickDate,
   draftTypes, setDraftTypes, draftCats, setDraftCats,
   allTypes, pickerOpen, setPickerOpen, onPickerApply, chips,
@@ -151,7 +153,10 @@ export function MobileFilterSheet({
             <div className={styles.pills}>
               <button
                 className={`${styles.pill} ${filters.ageLimit === 18 ? styles.pillOn : ''}`}
-                onClick={() => filters.ageLimit === 18 ? setFilter('ageLimit', undefined) : setFilter('ageLimit', 18)}>
+                onClick={() => {
+                  if (filters.ageLimit === 18) void setAgeLimit(undefined);
+                  else void setAgeLimit(18);
+                }}>
                 18+
               </button>
             </div>
@@ -213,7 +218,7 @@ export function MobileFilterSheet({
                   onFocus={e => e.currentTarget.select()}
                   onChange={e => {
                     const raw = e.target.value.replace(/[^0-9]/g, '');
-                    setFilter('ageLimit', raw !== '' ? Number(raw) : undefined);
+                    void setAgeLimit(raw !== '' ? Number(raw) : undefined);
                   }} />
               </div>
             </div>
