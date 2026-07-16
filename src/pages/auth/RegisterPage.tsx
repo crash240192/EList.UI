@@ -28,7 +28,7 @@ import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { birthDateToApiIso, todayLocalDateString } from '@/shared/lib/datetime';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import type { Gender } from '@/shared/api/types';
-import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
+import { AuthBrand } from './AuthBrand';
 import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
 
@@ -261,11 +261,7 @@ export default function RegisterPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        {/* Logo */}
-        <div className={styles.logoWrap}>
-          <img src={brandLogo} alt="EList" className={styles.logoImg} />
-          <div className={styles.logoSub}>Агрегатор городских мероприятий</div>
-        </div>
+        <AuthBrand />
 
         {/* Step indicator */}
         <div className={regStyles.stepRow}>

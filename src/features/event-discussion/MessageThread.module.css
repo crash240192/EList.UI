@@ -59,6 +59,16 @@
   color: var(--text-muted);
 }
 
+.loginLink {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.loginLink:hover {
+  text-decoration: underline;
+}
+
 .error {
   margin: 0;
   font-size: 14px;

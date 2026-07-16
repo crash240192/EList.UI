@@ -12,7 +12,7 @@ import { useAuthStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { OtpCodeInput } from '@/shared/ui/OtpCodeInput';
 import { usePageTitle } from '@/shared/hooks';
-import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
+import { AuthBrand } from './AuthBrand';
 import styles from './AuthPage.module.css';
 import fpStyles from './ForgotPasswordPage.module.css';
 
@@ -161,9 +161,7 @@ export default function ForgotPasswordPage() {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
-          <div className={styles.logoWrap}>
-            <img src={brandLogo} alt="EList" className={styles.logoImg} />
-          </div>
+          <AuthBrand subtitle={false} showBrowseLink={false} />
           <h1 className={styles.heading}>Пароль изменён</h1>
           <p className={styles.subheading}>Выполняем вход и переходим на главную...</p>
         </div>
@@ -174,9 +172,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.logoWrap}>
-          <img src={brandLogo} alt="EList" className={styles.logoImg} />
-        </div>
+        <AuthBrand subtitle={false} />
 
         {step === 'login' && (
           <>

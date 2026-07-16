@@ -48,6 +48,17 @@
   gap: 8px;
   margin-bottom: 18px;
 }
+.logoLink {
+  display: block;
+  line-height: 0;
+  border-radius: 8px;
+  transition: opacity 0.15s;
+}
+.logoLink:hover { opacity: 0.85; }
+.logoLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
 .logoImg {
   width: min(220px, 76vw);
   height: 68px;
@@ -57,6 +68,14 @@
 .logoSub {
   font-size: 11px; color: var(--text-muted);
 }
+.browseLink {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+.browseLink:hover { text-decoration: underline; }
 
 /* ── Заголовок ── */
 .heading {

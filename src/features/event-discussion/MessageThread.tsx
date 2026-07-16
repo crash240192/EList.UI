@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import type { IMessage } from '@/entities/conversation';
 import { createMessage } from '@/entities/conversation';
 import { useRootMessages } from './useRootMessages';
@@ -37,6 +38,7 @@ function MessageThreadInner({
   currentAccountId,
   layoutBoundsRef,
 }: MessageThreadProps) {
+  const location = useLocation();
   const { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh, removeMessage } =
     useRootMessages(conversationId);
   const { bump } = useDiscussionRefreshActions();
@@ -282,7 +284,16 @@ function MessageThreadInner({
       </div>
 
       {!currentAccountId && (
-        <p className={styles.muted}>Войдите, чтобы оставить комментарий</p>
+        <p className={styles.muted}>
+          <Link
+            to="/login"
+            state={{ from: `${location.pathname}${location.search}` }}
+            className={styles.loginLink}
+          >
+            Войдите
+          </Link>
+          , чтобы оставить комментарий
+        </p>
       )}
 
       {showFab && (
