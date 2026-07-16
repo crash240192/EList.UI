@@ -1,13 +1,26 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
 }
 
 .eventGroup {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 16px 0;
+}
+
+.eventGroup + .eventGroup {
+  border-top: 1px solid var(--border);
+}
+
+.eventGroup:first-of-type {
+  padding-top: 0;
+}
+
+.eventGroup:last-of-type {
+  padding-bottom: 0;
 }
 
 .albumGrid {
