@@ -17,6 +17,8 @@ export interface EventTypeChipType {
 interface EventTypeChipProps {
   type: EventTypeChipType;
   variant?: EventTypeChipVariant;
+  /** Инвертировать цвет фона и иконки (независимо от темы). */
+  invert?: boolean;
   iconSize?: number;
   className?: string;
   style?: CSSProperties;
@@ -26,17 +28,18 @@ interface EventTypeChipProps {
 export function EventTypeChip({
   type,
   variant = 'soft',
+  invert = false,
   iconSize = 12,
   className = '',
   style,
   onRemove,
 }: EventTypeChipProps) {
   const color = getEventCategoryColor(type);
-  const surface = getEventTypeChipSurface(color, variant);
+  const surface = getEventTypeChipSurface(color, variant, { invert });
 
   return (
     <span
-      className={`${styles.chip} ${className}`.trim()}
+      className={`${styles.chip} ${invert ? styles.chipInvert : ''} ${className}`.trim()}
       style={{ ...surface, ...style }}
     >
       {type.ico && (
@@ -45,7 +48,7 @@ export function EventTypeChip({
           alt=""
           width={iconSize}
           height={iconSize}
-          className={`event-type-ico ${styles.icon}`}
+          className={`${invert ? '' : 'event-type-ico '}${styles.icon}`.trim()}
         />
       )}
       <span className={styles.label}>{type.name}</span>
