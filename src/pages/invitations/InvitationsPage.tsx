@@ -4,12 +4,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   fetchUserInvitations,
+  searchInvitations,
+  cancelInvitation,
   markInvitationViewed,
   markAllInvitationsViewed,
   type IInvitation,
 } from '@/entities/invitation/invitationsApi';
 import { isInvitationUnviewed } from '@/entities/invitation/invitationViewed';
 import { useInvitationsStore } from '@/features/invitations/invitationsStore';
+import { useAccountId } from '@/features/auth/useAccountId';
+import { fetchAccountById } from '@/entities/user/api';
 import { apiClient } from '@/shared/api/client';
 import { isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
 import { useToastStore } from '@/app/store';
@@ -64,16 +68,50 @@ function EventTypeTags({ types, className }: { types: IEventType[]; className?: 
   );
 }
 
+function useInviteeLabel(accountId: string | null | undefined): {
+  login: string;
+  avatarId: string | null;
+  initials: string;
+} {
+  const [login, setLogin] = useState('участник');
+  const [avatarId, setAvatarId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accountId) return;
+    let cancelled = false;
+    fetchAccountById(accountId)
+      .then(acc => {
+        if (cancelled) return;
+        setLogin(acc.login || 'участник');
+        setAvatarId(acc.avatarId ?? null);
+      })
+      .catch(() => { /* defaults */ });
+    return () => { cancelled = true; };
+  }, [accountId]);
+
+  return {
+    login,
+    avatarId,
+    initials: (login[0] ?? '?').toUpperCase(),
+  };
+}
+
 export default function InvitationsPage() {
   usePageTitle('Приглашения');
   const navigate = useNavigate();
+  const { accountId } = useAccountId();
   const refreshNotViewedCount = useInvitationsStore(s => s.refreshNotViewedCount);
   const [tab, setTab] = useState<Tab>('incoming');
   const [items, setItems] = useState<IInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [sentItems, setSentItems] = useState<IInvitation[]>([]);
+  const [sentLoading, setSentLoading] = useState(false);
+  const [sentErr, setSentErr] = useState<string | null>(null);
+  const [sentLoaded, setSentLoaded] = useState(false);
   const [previewInv, setPreviewInv] = useState<IInvitation | null>(null);
   const [confirmDecl, setConfirmDecl] = useState<IInvitation | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<IInvitation | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
 
   const unviewedCount = useMemo(
@@ -90,6 +128,26 @@ export default function InvitationsPage() {
       .finally(() => setLoading(false));
     void refreshNotViewedCount();
   }, [refreshNotViewedCount]);
+
+  useEffect(() => {
+    if (tab !== 'sent' || !accountId || sentLoaded) return;
+    let cancelled = false;
+    setSentLoading(true);
+    setSentErr(null);
+    searchInvitations({ inviterAccountIds: [accountId], pageIndex: 0, pageSize: 50 })
+      .then(r => {
+        if (cancelled) return;
+        setSentItems(r.result);
+        setSentLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setSentErr('Не удалось загрузить отправленные приглашения');
+      })
+      .finally(() => {
+        if (!cancelled) setSentLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [tab, accountId, sentLoaded]);
 
   const markViewedIfNeeded = async (inv: IInvitation) => {
     if (!isInvitationUnviewed(inv)) return;
@@ -154,6 +212,14 @@ export default function InvitationsPage() {
     } catch { /* ignore */ }
   };
 
+  const doCancel = async (inv: IInvitation) => {
+    try {
+      await cancelInvitation(inv.id);
+      setSentItems(prev => prev.filter(i => i.id !== inv.id));
+      setConfirmCancel(null);
+    } catch { /* apiClient toast */ }
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
@@ -163,6 +229,9 @@ export default function InvitationsPage() {
               <h1 className={styles.cardTitle}>Приглашения</h1>
               {!loading && tab === 'incoming' && items.length > 0 && (
                 <span className={styles.badge}>{items.length}</span>
+              )}
+              {!sentLoading && tab === 'sent' && sentItems.length > 0 && (
+                <span className={styles.badge}>{sentItems.length}</span>
               )}
             </div>
             {!loading && tab === 'incoming' && unviewedCount > 0 && (
@@ -180,7 +249,7 @@ export default function InvitationsPage() {
           <TabBar
             tabs={[
               { id: 'incoming', label: 'Входящие', count: !loading ? items.length : undefined },
-              { id: 'sent', label: 'Отправленные', count: 0 },
+              { id: 'sent', label: 'Отправленные', count: sentLoaded ? sentItems.length : undefined },
             ]}
             activeId={tab}
             onChange={id => setTab(id as typeof tab)}
@@ -234,13 +303,36 @@ export default function InvitationsPage() {
             </div>
 
             <div className={`${styles.tabPane} ${tab === 'sent' ? styles.tabPaneActive : ''}`}>
-              <div className={styles.invList}>
-                <div className={styles.emptyState}>
-                  <p className={styles.emptyTitle}>Отправленных приглашений нет</p>
-                  <p className={styles.emptySub}>
-                    Приглашения, которые вы отправили участникам своих событий, будут отображаться здесь
-                  </p>
+              {sentLoading && (
+                <div className={styles.invList}>
+                  <div className={styles.skeletons}>
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className={styles.skeleton} />
+                    ))}
+                  </div>
                 </div>
+              )}
+
+              {sentErr && <div className={styles.err}>{sentErr}</div>}
+
+              <div className={styles.invList}>
+                {!sentLoading && !sentErr && sentItems.length === 0 && (
+                  <div className={styles.emptyState}>
+                    <p className={styles.emptyTitle}>Отправленных приглашений нет</p>
+                    <p className={styles.emptySub}>
+                      Приглашения, которые вы отправили участникам своих событий, будут отображаться здесь
+                    </p>
+                  </div>
+                )}
+
+                {!sentLoading && sentItems.map(inv => (
+                  <SentInvitationRow
+                    key={inv.id}
+                    inv={inv}
+                    onOpen={() => navigate(`/event/${inv.eventId}`)}
+                    onCancel={() => setConfirmCancel(inv)}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -268,6 +360,25 @@ export default function InvitationsPage() {
               </button>
               <button type="button" className={styles.dbtnDecline} onClick={() => doDecline(confirmDecl)}>
                 Отклонить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmCancel && (
+        <div className={styles.overlay} onClick={() => setConfirmCancel(null)}>
+          <div className={styles.declineDialog} onClick={e => e.stopPropagation()}>
+            <div className={styles.declineTitle}>Отменить приглашение?</div>
+            <div className={styles.declineText}>
+              Приглашение на «{confirmCancel.event.name}» будет отозвано.
+            </div>
+            <div className={styles.declineBtns}>
+              <button type="button" className={styles.dbtnCancel} onClick={() => setConfirmCancel(null)}>
+                Назад
+              </button>
+              <button type="button" className={styles.dbtnDecline} onClick={() => { void doCancel(confirmCancel); }}>
+                Отозвать
               </button>
             </div>
           </div>
@@ -332,6 +443,50 @@ function InvitationRow({
             Отклонить
           </button>
         </>
+      )}
+    />
+  );
+}
+
+function SentInvitationRow({
+  inv,
+  onOpen,
+  onCancel,
+}: {
+  inv: IInvitation;
+  onOpen: () => void;
+  onCancel: () => void;
+}) {
+  const event = inv.event;
+  const invitee = useInviteeLabel(inv.invitedAccountId);
+
+  return (
+    <EventListItem
+      event={event}
+      onClick={onOpen}
+      header={(
+        <>
+          <UserAvatar
+            accountId={inv.invitedAccountId}
+            avatarId={invitee.avatarId}
+            initials={invitee.initials}
+            size={18}
+            className={styles.whoAvatar}
+          />
+          <span className={styles.inviterText}>
+            пригласили <span className={styles.inviterName}>@{invitee.login}</span>
+          </span>
+          <span className={styles.invTime}>{formatRelativeInviteTime(inv.creationDate)}</span>
+        </>
+      )}
+      actions={(
+        <button
+          type="button"
+          className={`${listItemStyles.actionBtn} ${listItemStyles.actionBtnNo}`}
+          onClick={e => { e.stopPropagation(); onCancel(); }}
+        >
+          Отозвать
+        </button>
       )}
     />
   );

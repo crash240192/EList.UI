@@ -112,23 +112,72 @@ export interface ICreateInvitationRequest {
   eventId: string;
 }
 
+/** POST /api/invitations/search */
+export interface IInvitationsSearchRequest {
+  inviterAccountIds?: string[];
+  invitedAccountIds?: string[];
+  inviterOrgIds?: string[];
+  eventIds?: string[];
+  viewed?: boolean;
+  pageSize?: number;
+  pageIndex?: number;
+}
+
 export async function createInvitations(req: ICreateInvitationRequest): Promise<void> {
   await apiClient.post('/api/invitations/create', req);
 }
 
+function parseInvitationPaged(
+  payload: unknown,
+): { result: IInvitation[]; total: number } {
+  if (!payload) return { result: [], total: 0 };
+
+  // Иногда API отдаёт массив напрямую
+  if (Array.isArray(payload)) {
+    const list = payload.map(row => normalizeInvitation(row as Record<string, unknown>));
+    return { result: list, total: list.length };
+  }
+
+  const p = payload as Record<string, unknown>;
+  const rawList = p.result ?? p.Result;
+  const list = Array.isArray(rawList) ? rawList : [];
+  const normalized = list.map(row => normalizeInvitation(row as Record<string, unknown>));
+  const totalRaw = p.total ?? p.Total;
+  return {
+    result: normalized,
+    total: typeof totalRaw === 'number' ? totalRaw : list.length,
+  };
+}
+
 export async function fetchUserInvitations(pageIndex = 0, pageSize = 20): Promise<{ result: IInvitation[]; total: number }> {
-  const r = await apiClient.get<{ result: IInvitation[]; total: number }>(
+  const r = await apiClient.get<unknown>(
     `/api/invitations/userInvitations?pageIndex=${pageIndex}&pageSize=${pageSize}`
   );
-  const payload = r.result;
-  if (!payload) return { result: [], total: 0 };
-  const list = Array.isArray(payload.result) ? payload.result : [];
-  const normalized = list.map(row => normalizeInvitation(row as unknown as Record<string, unknown>));
-  const enriched = await enrichInvitationsWithEventTypes(normalized);
-  return {
-    result: enriched,
-    total: typeof payload.total === 'number' ? payload.total : list.length,
-  };
+  const parsed = parseInvitationPaged(r.result);
+  const enriched = await enrichInvitationsWithEventTypes(parsed.result);
+  return { result: enriched, total: parsed.total };
+}
+
+/**
+ * Поиск приглашений.
+ * Для «Отправленных» передаём inviterAccountIds: [currentAccountId].
+ */
+export async function searchInvitations(
+  req: IInvitationsSearchRequest = {},
+): Promise<{ result: IInvitation[]; total: number }> {
+  const r = await apiClient.post<unknown>('/api/invitations/search', {
+    pageIndex: 0,
+    pageSize: 50,
+    ...req,
+  });
+  const parsed = parseInvitationPaged(r.result);
+  const enriched = await enrichInvitationsWithEventTypes(parsed.result);
+  return { result: enriched, total: parsed.total };
+}
+
+/** GET /api/invitations/cancel?invitationId= */
+export async function cancelInvitation(invitationId: string): Promise<void> {
+  await apiClient.get(`/api/invitations/cancel?invitationId=${invitationId}`);
 }
 
 /** Подгружает типы мероприятий, если их нет во вложенном event */
