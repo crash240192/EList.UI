@@ -68,6 +68,7 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
             key={t.id}
             type={t}
             variant="overlay"
+            invert
             className={styles.typeBadge}
             iconSize={12}
           />
