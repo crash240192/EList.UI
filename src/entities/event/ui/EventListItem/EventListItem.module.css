@@ -215,15 +215,22 @@
   right: 0;
   top: 0;
   bottom: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  width: 200px;
-  padding: 8px 10px 8px 100px;
-  background: linear-gradient(to right, transparent 0%, var(--surface-2) 50%, var(--surface-2) 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+  width: 118px;
+  padding: 8px 8px 8px 40px;
+  box-sizing: border-box;
+  background: linear-gradient(to right, transparent 0%, var(--surface-2) 42%, var(--surface-2) 100%);
   transform: translateX(100%);
   transition: transform 0.22s ease;
+  z-index: 2;
+}
+
+/* Одна кнопка (отправленные) — тот же размер, что у одной из пары, снизу справа */
+.actions:has(> :only-child) > :only-child {
+  grid-row: 2;
 }
 
 .item:hover .actions {
@@ -231,7 +238,7 @@
   background: linear-gradient(
     to right,
     transparent 0%,
-    color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 50%,
+    color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 42%,
     color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 100%
   );
 }
@@ -241,17 +248,25 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 3px;
   border: none;
-  border-radius: 8px;
-  padding: 4px 0;
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1.1;
+  border-radius: 9px;
+  padding: 6px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.15;
   cursor: pointer;
   font-family: inherit;
   transition: background 0.12s, box-shadow 0.12s;
   width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.actionBtn svg {
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
 }
 
@@ -260,25 +275,56 @@
 }
 
 .actionBtnOk {
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(99, 102, 241, 0.12);
   color: var(--accent);
 }
 
 .actionBtnOk:hover:not(:disabled) {
-  background: rgba(99, 102, 241, 0.18);
+  background: rgba(99, 102, 241, 0.2);
 }
 
 .actionBtnNo {
-  background: rgba(239, 68, 68, 0.08);
+  background: rgba(239, 68, 68, 0.1);
   color: var(--danger);
 }
 
 .actionBtnNo:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.14);
+  background: rgba(239, 68, 68, 0.16);
 }
 
 .list {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* Mobile: кнопки всегда видны, без выезда */
+@media (max-width: 639px) {
+  .actions {
+    position: static;
+    transform: none;
+    width: 92px;
+    min-width: 92px;
+    padding: 8px;
+    background: none;
+    border-left: 1px solid var(--border);
+    align-self: stretch;
+    flex-shrink: 0;
+  }
+
+  .item:hover .actions {
+    transform: none;
+    background: none;
+  }
+
+  .actionBtn {
+    font-size: 10px;
+    padding: 5px 2px;
+    border-radius: 8px;
+  }
+
+  .actionBtn svg {
+    width: 13px;
+    height: 13px;
+  }
 }
