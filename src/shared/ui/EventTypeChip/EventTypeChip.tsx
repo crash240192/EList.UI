@@ -17,7 +17,7 @@ export interface EventTypeChipType {
 interface EventTypeChipProps {
   type: EventTypeChipType;
   variant?: EventTypeChipVariant;
-  /** Инвертировать цвет фона и иконки (независимо от темы). */
+  /** Белый текст и всегда инвертированные иконки; цвет фона чипа не меняется. */
   invert?: boolean;
   iconSize?: number;
   className?: string;
@@ -35,7 +35,7 @@ export function EventTypeChip({
   onRemove,
 }: EventTypeChipProps) {
   const color = getEventCategoryColor(type);
-  const surface = getEventTypeChipSurface(color, variant, { invert });
+  const surface = getEventTypeChipSurface(color, variant);
 
   return (
     <span
