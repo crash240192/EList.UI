@@ -8,8 +8,15 @@ import { storeActivationNotice, takeActivationNotice } from '@/features/auth/act
 import { useAuthStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { usePageTitle } from '@/shared/hooks';
-import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
+import { AuthBrand } from './AuthBrand';
 import styles from './AuthPage.module.css';
+
+function resolvePostLoginPath(from: unknown): string {
+  if (typeof from === 'string' && from.startsWith('/') && !from.startsWith('//')) {
+    return from;
+  }
+  return '/';
+}
 
 export default function LoginPage() {
   usePageTitle('Вход');
@@ -17,7 +24,9 @@ export default function LoginPage() {
   const location     = useLocation();
   const { setAuth }  = useAuthStore();
 
-  const resetError = (location.state as { passwordResetError?: string } | null)?.passwordResetError;
+  const locationState = location.state as { passwordResetError?: string; from?: string } | null;
+  const resetError = locationState?.passwordResetError;
+  const returnTo = resolvePostLoginPath(locationState?.from);
 
   const [form, setForm]     = useState({ login: '', password: '' });
   const [loading, setLoad]  = useState(false);
@@ -45,7 +54,7 @@ export default function LoginPage() {
         navigate('/activate', { replace: true });
         return;
       }
-      navigate('/', { replace: true });
+      navigate(returnTo, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Неверный логин или пароль');
     } finally { setLoad(false); }
@@ -58,11 +67,7 @@ export default function LoginPage() {
     <div className={styles.page}>
       <div className={styles.card}>
 
-        {/* Лого */}
-        <div className={styles.logoWrap}>
-          <img src={brandLogo} alt="EList" className={styles.logoImg} />
-          <div className={styles.logoSub}>Агрегатор городских мероприятий</div>
-        </div>
+        <AuthBrand />
 
         <h1 className={styles.heading}>Добро пожаловать</h1>
         <p className={styles.subheading}>Войдите в аккаунт чтобы продолжить</p>
