@@ -535,7 +535,6 @@ export default function EventPage() {
           <div className={styles.leftPanel}>
 
             {/* Цена */}
-            <div className={styles.blockPrice}>
             <div className={styles.priceBlock}>
               <div className={cost === 0 ? styles.priceVal : styles.priceValPaid}>
                 {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
@@ -557,10 +556,8 @@ export default function EventPage() {
                   </button>
                 )}
             </div>
-            </div>
 
             {showParticipantsBlock && (
-              <div className={styles.blockParticipants}>
               <AccessDeniedGate denied={participantsDenied} variant="section">
                 {participantsDenied ? (
                   <SectionDeniedPlaceholder lines={3} />
@@ -597,12 +594,10 @@ export default function EventPage() {
                   </button>
                 )}
               </AccessDeniedGate>
-              </div>
             )}
 
             {/* Организаторы */}
             {(organizers.length > 0 || organizersDenied) && (
-              <div className={styles.blockOrgs}>
               <AccessDeniedGate denied={organizersDenied} variant="section">
                 {organizersDenied ? (
                   <SectionDeniedPlaceholder lines={3} />
@@ -629,11 +624,9 @@ export default function EventPage() {
                   </div>
                 )}
               </AccessDeniedGate>
-              </div>
             )}
 
             {/* Альбомы */}
-            <div className={styles.blockAlbums}>
             <EventAlbums
               eventId={id!}
               compact
@@ -641,7 +634,6 @@ export default function EventPage() {
               isParticipating={isParticipating}
               accountId={accountId}
             />
-            </div>
 
           </div>
 
@@ -649,7 +641,7 @@ export default function EventPage() {
           <div className={styles.rightPanel}>
 
             {/* Описание */}
-            <div className={styles.blockDesc}>
+            <div>
               <div className={styles.secLabel}>О мероприятии</div>
               <p className={`${styles.desc} ${descExpanded ? '' : styles.descClamped}`}>
                 {event.description ?? 'Описание отсутствует'}
@@ -675,53 +667,33 @@ export default function EventPage() {
               )}
             </div>
 
-            {/* Место проведения: адрес + карта единым блоком */}
-            {(event.address || (event.latitude != null && event.longitude != null)) && (
-              <div className={styles.blockPlace}>
+            {/* Карта */}
+            {event.latitude != null && event.longitude != null && (
+              <div>
                 <div className={styles.secLabel}>Место проведения</div>
-                {event.address && (
-                  <div className={styles.placeAddress}>
-                    <PinIcon />
-                    <span className={styles.placeAddressText}>{event.address}</span>
-                    {event.latitude != null && event.longitude != null && (
-                      <a
-                        className={styles.routeLink}
-                        href={`https://yandex.ru/maps/?rtext=~${event.latitude},${event.longitude}&rtt=auto`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Маршрут
-                      </a>
-                    )}
-                  </div>
-                )}
-                {event.latitude != null && event.longitude != null && (
-                  <div className={styles.mapBlock}>
-                    <button
-                      type="button"
-                      className={styles.mapExpandBtn}
-                      onClick={() => setMapModalOpen(true)}
-                      aria-label="Развернуть карту"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" />
-                      </svg>
-                      Развернуть
-                    </button>
-                    <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} draggable={false} />
-                  </div>
-                )}
+                <div className={styles.mapBlock}>
+                  <button
+                    type="button"
+                    className={styles.mapExpandBtn}
+                    onClick={() => setMapModalOpen(true)}
+                    aria-label="Развернуть карту"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" />
+                    </svg>
+                    Развернуть
+                  </button>
+                  <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} draggable={false} />
+                </div>
               </div>
             )}
 
             {id && (
-              <div className={styles.blockDiscuss}>
-                <EventDiscussionsPanel
-                  eventId={id}
-                  currentAccountId={accountId}
-                  canManage={isOrganizer}
-                />
-              </div>
+              <EventDiscussionsPanel
+                eventId={id}
+                currentAccountId={accountId}
+                canManage={isOrganizer}
+              />
             )}
 
           </div>
@@ -919,4 +891,3 @@ function ShareIcon()   { return <svg width="15" height="15" viewBox="0 0 24 24" 
 function StarIcon()    { return <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>; }
 function PeopleIcon()  { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>; }
 function MoneyIcon()   { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>; }
-function PinIcon()     { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>; }
