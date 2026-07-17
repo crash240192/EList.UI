@@ -45,7 +45,8 @@ export function encodeFiltersToParams(s: UrlSyncState): URLSearchParams {
   if (isDeliberateStart(f.startTime, f.endTime) && f.startTime) p.set('from', f.startTime);
   if (f.endTime) p.set('to', f.endTime);
   if (f.price != null) p.set('price', String(f.price));
-  if (f.ageLimit != null && f.ageLimit > 0) p.set('age', String(f.ageLimit));
+  if (f.ageLimit != null) p.set('age', String(f.ageLimit));
+  if (f.adultOnly) p.set('adult', '1');
   if (f.types?.length) p.set('types', f.types.join(','));
   if (f.categories?.length) p.set('cats', f.categories.join(','));
 
@@ -78,7 +79,7 @@ export interface DecodedFilters {
 /** Разбирает query-параметры в патч состояния. Возвращает null, если
  *  распознаваемых параметров нет (URL чистый — обычный визит). */
 export function decodeParamsFromUrl(params: URLSearchParams): DecodedFilters | null {
-  const KNOWN = ['q', 'from', 'to', 'price', 'age', 'types', 'cats', 'lat', 'lng', 'r', 'z', 'view', 'city'];
+  const KNOWN = ['q', 'from', 'to', 'price', 'age', 'adult', 'types', 'cats', 'lat', 'lng', 'r', 'z', 'view', 'city'];
   if (!KNOWN.some((k) => params.has(k))) return null;
 
   const patch: Partial<IEventsSearchParams> = {};
@@ -93,6 +94,7 @@ export function decodeParamsFromUrl(params: URLSearchParams): DecodedFilters | n
   if (price != null) patch.price = price;
   const age = num(params.get('age'));
   if (age != null) patch.ageLimit = age;
+  if (params.get('adult') === '1') patch.adultOnly = true;
 
   const types = params.get('types');
   if (types) patch.types = types.split(',').filter(Boolean);

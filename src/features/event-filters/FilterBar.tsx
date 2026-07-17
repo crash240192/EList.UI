@@ -13,12 +13,18 @@ import {
 } from '@/features/event-filters/searchStartTime';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
+import { Select } from '@/shared/ui/Select/Select';
 import { AgeConfirmDialog } from '@/shared/ui/AgeConfirmDialog';
+import { BirthDateRequiredDialog } from '@/shared/ui/BirthDateRequiredDialog';
 import type { ICity } from '@/features/auth/useGeoCity';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { cookies } from '@/shared/lib/cookies';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
-import { useAnonymousAgeGate } from '@/features/event-filters/useAnonymousAgeGate';
+import {
+  ageFilterChipLabel,
+  ageFiltersActive,
+} from '@/features/event-filters/ageFilter';
+import { useAgeFilterGate } from '@/features/event-filters/useAgeFilterGate';
 import styles from './FilterBar.module.css';
 
 const DEFAULT_RADIUS_M = 25000; // запасной радиус до первой синхронизации с картой
@@ -87,12 +93,19 @@ export function FilterBar({
   const storeOverride = useStoreOverride?.();
   const { filters, setFilter, resetFilters, setMapCenter, setMapZoom } = storeOverride ?? storeDefault;
   const {
-    setAgeLimit,
+    ageSelectValue,
+    ageSelectOptions,
+    setAgeFilterValue,
+    clearAgeFilter,
     ageDialogOpen,
     ageDialogBusy,
     onAgeConfirm,
     onAgeDecline,
-  } = useAnonymousAgeGate(filters, setFilter);
+    birthDialogOpen,
+    birthDialogBusy,
+    onBirthSave,
+    onBirthCancel,
+  } = useAgeFilterGate(filters, setFilter);
   const [allTypes,       setAllTypes]       = useState<IEventType[]>([]);
   const [expanded,       setExpanded]       = useState(false);
   const [pickerOpen,     setPickerOpen]     = useState(false);
@@ -302,16 +315,15 @@ export function FilterBar({
   if (quickDate === 'tomorrow') chips.push({ label: 'Завтра',   onRemove: () => clearQuickDateFilter(setQuickDate, setFilter) });
   if (quickDate === 'weekend')  chips.push({ label: 'Выходные', onRemove: () => clearQuickDateFilter(setQuickDate, setFilter) });
   if (filters.price === 0)      chips.push({ label: 'Бесплатно', onRemove: () => setFilter('price', undefined) });
-  if (filters.ageLimit != null && filters.ageLimit > 0) {
-    chips.push({ label: `${filters.ageLimit}+`, onRemove: () => setFilter('ageLimit', undefined) });
-  }
+  const ageChip = ageFilterChipLabel(filters);
+  if (ageChip) chips.push({ label: ageChip, onRemove: clearAgeFilter });
 
   /** Счётчик для мобильного бейджа — без города (базовая геолокация, не пользовательский фильтр). */
   const mobileFilterCount = [
     quickDate,
     filters.price === 0,
     filters.price != null && filters.price > 0,
-    filters.ageLimit != null && filters.ageLimit > 0,
+    ageFiltersActive(filters),
     (filters.types?.length ?? 0) > 0,
     (filters.categories?.length ?? 0) > 0,
     !quickDate && !!filters.endTime,
@@ -327,7 +339,7 @@ export function FilterBar({
   const hasExpandedActive =
     (!quickDate && !!filters.endTime)
     || (!!filters.price && filters.price > 0)
-    || (filters.ageLimit != null && filters.ageLimit > 0);
+    || ageFiltersActive(filters);
 
   return (
     <>
@@ -443,15 +455,13 @@ export function FilterBar({
 
         {/* Группа: возраст */}
         <span className={styles.groupLabel}>Возраст</span>
-        <button
-          className={`${styles.quickBtn} ${filters.ageLimit === 18 ? styles.quickBtnOn : ''}`}
-          onClick={() => {
-            if (filters.ageLimit === 18) setAgeLimit(undefined);
-            else void setAgeLimit(18);
-          }}
-        >
-          18+
-        </button>
+        <Select
+          className={styles.ageSelect}
+          value={ageSelectValue}
+          onChange={(v) => { void setAgeFilterValue(v); }}
+          options={ageSelectOptions}
+          placeholder="Любой"
+        />
 
         <div className={styles.sep}/>
 
@@ -512,14 +522,14 @@ export function FilterBar({
               onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
           </div>
           <div className={styles.epBlock}>
-            <span className={styles.epLabel}>Возраст, от</span>
-            <input type="number" className={styles.epInput} min={0}
-              placeholder="Любой" value={filters.ageLimit ?? ''}
-              onFocus={e => e.currentTarget.select()}
-              onChange={e => {
-                const raw = e.target.value.replace(/[^0-9]/g, '');
-                void setAgeLimit(raw !== '' ? Number(raw) : undefined);
-              }} />
+            <span className={styles.epLabel}>Возраст, до</span>
+            <Select
+              className={styles.epAgeSelect}
+              value={ageSelectValue}
+              onChange={(v) => { void setAgeFilterValue(v); }}
+              options={ageSelectOptions}
+              placeholder="Любой"
+            />
           </div>
         </div>
       )}
@@ -550,7 +560,9 @@ export function FilterBar({
       onResetCity={restoreHomeCity}
       filters={filters}
       setFilter={setFilter}
-      setAgeLimit={setAgeLimit}
+      ageSelectValue={ageSelectValue}
+      ageSelectOptions={ageSelectOptions}
+      setAgeFilterValue={setAgeFilterValue}
       cityName={cityName}
       setCityName={setCityName}
       quickDate={quickDate}
@@ -573,6 +585,12 @@ export function FilterBar({
       busy={ageDialogBusy}
       onConfirm={() => { void onAgeConfirm(); }}
       onDecline={onAgeDecline}
+    />
+    <BirthDateRequiredDialog
+      open={birthDialogOpen}
+      busy={birthDialogBusy}
+      onSave={onBirthSave}
+      onCancel={onBirthCancel}
     />
     </>
   );

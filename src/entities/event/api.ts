@@ -42,6 +42,7 @@ export async function fetchEvents(
     pageSize: 20,
     active: true,  // по умолчанию ищем только активные мероприятия
     ...params,
+    adultOnly: params.adultOnly === true,
   };
 
   const data = await apiClient.post<PagedList<IEvent>>('/api/events/search', body);
@@ -69,6 +70,7 @@ export async function fetchEventsSearchShort(
     active: true,
     pageIndex: 0,
     pageSize: EVENTS_MAP_SHORT_PAGE_SIZE,
+    adultOnly: params.adultOnly === true,
   };
   const data = await apiClient.post<PagedList<IEventSearchShortItem>>('/api/events/search/short', body);
   const paged = data.result;

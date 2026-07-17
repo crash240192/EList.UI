@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { CategoryTypePicker } from './CategoryTypePicker';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
+import { Select } from '@/shared/ui/Select/Select';
 import type { ICity } from '@/features/auth/useGeoCity';
 import type { IEventType } from '@/entities/event';
 import type { IEventsSearchParams } from '@/entities/event';
@@ -27,8 +28,9 @@ interface MobileFilterSheetProps {
   // Данные
   filters: IEventsSearchParams;
   setFilter: <K extends keyof IEventsSearchParams>(key: K, value: IEventsSearchParams[K]) => void;
-  /** Установка возраста с проверкой анонимного согласия 18+ */
-  setAgeLimit: (value: number | undefined) => void | Promise<void>;
+  ageSelectValue: string;
+  ageSelectOptions: { value: string; label: string }[];
+  setAgeFilterValue: (value: string) => void | Promise<void>;
   cityName: string;
   setCityName: (v: string) => void;
   quickDate: 'today'|'tomorrow'|'weekend'|null;
@@ -48,7 +50,8 @@ interface MobileFilterSheetProps {
 
 export function MobileFilterSheet({
   open, onClose, onApply, onReset, onResetCity,
-  filters, setFilter, setAgeLimit, cityName, setCityName,
+  filters, setFilter, ageSelectValue, ageSelectOptions, setAgeFilterValue,
+  cityName, setCityName,
   quickDate, setQuickDate,
   draftTypes, setDraftTypes, draftCats, setDraftCats,
   allTypes, pickerOpen, setPickerOpen, onPickerApply, chips,
@@ -149,17 +152,13 @@ export function MobileFilterSheet({
 
           {/* Возраст */}
           <div className={styles.section}>
-            <div className={styles.sectionLabel}>Возраст</div>
-            <div className={styles.pills}>
-              <button
-                className={`${styles.pill} ${filters.ageLimit === 18 ? styles.pillOn : ''}`}
-                onClick={() => {
-                  if (filters.ageLimit === 18) void setAgeLimit(undefined);
-                  else void setAgeLimit(18);
-                }}>
-                18+
-              </button>
-            </div>
+            <div className={styles.sectionLabel}>Возраст, до</div>
+            <Select
+              value={ageSelectValue}
+              onChange={(v) => { void setAgeFilterValue(v); }}
+              options={ageSelectOptions}
+              placeholder="Любой"
+            />
           </div>
 
           {/* Типы мероприятий */}
@@ -210,16 +209,6 @@ export function MobileFilterSheet({
                   placeholder="Любая" value={filters.price ?? ''}
                   onFocus={e => e.currentTarget.select()}
                   onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
-              </div>
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>Возраст</span>
-                <input className={styles.input} type="number" min={0}
-                  placeholder="Любой" value={filters.ageLimit ?? ''}
-                  onFocus={e => e.currentTarget.select()}
-                  onChange={e => {
-                    const raw = e.target.value.replace(/[^0-9]/g, '');
-                    void setAgeLimit(raw !== '' ? Number(raw) : undefined);
-                  }} />
               </div>
             </div>
           </div>
