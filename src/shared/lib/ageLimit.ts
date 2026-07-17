@@ -20,7 +20,10 @@ export function normalizeAgeLimitValue(
   hasTariff: boolean,
 ): string {
   const options = getAvailableAgeLimitOptions(maxAge, hasTariff);
-  if (raw == null || raw === 0) return String(options[0]);
+  if (raw == null) return String(options[0]);
+
+  // Точное совпадение с доступным вариантом — не округляем
+  if ((options as readonly number[]).includes(raw)) return String(raw);
 
   let nearest: EventAgeLimit = options[0];
   for (const age of EVENT_AGE_LIMIT_OPTIONS) {
