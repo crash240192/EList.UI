@@ -85,12 +85,20 @@ export function Select({ value, onChange, options, placeholder = 'Выберит
 
       {open && createPortal(
         <div ref={dropRef} style={dropStyle} className={styles.dropdown}>
-          {placeholder && !value && (
-            <div className={`${styles.item} ${styles.itemPlaceholder}`} onClick={() => handleSelect('')}>
+          {placeholder && (
+            <div
+              className={`${styles.item} ${styles.itemPlaceholder} ${!value ? styles.itemActive : ''}`}
+              onClick={() => handleSelect('')}
+            >
               {placeholder}
+              {!value && (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              )}
             </div>
           )}
-          {options.map(opt => (
+          {options.filter((opt) => opt.value !== '').map(opt => (
             <div key={opt.value}
               className={`${styles.item} ${opt.value === value ? styles.itemActive : ''}`}
               onClick={() => handleSelect(opt.value)}>

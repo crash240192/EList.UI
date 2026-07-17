@@ -102,9 +102,7 @@ export function FilterBar({
     onAgeConfirm,
     onAgeDecline,
     birthDialogOpen,
-    birthDialogBusy,
-    onBirthSave,
-    onBirthCancel,
+    onBirthClose,
   } = useAgeFilterGate(filters, setFilter);
   const [allTypes,       setAllTypes]       = useState<IEventType[]>([]);
   const [expanded,       setExpanded]       = useState(false);
@@ -588,9 +586,7 @@ export function FilterBar({
     />
     <BirthDateRequiredDialog
       open={birthDialogOpen}
-      busy={birthDialogBusy}
-      onSave={onBirthSave}
-      onCancel={onBirthCancel}
+      onClose={onBirthClose}
     />
     </>
   );

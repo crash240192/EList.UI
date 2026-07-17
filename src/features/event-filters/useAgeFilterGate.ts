@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthStore, useToastStore } from '@/app/store';
 import { agreeAnonymousAge, getAnonymousAgeAgreement } from '@/entities/agreement';
 import type { IEventsSearchParams } from '@/entities/event';
-import { getMyPersonInfo, savePersonInfo } from '@/entities/user/settingsApi';
-import { birthDateToApiIso, getAge } from '@/shared/lib/datetime';
+import { getMyPersonInfo } from '@/entities/user/settingsApi';
+import { getAge } from '@/shared/lib/datetime';
 import {
   ageFilterSelectValue,
   getAgeFilterSelectOptions,
@@ -52,7 +52,6 @@ export function useAgeFilterGate(
   const [ageDialogOpen, setAgeDialogOpen] = useState(false);
   const [ageDialogBusy, setAgeDialogBusy] = useState(false);
   const [birthDialogOpen, setBirthDialogOpen] = useState(false);
-  const [birthDialogBusy, setBirthDialogBusy] = useState(false);
 
   const pendingRef = useRef<PendingAgeFilter | null>(null);
   const agreedRef = useRef<boolean | null>(null);
@@ -114,8 +113,8 @@ export function useAgeFilterGate(
     setAgeDialogOpen(true);
   }, []);
 
-  const openBirthDialog = useCallback((pending: PendingAgeFilter) => {
-    pendingRef.current = pending;
+  const openBirthDialog = useCallback(() => {
+    pendingRef.current = null;
     setBirthDialogOpen(true);
   }, []);
 
@@ -145,8 +144,8 @@ export function useAgeFilterGate(
         applyAgeFilters(setFilter, parsed.ageLimit, parsed.adultOnly);
         return;
       }
-      // ДР не указана
-      openBirthDialog(pending);
+      // ДР не указана — предложить перейти в настройки
+      openBirthDialog();
       return;
     }
 
@@ -194,41 +193,9 @@ export function useAgeFilterGate(
     }
   }, [filters.adultOnly, filters.ageLimit, setFilter]);
 
-  const onBirthCancel = useCallback(() => {
-    pendingRef.current = null;
+  const onBirthClose = useCallback(() => {
     setBirthDialogOpen(false);
   }, []);
-
-  const onBirthSave = useCallback(async (birthDateLocal: string) => {
-    setBirthDialogBusy(true);
-    try {
-      const iso = birthDateToApiIso(birthDateLocal);
-      if (!iso) {
-        toast('Укажите корректную дату рождения', 'error');
-        return;
-      }
-      await savePersonInfo({ birthDate: iso });
-      const age = getAge(iso);
-      setUserAge(age);
-
-      const pending = pendingRef.current;
-      pendingRef.current = null;
-      setBirthDialogOpen(false);
-
-      if (age < 18) {
-        toast('Фильтр 18+ недоступен для вашего возраста', 'info');
-        clearAgeFilters(setFilter);
-        return;
-      }
-      if (pending) {
-        applyAgeFilters(setFilter, pending.ageLimit, pending.adultOnly);
-      }
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось сохранить дату рождения', 'error');
-    } finally {
-      setBirthDialogBusy(false);
-    }
-  }, [setFilter, toast]);
 
   // Deep-link / гидратация взрослых фильтров без согласия
   useEffect(() => {
@@ -291,21 +258,14 @@ export function useAgeFilterGate(
     }
     if (userAge != null && userAge >= 18) return;
 
-    // Нет ДР — спросить
+    // Нет ДР — сбросить фильтр и предложить настройки
     guardingRef.current = true;
-    const selectValue = ageFilterSelectValue(filters);
-    const pending: PendingAgeFilter = {
-      ageLimit: filters.ageLimit,
-      adultOnly: filters.adultOnly === true,
-      selectValue,
-    };
     clearAgeFilters(setFilter);
-    openBirthDialog(pending);
+    openBirthDialog();
     guardingRef.current = false;
   }, [
     birthDialogOpen,
     birthLoaded,
-    filters,
     filters.adultOnly,
     filters.ageLimit,
     isAuthenticated,
@@ -332,8 +292,6 @@ export function useAgeFilterGate(
     onAgeConfirm,
     onAgeDecline,
     birthDialogOpen,
-    birthDialogBusy,
-    onBirthSave,
-    onBirthCancel,
+    onBirthClose,
   };
 }

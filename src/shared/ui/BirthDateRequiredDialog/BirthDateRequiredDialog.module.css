@@ -27,14 +27,10 @@
 }
 
 .message {
-  margin: 0 0 14px;
+  margin: 0 0 18px;
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-secondary);
-}
-
-.field {
-  margin-bottom: 16px;
 }
 
 .actions {
@@ -44,7 +40,7 @@
 }
 
 .cancelBtn,
-.saveBtn {
+.settingsBtn {
   border-radius: 8px;
   padding: 8px 14px;
   font-size: 13px;
@@ -53,29 +49,23 @@
   cursor: pointer;
 }
 
-.cancelBtn:disabled,
-.saveBtn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 .cancelBtn {
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-secondary);
 }
 
-.cancelBtn:hover:not(:disabled) {
+.cancelBtn:hover {
   border-color: color-mix(in srgb, var(--border) 70%, var(--text-muted));
   color: var(--text-primary);
 }
 
-.saveBtn {
+.settingsBtn {
   border: none;
   background: var(--accent);
   color: #fff;
 }
 
-.saveBtn:hover:not(:disabled) {
+.settingsBtn:hover {
   background: var(--accent-hover);
 }

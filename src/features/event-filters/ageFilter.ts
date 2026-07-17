@@ -76,7 +76,10 @@ export function parseAgeFilterValue(value: string): {
 /** Опции с учётом возраста авторизованного пользователя (<18 — без 18+) */
 export function getAgeFilterSelectOptions(userAge: number | null): { value: string; label: string }[] {
   const under18 = userAge != null && userAge < 18;
-  return AGE_FILTER_OPTIONS
-    .filter((o) => !(under18 && o.requiresAdult))
-    .map(({ value, label }) => ({ value, label }));
+  return [
+    { value: '', label: 'Любой' },
+    ...AGE_FILTER_OPTIONS
+      .filter((o) => !(under18 && o.requiresAdult))
+      .map(({ value, label }) => ({ value, label })),
+  ];
 }
