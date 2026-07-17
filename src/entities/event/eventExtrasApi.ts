@@ -58,7 +58,27 @@ export async function fetchEventParameters(eventId: string): Promise<IEventParam
     const data = await apiClient.get<IEventParameters>(
       `/api/events/eventParameters/byEvent/${eventId}`
     );
-    return data.result ?? null;
+    const raw = data.result as (IEventParameters & Record<string, unknown>) | null;
+    if (!raw) return null;
+
+    // API может отдать camelCase или PascalCase
+    const ageRaw = raw.ageLimit ?? raw.AgeLimit;
+    const ageLimit =
+      ageRaw == null || ageRaw === ''
+        ? null
+        : typeof ageRaw === 'number'
+          ? ageRaw
+          : Number(ageRaw);
+
+    return {
+      id: String(raw.id ?? raw.Id ?? ''),
+      cost: Number(raw.cost ?? raw.Cost ?? 0),
+      private: Boolean(raw.private ?? raw.Private ?? false),
+      maxPersonsCount: (raw.maxPersonsCount ?? raw.MaxPersonsCount ?? null) as number | null,
+      ageLimit: ageLimit != null && Number.isFinite(ageLimit) ? ageLimit : null,
+      allowedGender: (raw.allowedGender ?? raw.AllowedGender ?? null) as IEventParameters['allowedGender'],
+      allowUsersToInvite: Boolean(raw.allowUsersToInvite ?? raw.AllowUsersToInvite ?? true),
+    };
   } catch {
     return null;
   }

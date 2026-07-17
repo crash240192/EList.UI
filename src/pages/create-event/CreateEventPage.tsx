@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, assignEventTypes, fetchEventParameters } from '@/entities/event';
-import type { IEventType } from '@/entities/event';
+import type { IEvent, IEventType } from '@/entities/event';
 import {
   fetchEventTypesByEvent,
   getBWList,
@@ -278,7 +278,27 @@ export default function CreateEventPage() {
       : fetchEventParameters(id!).catch(() => null);
 
     Promise.all([loadEvent, loadTypes, loadParams]).then(([ev, evTypes, params]) => {
-      const parameters = params ?? ev.parameters ?? null;
+      const evRaw = ev as IEvent & Record<string, unknown>;
+      const embedded = (ev.parameters
+        ?? (evRaw as { Parameters?: typeof ev.parameters }).Parameters
+        ?? null) as (NonNullable<typeof ev.parameters> & Record<string, unknown>) | null;
+      const parameters = params ?? (embedded
+        ? {
+            ...embedded,
+            ageLimit: (
+              embedded.ageLimit
+              ?? embedded.AgeLimit
+              ?? evRaw.ageLimit
+              ?? evRaw.AgeLimit
+              ?? null
+            ) as number | null,
+          }
+        : null);
+      const rawAge = parameters?.ageLimit
+        ?? (parameters as { AgeLimit?: number } | null)?.AgeLimit
+        ?? (evRaw.ageLimit as number | null | undefined)
+        ?? (evRaw.AgeLimit as number | null | undefined)
+        ?? null;
       const startParts = ev.startTime ? apiIsoToLocalParts(ev.startTime) : { date: '', time: '' };
       const endParts = ev.endTime ? apiIsoToLocalParts(ev.endTime) : { date: '', time: '' };
       setForm({
@@ -290,7 +310,11 @@ export default function CreateEventPage() {
         endDate:            endParts.date,
         endTime:            endParts.time,
         cost:               String(parameters?.cost ?? 0),
-        ageLimit:           normalizeAgeLimitValue(parameters?.ageLimit, null, true),
+        ageLimit:           normalizeAgeLimitValue(
+          rawAge == null ? null : Number(rawAge),
+          null,
+          true,
+        ),
         isPrivate:          parameters?.private ?? false,
         maxPersons:         String(parameters?.maxPersonsCount ?? ''),
         allowUsersToInvite: parameters?.allowUsersToInvite ?? true,
@@ -482,22 +506,41 @@ export default function CreateEventPage() {
   const maxCost      = tv?.costLimit    ?? null;
   const maxPersons   = tv?.personsLimit ?? null;
   const maxAge       = tv?.ageLimit     ?? null;
+  const tariffAgeOptions = useMemo(
+    () => (tariffReady ? getAvailableAgeLimitOptions(maxAge, hasTariff) : [...EVENT_AGE_LIMIT_OPTIONS]),
+    [tariffReady, maxAge, hasTariff],
+  );
   const ageLimitOptions = useMemo(() => {
-    // Пока тариф грузится — полный список, иначе текущее значение (16+ и т.п.) пропадает из select
+    // Пока тариф грузится — полный список, иначе текущее значение пропадает из <select>
+    // и браузер показывает первый пункт (0+)
     if (!tariffReady) return [...EVENT_AGE_LIMIT_OPTIONS];
-    return getAvailableAgeLimitOptions(maxAge, hasTariff);
-  }, [tariffReady, maxAge, hasTariff]);
+    const opts = tariffAgeOptions;
+    if (!isEditing || form.ageLimit === '') return opts;
+
+    // При редактировании оставляем фактический ценз в списке, даже если тариф его уже не даёт
+    const current = parseInt(form.ageLimit, 10);
+    if (
+      Number.isFinite(current)
+      && (EVENT_AGE_LIMIT_OPTIONS as readonly number[]).includes(current)
+      && !(opts as readonly number[]).includes(current)
+    ) {
+      return [...opts, current as EventAgeLimit].sort((a, b) => a - b);
+    }
+    return opts;
+  }, [tariffReady, tariffAgeOptions, isEditing, form.ageLimit]);
   const canSetCost       = !hasTariff || maxCost    === null || maxCost    > 0;
   const canSetMaxPersons = !hasTariff || maxPersons === null || maxPersons > 0;
-  const canSetAge        = ageLimitOptions.length > 1;
+  // Блокировку считаем по тарифу, а не по расширенному списку (куда временно добавлен текущий ценз)
+  const canSetAge        = tariffAgeOptions.length > 1;
   const canSetPrivate    = hasTariff ? !!tv!.allowPrivate : false;
   const canSetGender     = hasTariff ? !!tv!.allowGenderSegregation : false;
   const hasTariffWarning = hasWallet && (!canSetPrivate || !canSetGender);
   const tariffName       = tariff?.name ?? 'текущем';
 
   useEffect(() => {
-    // Ждём и событие, и тариф: иначе hasTariff=false на мгновение сбрасывает 16+ → 0+ навсегда
-    if (loading || !tariffReady || form.ageLimit === '') return;
+    // На редактировании не затираем сохранённый ценз под лимит тарифа
+    // (иначе 16+ при maxAge=12 исчезает из <select> и выглядит как 0+)
+    if (isEditing || loading || !tariffReady || form.ageLimit === '') return;
     const normalized = normalizeAgeLimitValue(
       parseInt(form.ageLimit, 10),
       maxAge,
@@ -506,7 +549,7 @@ export default function CreateEventPage() {
     if (normalized !== form.ageLimit) {
       setForm(f => ({ ...f, ageLimit: normalized }));
     }
-  }, [hasTariff, maxAge, tariffReady, loading, form.ageLimit]);
+  }, [isEditing, hasTariff, maxAge, tariffReady, loading, form.ageLimit]);
 
   const parseAgeLimit = (): number | null => {
     if (form.ageLimit === '') return null;
