@@ -15,6 +15,9 @@ import { useHomeFilterUrlSync } from '@/features/event-filters/filterUrlSync';
 import { EventMap } from '@/features/event-map/EventMap';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { CityConfirmDialog } from '@/shared/ui/CityConfirmDialog/CityConfirmDialog';
+import { AgeConfirmDialog } from '@/shared/ui/AgeConfirmDialog';
+import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialog';
+import { isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
 import styles from './HomePage.module.css';
@@ -169,14 +172,52 @@ export default function HomePage() {
     navigate(`/event/${event.id}`);
   }, [navigate]);
 
-  const handleMapMarkerClick = useCallback(async (eventId: string) => {
+  const pendingAgeEventIdRef = useRef<string | null>(null);
+  const handleMapAgeAccessErrorRef = useRef<
+    (err: unknown) => Promise<'retry' | 'denied' | 'prompt'>
+  >(async () => 'denied');
+
+  const openMapEventPreview = useCallback(async (eventId: string) => {
     try {
       const ev = await fetchEventById(eventId);
       setSelectedEvent(ev);
-    } catch {
-      /* превью не загрузилось — модалку не открываем */
+      pendingAgeEventIdRef.current = null;
+    } catch (e) {
+      if (isEventAccessDeniedError(e)) {
+        const resolution = await handleMapAgeAccessErrorRef.current(e);
+        if (resolution === 'prompt') {
+          pendingAgeEventIdRef.current = eventId;
+          return;
+        }
+      }
+      pendingAgeEventIdRef.current = null;
     }
   }, []);
+
+  const onMapAgeGranted = useCallback(async () => {
+    const eventId = pendingAgeEventIdRef.current;
+    if (!eventId) return;
+    await openMapEventPreview(eventId);
+  }, [openMapEventPreview]);
+
+  const {
+    ageDialogOpen: mapAgeDialogOpen,
+    ageDialogBusy: mapAgeDialogBusy,
+    handleAccessError: handleMapAgeAccessError,
+    onAgeConfirm: onMapAgeConfirm,
+    onAgeDecline: onMapAgeDecline,
+  } = useEventAgeAccessDialog(onMapAgeGranted);
+
+  handleMapAgeAccessErrorRef.current = handleMapAgeAccessError;
+
+  const handleMapMarkerClick = useCallback((eventId: string) => {
+    void openMapEventPreview(eventId);
+  }, [openMapEventPreview]);
+
+  const handleMapAgeDecline = useCallback(() => {
+    pendingAgeEventIdRef.current = null;
+    onMapAgeDecline();
+  }, [onMapAgeDecline]);
 
   /** Видимая область карты → lat/lng/radius в стор для search/short; подпись города в фильтре не меняем. */
   const handleMapSearchArea = useCallback(
@@ -275,6 +316,13 @@ export default function HomePage() {
       {selectedEvent && (
         <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
       )}
+
+      <AgeConfirmDialog
+        open={mapAgeDialogOpen}
+        busy={mapAgeDialogBusy}
+        onConfirm={() => { void onMapAgeConfirm(); }}
+        onDecline={handleMapAgeDecline}
+      />
 
       {mapTruncationOpen && (
         <>

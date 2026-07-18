@@ -34,6 +34,8 @@ import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
+import { AgeConfirmDialog } from '@/shared/ui/AgeConfirmDialog';
+import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialog';
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
@@ -148,7 +150,18 @@ export default function EventPage() {
     setHeroCollapse(0);
   }, [loading]);
 
-  useEffect(() => {
+  const reloadAfterAgeAgreeRef = useRef<() => Promise<void>>(async () => {});
+  const onAgeGranted = useCallback(() => reloadAfterAgeAgreeRef.current(), []);
+
+  const {
+    ageDialogOpen,
+    ageDialogBusy,
+    handleAccessError,
+    onAgeConfirm,
+    onAgeDecline,
+  } = useEventAgeAccessDialog(onAgeGranted);
+
+  const loadEvent = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setPageAccessDenied(false);
@@ -164,36 +177,48 @@ export default function EventPage() {
       return;
     }
 
-    void fetchEventById(id)
-      .then(async (ev) => {
-        let merged = ev;
-        const [partsResult, paramsResult] = await Promise.all([
-          fetchEventParticipants(id)
-            .then(p => ({ ok: true as const, data: p }))
-            .catch(e => ({ ok: false as const, error: e })),
-          fetchEventParameters(id)
-            .then(p => ({ ok: true as const, data: p }))
-            .catch(e => ({ ok: false as const, error: e })),
-        ]);
+    try {
+      const ev = await fetchEventById(id);
+      let merged = ev;
+      const [partsResult, paramsResult] = await Promise.all([
+        fetchEventParticipants(id)
+          .then(p => ({ ok: true as const, data: p }))
+          .catch(e => ({ ok: false as const, error: e })),
+        fetchEventParameters(id)
+          .then(p => ({ ok: true as const, data: p }))
+          .catch(e => ({ ok: false as const, error: e })),
+      ]);
 
-        if (partsResult.ok) setParticipants(partsResult.data);
-        else if (isAccessDeniedError(partsResult.error)) setParticipantsDenied(true);
+      if (partsResult.ok) setParticipants(partsResult.data);
+      else if (isAccessDeniedError(partsResult.error)) setParticipantsDenied(true);
 
-        if (paramsResult.ok && paramsResult.data) {
-          merged = { ...merged, parameters: { ...paramsResult.data } };
-        }
+      if (paramsResult.ok && paramsResult.data) {
+        merged = { ...merged, parameters: { ...paramsResult.data } };
+      }
 
-        setEvent(merged);
-      })
-      .catch((e: unknown) => {
-        if (isEventAccessDeniedError(e)) {
-          setPageAccessDenied(true);
-        } else {
-          setEvent(null);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
+      setEvent(merged);
+    } catch (e: unknown) {
+      if (isEventAccessDeniedError(e)) {
+        const resolution = await handleAccessError(e);
+        if (resolution !== 'prompt') setPageAccessDenied(true);
+      } else {
+        setEvent(null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [id, handleAccessError]);
+
+  reloadAfterAgeAgreeRef.current = loadEvent;
+
+  useEffect(() => {
+    void loadEvent();
+  }, [loadEvent]);
+
+  const handleAgeDecline = useCallback(() => {
+    onAgeDecline();
+    setPageAccessDenied(true);
+  }, [onAgeDecline]);
 
   useEffect(() => () => {
     if (limitNoticeTimerRef.current) window.clearTimeout(limitNoticeTimerRef.current);
@@ -267,6 +292,25 @@ export default function EventPage() {
   }, [participants, accountId]);
 
   if (loading) return <PageSkeleton />;
+  if (ageDialogOpen) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <HeroBackButton
+            className={styles.deniedBackBtn}
+            variant="solid"
+            onClick={() => { handleAgeDecline(); goBack(); }}
+          />
+        </div>
+        <AgeConfirmDialog
+          open
+          busy={ageDialogBusy}
+          onConfirm={() => { void onAgeConfirm(); }}
+          onDecline={handleAgeDecline}
+        />
+      </div>
+    );
+  }
   if (pageAccessDenied) {
     return (
       <div className={styles.page}>
