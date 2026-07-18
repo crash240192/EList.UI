@@ -58,6 +58,7 @@ export default function EventPage() {
   const goBack   = useSafeBack('/');
   const { accountId } = useAccountId();
   const authenticated = useAuthStore(s => s.isAuthenticated());
+  const toast = useToastStore(s => s.add);
 
   const [event,         setEvent]         = useState<IEvent | null>(null);
   const [participants,  setParticipants]  = useState<IParticipantView[]>([]);
@@ -74,7 +75,6 @@ export default function EventPage() {
   const [joinShake,       setJoinShake]       = useState(false);
   const [limitNotice,     setLimitNotice]     = useState(false);
   const [pageAccessDenied, setPageAccessDenied] = useState(false);
-  const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
   const [participantsDenied, setParticipantsDenied] = useState(false);
   const limitNoticeTimerRef = useRef<number | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -169,7 +169,6 @@ export default function EventPage() {
     if (!id) return;
     setLoading(true);
     setPageAccessDenied(false);
-    setAccessDeniedMessage(null);
     setParticipantsDenied(false);
     setEvent(null);
     setParticipants([]);
@@ -207,7 +206,8 @@ export default function EventPage() {
         const result = await handleAccessError(e);
         if (result.resolution === 'denied') {
           setPageAccessDenied(true);
-          setAccessDeniedMessage(result.message);
+          // 13003 не уходит в глобальный toast — показываем сообщение из ответа сами
+          if (result.message) toast(result.message, 'error');
         }
         // prompt-anonymous / prompt-birthdate — модалки уже открыты хуком
       } else {
@@ -216,7 +216,7 @@ export default function EventPage() {
     } finally {
       setLoading(false);
     }
-  }, [id, handleAccessError]);
+  }, [id, handleAccessError, toast]);
 
   reloadAfterAgeAgreeRef.current = loadEvent;
 
@@ -232,7 +232,6 @@ export default function EventPage() {
   const handleBirthDecline = useCallback(() => {
     onBirthClose();
     setPageAccessDenied(true);
-    setAccessDeniedMessage('Чтобы просматривать это мероприятие, укажите дату рождения в настройках профиля.');
   }, [onBirthClose]);
 
   useEffect(() => () => {
@@ -348,16 +347,9 @@ export default function EventPage() {
       <div className={styles.page}>
         <div className={styles.card}>
           <HeroBackButton className={styles.deniedBackBtn} variant="solid" onClick={goBack} />
-          {accessDeniedMessage ? (
-            <div className={styles.errorState}>
-              <p>{accessDeniedMessage}</p>
-              <button type="button" onClick={goBack}>← Назад</button>
-            </div>
-          ) : (
-            <AccessDeniedGate denied variant="page">
-              <EventCardDeniedPlaceholder />
-            </AccessDeniedGate>
-          )}
+          <AccessDeniedGate denied variant="page">
+            <EventCardDeniedPlaceholder />
+          </AccessDeniedGate>
         </div>
       </div>
     );
