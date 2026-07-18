@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
-import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, assignEventTypes } from '@/entities/event';
-import type { IEventType } from '@/entities/event';
+import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, assignEventTypes, fetchEventParameters } from '@/entities/event';
+import type { IEvent, IEventType } from '@/entities/event';
 import {
   fetchEventTypesByEvent,
   getBWList,
@@ -43,6 +43,7 @@ import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
+  EVENT_AGE_LIMIT_OPTIONS,
   formatAgeLimitLabel,
   getAvailableAgeLimitOptions,
   normalizeAgeLimitValue,
@@ -172,6 +173,8 @@ export default function CreateEventPage() {
   const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
   const [tariff,          setTariff]          = useState<ITariff | null>(null);
   const [hasWallet,       setHasWallet]       = useState<boolean | null>(null);
+  /** true, когда загрузка кошелька/тарифа завершена (чтобы не сбросить ageLimit в 0+ раньше времени) */
+  const [tariffReady,     setTariffReady]     = useState(false);
 
   const { toast, show: showToast } = useToast();
 
@@ -204,8 +207,15 @@ export default function CreateEventPage() {
             setTariffValidator(v);
           }
         }
-      } catch { setHasWallet(false); }
-    }).catch(() => setHasWallet(false));
+      } catch {
+        setHasWallet(false);
+      } finally {
+        setTariffReady(true);
+      }
+    }).catch(() => {
+      setHasWallet(false);
+      setTariffReady(true);
+    });
   }, []);
 
   // Загрузка всех типов и категорий для чипов (цвета категорий)
@@ -263,8 +273,32 @@ export default function CreateEventPage() {
       ? Promise.resolve(MOCK_EVENTS.find(e => e.id === id) ?? MOCK_EVENTS[0])
       : fetchEventById(id!);
     const loadTypes = USE_MOCK ? Promise.resolve([]) : fetchEventTypesByEvent(id!);
+    const loadParams = USE_MOCK
+      ? Promise.resolve(null)
+      : fetchEventParameters(id!).catch(() => null);
 
-    Promise.all([loadEvent, loadTypes]).then(([ev, evTypes]) => {
+    Promise.all([loadEvent, loadTypes, loadParams]).then(([ev, evTypes, params]) => {
+      const evRaw = ev as IEvent & Record<string, unknown>;
+      const embedded = (ev.parameters
+        ?? (evRaw as { Parameters?: typeof ev.parameters }).Parameters
+        ?? null) as (NonNullable<typeof ev.parameters> & Record<string, unknown>) | null;
+      const parameters = params ?? (embedded
+        ? {
+            ...embedded,
+            ageLimit: (
+              embedded.ageLimit
+              ?? embedded.AgeLimit
+              ?? evRaw.ageLimit
+              ?? evRaw.AgeLimit
+              ?? null
+            ) as number | null,
+          }
+        : null);
+      const rawAge = parameters?.ageLimit
+        ?? (parameters as { AgeLimit?: number } | null)?.AgeLimit
+        ?? (evRaw.ageLimit as number | null | undefined)
+        ?? (evRaw.AgeLimit as number | null | undefined)
+        ?? null;
       const startParts = ev.startTime ? apiIsoToLocalParts(ev.startTime) : { date: '', time: '' };
       const endParts = ev.endTime ? apiIsoToLocalParts(ev.endTime) : { date: '', time: '' };
       setForm({
@@ -275,12 +309,16 @@ export default function CreateEventPage() {
         startTime:          startParts.time,
         endDate:            endParts.date,
         endTime:            endParts.time,
-        cost:               String(ev.parameters?.cost ?? 0),
-        ageLimit:           normalizeAgeLimitValue(ev.parameters?.ageLimit, null, true),
-        isPrivate:          ev.parameters?.private ?? false,
-        maxPersons:         String(ev.parameters?.maxPersonsCount ?? ''),
-        allowUsersToInvite: ev.parameters?.allowUsersToInvite ?? true,
-        allowedGender:      ev.parameters?.allowedGender ?? '',
+        cost:               String(parameters?.cost ?? 0),
+        ageLimit:           normalizeAgeLimitValue(
+          rawAge == null ? null : Number(rawAge),
+          null,
+          true,
+        ),
+        isPrivate:          parameters?.private ?? false,
+        maxPersons:         String(parameters?.maxPersonsCount ?? ''),
+        allowUsersToInvite: parameters?.allowUsersToInvite ?? true,
+        allowedGender:      parameters?.allowedGender ?? '',
       });
       if (ev.latitude)      setLat(ev.latitude);
       if (ev.longitude)     setLng(ev.longitude);
@@ -298,7 +336,7 @@ export default function CreateEventPage() {
       }
 
       // Загружаем только нужный список при открытии
-      const neededList: BWListType = (ev.parameters?.private ?? false) ? 'whiteList' : 'blackList';
+      const neededList: BWListType = (parameters?.private ?? false) ? 'whiteList' : 'blackList';
       loadedBWListsRef.current.add(neededList);
       getBWList(neededList, id!).then(items => {
         const mapped = mapBWListItems(items);
@@ -468,20 +506,41 @@ export default function CreateEventPage() {
   const maxCost      = tv?.costLimit    ?? null;
   const maxPersons   = tv?.personsLimit ?? null;
   const maxAge       = tv?.ageLimit     ?? null;
-  const ageLimitOptions = useMemo(
-    () => getAvailableAgeLimitOptions(maxAge, hasTariff),
-    [maxAge, hasTariff],
+  const tariffAgeOptions = useMemo(
+    () => (tariffReady ? getAvailableAgeLimitOptions(maxAge, hasTariff) : [...EVENT_AGE_LIMIT_OPTIONS]),
+    [tariffReady, maxAge, hasTariff],
   );
+  const ageLimitOptions = useMemo(() => {
+    // Пока тариф грузится — полный список, иначе текущее значение пропадает из <select>
+    // и браузер показывает первый пункт (0+)
+    if (!tariffReady) return [...EVENT_AGE_LIMIT_OPTIONS];
+    const opts = tariffAgeOptions;
+    if (!isEditing || form.ageLimit === '') return opts;
+
+    // При редактировании оставляем фактический ценз в списке, даже если тариф его уже не даёт
+    const current = parseInt(form.ageLimit, 10);
+    if (
+      Number.isFinite(current)
+      && (EVENT_AGE_LIMIT_OPTIONS as readonly number[]).includes(current)
+      && !(opts as readonly number[]).includes(current)
+    ) {
+      return [...opts, current as EventAgeLimit].sort((a, b) => a - b);
+    }
+    return opts;
+  }, [tariffReady, tariffAgeOptions, isEditing, form.ageLimit]);
   const canSetCost       = !hasTariff || maxCost    === null || maxCost    > 0;
   const canSetMaxPersons = !hasTariff || maxPersons === null || maxPersons > 0;
-  const canSetAge        = ageLimitOptions.length > 1;
+  // Блокировку считаем по тарифу, а не по расширенному списку (куда временно добавлен текущий ценз)
+  const canSetAge        = tariffAgeOptions.length > 1;
   const canSetPrivate    = hasTariff ? !!tv!.allowPrivate : false;
   const canSetGender     = hasTariff ? !!tv!.allowGenderSegregation : false;
   const hasTariffWarning = hasWallet && (!canSetPrivate || !canSetGender);
   const tariffName       = tariff?.name ?? 'текущем';
 
   useEffect(() => {
-    if (loading || hasWallet === null || form.ageLimit === '') return;
+    // На редактировании не затираем сохранённый ценз под лимит тарифа
+    // (иначе 16+ при maxAge=12 исчезает из <select> и выглядит как 0+)
+    if (isEditing || loading || !tariffReady || form.ageLimit === '') return;
     const normalized = normalizeAgeLimitValue(
       parseInt(form.ageLimit, 10),
       maxAge,
@@ -490,7 +549,7 @@ export default function CreateEventPage() {
     if (normalized !== form.ageLimit) {
       setForm(f => ({ ...f, ageLimit: normalized }));
     }
-  }, [hasTariff, maxAge, hasWallet, loading, form.ageLimit]);
+  }, [isEditing, hasTariff, maxAge, tariffReady, loading, form.ageLimit]);
 
   const parseAgeLimit = (): number | null => {
     if (form.ageLimit === '') return null;
