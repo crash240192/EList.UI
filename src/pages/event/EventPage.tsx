@@ -35,6 +35,7 @@ import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import { AgeConfirmDialog } from '@/shared/ui/AgeConfirmDialog';
+import { BirthDateRequiredDialog } from '@/shared/ui/BirthDateRequiredDialog';
 import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialog';
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
@@ -73,6 +74,7 @@ export default function EventPage() {
   const [joinShake,       setJoinShake]       = useState(false);
   const [limitNotice,     setLimitNotice]     = useState(false);
   const [pageAccessDenied, setPageAccessDenied] = useState(false);
+  const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
   const [participantsDenied, setParticipantsDenied] = useState(false);
   const limitNoticeTimerRef = useRef<number | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -154,17 +156,20 @@ export default function EventPage() {
   const onAgeGranted = useCallback(() => reloadAfterAgeAgreeRef.current(), []);
 
   const {
-    ageDialogOpen,
+    anonymousDialogOpen,
+    birthDialogOpen,
     ageDialogBusy,
     handleAccessError,
     onAgeConfirm,
     onAgeDecline,
+    onBirthClose,
   } = useEventAgeAccessDialog(onAgeGranted);
 
   const loadEvent = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setPageAccessDenied(false);
+    setAccessDeniedMessage(null);
     setParticipantsDenied(false);
     setEvent(null);
     setParticipants([]);
@@ -199,8 +204,12 @@ export default function EventPage() {
       setEvent(merged);
     } catch (e: unknown) {
       if (isEventAccessDeniedError(e)) {
-        const resolution = await handleAccessError(e);
-        if (resolution !== 'prompt') setPageAccessDenied(true);
+        const result = await handleAccessError(e);
+        if (result.resolution === 'denied') {
+          setPageAccessDenied(true);
+          setAccessDeniedMessage(result.message);
+        }
+        // prompt-anonymous / prompt-birthdate — модалки уже открыты хуком
       } else {
         setEvent(null);
       }
@@ -219,6 +228,12 @@ export default function EventPage() {
     onAgeDecline();
     setPageAccessDenied(true);
   }, [onAgeDecline]);
+
+  const handleBirthDecline = useCallback(() => {
+    onBirthClose();
+    setPageAccessDenied(true);
+    setAccessDeniedMessage('Чтобы просматривать это мероприятие, укажите дату рождения в настройках профиля.');
+  }, [onBirthClose]);
 
   useEffect(() => () => {
     if (limitNoticeTimerRef.current) window.clearTimeout(limitNoticeTimerRef.current);
@@ -292,7 +307,7 @@ export default function EventPage() {
   }, [participants, accountId]);
 
   if (loading) return <PageSkeleton />;
-  if (ageDialogOpen) {
+  if (anonymousDialogOpen) {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
@@ -311,14 +326,38 @@ export default function EventPage() {
       </div>
     );
   }
+  if (birthDialogOpen) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <HeroBackButton
+            className={styles.deniedBackBtn}
+            variant="solid"
+            onClick={() => { handleBirthDecline(); goBack(); }}
+          />
+        </div>
+        <BirthDateRequiredDialog
+          open
+          onClose={handleBirthDecline}
+        />
+      </div>
+    );
+  }
   if (pageAccessDenied) {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
           <HeroBackButton className={styles.deniedBackBtn} variant="solid" onClick={goBack} />
-          <AccessDeniedGate denied variant="page">
-            <EventCardDeniedPlaceholder />
-          </AccessDeniedGate>
+          {accessDeniedMessage ? (
+            <div className={styles.errorState}>
+              <p>{accessDeniedMessage}</p>
+              <button type="button" onClick={goBack}>← Назад</button>
+            </div>
+          ) : (
+            <AccessDeniedGate denied variant="page">
+              <EventCardDeniedPlaceholder />
+            </AccessDeniedGate>
+          )}
         </div>
       </div>
     );

@@ -1,49 +1,85 @@
 // features/event/useEventAgeAccessDialog.ts
-// При 13003 (доступ по возрасту) для анонима — проверить/запросить согласие 18+.
+// При 13003 (доступ по возрасту):
+// — аноним без согласия → модалка «мне есть 18»
+// — авторизованный без ДР → предложить заполнить в настройках
+// — авторизованный с возрастом < 18 → показать сообщение из ответа API
 
 import { useCallback, useState } from 'react';
 import { useAuthStore } from '@/app/store';
 import { agreeAnonymousAge, getAnonymousAgeAgreement } from '@/entities/agreement';
-import { isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
+import { getMyPersonInfo } from '@/entities/user/settingsApi';
+import { isApiError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 
-export type EventAgeAccessResolution = 'retry' | 'denied' | 'prompt';
+export type EventAgeAccessResolution =
+  | 'prompt-anonymous'
+  | 'prompt-birthdate'
+  | 'denied';
+
+export interface EventAgeAccessResult {
+  resolution: EventAgeAccessResolution;
+  /** Текст ошибки из ответа API (для denied) */
+  message: string | null;
+}
+
+function apiErrorMessage(err: unknown): string | null {
+  if (!isApiError(err)) return null;
+  return err.serverMessage || err.message || null;
+}
 
 /**
- * Обрабатывает ошибку доступа к мероприятию.
- * Для анонима без подтверждённого возраста возвращает 'prompt' (нужна модалка).
+ * Разбирает 13003: нужна ли модалка анониму / ДР авторизованному, или сразу отказ.
  */
 export async function resolveEventAgeAccessError(
   err: unknown,
   isAuthenticated: boolean,
-): Promise<EventAgeAccessResolution> {
-  if (!isEventAccessDeniedError(err)) return 'denied';
-  if (isAuthenticated) return 'denied';
-
-  try {
-    const agreed = await getAnonymousAgeAgreement();
-    if (agreed) return 'denied';
-  } catch {
-    // нет соглашения — показываем диалог
+): Promise<EventAgeAccessResult> {
+  if (!isEventAccessDeniedError(err)) {
+    return { resolution: 'denied', message: apiErrorMessage(err) };
   }
-  return 'prompt';
+
+  const message = apiErrorMessage(err);
+
+  if (!isAuthenticated) {
+    try {
+      const agreed = await getAnonymousAgeAgreement();
+      if (agreed) return { resolution: 'denied', message };
+    } catch {
+      // нет соглашения
+    }
+    return { resolution: 'prompt-anonymous', message: null };
+  }
+
+  // Авторизованный
+  try {
+    const person = await getMyPersonInfo();
+    if (!person?.birthDate) {
+      return { resolution: 'prompt-birthdate', message: null };
+    }
+    // ДР указана (в т.ч. возраст < 18) — показываем текст ошибки из API
+    return { resolution: 'denied', message };
+  } catch {
+    return { resolution: 'prompt-birthdate', message: null };
+  }
 }
 
 export function useEventAgeAccessDialog(onGranted: () => void | Promise<void>) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
-  const [open, setOpen] = useState(false);
+  const [anonymousDialogOpen, setAnonymousDialogOpen] = useState(false);
+  const [birthDialogOpen, setBirthDialogOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const handleAccessError = useCallback(async (err: unknown): Promise<EventAgeAccessResolution> => {
-    const resolution = await resolveEventAgeAccessError(err, isAuthenticated);
-    if (resolution === 'prompt') setOpen(true);
-    return resolution;
+  const handleAccessError = useCallback(async (err: unknown): Promise<EventAgeAccessResult> => {
+    const result = await resolveEventAgeAccessError(err, isAuthenticated);
+    if (result.resolution === 'prompt-anonymous') setAnonymousDialogOpen(true);
+    if (result.resolution === 'prompt-birthdate') setBirthDialogOpen(true);
+    return result;
   }, [isAuthenticated]);
 
-  const onConfirm = useCallback(async () => {
+  const onAgeConfirm = useCallback(async () => {
     setBusy(true);
     try {
       await agreeAnonymousAge();
-      setOpen(false);
+      setAnonymousDialogOpen(false);
       await onGranted();
     } catch {
       // toast из apiClient
@@ -52,17 +88,23 @@ export function useEventAgeAccessDialog(onGranted: () => void | Promise<void>) {
     }
   }, [onGranted]);
 
-  const onDecline = useCallback(() => {
-    setOpen(false);
+  const onAgeDecline = useCallback(() => {
+    setAnonymousDialogOpen(false);
+  }, []);
+
+  const onBirthClose = useCallback(() => {
+    setBirthDialogOpen(false);
   }, []);
 
   return {
-    ageDialogOpen: open,
+    /** @deprecated use anonymousDialogOpen */
+    ageDialogOpen: anonymousDialogOpen,
+    anonymousDialogOpen,
+    birthDialogOpen,
     ageDialogBusy: busy,
     handleAccessError,
-    onAgeConfirm: onConfirm,
-    onAgeDecline: onDecline,
-    openAgeDialog: () => setOpen(true),
-    closeAgeDialog: () => setOpen(false),
+    onAgeConfirm,
+    onAgeDecline,
+    onBirthClose,
   };
 }

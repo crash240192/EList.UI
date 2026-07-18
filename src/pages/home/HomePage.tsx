@@ -7,7 +7,7 @@ import type { IEvent, IEventsSearchParams } from '@/entities/event';
 import { EventCard, fetchEventById, EVENTS_MAP_SHORT_PAGE_SIZE } from '@/entities/event';
 import { useEvents } from '@/features/event-list/useEvents';
 import { useEventsMapShort } from '@/features/event-list/useEventsMapShort';
-import { useFiltersStore } from '@/app/store';
+import { useFiltersStore, useToastStore } from '@/app/store';
 import { useInfiniteScroll, useDebounce, usePageTitle } from '@/shared/hooks';
 import { EventModal } from './EventModal';
 import { FilterBar } from '@/features/event-filters/FilterBar';
@@ -16,7 +16,11 @@ import { EventMap } from '@/features/event-map/EventMap';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { CityConfirmDialog } from '@/shared/ui/CityConfirmDialog/CityConfirmDialog';
 import { AgeConfirmDialog } from '@/shared/ui/AgeConfirmDialog';
-import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialog';
+import { BirthDateRequiredDialog } from '@/shared/ui/BirthDateRequiredDialog';
+import {
+  useEventAgeAccessDialog,
+  type EventAgeAccessResult,
+} from '@/features/event/useEventAgeAccessDialog';
 import { isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
@@ -172,10 +176,11 @@ export default function HomePage() {
     navigate(`/event/${event.id}`);
   }, [navigate]);
 
+  const toast = useToastStore((s) => s.add);
   const pendingAgeEventIdRef = useRef<string | null>(null);
   const handleMapAgeAccessErrorRef = useRef<
-    (err: unknown) => Promise<'retry' | 'denied' | 'prompt'>
-  >(async () => 'denied');
+    (err: unknown) => Promise<EventAgeAccessResult>
+  >(async () => ({ resolution: 'denied', message: null }));
 
   const openMapEventPreview = useCallback(async (eventId: string) => {
     try {
@@ -184,15 +189,19 @@ export default function HomePage() {
       pendingAgeEventIdRef.current = null;
     } catch (e) {
       if (isEventAccessDeniedError(e)) {
-        const resolution = await handleMapAgeAccessErrorRef.current(e);
-        if (resolution === 'prompt') {
+        const result = await handleMapAgeAccessErrorRef.current(e);
+        if (
+          result.resolution === 'prompt-anonymous'
+          || result.resolution === 'prompt-birthdate'
+        ) {
           pendingAgeEventIdRef.current = eventId;
           return;
         }
+        if (result.message) toast(result.message, 'error');
       }
       pendingAgeEventIdRef.current = null;
     }
-  }, []);
+  }, [toast]);
 
   const onMapAgeGranted = useCallback(async () => {
     const eventId = pendingAgeEventIdRef.current;
@@ -201,11 +210,13 @@ export default function HomePage() {
   }, [openMapEventPreview]);
 
   const {
-    ageDialogOpen: mapAgeDialogOpen,
+    anonymousDialogOpen: mapAgeDialogOpen,
+    birthDialogOpen: mapBirthDialogOpen,
     ageDialogBusy: mapAgeDialogBusy,
     handleAccessError: handleMapAgeAccessError,
     onAgeConfirm: onMapAgeConfirm,
     onAgeDecline: onMapAgeDecline,
+    onBirthClose: onMapBirthClose,
   } = useEventAgeAccessDialog(onMapAgeGranted);
 
   handleMapAgeAccessErrorRef.current = handleMapAgeAccessError;
@@ -218,6 +229,11 @@ export default function HomePage() {
     pendingAgeEventIdRef.current = null;
     onMapAgeDecline();
   }, [onMapAgeDecline]);
+
+  const handleMapBirthDecline = useCallback(() => {
+    pendingAgeEventIdRef.current = null;
+    onMapBirthClose();
+  }, [onMapBirthClose]);
 
   /** Видимая область карты → lat/lng/radius в стор для search/short; подпись города в фильтре не меняем. */
   const handleMapSearchArea = useCallback(
@@ -322,6 +338,10 @@ export default function HomePage() {
         busy={mapAgeDialogBusy}
         onConfirm={() => { void onMapAgeConfirm(); }}
         onDecline={handleMapAgeDecline}
+      />
+      <BirthDateRequiredDialog
+        open={mapBirthDialogOpen}
+        onClose={handleMapBirthDecline}
       />
 
       {mapTruncationOpen && (

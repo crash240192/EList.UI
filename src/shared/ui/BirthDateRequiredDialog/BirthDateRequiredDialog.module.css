@@ -1,0 +1,71 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 600;
+}
+
+.modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 601;
+  width: min(360px, calc(100vw - 32px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.message {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.cancelBtn,
+.settingsBtn {
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.cancelBtn {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.cancelBtn:hover {
+  border-color: color-mix(in srgb, var(--border) 70%, var(--text-muted));
+  color: var(--text-primary);
+}
+
+.settingsBtn {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+}
+
+.settingsBtn:hover {
+  background: var(--accent-hover);
+}
