@@ -29,6 +29,7 @@ import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
+import { getEventListTypes } from '@/entities/event/lib/eventListItemUtils';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
@@ -503,7 +504,7 @@ export default function EventPage() {
           <div className={styles.heroBottom}>
             <h1 className={styles.heroTitle}>{event.name}</h1>
             <div className={styles.heroTags}>
-              {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : event.eventType ? [event.eventType] : []).map(t => (
+              {getEventListTypes(event).map(t => (
                 <EventTypeChip
                   key={t.id}
                   type={t}

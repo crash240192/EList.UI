@@ -6,6 +6,7 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
+import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
 import styles from './EventCard.module.css';
 
 interface EventCardContextValue { event: IEvent; }
@@ -61,9 +62,9 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
 
       <div className={styles.coverOverlay} />
 
-      {/* Бейджи всех типов */}
+      {/* Бейджи типов — одна строка, сколько влезло по ширине */}
       <div className={styles.typeBadges}>
-        {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes : event.eventType ? [event.eventType] : [])!.slice(0, 2).map(t => (
+        {getEventTypes(event).map(t => (
           <EventTypeChip
             key={t.id}
             type={t}

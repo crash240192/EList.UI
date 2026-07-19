@@ -8,6 +8,7 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
+import { getEventListTypes } from '@/entities/event/lib/eventListItemUtils';
 import styles from './EventModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
@@ -73,19 +74,16 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
             <h2 className={styles.heroTitle}>{event.name}</h2>
             {((event.eventTypes?.length ?? 0) > 0 || event.eventType) && (
               <div className={styles.typeRow}>
-                {((event.eventTypes?.length ?? 0) > 0 ? event.eventTypes! : [event.eventType!]).map(t => {
-                  if (!t) return null;
-                  return (
-                    <EventTypeChip
-                      key={t.id}
-                      type={t}
-                      variant="overlay"
-                      invert
-                      className={styles.typeChip}
-                      iconSize={12}
-                    />
-                  );
-                })}
+                {getEventListTypes(event).map(t => (
+                  <EventTypeChip
+                    key={t.id}
+                    type={t}
+                    variant="overlay"
+                    invert
+                    className={styles.typeChip}
+                    iconSize={12}
+                  />
+                ))}
               </div>
             )}
           </div>

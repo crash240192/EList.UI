@@ -1,6 +1,9 @@
 import type { IEventType } from '@/entities/event/types';
 import { getEventCoverBackground, buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 
+/** Максимум чипов типов на странице события, превью и в списке */
+export const EVENT_TYPE_CHIPS_MAX = 6;
+
 export interface EventListItemData {
   id: string;
   name: string;
@@ -19,13 +22,18 @@ export interface EventListItemData {
   colors?: string[];
 }
 
-export function getEventListTypes(event: EventListItemData, limit = 3): IEventType[] {
-  const types = event.eventTypes?.length
-    ? event.eventTypes
-    : event.eventType
-      ? [event.eventType]
-      : [];
-  return types.slice(0, limit);
+/** Все типы мероприятия (без лимита) — для карточки с обрезкой по ширине строки */
+export function getEventTypes(event: EventListItemData): IEventType[] {
+  if (event.eventTypes?.length) return event.eventTypes;
+  if (event.eventType) return [event.eventType];
+  return [];
+}
+
+export function getEventListTypes(
+  event: EventListItemData,
+  limit: number = EVENT_TYPE_CHIPS_MAX,
+): IEventType[] {
+  return getEventTypes(event).slice(0, limit);
 }
 
 export function getEventListParams(event: EventListItemData) {

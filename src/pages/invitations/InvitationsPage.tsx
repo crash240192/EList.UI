@@ -22,6 +22,7 @@ import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { TabBar } from '@/shared/ui/TabBar';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { EventListItem } from '@/entities/event/ui/EventListItem';
+import { EVENT_TYPE_CHIPS_MAX } from '@/entities/event/lib/eventListItemUtils';
 import listItemStyles from '@/entities/event/ui/EventListItem/EventListItem.module.css';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -56,7 +57,7 @@ function EventTypeTags({ types, className }: { types: IEventType[]; className?: 
   if (types.length === 0) return null;
   return (
     <div className={className}>
-      {types.slice(0, 3).map(t => (
+      {types.slice(0, EVENT_TYPE_CHIPS_MAX).map(t => (
         <EventTypeChip
           key={t.id}
           type={t}

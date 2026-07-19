@@ -30,16 +30,26 @@
   pointer-events: none;
 }
 
-/* Бейджи на обложке */
+/* Бейджи на обложке — одна горизонтальная строка, лишнее обрезается */
 .typeBadges {
-  position: absolute; bottom: 8px; left: 8px;
-  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 4px;
+  align-items: center;
+  overflow: hidden;
 }
 .typeBadge {
   backdrop-filter: blur(6px);
   font-size: var(--font-2xs);
   padding: 3px 9px;
   border-radius: 20px;
+  flex-shrink: 0;
+  max-width: 100%;
 }
 .ageBadge {
   position: absolute; top: 8px; right: 8px;
