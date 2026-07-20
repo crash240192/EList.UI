@@ -15,6 +15,7 @@ import {
 } from '@/features/invitations/invitationsStore';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { useActivationRedirect } from '@/features/auth/useActivationRedirect';
+import { UserAgreementsGate } from '@/features/agreements';
 import { useMediaQuery } from '@/shared/hooks';
 import { media } from '@/shared/lib/breakpoints';
 import styles from './AppLayout.module.css';
@@ -77,6 +78,7 @@ export function AppLayout() {
   }, [isWide]);
 
   return (
+    <UserAgreementsGate>
     <div className={styles.root}>
       {/* ---- Header ---- */}
       <header className={styles.header}>
@@ -204,6 +206,7 @@ export function AppLayout() {
         <Outlet />
       </main>
     </div>
+    </UserAgreementsGate>
   );
 }
 
