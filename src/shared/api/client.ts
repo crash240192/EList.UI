@@ -132,6 +132,32 @@ async function requestWithClientJwtOnly<T>(
 }
 
 /**
+ * GET со стандартными заголовками (client JWT + Authorization при наличии).
+ * Не бросает при success:false и не показывает тост — для статусных проверок.
+ */
+async function getStatus(path: string): Promise<boolean> {
+  const clientHash = getOrCreateClientHash();
+  const authToken = getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'authorization-jwt': clientHash,
+  };
+  if (authToken) headers['Authorization'] = authToken;
+
+  const fetchPromise = fetch(`${BASE_URL}${path}`, { method: 'GET', headers }).then(async response => {
+    if (!response.ok) return false;
+    try {
+      const data: CommandResult<unknown> = await response.json();
+      return Boolean(data.success);
+    } catch {
+      return false;
+    }
+  });
+
+  return withTimeout(fetchPromise);
+}
+
+/**
  * GET только с client JWT. Не бросает при success:false и не показывает тост —
  * удобно для статусных проверок (например, согласие 18+).
  */
@@ -167,6 +193,8 @@ export const apiClient = {
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
+  /** GET: возвращает data.success, без тоста и без throw на success:false */
+  getStatus,
   /** GET client-JWT: возвращает data.success, без тоста и без throw на success:false */
   getStatusWithClientJwt,
 };

@@ -13,9 +13,30 @@ import { Select } from '@/shared/ui/Select/Select';
 import { EVENT_AGE_LIMIT_OPTIONS, formatAgeLimitLabel, normalizeAgeLimitValue, type EventAgeLimit } from '@/shared/lib/ageLimit';
 import { TabBar } from '@/shared/ui/TabBar';
 import { usePageTitle } from '@/shared/hooks';
+import {
+  DocumentType,
+  addAgreementDocument,
+  fetchLastDocuments,
+  type DocumentTypeValue,
+  type IAgreementDocument,
+  type IDocumentRequest,
+} from '@/entities/agreement';
 import styles from './AdminPage.module.css';
 
-type AdminTab = 'eventTypes' | 'contactTypes' | 'tariffs';
+type AdminTab = 'eventTypes' | 'contactTypes' | 'tariffs' | 'agreements';
+
+const DOCUMENT_TYPE_OPTIONS: { value: DocumentTypeValue; label: string }[] = [
+  { value: DocumentType.Policy, label: 'Политика обработки ПДн' },
+  { value: DocumentType.Consent, label: 'Согласие на обработку ПДн' },
+  { value: DocumentType.Agreement, label: 'Пользовательское соглашение' },
+];
+
+/** Какой сегмент semver увеличить при сохранении (0 = major, 1 = minor, 2 = patch) */
+const VERSION_BUMP_OPTIONS = [
+  { value: '0', label: 'Major (x.0.0)' },
+  { value: '1', label: 'Minor (0.x.0)' },
+  { value: '2', label: 'Patch (0.0.x)' },
+];
 
 // Восстанавливаем data URL из чистого base64 для отображения иконки
 function icoToDisplayUrl(ico: string): string {
@@ -42,6 +63,7 @@ export default function AdminPage() {
           { id: 'eventTypes', label: 'Типы мероприятий' },
           { id: 'contactTypes', label: 'Типы контактов' },
           { id: 'tariffs', label: 'Тарифы' },
+          { id: 'agreements', label: 'Соглашения' },
         ]}
         activeId={tab}
         onChange={id => setTab(id as AdminTab)}
@@ -51,6 +73,7 @@ export default function AdminPage() {
         {tab === 'eventTypes'   && <EventTypesTab />}
         {tab === 'contactTypes' && <ContactTypesTab />}
         {tab === 'tariffs'      && <TariffsTab />}
+        {tab === 'agreements'   && <AgreementsTab />}
       </div>
     </div>
   );
@@ -939,6 +962,188 @@ function TariffForm({ tariff, onSave, onCancel }: {
 function formatPeriod(t: ITariff): string {
   const days = (t as any).periodDays ?? t.period?.days;
   return days ? `${days} дн.` : '—';
+}
+
+// =============================================================================
+// ВКЛАДКА: Документы соглашений
+// =============================================================================
+
+function AgreementsTab() {
+  const [docs, setDocs] = useState<IAgreementDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<DocumentTypeValue | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setDocs(await fetchLastDocuments());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const docByType = (type: DocumentTypeValue) => docs.find(d => d.type === type) ?? null;
+
+  if (loading) return <div className={styles.loader}>Загрузка...</div>;
+  if (error) return <div className={styles.errorMsg}>{error}</div>;
+
+  return (
+    <div className={styles.splitPane}>
+      <div className={`${styles.listPane} ${selectedType !== null ? styles.mobileHidden : ''}`}>
+        <div className={styles.paneHeader}>
+          <h2 className={styles.paneTitle}>Документы</h2>
+        </div>
+        <div className={styles.itemList}>
+          {DOCUMENT_TYPE_OPTIONS.map(opt => {
+            const current = docByType(opt.value);
+            return (
+              <div
+                key={opt.value}
+                className={`${styles.categoryRow} ${selectedType === opt.value ? styles.listRowActive : ''}`}
+                onClick={() => setSelectedType(opt.value)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className={styles.itemInfo}>
+                  <span className={styles.itemName}>{opt.label}</span>
+                  <span className={styles.itemSub}>
+                    {current
+                      ? `v${current.version}${current.header ? ` · ${current.header}` : ''}`
+                      : 'Документ ещё не загружен'}
+                  </span>
+                </div>
+                <div className={styles.itemActions}>
+                  <EditIconBtn onClick={e => { e.stopPropagation(); setSelectedType(opt.value); }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className={`${styles.formPane} ${selectedType === null ? styles.mobileHidden : ''}`}>
+        <button className={styles.mobileBackBtn} onClick={() => setSelectedType(null)}>
+          ← Назад к списку
+        </button>
+        {selectedType !== null ? (
+          <AgreementDocumentForm
+            key={selectedType}
+            type={selectedType}
+            current={docByType(selectedType)}
+            onSave={async (payload) => {
+              await addAgreementDocument(payload);
+              setSelectedType(null);
+              await load();
+            }}
+            onCancel={() => setSelectedType(null)}
+          />
+        ) : (
+          <div className={styles.emptyForm}>
+            <p>Выберите тип документа для редактирования</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AgreementDocumentForm({
+  type,
+  current,
+  onSave,
+  onCancel,
+}: {
+  type: DocumentTypeValue;
+  current: IAgreementDocument | null;
+  onSave: (data: IDocumentRequest) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const typeLabel = DOCUMENT_TYPE_OPTIONS.find(o => o.value === type)?.label ?? 'Документ';
+  const [header, setHeader] = useState(current?.header ?? '');
+  const [text, setText] = useState(current?.text ?? '');
+  const [versionBump, setVersionBump] = useState('2');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    if (!header.trim()) { setErr('Укажите заголовок'); return; }
+    if (!text.trim()) { setErr('Укажите текст документа'); return; }
+    setSaving(true);
+    setErr(null);
+    try {
+      await onSave({
+        header: header.trim(),
+        text: text.trim(),
+        type,
+        version: versionBump,
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={`${styles.form} ${styles.agreementForm}`}>
+      <h3 className={styles.formTitle}>{typeLabel}</h3>
+      {current && (
+        <p className={styles.agreementMeta}>
+          Текущая версия: <strong>v{current.version}</strong>
+          {current.creationDate && (
+            <> · {new Date(current.creationDate).toLocaleString('ru-RU')}</>
+          )}
+        </p>
+      )}
+      {!current && (
+        <p className={styles.agreementMeta}>Документа ещё нет — будет создана первая версия</p>
+      )}
+      {err && <div className={styles.formError}>{err}</div>}
+
+      <FormField label="Заголовок *">
+        <input
+          className={styles.input}
+          value={header}
+          onChange={e => setHeader(e.target.value)}
+          placeholder="Заголовок документа"
+        />
+      </FormField>
+
+      <FormField label="Текст документа *">
+        <textarea
+          className={`${styles.textarea} ${styles.agreementTextarea}`}
+          rows={14}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder="Полный текст соглашения..."
+        />
+      </FormField>
+
+      <FormField label="Увеличить версию *">
+        <Select
+          value={versionBump}
+          onChange={setVersionBump}
+          options={VERSION_BUMP_OPTIONS}
+        />
+        <span className={styles.fieldHint}>
+          Указывается индекс сегмента версии: 0 — major, 1 — minor, 2 — patch
+        </span>
+      </FormField>
+
+      <div className={styles.formActions}>
+        <button type="button" className={styles.cancelBtn} onClick={onCancel} disabled={saving}>
+          Отмена
+        </button>
+        <button type="button" className={styles.saveBtn} onClick={() => { void handleSave(); }} disabled={saving}>
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ---- Общий компонент поля ----
