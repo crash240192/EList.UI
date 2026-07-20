@@ -31,12 +31,14 @@ const DOCUMENT_TYPE_OPTIONS: { value: DocumentTypeValue; label: string }[] = [
   { value: DocumentType.Agreement, label: 'Пользовательское соглашение' },
 ];
 
-/** Какой сегмент semver увеличить при сохранении (0 = major, 1 = minor, 2 = patch) */
-const VERSION_BUMP_OPTIONS = [
-  { value: '0', label: 'Major (x.0.0)' },
-  { value: '1', label: 'Minor (0.x.0)' },
-  { value: '2', label: 'Patch (0.0.x)' },
-];
+const VERSION_RE = /^\d+\.\d+\.\d+$/;
+
+/** Следующая patch-версия от текущей (x.x.x → x.x.(x+1)), иначе 1.0.0 */
+function suggestNextVersion(current: string | undefined): string {
+  if (!current || !VERSION_RE.test(current)) return '1.0.0';
+  const [major, minor, patch] = current.split('.').map(Number);
+  return `${major}.${minor}.${patch + 1}`;
+}
 
 // Восстанавливаем data URL из чистого base64 для отображения иконки
 function icoToDisplayUrl(ico: string): string {
@@ -1065,13 +1067,18 @@ function AgreementDocumentForm({
   const typeLabel = DOCUMENT_TYPE_OPTIONS.find(o => o.value === type)?.label ?? 'Документ';
   const [header, setHeader] = useState(current?.header ?? '');
   const [text, setText] = useState(current?.text ?? '');
-  const [versionBump, setVersionBump] = useState('2');
+  const [version, setVersion] = useState(() => suggestNextVersion(current?.version));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (!header.trim()) { setErr('Укажите заголовок'); return; }
     if (!text.trim()) { setErr('Укажите текст документа'); return; }
+    const versionValue = version.trim();
+    if (!VERSION_RE.test(versionValue)) {
+      setErr('Версия должна быть в формате x.x.x (например, 1.0.0)');
+      return;
+    }
     setSaving(true);
     setErr(null);
     try {
@@ -1079,7 +1086,7 @@ function AgreementDocumentForm({
         header: header.trim(),
         text: text.trim(),
         type,
-        version: versionBump,
+        version: versionValue,
       });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Ошибка сохранения');
@@ -1123,15 +1130,16 @@ function AgreementDocumentForm({
         />
       </FormField>
 
-      <FormField label="Увеличить версию *">
-        <Select
-          value={versionBump}
-          onChange={setVersionBump}
-          options={VERSION_BUMP_OPTIONS}
+      <FormField label="Версия *">
+        <input
+          className={styles.input}
+          value={version}
+          onChange={e => setVersion(e.target.value)}
+          placeholder="1.0.0"
+          inputMode="decimal"
+          autoComplete="off"
         />
-        <span className={styles.fieldHint}>
-          Указывается индекс сегмента версии: 0 — major, 1 — minor, 2 — patch
-        </span>
+        <span className={styles.fieldHint}>Формат x.x.x, например 1.0.0</span>
       </FormField>
 
       <div className={styles.formActions}>
