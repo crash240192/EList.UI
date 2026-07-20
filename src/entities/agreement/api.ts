@@ -18,44 +18,42 @@ export async function agreeAnonymousAge(): Promise<void> {
   await apiClient.getWithClientJwt('/api/agreements/age/anonymous/agree');
 }
 
-function documentTypeQuery(documentType: DocumentTypeValue): string {
-  return `documentType=${encodeURIComponent(String(documentType))}`;
-}
-
 /**
  * Актуальна ли принятая пользователем версия документа.
- * GET /api/agreements/checkUserAgreement?documentType=
+ * GET /api/agreements/checkUserAgreement/{documentType}
  * success === true → согласие актуально.
  */
 export async function checkUserAgreement(documentType: DocumentTypeValue): Promise<boolean> {
-  return apiClient.getStatus(`/api/agreements/checkUserAgreement?${documentTypeQuery(documentType)}`);
+  return apiClient.getStatus(`/api/agreements/checkUserAgreement/${documentType}`);
 }
 
 /**
  * Принять документ указанного типа.
- * GET /api/agreements/agree?documentType=
+ * GET /api/agreements/agree/{documentType}
  */
 export async function agreeDocument(documentType: DocumentTypeValue): Promise<void> {
-  await apiClient.get(`/api/agreements/agree?${documentTypeQuery(documentType)}`);
+  await apiClient.get(`/api/agreements/agree/${documentType}`);
 }
 
 /**
- * Последняя версия документа по типу.
- * GET /api/agreements/documents/last/{type}
+ * Последняя версия документа по типу (публичный endpoint).
+ * GET /api/agreements/documents/last/{documentType}
  */
-export async function fetchLastDocument(type: DocumentTypeValue): Promise<IAgreementDocument | null> {
-  const data = await apiClient.get<IAgreementDocument>(`/api/agreements/documents/last/${type}`);
+export async function fetchLastDocument(documentType: DocumentTypeValue): Promise<IAgreementDocument | null> {
+  const data = await apiClient.getWithClientJwt<IAgreementDocument>(
+    `/api/agreements/documents/last/${documentType}`,
+  );
   const raw = data.result as (IAgreementDocument & Record<string, unknown>) | null;
   if (!raw) return null;
   return normalizeDocument(raw);
 }
 
 /**
- * Последние версии всех документов.
+ * Последние версии всех документов (публичный endpoint).
  * GET /api/agreements/documents/last
  */
 export async function fetchLastDocuments(): Promise<IAgreementDocument[]> {
-  const data = await apiClient.get<IAgreementDocument[]>('/api/agreements/documents/last');
+  const data = await apiClient.getWithClientJwt<IAgreementDocument[]>('/api/agreements/documents/last');
   const list = data.result ?? [];
   return list.map((d) => normalizeDocument(d as IAgreementDocument & Record<string, unknown>));
 }
