@@ -16,6 +16,7 @@ import { usePageTitle } from '@/shared/hooks';
 import {
   DocumentType,
   addAgreementDocument,
+  fetchLastDocument,
   fetchLastDocuments,
   type DocumentTypeValue,
   type IAgreementDocument,
@@ -989,7 +990,8 @@ function AgreementsTab() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const docByType = (type: DocumentTypeValue) => docs.find(d => d.type === type) ?? null;
+  const docByType = (type: DocumentTypeValue) =>
+    docs.find(d => Number(d.type) === type) ?? null;
 
   if (loading) return <div className={styles.loader}>Загрузка...</div>;
   if (error) return <div className={styles.errorMsg}>{error}</div>;
@@ -1035,7 +1037,6 @@ function AgreementsTab() {
           <AgreementDocumentForm
             key={selectedType}
             type={selectedType}
-            current={docByType(selectedType)}
             onSave={async (payload) => {
               await addAgreementDocument(payload);
               setSelectedType(null);
@@ -1055,21 +1056,49 @@ function AgreementsTab() {
 
 function AgreementDocumentForm({
   type,
-  current,
   onSave,
   onCancel,
 }: {
   type: DocumentTypeValue;
-  current: IAgreementDocument | null;
   onSave: (data: IDocumentRequest) => Promise<void>;
   onCancel: () => void;
 }) {
   const typeLabel = DOCUMENT_TYPE_OPTIONS.find(o => o.value === type)?.label ?? 'Документ';
-  const [header, setHeader] = useState(current?.header ?? '');
-  const [text, setText] = useState(current?.text ?? '');
-  const [version, setVersion] = useState(() => suggestNextVersion(current?.version));
+  const [current, setCurrent] = useState<IAgreementDocument | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [header, setHeader] = useState('');
+  const [text, setText] = useState('');
+  const [version, setVersion] = useState('1.0.0');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingDoc(true);
+    setLoadErr(null);
+    setErr(null);
+    fetchLastDocument(type)
+      .then(doc => {
+        if (cancelled) return;
+        setCurrent(doc);
+        setHeader(doc?.header ?? '');
+        setText(doc?.text ?? '');
+        setVersion(suggestNextVersion(doc?.version));
+      })
+      .catch(e => {
+        if (cancelled) return;
+        setCurrent(null);
+        setHeader('');
+        setText('');
+        setVersion('1.0.0');
+        setLoadErr(e instanceof Error ? e.message : 'Не удалось загрузить документ');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDoc(false);
+      });
+    return () => { cancelled = true; };
+  }, [type]);
 
   const handleSave = async () => {
     if (!header.trim()) { setErr('Укажите заголовок'); return; }
@@ -1095,6 +1124,10 @@ function AgreementDocumentForm({
     }
   };
 
+  if (loadingDoc) {
+    return <div className={styles.loader}>Загрузка документа...</div>;
+  }
+
   return (
     <div className={`${styles.form} ${styles.agreementForm}`}>
       <h3 className={styles.formTitle}>{typeLabel}</h3>
@@ -1106,9 +1139,10 @@ function AgreementDocumentForm({
           )}
         </p>
       )}
-      {!current && (
+      {!current && !loadErr && (
         <p className={styles.agreementMeta}>Документа ещё нет — будет создана первая версия</p>
       )}
+      {loadErr && <div className={styles.formError}>{loadErr}</div>}
       {err && <div className={styles.formError}>{err}</div>}
 
       <FormField label="Заголовок *">
