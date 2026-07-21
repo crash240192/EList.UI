@@ -3,6 +3,7 @@
 import { createPortal } from 'react-dom';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import type { IAgreementDocument } from '@/entities/agreement';
+import { AgreementDocumentHtml } from './AgreementDocumentHtml';
 import styles from './AgreementDocumentModal.module.css';
 
 interface AgreementDocumentModalProps {
@@ -42,7 +43,7 @@ export function AgreementDocumentModal({
             {loading && <p className={styles.hint}>Загрузка документа…</p>}
             {!loading && error && <p className={styles.error}>{error}</p>}
             {!loading && !error && doc && (
-              <div className={styles.text}>{doc.text}</div>
+              <AgreementDocumentHtml html={doc.text} />
             )}
           </div>
         </div>
