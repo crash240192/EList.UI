@@ -81,7 +81,7 @@
   padding: 18px 20px;
 }
 
-.error {
+.checkRow {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -90,6 +90,11 @@
   cursor: pointer;
   line-height: 1.4;
   flex-shrink: 0;
+}
+
+.checkRow span {
+  flex: 1;
+  min-width: 0;
 }
 
 .checkRow input {
