@@ -427,13 +427,13 @@ export default function RegisterPage() {
                     onChange={e => setConsentAccepted(e.target.checked)}
                   />
                   <span>
-                    Согласен на обработку персональных данных.{' '}
+                    Согласен на{' '}
                     <button
                       type="button"
                       className={regStyles.docLink}
                       onClick={(e) => { e.preventDefault(); void openDocument(DocumentType.Consent); }}
                     >
-                      Читать
+                      обработку персональных данных
                     </button>
                   </span>
                 </label>
@@ -444,13 +444,13 @@ export default function RegisterPage() {
                     onChange={e => setAgreementAccepted(e.target.checked)}
                   />
                   <span>
-                    Согласен с условиями пользовательского соглашения.{' '}
+                    Согласен с условиями{' '}
                     <button
                       type="button"
                       className={regStyles.docLink}
                       onClick={(e) => { e.preventDefault(); void openDocument(DocumentType.Agreement); }}
                     >
-                      Читать
+                      пользовательского соглашения
                     </button>
                   </span>
                 </label>

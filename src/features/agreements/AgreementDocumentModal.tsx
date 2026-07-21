@@ -38,11 +38,13 @@ export function AgreementDocumentModal({
           </button>
         </div>
         <div className={styles.body}>
-          {loading && <p className={styles.hint}>Загрузка документа…</p>}
-          {!loading && error && <p className={styles.error}>{error}</p>}
-          {!loading && !error && doc && (
-            <div className={styles.text}>{doc.text}</div>
-          )}
+          <div className={styles.textPanel}>
+            {loading && <p className={styles.hint}>Загрузка документа…</p>}
+            {!loading && error && <p className={styles.error}>{error}</p>}
+            {!loading && !error && doc && (
+              <div className={styles.text}>{doc.text}</div>
+            )}
+          </div>
         </div>
         <div className={styles.footer}>
           <button type="button" className={styles.okBtn} onClick={onClose}>

@@ -1,5 +1,6 @@
 // features/agreements/UserAgreementsGate.tsx
 // После входа / при открытии приложения: проверка актуальности Consent и Agreement
+// Устаревшие документы показываются по одному, последовательно
 
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -20,11 +21,9 @@ const CHECK_TYPES: DocumentTypeValue[] = [DocumentType.Consent, DocumentType.Agr
 interface PendingDoc {
   type: DocumentTypeValue;
   document: IAgreementDocument;
-  checked: boolean;
 }
 
 interface UserAgreementsGateProps {
-  /** Блокирует контент приложения, пока согласия не подтверждены */
   children?: React.ReactNode;
 }
 
@@ -33,17 +32,18 @@ export function UserAgreementsGate({ children }: UserAgreementsGateProps) {
   const activationRequired = useAuthStore(s => s.activationRequired);
   const logout = useAuthStore(s => s.logout);
 
-  const [pending, setPending] = useState<PendingDoc[] | null>(null);
-  const [checking, setChecking] = useState(false);
+  const [queue, setQueue] = useState<PendingDoc[]>([]);
+  const [index, setIndex] = useState(0);
+  const [checked, setChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const runCheck = useCallback(async () => {
     if (!authenticated || activationRequired) {
-      setPending(null);
+      setQueue([]);
+      setIndex(0);
       return;
     }
-    setChecking(true);
     setError(null);
     try {
       const outdated: PendingDoc[] = [];
@@ -52,14 +52,14 @@ export function UserAgreementsGate({ children }: UserAgreementsGateProps) {
         if (ok) continue;
         const document = await fetchLastDocument(type);
         if (!document) continue;
-        outdated.push({ type, document, checked: false });
+        outdated.push({ type, document });
       }
-      setPending(outdated.length > 0 ? outdated : null);
+      setQueue(outdated);
+      setIndex(0);
+      setChecked(false);
     } catch {
-      // Не блокируем приложение при сетевой ошибке проверки
-      setPending(null);
-    } finally {
-      setChecking(false);
+      setQueue([]);
+      setIndex(0);
     }
   }, [authenticated, activationRequired]);
 
@@ -67,29 +67,35 @@ export function UserAgreementsGate({ children }: UserAgreementsGateProps) {
     void runCheck();
   }, [runCheck]);
 
-  const setChecked = (type: DocumentTypeValue, checked: boolean) => {
-    setPending(list =>
-      list ? list.map(item => (item.type === type ? { ...item, checked } : item)) : list,
-    );
-  };
+  const current = queue[index] ?? null;
 
   const handleCancel = () => {
     logout();
-    setPending(null);
+    setQueue([]);
+    setIndex(0);
+    setChecked(false);
+    setError(null);
   };
 
   const handleOk = async () => {
-    if (!pending || pending.some(p => !p.checked)) {
-      setError('Отметьте согласие со всеми документами');
+    if (!current) return;
+    if (!checked) {
+      setError('Отметьте согласие с документом');
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      for (const item of pending) {
-        await agreeDocument(item.type);
+      await agreeDocument(current.type);
+      const next = index + 1;
+      if (next < queue.length) {
+        setIndex(next);
+        setChecked(false);
+      } else {
+        setQueue([]);
+        setIndex(0);
+        setChecked(false);
       }
-      setPending(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось сохранить согласие');
     } finally {
@@ -97,16 +103,17 @@ export function UserAgreementsGate({ children }: UserAgreementsGateProps) {
     }
   };
 
-  const blocking = Boolean(pending && pending.length > 0);
-
   return (
     <>
       {children}
-      {blocking && pending && (
+      {current && (
         <ReconsentDialog
-          items={pending}
+          item={current}
+          step={index + 1}
+          total={queue.length}
+          checked={checked}
           error={error}
-          busy={submitting || checking}
+          busy={submitting}
           onToggle={setChecked}
           onOk={() => { void handleOk(); }}
           onCancel={handleCancel}
@@ -117,21 +124,31 @@ export function UserAgreementsGate({ children }: UserAgreementsGateProps) {
 }
 
 function ReconsentDialog({
-  items,
+  item,
+  step,
+  total,
+  checked,
   error,
   busy,
   onToggle,
   onOk,
   onCancel,
 }: {
-  items: PendingDoc[];
+  item: PendingDoc;
+  step: number;
+  total: number;
+  checked: boolean;
   error: string | null;
   busy: boolean;
-  onToggle: (type: DocumentTypeValue, checked: boolean) => void;
+  onToggle: (checked: boolean) => void;
   onOk: () => void;
   onCancel: () => void;
 }) {
   useModalBackButton(onCancel);
+
+  const consentLabel = item.type === DocumentType.Consent
+    ? 'Согласен на обработку персональных данных'
+    : 'Согласен с условиями пользовательского соглашения';
 
   return createPortal(
     <>
@@ -142,35 +159,32 @@ function ReconsentDialog({
         aria-modal="true"
         aria-labelledby="reconsent-title"
       >
-        <h2 id="reconsent-title" className={styles.title}>
-          Обновление пользовательских соглашений
-        </h2>
-        <p className={styles.lead}>
-          Появились новые версии документов. Ознакомьтесь с ними и подтвердите согласие,
-          чтобы продолжить работу.
-        </p>
-
-        <div className={styles.docs}>
-          {items.map(item => (
-            <section key={item.type} className={styles.docBlock}>
-              <h3 className={styles.docHeader}>{item.document.header}</h3>
-              <div className={styles.docText}>{item.document.text}</div>
-              <label className={styles.checkRow}>
-                <input
-                  type="checkbox"
-                  checked={item.checked}
-                  disabled={busy}
-                  onChange={e => onToggle(item.type, e.target.checked)}
-                />
-                <span>
-                  {item.type === DocumentType.Consent
-                    ? 'Согласен на обработку персональных данных'
-                    : 'Согласен с условиями пользовательского соглашения'}
-                </span>
-              </label>
-            </section>
-          ))}
+        <div className={styles.header}>
+          <div className={styles.headerText}>
+            <h2 id="reconsent-title" className={styles.title}>
+              {item.document.header || 'Обновление соглашения'}
+            </h2>
+            {total > 1 && (
+              <p className={styles.stepHint}>Документ {step} из {total}</p>
+            )}
+          </div>
         </div>
+
+        <div className={styles.body}>
+          <div className={styles.textPanel}>
+            <div className={styles.text}>{item.document.text}</div>
+          </div>
+        </div>
+
+        <label className={styles.checkRow}>
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={busy}
+            onChange={e => onToggle(e.target.checked)}
+          />
+          <span>{consentLabel}</span>
+        </label>
 
         {error && <p className={styles.error}>{error}</p>}
 
@@ -187,7 +201,7 @@ function ReconsentDialog({
             type="button"
             className={styles.okBtn}
             onClick={onOk}
-            disabled={busy || items.some(i => !i.checked)}
+            disabled={busy || !checked}
           >
             {busy ? 'Сохранение…' : 'ОК'}
           </button>
