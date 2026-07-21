@@ -6,7 +6,16 @@
   line-height: 1.65;
   color: var(--text-primary);
   word-break: break-word;
+}
+
+/* Обычный текст без тегов — сохраняем переносы строк */
+.plain {
   white-space: pre-wrap;
+}
+
+/* HTML — стандартный flow, иначе ведущие \n из разметки дают пустые строки */
+.html {
+  white-space: normal;
 }
 
 .root :first-child {
