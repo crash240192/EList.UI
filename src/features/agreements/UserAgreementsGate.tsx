@@ -14,6 +14,7 @@ import {
 } from '@/entities/agreement';
 import { useAuthStore } from '@/app/store';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import { AgreementDocumentHtml } from './AgreementDocumentHtml';
 import styles from './UserAgreementsGate.module.css';
 
 const CHECK_TYPES: DocumentTypeValue[] = [DocumentType.Consent, DocumentType.Agreement];
@@ -172,7 +173,7 @@ function ReconsentDialog({
 
         <div className={styles.body}>
           <div className={styles.textPanel}>
-            <div className={styles.text}>{item.document.text}</div>
+            <AgreementDocumentHtml html={item.document.text} />
           </div>
         </div>
 

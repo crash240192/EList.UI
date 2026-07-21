@@ -91,15 +91,6 @@
   padding: 18px 20px;
 }
 
-.text {
-  margin: 0;
-  font-size: var(--font-base, 15px);
-  line-height: 1.65;
-  color: var(--text-primary);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 .hint {
   margin: 0;
   font-size: var(--font-md, 14px);
@@ -150,9 +141,5 @@
     min-height: 220px;
     max-height: 55vh;
     padding: 14px 14px;
-  }
-
-  .text {
-    font-size: var(--font-md, 14px);
   }
 }
