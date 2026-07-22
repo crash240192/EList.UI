@@ -1,7 +1,7 @@
 // pages/invitations/InvitationsPage.tsx — макет examples/elist_invitations.html
 
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchUserInvitations,
   searchInvitations,
@@ -100,9 +100,14 @@ function useInviteeLabel(accountId: string | null | undefined): {
 export default function InvitationsPage() {
   usePageTitle('Приглашения');
   const navigate = useNavigate();
+  const location = useLocation();
   const { accountId } = useAccountId();
   const refreshNotViewedCount = useInvitationsStore(s => s.refreshNotViewedCount);
   const [tab, setTab] = useState<Tab>('incoming');
+  const invitationsReturnTo = `${location.pathname}${location.search}`;
+  const openEvent = (eventId: string) => {
+    navigate(`/event/${eventId}`, { state: { from: invitationsReturnTo } });
+  };
   const [items, setItems] = useState<IInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -168,7 +173,7 @@ export default function InvitationsPage() {
 
   const handleInvitationClick = (inv: IInvitation) => {
     void markViewedIfNeeded(inv);
-    navigate(`/event/${inv.eventId}`);
+    openEvent(inv.eventId);
   };
 
   const openPreview = (inv: IInvitation) => {
@@ -180,9 +185,11 @@ export default function InvitationsPage() {
     try {
       await apiClient.get(`/api/invitations/accept?invitationId=${inv.id}`);
       setItems(prev => prev.filter(i => i.id !== inv.id));
-      setPreviewInv(null);
       void refreshNotViewedCount();
-      navigate(`/event/${inv.eventId}`);
+      // Сначала navigate — иначе cleanup useModalBackButton может вызвать history.back()
+      // и отменить переход (или оставить битый history.state.idx).
+      openEvent(inv.eventId);
+      setPreviewInv(null);
     } catch (e) {
       if (isApiError(e) && isAccessDeniedError(e)) {
         useToastStore.getState().add(e.serverMessage || e.message);
@@ -330,7 +337,7 @@ export default function InvitationsPage() {
                   <SentInvitationRow
                     key={inv.id}
                     inv={inv}
-                    onOpen={() => navigate(`/event/${inv.eventId}`)}
+                    onOpen={() => openEvent(inv.eventId)}
                     onCancel={() => setConfirmCancel(inv)}
                   />
                 ))}
