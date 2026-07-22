@@ -230,6 +230,7 @@ function UserEventsPanel({
               key={event.id}
               event={event}
               onClick={() => onOpen(event.id)}
+              bleedCover
             />
           ))}
         </EventList>

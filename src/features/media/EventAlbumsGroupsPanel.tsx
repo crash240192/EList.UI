@@ -79,6 +79,7 @@ function EventGroupSection({
         event={event}
         onClick={() => onOpenEvent(event.id)}
         showChevron
+        bleedCover
         footer={<span>{albumCountLabel(albums.length)}</span>}
       />
       <div className={styles.albumGrid}>
