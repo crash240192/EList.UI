@@ -1,7 +1,7 @@
 // pages/invitations/InvitationsPage.tsx — макет examples/elist_invitations.html
 
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   fetchUserInvitations,
   searchInvitations,
@@ -40,6 +40,10 @@ import type { IEventType } from '@/entities/event/types';
 import styles from './InvitationsPage.module.css';
 
 type Tab = 'incoming' | 'sent';
+
+function tabFromSearch(params: URLSearchParams): Tab {
+  return params.get('tab') === 'sent' ? 'sent' : 'incoming';
+}
 
 function inviterName(inv: IInvitation): string {
   const p = inv.inviter?.personInfo;
@@ -100,9 +104,18 @@ function useInviteeLabel(accountId: string | null | undefined): {
 export default function InvitationsPage() {
   usePageTitle('Приглашения');
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { accountId } = useAccountId();
   const refreshNotViewedCount = useInvitationsStore(s => s.refreshNotViewedCount);
-  const [tab, setTab] = useState<Tab>('incoming');
+  const tab = tabFromSearch(searchParams);
+  const setTab = (next: Tab) => {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev);
+      if (next === 'incoming') p.delete('tab');
+      else p.set('tab', next);
+      return p;
+    }, { replace: true });
+  };
   const [items, setItems] = useState<IInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -253,7 +266,7 @@ export default function InvitationsPage() {
               { id: 'sent', label: 'Отправленные', count: sentLoaded ? sentItems.length : undefined },
             ]}
             activeId={tab}
-            onChange={id => setTab(id as typeof tab)}
+            onChange={id => setTab(id as Tab)}
           />
 
           <div className={styles.cardBody}>
