@@ -4,12 +4,13 @@ import { apiClient } from '@/shared/api/client';
 
 // ---- Пароль ----
 
+/** POST /api/authorization/changePassword */
 export async function changePassword(payload: {
   oldPassword: string;
   newPassword: string;
   newPasswordConfirmation: string;
 }): Promise<void> {
-  await apiClient.post('/api/accounts/changePassword', payload);
+  await apiClient.post('/api/authorization/changePassword', payload);
 }
 
 // ---- Местоположение ----
