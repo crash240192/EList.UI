@@ -43,12 +43,9 @@ import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
-  EVENT_AGE_LIMIT_OPTIONS,
-  formatAgeLimitLabel,
-  getAvailableAgeLimitOptions,
-  normalizeAgeLimitValue,
+  getMaxEventAgeForTariff,
+  isEventAgeAllowed,
   resolveAgeLimitBadge,
-  type EventAgeLimit,
 } from '@/shared/lib/ageLimit';
 import styles from './CreateEventPage.module.css';
 
@@ -310,11 +307,9 @@ export default function CreateEventPage() {
         endDate:            endParts.date,
         endTime:            endParts.time,
         cost:               String(parameters?.cost ?? 0),
-        ageLimit:           normalizeAgeLimitValue(
-          rawAge == null ? null : Number(rawAge),
-          null,
-          true,
-        ),
+        ageLimit:           rawAge == null || Number.isNaN(Number(rawAge))
+          ? ''
+          : String(Math.max(0, Math.trunc(Number(rawAge)))),
         isPrivate:          parameters?.private ?? false,
         maxPersons:         String(parameters?.maxPersonsCount ?? ''),
         allowUsersToInvite: parameters?.allowUsersToInvite ?? true,
@@ -505,33 +500,16 @@ export default function CreateEventPage() {
   // null = нет ограничений (разрешено любое значение); число = максимально допустимое
   const maxCost      = tv?.costLimit    ?? null;
   const maxPersons   = tv?.personsLimit ?? null;
-  const maxAge       = tv?.ageLimit     ?? null;
-  const tariffAgeOptions = useMemo(
-    () => (tariffReady ? getAvailableAgeLimitOptions(maxAge, hasTariff) : [...EVENT_AGE_LIMIT_OPTIONS]),
-    [tariffReady, maxAge, hasTariff],
+  const tariffAgeLimit = tv?.ageLimit ?? null;
+  /** Макс. ценз события по тарифу; null = любой возраст */
+  const maxEventAge = useMemo(
+    () => (tariffReady ? getMaxEventAgeForTariff(tariffAgeLimit, hasTariff) : null),
+    [tariffReady, tariffAgeLimit, hasTariff],
   );
-  const ageLimitOptions = useMemo(() => {
-    // Пока тариф грузится — полный список, иначе текущее значение пропадает из <select>
-    // и браузер показывает первый пункт (0+)
-    if (!tariffReady) return [...EVENT_AGE_LIMIT_OPTIONS];
-    const opts = tariffAgeOptions;
-    if (!isEditing || form.ageLimit === '') return opts;
-
-    // При редактировании оставляем фактический ценз в списке, даже если тариф его уже не даёт
-    const current = parseInt(form.ageLimit, 10);
-    if (
-      Number.isFinite(current)
-      && (EVENT_AGE_LIMIT_OPTIONS as readonly number[]).includes(current)
-      && !(opts as readonly number[]).includes(current)
-    ) {
-      return [...opts, current as EventAgeLimit].sort((a, b) => a - b);
-    }
-    return opts;
-  }, [tariffReady, tariffAgeOptions, isEditing, form.ageLimit]);
   const canSetCost       = !hasTariff || maxCost    === null || maxCost    > 0;
   const canSetMaxPersons = !hasTariff || maxPersons === null || maxPersons > 0;
-  // Блокировку считаем по тарифу, а не по расширенному списку (куда временно добавлен текущий ценз)
-  const canSetAge        = tariffAgeOptions.length > 1;
+  // 0 в тарифе / нет тарифа → только 0+, поле блокируем
+  const canSetAge        = !tariffReady || maxEventAge === null || maxEventAge > 0;
   const canSetPrivate    = hasTariff ? !!tv!.allowPrivate : false;
   const canSetGender     = hasTariff ? !!tv!.allowGenderSegregation : false;
   const hasTariffWarning = hasWallet && (!canSetPrivate || !canSetGender);
@@ -539,23 +517,42 @@ export default function CreateEventPage() {
 
   useEffect(() => {
     // На редактировании не затираем сохранённый ценз под лимит тарифа
-    // (иначе 16+ при maxAge=12 исчезает из <select> и выглядит как 0+)
     if (isEditing || loading || !tariffReady || form.ageLimit === '') return;
-    const normalized = normalizeAgeLimitValue(
-      parseInt(form.ageLimit, 10),
-      maxAge,
-      hasTariff,
-    );
-    if (normalized !== form.ageLimit) {
-      setForm(f => ({ ...f, ageLimit: normalized }));
+    if (maxEventAge === 0) {
+      if (form.ageLimit !== '0') setForm(f => ({ ...f, ageLimit: '0' }));
+      return;
     }
-  }, [isEditing, hasTariff, maxAge, tariffReady, loading, form.ageLimit]);
+    const age = parseInt(form.ageLimit, 10);
+    if (!Number.isFinite(age)) return;
+    if (maxEventAge != null && age > maxEventAge) {
+      setForm(f => ({ ...f, ageLimit: String(maxEventAge) }));
+    }
+  }, [isEditing, maxEventAge, tariffReady, loading, form.ageLimit]);
 
   const parseAgeLimit = (): number | null => {
     if (form.ageLimit === '') return null;
     const age = parseInt(form.ageLimit, 10);
     return Number.isNaN(age) ? null : age;
   };
+
+  const ageLimitHint = (() => {
+    if (!tariffReady) return undefined;
+    if (!canSetAge) return 'Недоступно в тарифе — только 0+';
+    if (maxEventAge == null) return 'любой возраст';
+    return `от 0+ до ${maxEventAge}+`;
+  })();
+
+  const ageLimitErrorHint = (() => {
+    if (!form.ageLimit) return undefined;
+    if (maxEventAge == null) return 'Недопустимое значение';
+    return `Превышает лимит тарифа (до ${maxEventAge}+)`;
+  })();
+
+  const ageLimitToastMessage = !form.ageLimit
+    ? 'Укажите возрастное ограничение'
+    : maxEventAge == null
+      ? 'Недопустимое возрастное ограничение'
+      : `Возрастное ограничение превышает лимит тарифа (до ${maxEventAge}+)`;
 
   // Validation
   const validate = (): FieldError | null => {
@@ -593,7 +590,11 @@ export default function CreateEventPage() {
         errs.add('ageLimit');
       } else {
         const age = parseInt(form.ageLimit, 10);
-        if (Number.isNaN(age) || !ageLimitOptions.includes(age as EventAgeLimit)) {
+        // При редактировании сохраняем уже выставленный ценз даже при более жёстком тарифе;
+        // при создании — только диапазон, разрешённый тарифом.
+        if (Number.isNaN(age) || age < 0) {
+          errs.add('ageLimit');
+        } else if (!isEditing && !isEventAgeAllowed(age, tariffAgeLimit, hasTariff)) {
           errs.add('ageLimit');
         }
       }
@@ -668,9 +669,7 @@ export default function CreateEventPage() {
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: !form.ageLimit
-          ? 'Выберите возрастное ограничение'
-          : `Возрастное ограничение превышает лимит тарифа (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`,
+        ageLimit: ageLimitToastMessage,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -767,9 +766,7 @@ export default function CreateEventPage() {
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
         maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: !form.ageLimit
-          ? 'Выберите возрастное ограничение'
-          : `Возрастное ограничение превышает лимит тарифа (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`,
+        ageLimit: ageLimitToastMessage,
       }[firstErr]);
       scrollTo(firstErr); return;
     }
@@ -1026,23 +1023,22 @@ export default function CreateEventPage() {
               label="Возрастное ограничение *"
               error={hasErr('ageLimit') ? (!form.ageLimit ? 'Обязательное поле' : 'Недопустимое значение') : undefined}
             >
-              <LockedSelect
+              <LockedInput
                 locked={!canSetAge}
                 value={form.ageLimit}
-                placeholder="Выберите..."
-                onChange={v => {
+                placeholder="например 18"
+                onChange={e => {
+                  const v = e.target.value.replace(/[^0-9]/g, '');
                   setForm(f => ({ ...f, ageLimit: v }));
                   setFieldErrors(p => { const n = new Set(p); n.delete('ageLimit'); return n; });
                 }}
-                options={ageLimitOptions.map(age => ({
-                  value: String(age),
-                  label: formatAgeLimitLabel(age),
-                }))}
+                type="number"
+                min="0"
+                max={maxEventAge != null ? String(maxEventAge) : undefined}
+                inputMode="numeric"
                 hasError={hasErr('ageLimit')}
-                hint={hasErr('ageLimit')
-                  ? (!form.ageLimit ? undefined : `Превышает лимит тарифа (до ${maxAge ?? ageLimitOptions[ageLimitOptions.length - 1]}+)`)
-                  : !canSetAge ? 'Недоступно в тарифе — только 0+'
-                  : maxAge ? `до ${maxAge}+` : undefined}
+                suffix={form.ageLimit !== '' ? '+' : undefined}
+                hint={hasErr('ageLimit') ? ageLimitErrorHint : ageLimitHint}
               />
             </Field>
 

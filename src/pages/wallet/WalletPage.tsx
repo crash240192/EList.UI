@@ -6,6 +6,7 @@ import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { usePageTitle } from '@/shared/hooks';
+import { formatTariffAgeCapability } from '@/shared/lib/ageLimit';
 import styles from './WalletPage.module.css';
 
 const HISTORY_STUB: {
@@ -56,8 +57,8 @@ function formatValidatorRows(v: ITariffValidator): { label: string; value: strin
     },
     {
       label: 'Возрастной ценз',
-      value: v.ageLimit == null ? 'Без ограничений' : v.ageLimit === 0 ? 'Нельзя ставить ценз' : `до ${v.ageLimit}+`,
-      type: v.ageLimit == null ? 'ok' : v.ageLimit === 0 ? 'no' : 'warn',
+      value: formatTariffAgeCapability(v.ageLimit),
+      type: v.ageLimit == null || v.ageLimit >= 18 ? 'ok' : v.ageLimit === 0 ? 'no' : 'warn',
     },
   ];
 }
