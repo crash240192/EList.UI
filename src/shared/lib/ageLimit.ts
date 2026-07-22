@@ -5,12 +5,14 @@ export type EventAgeLimit = (typeof EVENT_AGE_LIMIT_OPTIONS)[number];
 
 /**
  * Максимальный возрастной ценз события по лимиту тарифа.
- * `null` = без ограничений (можно указать любой возраст ≥ 0).
+ * `null` = без ограничения (можно указать любой возраст ≥ 0).
  *
- * Значение в валидаторе тарифа — верхняя граница включительно:
- * - нет тарифа → только 0
- * - в тарифе null (пусто) → любой возраст
- * - в тарифе N (0 / 6 / 12 / 16 / 18) → от 0 до N включительно
+ * Значение в валидаторе — верхняя граница минимального возраста посетителей (включительно):
+ * - нет тарифа → только 0+
+ * - null → без ограничения
+ * - 0 → только 0+
+ * - 6 / 12 / 16 / 18 → event.ageLimit от 0 до N включительно
+ *   (тариф «макс. 16+» → можно 16+, нельзя 17+)
  */
 export function getMaxEventAgeForTariff(
   tariffAgeLimit: number | null,
@@ -32,15 +34,19 @@ export function isEventAgeAllowed(
   return age <= max;
 }
 
-/** Подпись лимита тарифа для кошелька / подсказок */
-export function formatTariffAgeCapability(tariffAgeLimit: number | null): string {
-  if (tariffAgeLimit == null) return 'Без ограничений';
-  return formatTariffAgeLimitLabel(tariffAgeLimit);
+/**
+ * Подпись лимита тарифа (админка / кошелёк).
+ * 0 → «только 0+», N → «макс. N+», null → «без ограничения»
+ */
+export function formatTariffAgeLimitLabel(age: number): string {
+  if (age === 0) return 'только 0+';
+  return `макс. ${age}+`;
 }
 
-/** Подпись опции в админке валидатора: «до 18+» */
-export function formatTariffAgeLimitLabel(age: number): string {
-  return `до ${age}+`;
+/** Подпись лимита тарифа для кошелька / подсказок (включая null) */
+export function formatTariffAgeCapability(tariffAgeLimit: number | null): string {
+  if (tariffAgeLimit == null) return 'без ограничения';
+  return formatTariffAgeLimitLabel(tariffAgeLimit);
 }
 
 /** Варианты для селекта тарифа в админке (пресеты) */

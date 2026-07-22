@@ -537,22 +537,26 @@ export default function CreateEventPage() {
 
   const ageLimitHint = (() => {
     if (!tariffReady) return undefined;
-    if (!canSetAge) return 'Недоступно в тарифе — только до 0+';
-    if (maxEventAge == null) return 'любой возраст';
-    return `до ${maxEventAge}+`;
+    if (!canSetAge) return 'По тарифу доступен только рейтинг 0+';
+    if (maxEventAge == null) return 'любой возрастной рейтинг';
+    if (maxEventAge === 0) return 'только 0+';
+    return `можно указать рейтинг не выше ${maxEventAge}+`;
   })();
 
   const ageLimitErrorHint = (() => {
     if (!form.ageLimit) return undefined;
     if (maxEventAge == null) return 'Недопустимое значение';
-    return `Превышает лимит тарифа (до ${maxEventAge}+)`;
+    if (maxEventAge === 0) return 'По тарифу доступен только рейтинг 0+';
+    return `Превышает лимит тарифа (макс. ${maxEventAge}+)`;
   })();
 
   const ageLimitToastMessage = !form.ageLimit
-    ? 'Укажите возрастное ограничение'
+    ? 'Укажите возрастной рейтинг'
     : maxEventAge == null
-      ? 'Недопустимое возрастное ограничение'
-      : `Возрастное ограничение превышает лимит тарифа (до ${maxEventAge}+)`;
+      ? 'Недопустимый возрастной рейтинг'
+      : maxEventAge === 0
+        ? 'По тарифу доступен только рейтинг 0+'
+        : `Возрастной рейтинг превышает лимит тарифа (макс. ${maxEventAge}+)`;
 
   // Validation
   const validate = (): FieldError | null => {
@@ -1016,7 +1020,7 @@ export default function CreateEventPage() {
             </div>
 
             <Field
-              label="Возрастное ограничение *"
+              label="Возрастной рейтинг *"
               error={hasErr('ageLimit') ? (!form.ageLimit ? 'Обязательное поле' : 'Недопустимое значение') : undefined}
             >
               <LockedInput

@@ -915,11 +915,11 @@ function TariffForm({ tariff, onSave, onCancel }: {
             onChange={e => setValidatorStr(v => ({ ...v, personsLimit: e.target.value }))} />
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>Макс. возрастное ограничение (пусто = без ограничений)</label>
+          <label className={styles.label}>Возрастной рейтинг событий (пусто = без ограничения)</label>
           <Select
             value={validatorStr.ageLimit}
             onChange={v => setValidatorStr(s => ({ ...s, ageLimit: v }))}
-            placeholder="не задано"
+            placeholder="без ограничения"
             options={EVENT_AGE_LIMIT_OPTIONS.map(age => ({
               value: String(age),
               label: formatTariffAgeLimitLabel(age),
