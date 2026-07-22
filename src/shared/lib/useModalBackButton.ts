@@ -17,6 +17,18 @@ const STATE_KEY = 'elistModal';
 let ignoringOwnBack = false;
 let ignoreResetTimer: ReturnType<typeof setTimeout> | null = null;
 
+function pushModalHistoryEntry(): void {
+  const prev = window.history.state;
+  // Preserve React Router's idx/key/usr — a bare { elistModal: true } wipes idx,
+  // and the next navigate() then computes idx as undefined+1 → NaN, so useSafeBack
+  // thinks there is no history and sends the user to "/".
+  const base =
+    prev && typeof prev === 'object' && !Array.isArray(prev)
+      ? (prev as Record<string, unknown>)
+      : {};
+  history.pushState({ ...base, [STATE_KEY]: true }, '');
+}
+
 export function useModalBackButton(onClose: () => void, isOpen = true): void {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -24,7 +36,7 @@ export function useModalBackButton(onClose: () => void, isOpen = true): void {
   useEffect(() => {
     if (!isOpen) return;
 
-    history.pushState({ [STATE_KEY]: true }, '');
+    pushModalHistoryEntry();
     let closedByBack = false;
 
     const handler = () => {
