@@ -536,7 +536,12 @@ export function FilterBar({
     {/* City dropdown через portal — не обрезается overflow родителей */}
     {showCity && createPortal(
       <div data-city-drop style={{ ...cityDropStyle, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
-        <CitySearch value={cityName} onSelect={handleCitySelect} placeholder="Поиск города..." />
+        <CitySearch
+          value={cityName}
+          onSelect={handleCitySelect}
+          placeholder="Введите название города"
+          clearOnFocus
+        />
       </div>,
       document.body
     )}

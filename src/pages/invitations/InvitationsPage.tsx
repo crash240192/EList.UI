@@ -410,6 +410,7 @@ function InvitationRow({
       onClick={onOpen}
       urgency={urgency}
       unviewed={unviewed}
+      bleedCover
       header={(
         <>
           <UserAvatar
@@ -465,6 +466,7 @@ function SentInvitationRow({
     <EventListItem
       event={event}
       onClick={onOpen}
+      bleedCover
       header={(
         <>
           <UserAvatar

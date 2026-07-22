@@ -29,6 +29,8 @@ interface EventListItemProps {
   footer?: ReactNode;
   actions?: ReactNode;
   showChevron?: boolean;
+  /** На мобилке обложка на всю высоту слева с градиентным затуханием */
+  bleedCover?: boolean;
 }
 
 function ClockIcon() {
@@ -69,6 +71,7 @@ export function EventListItem({
   footer,
   actions,
   showChevron,
+  bleedCover,
 }: EventListItemProps) {
   const types = getEventListTypes(event);
   const params = getEventListParams(event);
@@ -90,6 +93,7 @@ export function EventListItem({
         styles.item,
         urgency?.kind === 'hot' ? styles.itemUrgent : '',
         unviewed ? styles.itemUnviewed : '',
+        bleedCover ? styles.bleedCover : '',
         className ?? '',
       ].filter(Boolean).join(' ')}
     >

@@ -14,12 +14,14 @@ interface CitySearchProps {
   onAutoDetect?: () => void;
   placeholder?: string;
   className?: string;
+  /** При фокусе очищает поле, чтобы было видно placeholder для ввода */
+  clearOnFocus?: boolean;
 }
 
 export function CitySearch({
   value, onSelect, geoLoading, detectedCoords,
-  onAutoDetect, placeholder = 'Начните вводить название города...',
-  className,
+  onAutoDetect, placeholder = 'Введите название города',
+  className, clearOnFocus = false,
 }: CitySearchProps) {
   const [query,       setQuery]       = useState(value);
   const [suggestions, setSuggestions] = useState<ICity[]>([]);
@@ -110,10 +112,22 @@ export function CitySearch({
   };
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    // Выделяем текст при фокусе — через setTimeout чтобы не конфликтовать с кликом
-    const target = e.target;
-    setTimeout(() => target.select(), 0);
+    if (clearOnFocus) {
+      setQuery('');
+      prevValueRef.current = '';
+    } else {
+      const target = e.target;
+      setTimeout(() => target.select(), 0);
+    }
     if (suggestions.length > 0) { updateDropPos(); setOpen(true); }
+  };
+
+  const handleBlur = () => {
+    // Если ничего не выбрали — вернуть текущее значение города
+    if (clearOnFocus && !query.trim()) {
+      setQuery(value);
+      prevValueRef.current = value;
+    }
   };
 
   const handleSelect = (city: ICity) => {
@@ -135,6 +149,7 @@ export function CitySearch({
           value={query}
           onChange={handleChange}
           onFocus={handleFocus}
+          onBlur={handleBlur}
           autoComplete="off"
         />
         {searching && <span className={styles.spinner} aria-hidden />}

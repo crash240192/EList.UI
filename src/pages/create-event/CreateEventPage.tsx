@@ -33,6 +33,7 @@ import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import {
   addDaysLocalDateString,
   apiIsoToLocalParts,
+  formatLocalDateLongRu,
   localPartsToApiIso,
   todayLocalDateString,
 } from '@/shared/lib/datetime';
@@ -476,9 +477,16 @@ export default function CreateEventPage() {
     setSelectedTypes(p => [...new Set([...p, ...otherTypeIds])]);
   };
 
+  const maxStartDate = tariffValidator?.createDateMaxPeriod != null
+    ? addDaysLocalDateString(tariffValidator.createDateMaxPeriod)
+    : null;
+
   const startDateTimeFieldError = ((): string | undefined => {
     if (!hasErr('startDate') && !hasErr('startTime')) return undefined;
     if (!form.startDate || !form.startTime) return 'Укажите дату и время';
+    if (maxStartDate && form.startDate > maxStartDate) {
+      return `Дата начала не может быть позднее ${formatLocalDateLongRu(maxStartDate)}`;
+    }
     return 'Дата и время начала не могут быть в прошлом';
   })();
 
@@ -486,6 +494,14 @@ export default function CreateEventPage() {
     if (!hasErr('endDate') && !hasErr('endTime')) return undefined;
     if (!form.endDate || !form.endTime) return 'Укажите дату и время';
     return 'Дата и время окончания не могут быть раньше начала';
+  })();
+
+  const startDateToastMessage = ((): string => {
+    if (!form.startDate || !form.startTime) return 'Укажите дату и время начала';
+    if (maxStartDate && form.startDate > maxStartDate) {
+      return `Дата начала не может быть позднее ${formatLocalDateLongRu(maxStartDate)}`;
+    }
+    return 'Дата и время начала не могут быть в прошлом';
   })();
 
   const endDateTimeToast = ((): string => {
@@ -569,6 +585,9 @@ export default function CreateEventPage() {
     if (!isEditing && form.startDate && form.startTime) {
       const start = new Date(`${form.startDate}T${form.startTime}`);
       if (!isNaN(start.getTime()) && start.getTime() < Date.now()) errs.add('startDate');
+    }
+    if (form.startDate && maxStartDate && form.startDate > maxStartDate) {
+      errs.add('startDate');
     }
     if (endMode === 'duration') {
       const dh = parseInt(durationH) || 0;
@@ -662,9 +681,7 @@ export default function CreateEventPage() {
     if (firstErr) {
       showToast({ name:'Укажите название', type:'Выберите тип мероприятия',
         location:'Укажите адрес на карте',
-        startDate: !form.startDate || !form.startTime
-          ? 'Укажите дату и время начала'
-          : 'Дата и время начала не могут быть в прошлом',
+        startDate: startDateToastMessage,
         startTime:'Укажите время начала', duration:'Укажите длительность',
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
@@ -759,9 +776,7 @@ export default function CreateEventPage() {
     if (firstErr) {
       showToast({ name:'Укажите название', type:'Выберите тип мероприятия',
         location:'Укажите адрес на карте',
-        startDate: !form.startDate || !form.startTime
-          ? 'Укажите дату и время начала'
-          : 'Дата и время начала не могут быть в прошлом',
+        startDate: startDateToastMessage,
         startTime:'Укажите время начала', duration:'Укажите длительность',
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
         cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
@@ -920,9 +935,7 @@ export default function CreateEventPage() {
                   placeholder="Дата и время начала"
                   hasError={hasErr('startDate') || hasErr('startTime')}
                   min={!isEditing ? todayLocalDateString() : undefined}
-                  max={tariffValidator?.createDateMaxPeriod != null
-                    ? addDaysLocalDateString(tariffValidator!.createDateMaxPeriod!)
-                    : undefined}
+                  max={maxStartDate ?? undefined}
                 />
               </div>
             </Field>

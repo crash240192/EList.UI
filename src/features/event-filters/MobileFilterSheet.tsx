@@ -102,7 +102,12 @@ export function MobileFilterSheet({
             <div className={styles.sectionLabel}>Город</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <CitySearch value={cityName} onSelect={handleCitySelect} placeholder="Поиск города..." />
+                <CitySearch
+                  value={cityName}
+                  onSelect={handleCitySelect}
+                  placeholder="Введите название города"
+                  clearOnFocus
+                />
               </div>
               {cityName && (
                 <button onClick={onResetCity} title="Мой город" style={{

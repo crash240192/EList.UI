@@ -17,6 +17,13 @@ export function addDaysLocalDateString(days: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** YYYY-MM-DD → «22 июля 2026» */
+export function formatLocalDateLongRu(isoDate: string): string {
+  const d = parseLocalDateString(isoDate);
+  if (!d) return isoDate;
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 /** YYYY-MM-DD как локальную календарную дату (без сдвига UTC) */
 export function parseLocalDateString(isoDate: string): Date | null {
   const m = isoDate.match(DATE_ONLY_RE);
