@@ -58,7 +58,7 @@ function formatValidatorRows(v: ITariffValidator): { label: string; value: strin
     {
       label: 'Возрастной ценз',
       value: formatTariffAgeCapability(v.ageLimit),
-      type: v.ageLimit == null || v.ageLimit >= 18 ? 'ok' : v.ageLimit === 0 ? 'no' : 'warn',
+      type: v.ageLimit == null ? 'ok' : v.ageLimit === 0 ? 'no' : 'warn',
     },
   ];
 }

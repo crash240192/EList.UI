@@ -537,9 +537,9 @@ export default function CreateEventPage() {
 
   const ageLimitHint = (() => {
     if (!tariffReady) return undefined;
-    if (!canSetAge) return 'Недоступно в тарифе — только 0+';
+    if (!canSetAge) return 'Недоступно в тарифе — только до 0+';
     if (maxEventAge == null) return 'любой возраст';
-    return `от 0+ до ${maxEventAge}+`;
+    return `до ${maxEventAge}+`;
   })();
 
   const ageLimitErrorHint = (() => {
@@ -590,11 +590,7 @@ export default function CreateEventPage() {
         errs.add('ageLimit');
       } else {
         const age = parseInt(form.ageLimit, 10);
-        // При редактировании сохраняем уже выставленный ценз даже при более жёстком тарифе;
-        // при создании — только диапазон, разрешённый тарифом.
-        if (Number.isNaN(age) || age < 0) {
-          errs.add('ageLimit');
-        } else if (!isEditing && !isEventAgeAllowed(age, tariffAgeLimit, hasTariff)) {
+        if (Number.isNaN(age) || age < 0 || !isEventAgeAllowed(age, tariffAgeLimit, hasTariff)) {
           errs.add('ageLimit');
         }
       }

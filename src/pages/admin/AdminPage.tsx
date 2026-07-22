@@ -10,7 +10,7 @@ import {
 } from '@/entities/admin/adminApi';
 import { sortByNameRu } from '@/entities/event/lib/sortByNameRu';
 import { Select } from '@/shared/ui/Select/Select';
-import { EVENT_AGE_LIMIT_OPTIONS, formatAgeLimitLabel, normalizeAgeLimitValue, type EventAgeLimit } from '@/shared/lib/ageLimit';
+import { EVENT_AGE_LIMIT_OPTIONS, formatTariffAgeLimitLabel, type EventAgeLimit } from '@/shared/lib/ageLimit';
 import { TabBar } from '@/shared/ui/TabBar';
 import { usePageTitle } from '@/shared/hooks';
 import {
@@ -799,7 +799,7 @@ function TariffsTab() {
 // ---- Форма тарифа ----
 
 const EMPTY_VALIDATOR_STR = {
-  costLimit: '', personsLimit: '', ageLimit: '0',
+  costLimit: '', personsLimit: '', ageLimit: '',
   maxEventsCount: '', createDateMaxPeriod: '',
   allowPrivate: false, allowGenderSegregation: false, allowMultidaysEvent: false,
 };
@@ -831,7 +831,7 @@ function TariffForm({ tariff, onSave, onCancel }: {
         setValidatorStr({
           costLimit:           v.costLimit    != null ? String(v.costLimit)    : '',
           personsLimit:        v.personsLimit != null ? String(v.personsLimit) : '',
-          ageLimit:            normalizeAgeLimitValue(v.ageLimit, null, true),
+          ageLimit:            v.ageLimit != null ? String(v.ageLimit) : '',
           maxEventsCount:      v.maxEventsCount      != null ? String(v.maxEventsCount)      : '',
           createDateMaxPeriod: v.createDateMaxPeriod != null ? String(v.createDateMaxPeriod) : '',
           allowPrivate:            !!v.allowPrivate,
@@ -848,15 +848,18 @@ function TariffForm({ tariff, onSave, onCancel }: {
 
   const handleSave = async () => {
     if (!name.trim()) { setErr('Укажите название'); return; }
-    if (!validatorStr.ageLimit || !EVENT_AGE_LIMIT_OPTIONS.includes(parseInt(validatorStr.ageLimit, 10) as EventAgeLimit)) {
-      setErr('Выберите возрастное ограничение');
+    if (
+      validatorStr.ageLimit !== ''
+      && !EVENT_AGE_LIMIT_OPTIONS.includes(parseInt(validatorStr.ageLimit, 10) as EventAgeLimit)
+    ) {
+      setErr('Выберите допустимое возрастное ограничение или оставьте пустым');
       return;
     }
     setSaving(true); setErr(null);
     const validator: ITariffValidator = {
       costLimit:              validatorStr.costLimit           !== '' ? parseFloat(validatorStr.costLimit)           : null as any,
       personsLimit:           validatorStr.personsLimit        !== '' ? parseInt(validatorStr.personsLimit)          : null as any,
-      ageLimit:               parseInt(validatorStr.ageLimit, 10),
+      ageLimit:               validatorStr.ageLimit !== '' ? parseInt(validatorStr.ageLimit, 10) : null,
       maxEventsCount:         validatorStr.maxEventsCount      !== '' ? parseInt(validatorStr.maxEventsCount)        : null,
       createDateMaxPeriod:    validatorStr.createDateMaxPeriod !== '' ? parseInt(validatorStr.createDateMaxPeriod)   : null,
       allowPrivate:           validatorStr.allowPrivate,
@@ -912,13 +915,14 @@ function TariffForm({ tariff, onSave, onCancel }: {
             onChange={e => setValidatorStr(v => ({ ...v, personsLimit: e.target.value }))} />
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>Макс. возрастное ограничение *</label>
+          <label className={styles.label}>Макс. возрастное ограничение (пусто = без ограничений)</label>
           <Select
             value={validatorStr.ageLimit}
             onChange={v => setValidatorStr(s => ({ ...s, ageLimit: v }))}
+            placeholder="не задано"
             options={EVENT_AGE_LIMIT_OPTIONS.map(age => ({
               value: String(age),
-              label: formatAgeLimitLabel(age),
+              label: formatTariffAgeLimitLabel(age),
             }))}
           />
         </div>
