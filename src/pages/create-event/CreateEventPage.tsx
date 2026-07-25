@@ -517,35 +517,47 @@ export default function CreateEventPage() {
   const maxCost      = tv?.costLimit    ?? null;
   const maxPersons   = tv?.personsLimit ?? null;
   const tariffAgeLimit = tv?.ageLimit ?? null;
-  /** Макс. ценз события по тарифу; null = любой возраст */
+  /** Макс. ценз события по тарифу; null = любой возраст; без тарифа → 0 */
   const maxEventAge = useMemo(
     () => (tariffReady ? getMaxEventAgeForTariff(tariffAgeLimit, hasTariff) : null),
     [tariffReady, tariffAgeLimit, hasTariff],
   );
-  const canSetCost       = !hasTariff || maxCost    === null || maxCost    > 0;
+  /** Без тарифа — потолок 0 ₽; с тарифом — costLimit (null = без лимита) */
+  const effectiveMaxCost = !hasTariff ? 0 : maxCost;
+  const canSetCost       = tariffReady && (effectiveMaxCost === null || effectiveMaxCost > 0);
   const canSetMaxPersons = !hasTariff || maxPersons === null || maxPersons > 0;
-  // 0 в тарифе / нет тарифа → только 0+, поле блокируем
-  const canSetAge        = !tariffReady || maxEventAge === null || maxEventAge > 0;
+  /** Нет тарифа или в тарифе только 0+ — поле возраста фиксируем */
+  const ageFixedToZero   = tariffReady && maxEventAge === 0;
+  const canSetAge        = tariffReady && (maxEventAge === null || maxEventAge > 0);
   const canSetPrivate    = hasTariff ? !!tv!.allowPrivate : false;
   const canSetGender     = hasTariff ? !!tv!.allowGenderSegregation : false;
   const hasTariffWarning = hasWallet && (!canSetPrivate || !canSetGender);
   const tariffName       = tariff?.name ?? 'текущем';
 
+  // Стоимость: без тарифа / costLimit 0 → всегда 0
   useEffect(() => {
-    // На редактировании не затираем сохранённый ценз под лимит тарифа
-    if (isEditing || loading || !tariffReady || form.ageLimit === '') return;
-    if (maxEventAge === 0) {
+    if (!tariffReady || canSetCost) return;
+    if (form.cost !== '0') setForm(f => ({ ...f, cost: '0' }));
+  }, [tariffReady, canSetCost, form.cost]);
+
+  useEffect(() => {
+    if (loading || !tariffReady) return;
+    // Только 0+ — прописываем 0 и на создании, и на редактировании
+    if (ageFixedToZero) {
       if (form.ageLimit !== '0') setForm(f => ({ ...f, ageLimit: '0' }));
       return;
     }
+    // На редактировании не затираем сохранённый ценз под более мягкий лимит
+    if (isEditing || form.ageLimit === '') return;
     const age = parseInt(form.ageLimit, 10);
     if (!Number.isFinite(age)) return;
     if (maxEventAge != null && age > maxEventAge) {
       setForm(f => ({ ...f, ageLimit: String(maxEventAge) }));
     }
-  }, [isEditing, maxEventAge, tariffReady, loading, form.ageLimit]);
+  }, [isEditing, ageFixedToZero, maxEventAge, tariffReady, loading, form.ageLimit]);
 
   const parseAgeLimit = (): number | null => {
+    if (ageFixedToZero) return 0;
     if (form.ageLimit === '') return null;
     const age = parseInt(form.ageLimit, 10);
     return Number.isNaN(age) ? null : age;
@@ -553,9 +565,12 @@ export default function CreateEventPage() {
 
   const ageLimitHint = (() => {
     if (!tariffReady) return undefined;
-    if (!canSetAge) return 'По тарифу доступен только рейтинг 0+';
+    if (ageFixedToZero) {
+      return hasTariff
+        ? 'По тарифу доступен только рейтинг 0+'
+        : 'Без тарифа доступен только рейтинг 0+';
+    }
     if (maxEventAge == null) return 'любой возрастной рейтинг';
-    if (maxEventAge === 0) return 'только 0+';
     return `можно указать рейтинг не выше ${maxEventAge}+`;
   })();
 
@@ -573,6 +588,14 @@ export default function CreateEventPage() {
       : maxEventAge === 0
         ? 'По тарифу доступен только рейтинг 0+'
         : `Возрастной рейтинг превышает лимит тарифа (макс. ${maxEventAge}+)`;
+
+  const costToastMessage = parseFloat(form.cost) < 0
+    ? 'Стоимость не может быть отрицательной'
+    : effectiveMaxCost === 0
+      ? (hasTariff
+        ? 'По тарифу доступны только бесплатные мероприятия'
+        : 'Без тарифа стоимость может быть только 0 ₽')
+      : `Стоимость превышает лимит тарифа (до ${effectiveMaxCost?.toLocaleString()} ₽)`;
 
   // Validation
   const validate = (): FieldError | null => {
@@ -608,7 +631,8 @@ export default function CreateEventPage() {
     // Проверяем отрицательные значения
     if (form.cost && parseFloat(form.cost) < 0)                                           errs.add('cost');
     if (form.maxPersons && parseInt(form.maxPersons) < 0)                                 errs.add('maxPersons');
-    if (hasWallet) {
+    // Возраст: если зафиксирован 0+ — не требуем ручного выбора
+    if (hasWallet && tariffReady && !ageFixedToZero) {
       if (!form.ageLimit) {
         errs.add('ageLimit');
       } else {
@@ -618,8 +642,8 @@ export default function CreateEventPage() {
         }
       }
     }
-    // Проверяем ограничения тарифа
-    if (maxCost != null && parseFloat(form.cost) > maxCost)                               errs.add('cost');
+    // Ограничения тарифа / отсутствие тарифа (effectiveMaxCost = 0 без тарифа)
+    if (effectiveMaxCost != null && parseFloat(form.cost || '0') > effectiveMaxCost)      errs.add('cost');
     if (maxPersons != null && form.maxPersons && parseInt(form.maxPersons) > maxPersons)  errs.add('maxPersons');
 
     setFieldErrors(errs);
@@ -684,7 +708,7 @@ export default function CreateEventPage() {
         startDate: startDateToastMessage,
         startTime:'Укажите время начала', duration:'Укажите длительность',
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
-        cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
+        cost: costToastMessage,
         maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
         ageLimit: ageLimitToastMessage,
       }[firstErr]);
@@ -779,7 +803,7 @@ export default function CreateEventPage() {
         startDate: startDateToastMessage,
         startTime:'Укажите время начала', duration:'Укажите длительность',
         endDate: endDateTimeToast, endTime:'Укажите время окончания',
-        cost: parseFloat(form.cost) < 0 ? 'Стоимость не может быть отрицательной' : `Стоимость превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`,
+        cost: costToastMessage,
         maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
         ageLimit: ageLimitToastMessage,
       }[firstErr]);
@@ -1010,10 +1034,16 @@ export default function CreateEventPage() {
                   type="number" min="0"
                   hasError={hasErr('cost')}
                   hint={hasErr('cost')
-                    ? `Превышает лимит тарифа (до ${maxCost?.toLocaleString()} ₽)`
-                    : canSetCost && tariffValidator?.costLimit
-                    ? `до ${tariffValidator.costLimit.toLocaleString()} ₽`
-                    : !canSetCost ? 'Недоступно в тарифе' : undefined}
+                    ? (effectiveMaxCost === 0
+                      ? (hasTariff
+                        ? 'По тарифу доступны только бесплатные мероприятия'
+                        : 'Без тарифа стоимость может быть только 0 ₽')
+                      : `Превышает лимит тарифа (до ${effectiveMaxCost?.toLocaleString()} ₽)`)
+                    : canSetCost && effectiveMaxCost != null
+                    ? `до ${effectiveMaxCost.toLocaleString()} ₽`
+                    : !canSetCost
+                    ? (hasTariff ? 'Недоступно в тарифе' : 'Без тарифа — только бесплатные')
+                    : undefined}
                 />
               </Field>
               <Field label="Макс. участников">
@@ -1033,13 +1063,13 @@ export default function CreateEventPage() {
             </div>
 
             <Field
-              label="Возрастной рейтинг *"
+              label={canSetAge ? 'Возрастной рейтинг *' : 'Возрастной рейтинг'}
               error={hasErr('ageLimit') ? (!form.ageLimit ? 'Обязательное поле' : 'Недопустимое значение') : undefined}
             >
               <LockedInput
                 locked={!canSetAge}
-                value={form.ageLimit}
-                placeholder="например 18"
+                value={ageFixedToZero ? '0' : form.ageLimit}
+                placeholder={ageFixedToZero ? '0' : 'например 18'}
                 onChange={e => {
                   const v = e.target.value.replace(/[^0-9]/g, '');
                   setForm(f => ({ ...f, ageLimit: v }));
@@ -1050,7 +1080,7 @@ export default function CreateEventPage() {
                 max={maxEventAge != null ? String(maxEventAge) : undefined}
                 inputMode="numeric"
                 hasError={hasErr('ageLimit')}
-                suffix={form.ageLimit !== '' ? '+' : undefined}
+                suffix={(ageFixedToZero || form.ageLimit !== '') ? '+' : undefined}
                 hint={hasErr('ageLimit') ? ageLimitErrorHint : ageLimitHint}
               />
             </Field>
