@@ -4,8 +4,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DocumentType,
-  agreeDocument,
-  checkUserAgreement,
+  agreeOrganizationDocument,
+  checkOrganizationAgreement,
   fetchLastDocument,
   type IAgreementDocument,
 } from '@/entities/agreement';
@@ -201,8 +201,8 @@ function OrganizationCreateView({
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [accepted, setAccepted] = useState(false);
-  const [agreementOk, setAgreementOk] = useState<boolean | null>(null);
   const [doc, setDoc] = useState<IAgreementDocument | null>(null);
+  const [docLoading, setDocLoading] = useState(true);
   const [docOpen, setDocOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -210,20 +210,17 @@ function OrganizationCreateView({
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const [ok, last] = await Promise.all([
-          checkUserAgreement(DocumentType.OrganizationAgreement).catch(() => false),
-          fetchLastDocument(DocumentType.OrganizationAgreement).catch(() => null),
-        ]);
-        if (cancelled) return;
-        setAgreementOk(ok);
-        setDoc(last);
-        if (ok) setAccepted(true);
-      } catch {
-        if (!cancelled) setAgreementOk(false);
-      }
-    })();
+    setDocLoading(true);
+    fetchLastDocument(DocumentType.OrganizationAgreement)
+      .then(last => {
+        if (!cancelled) setDoc(last);
+      })
+      .catch(() => {
+        if (!cancelled) setDoc(null);
+      })
+      .finally(() => {
+        if (!cancelled) setDocLoading(false);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -234,10 +231,7 @@ function OrganizationCreateView({
     setSaving(true);
     setMsg(null);
     try {
-      if (!agreementOk) {
-        await agreeDocument(DocumentType.OrganizationAgreement);
-        setAgreementOk(true);
-      }
+      // Сначала создаём организацию, затем принимаем оферту от её имени
       const id = await createOrganization({
         name: name.trim(),
         description: description.trim() || null,
@@ -245,6 +239,19 @@ function OrganizationCreateView({
         latitude: lat,
         longitude: lng,
       });
+      try {
+        await agreeOrganizationDocument(id, DocumentType.OrganizationAgreement);
+      } catch (agreeErr) {
+        // Организация уже создана — открываем её, согласие можно повторить позже при необходимости
+        setMsg({
+          text: agreeErr instanceof Error
+            ? `Организация создана, но не удалось сохранить согласие: ${agreeErr.message}`
+            : 'Организация создана, но не удалось сохранить согласие',
+          ok: false,
+        });
+        onCreated(id);
+        return;
+      }
       onCreated(id);
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'Не удалось создать организацию', ok: false });
@@ -306,7 +313,6 @@ function OrganizationCreateView({
             id="org-agree"
             type="checkbox"
             checked={accepted}
-            disabled={agreementOk === true}
             onChange={e => setAccepted(e.target.checked)}
           />
           <label htmlFor="org-agree" className={styles.agreeLabel}>
@@ -319,7 +325,8 @@ function OrganizationCreateView({
             >
               договор оферты с организацией
             </button>
-            {!doc && agreementOk === false && (
+            {docLoading && <span className={styles.agreeHint}> (загрузка документа…)</span>}
+            {!docLoading && !doc && (
               <span className={styles.agreeHint}> (документ пока недоступен на сервере)</span>
             )}
           </label>
@@ -874,6 +881,10 @@ function OrganizationSalesSection({
   const [onboardingStatus, setOnboardingStatus] = useState(
     OrganizationOnboardingStatus.None as string,
   );
+  const [ticketingAgreed, setTicketingAgreed] = useState(false);
+  const [ticketingAccepted, setTicketingAccepted] = useState(false);
+  const [ticketingDoc, setTicketingDoc] = useState<IAgreementDocument | null>(null);
+  const [ticketingDocOpen, setTicketingDocOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -883,9 +894,11 @@ function OrganizationSalesSection({
     (async () => {
       setLoading(true);
       try {
-        const [legal, payout] = await Promise.all([
+        const [legal, payout, agreed, doc] = await Promise.all([
           fetchOrganizationLegal(organizationId),
           fetchOrganizationPayout(organizationId),
+          checkOrganizationAgreement(organizationId, DocumentType.TicketingAgreement).catch(() => false),
+          fetchLastDocument(DocumentType.TicketingAgreement).catch(() => null),
         ]);
         if (cancelled) return;
         const L = legal ?? org.legal;
@@ -906,6 +919,9 @@ function OrganizationSalesSection({
           setTaxRegime(P.taxRegime ?? '');
           setOnboardingStatus(P.onboardingStatus ?? OrganizationOnboardingStatus.None);
         }
+        setTicketingAgreed(agreed);
+        setTicketingAccepted(agreed);
+        setTicketingDoc(doc);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -922,14 +938,34 @@ function OrganizationSalesSection({
   const onboardingActive = onboardingStatus === OrganizationOnboardingStatus.Active;
 
   const checklist = [
+    { ok: ticketingAgreed, label: 'Соглашение на продажу билетов принято' },
     { ok: legalFilled, label: 'Юридические данные заполнены' },
     { ok: payoutFilled, label: 'Реквизиты для выплат заполнены' },
     { ok: verified, label: 'Верификация пройдена' },
     { ok: onboardingActive, label: 'Онбординг выплат активен' },
   ];
 
+  const acceptTicketingAgreement = async () => {
+    if (!isOwner || !ticketingAccepted || ticketingAgreed) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await agreeOrganizationDocument(organizationId, DocumentType.TicketingAgreement);
+      setTicketingAgreed(true);
+      setMsg({ text: 'Соглашение на продажу билетов принято', ok: true });
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось сохранить согласие', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const saveLegal = async () => {
     if (!isOwner) return;
+    if (!ticketingAgreed) {
+      setMsg({ text: 'Сначала примите соглашение на продажу билетов', ok: false });
+      return;
+    }
     if (isSelfEmployed) {
       setMsg({
         text: 'Платный тир доступен только для ИП и юридических лиц',
@@ -961,6 +997,10 @@ function OrganizationSalesSection({
 
   const savePayout = async () => {
     if (!isOwner) return;
+    if (!ticketingAgreed) {
+      setMsg({ text: 'Сначала примите соглашение на продажу билетов', ok: false });
+      return;
+    }
     setBusy(true);
     setMsg(null);
     try {
@@ -982,6 +1022,10 @@ function OrganizationSalesSection({
 
   const submitVerification = async () => {
     if (!isOwner) return;
+    if (!ticketingAgreed) {
+      setMsg({ text: 'Сначала примите соглашение на продажу билетов', ok: false });
+      return;
+    }
     setBusy(true);
     setMsg(null);
     try {
@@ -997,6 +1041,10 @@ function OrganizationSalesSection({
 
   const toggleTickets = async (enabled: boolean) => {
     if (!isOwner) return;
+    if (enabled && !ticketingAgreed) {
+      setMsg({ text: 'Сначала примите соглашение на продажу билетов', ok: false });
+      return;
+    }
     setBusy(true);
     setMsg(null);
     try {
@@ -1017,6 +1065,66 @@ function OrganizationSalesSection({
 
   return (
     <>
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Соглашение на продажу билетов</div>
+          <div className={styles.scardDesc}>
+            Согласие принимается от имени организации и требуется для подключения продаж
+          </div>
+        </div>
+        {ticketingAgreed ? (
+          <div className={styles.formBody}>
+            <div className={styles.bannerOk} style={{ margin: 0 }}>Соглашение принято</div>
+          </div>
+        ) : (
+          <>
+            <div className={styles.formBody}>
+              <div className={styles.agreeRow}>
+                <input
+                  id="ticketing-agree"
+                  type="checkbox"
+                  checked={ticketingAccepted}
+                  disabled={!isOwner}
+                  onChange={e => setTicketingAccepted(e.target.checked)}
+                />
+                <label htmlFor="ticketing-agree" className={styles.agreeLabel}>
+                  Принимаю{' '}
+                  <button
+                    type="button"
+                    className={styles.linkBtn}
+                    onClick={() => setTicketingDocOpen(true)}
+                    disabled={!ticketingDoc}
+                  >
+                    соглашение на продажу билетов
+                  </button>
+                  {!ticketingDoc && (
+                    <span className={styles.agreeHint}> (документ пока недоступен на сервере)</span>
+                  )}
+                </label>
+              </div>
+            </div>
+            {isOwner && (
+              <div className={styles.scardFooter}>
+                <div className={styles.footerSpacer} />
+                <Button
+                  loading={busy}
+                  disabled={!ticketingAccepted}
+                  onClick={() => { void acceptTicketingAgreement(); }}
+                >
+                  Принять соглашение
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+        {ticketingDocOpen && (
+          <AgreementDocumentModal
+            doc={ticketingDoc}
+            onClose={() => setTicketingDocOpen(false)}
+          />
+        )}
+      </div>
+
       <div className={styles.scard}>
         <div className={styles.scardHead}>
           <div className={styles.scardTitle}>Готовность к продажам</div>
@@ -1046,8 +1154,14 @@ function OrganizationSalesSection({
           {isOwner && !org.canSellTickets && (
             <Button
               loading={busy}
-              disabled={!verified}
-              title={!verified ? 'Нужна успешная верификация' : undefined}
+              disabled={!verified || !ticketingAgreed}
+              title={
+                !ticketingAgreed
+                  ? 'Нужно принять соглашение на продажу билетов'
+                  : !verified
+                    ? 'Нужна успешная верификация'
+                    : undefined
+              }
               onClick={() => { void toggleTickets(true); }}
             >
               Включить продажу билетов
@@ -1116,7 +1230,14 @@ function OrganizationSalesSection({
         {isOwner && (
           <div className={styles.scardFooter}>
             <div className={styles.footerSpacer} />
-            <Button loading={busy} onClick={() => { void saveLegal(); }}>Сохранить юр. данные</Button>
+            <Button
+              loading={busy}
+              disabled={!ticketingAgreed}
+              title={!ticketingAgreed ? 'Сначала примите соглашение на продажу билетов' : undefined}
+              onClick={() => { void saveLegal(); }}
+            >
+              Сохранить юр. данные
+            </Button>
           </div>
         )}
         {!isOwner && canEdit && (
@@ -1154,7 +1275,14 @@ function OrganizationSalesSection({
         {isOwner && (
           <div className={styles.scardFooter}>
             <div className={styles.footerSpacer} />
-            <Button loading={busy} onClick={() => { void savePayout(); }}>Сохранить реквизиты</Button>
+            <Button
+              loading={busy}
+              disabled={!ticketingAgreed}
+              title={!ticketingAgreed ? 'Сначала примите соглашение на продажу билетов' : undefined}
+              onClick={() => { void savePayout(); }}
+            >
+              Сохранить реквизиты
+            </Button>
           </div>
         )}
       </div>
@@ -1171,7 +1299,8 @@ function OrganizationSalesSection({
             <div className={styles.footerSpacer} />
             <Button
               loading={busy}
-              disabled={!legalFilled || !payoutFilled || pending}
+              disabled={!ticketingAgreed || !legalFilled || !payoutFilled || pending}
+              title={!ticketingAgreed ? 'Сначала примите соглашение на продажу билетов' : undefined}
               onClick={() => { void submitVerification(); }}
             >
               {pending ? 'На проверке' : 'Отправить на проверку'}

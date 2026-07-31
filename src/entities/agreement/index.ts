@@ -3,6 +3,8 @@ export {
   agreeAnonymousAge,
   checkUserAgreement,
   agreeDocument,
+  checkOrganizationAgreement,
+  agreeOrganizationDocument,
   fetchLastDocument,
   fetchLastDocuments,
   addAgreementDocument,

@@ -1,5 +1,5 @@
 // entities/agreement/api.ts
-// Соглашения: анонимный возраст 18+ и документы Consent / Agreement / Policy
+// Соглашения: анонимный возраст 18+, user/org документы Consent / Agreement / Policy / Organization / Ticketing
 
 import { apiClient } from '@/shared/api/client';
 import type {
@@ -33,6 +33,32 @@ export async function checkUserAgreement(documentType: DocumentTypeValue): Promi
  */
 export async function agreeDocument(documentType: DocumentTypeValue): Promise<void> {
   await apiClient.get(`/api/agreements/agree/${documentType}`);
+}
+
+/**
+ * Актуальна ли принятая организацией версия документа.
+ * GET /api/agreements/checkOrganizationAgreement/{organizationId}/{documentType}
+ */
+export async function checkOrganizationAgreement(
+  organizationId: string,
+  documentType: DocumentTypeValue,
+): Promise<boolean> {
+  return apiClient.getStatus(
+    `/api/agreements/checkOrganizationAgreement/${organizationId}/${documentType}`,
+  );
+}
+
+/**
+ * Принять документ от имени организации.
+ * GET /api/agreements/agree/organization/{organizationId}/{documentType}
+ */
+export async function agreeOrganizationDocument(
+  organizationId: string,
+  documentType: DocumentTypeValue,
+): Promise<void> {
+  await apiClient.get(
+    `/api/agreements/agree/organization/${organizationId}/${documentType}`,
+  );
 }
 
 /**
