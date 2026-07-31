@@ -2,10 +2,11 @@
 // Соглашения: анонимный возраст 18+, user/org документы Consent / Agreement / Policy / Organization / Ticketing
 
 import { apiClient } from '@/shared/api/client';
-import type {
-  DocumentTypeValue,
-  IAgreementDocument,
-  IDocumentRequest,
+import {
+  parseDocumentType,
+  type DocumentTypeValue,
+  type IAgreementDocument,
+  type IDocumentRequest,
 } from './types';
 
 /** Подтверждён ли возраст 18+ для текущего анонимного клиента */
@@ -95,7 +96,7 @@ function normalizeDocument(raw: IAgreementDocument & Record<string, unknown>): I
     header: String(raw.header ?? raw.Header ?? ''),
     text: String(raw.text ?? raw.Text ?? ''),
     hash: String(raw.hash ?? raw.Hash ?? ''),
-    type: Number(raw.type ?? raw.Type ?? 0) as DocumentTypeValue,
+    type: parseDocumentType(raw.type ?? raw.Type),
     version: String(raw.version ?? raw.Version ?? ''),
     creationDate: String(raw.creationDate ?? raw.CreationDate ?? ''),
   };

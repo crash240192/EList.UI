@@ -14,7 +14,7 @@ import { EVENT_AGE_LIMIT_OPTIONS, formatTariffAgeLimitLabel, type EventAgeLimit 
 import { TabBar } from '@/shared/ui/TabBar';
 import { usePageTitle } from '@/shared/hooks';
 import {
-  DocumentType,
+  DOCUMENT_TYPE_LABELS,
   addAgreementDocument,
   fetchLastDocument,
   fetchLastDocuments,
@@ -26,13 +26,8 @@ import styles from './AdminPage.module.css';
 
 type AdminTab = 'eventTypes' | 'contactTypes' | 'tariffs' | 'agreements';
 
-const DOCUMENT_TYPE_OPTIONS: { value: DocumentTypeValue; label: string }[] = [
-  { value: DocumentType.Policy, label: 'Политика обработки ПДн' },
-  { value: DocumentType.Consent, label: 'Согласие на обработку ПДн' },
-  { value: DocumentType.Agreement, label: 'Пользовательское соглашение' },
-  { value: DocumentType.OrganizationAgreement, label: 'Договор оферты с организацией' },
-  { value: DocumentType.TicketingAgreement, label: 'Соглашение на продажу билетов' },
-];
+/** Типы документов на вкладке «Соглашения» (включая OrganizationAgreement и TicketingAgreement) */
+const DOCUMENT_TYPE_OPTIONS = DOCUMENT_TYPE_LABELS;
 
 const VERSION_RE = /^\d+\.\d+\.\d+$/;
 

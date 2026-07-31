@@ -12,6 +12,9 @@ export {
 
 export {
   DocumentType,
+  DOCUMENT_TYPE_NAMES,
+  DOCUMENT_TYPE_LABELS,
+  parseDocumentType,
   type DocumentTypeValue,
   type IAgreementDocument,
   type IDocumentRequest,
