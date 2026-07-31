@@ -2,10 +2,12 @@
 
 import { apiClient } from '@/shared/api/client';
 
-/** GET /api/media/organization/avatar/{organizationId} → текущий fileId логотипа */
+/** GET /api/media/organization/avatar/getByOrganizationId/{organizationId} */
 export async function getOrganizationAvatar(organizationId: string): Promise<string | null> {
   try {
-    const r = await apiClient.get<string | null>(`/api/media/organization/avatar/${organizationId}`);
+    const r = await apiClient.get<string | null>(
+      `/api/media/organization/avatar/getByOrganizationId/${organizationId}`,
+    );
     return r.result ?? null;
   } catch {
     return null;
@@ -22,10 +24,12 @@ export async function setOrganizationAvatar(
   );
 }
 
-/** GET /api/media/organization/avatars/{organizationId} → история fileId */
+/** GET /api/media/organization/avatars/getByOrganizationId/{organizationId} */
 export async function getOrganizationAvatarHistory(organizationId: string): Promise<string[]> {
   try {
-    const r = await apiClient.get<string[]>(`/api/media/organization/avatars/${organizationId}`);
+    const r = await apiClient.get<string[]>(
+      `/api/media/organization/avatars/getByOrganizationId/${organizationId}`,
+    );
     return r.result ?? [];
   } catch {
     return [];

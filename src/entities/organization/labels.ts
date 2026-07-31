@@ -6,6 +6,7 @@ import {
   OrganizationRole,
   OrganizationVerificationStatus,
   type OrganizationLegalFormValue,
+  type OrganizationMemberResponse,
   type OrganizationOnboardingStatusValue,
   type OrganizationRoleValue,
   type OrganizationVerificationStatusValue,
@@ -32,7 +33,7 @@ export function formatVerificationStatus(status: OrganizationVerificationStatusV
 export function formatLegalForm(form: OrganizationLegalFormValue): string {
   switch (form) {
     case OrganizationLegalForm.SelfEmployed: return 'Самозанятый';
-    case OrganizationLegalForm.IndividualEntrepreneur: return 'ИП';
+    case OrganizationLegalForm.Ip: return 'ИП';
     case OrganizationLegalForm.LegalEntity: return 'Юридическое лицо';
     default: return form;
   }
@@ -46,4 +47,23 @@ export function formatOnboardingStatus(status: OrganizationOnboardingStatusValue
     case OrganizationOnboardingStatus.Rejected: return 'Отклонён';
     default: return 'Не начат';
   }
+}
+
+export function organizationMemberDisplayName(m: OrganizationMemberResponse): string {
+  const full = [m.personInfo?.firstName, m.personInfo?.lastName].filter(Boolean).join(' ').trim();
+  if (full) return full;
+  const login = m.account?.login;
+  if (login) return `@${login}`;
+  return m.accountId.slice(0, 8);
+}
+
+export function organizationMemberInitials(m: OrganizationMemberResponse): string {
+  const first = m.personInfo?.firstName?.[0];
+  const last = m.personInfo?.lastName?.[0];
+  if (first) return `${first}${last ?? ''}`.toUpperCase();
+  return (m.account?.login?.[0] ?? '?').toUpperCase();
+}
+
+export function organizationMemberAvatarId(m: OrganizationMemberResponse): string | null {
+  return m.account?.avatarId ?? null;
 }

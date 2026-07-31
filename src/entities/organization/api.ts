@@ -15,7 +15,8 @@ import type {
 
 /** POST /api/organizations/create → organizationId */
 export async function createOrganization(payload: OrganizationRequest): Promise<string> {
-  const r = await apiClient.post<string>('/api/organizations/create', payload);
+  const r = await apiClient.post<string | null>('/api/organizations/create', payload);
+  if (!r.result) throw new Error(r.message || 'Не удалось создать организацию');
   return r.result;
 }
 

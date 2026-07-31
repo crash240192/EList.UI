@@ -26,6 +26,9 @@ import {
   formatOrganizationRole,
   formatVerificationStatus,
   getOrganizationAvatar,
+  organizationMemberAvatarId,
+  organizationMemberDisplayName,
+  organizationMemberInitials,
   removeOrganizationMember,
   saveOrganizationLegal,
   saveOrganizationPayout,
@@ -40,6 +43,7 @@ import {
   type OrganizationMemberResponse,
   type OrganizationPayoutRequest,
   type OrganizationResponse,
+  type OrganizationRoleValue,
 } from '@/entities/organization';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { AgreementDocumentModal } from '@/features/agreements';
@@ -54,17 +58,6 @@ type View =
   | { kind: 'create' }
   | { kind: 'detail'; id: string };
 
-function memberName(m: OrganizationMemberResponse): string {
-  const full = [m.firstName, m.lastName].filter(Boolean).join(' ').trim();
-  if (full) return full;
-  return m.login ? `@${m.login}` : m.accountId.slice(0, 8);
-}
-
-function memberInitials(m: OrganizationMemberResponse): string {
-  if (m.firstName) return `${m.firstName[0]}${m.lastName?.[0] ?? ''}`.toUpperCase();
-  return (m.login?.[0] ?? '?').toUpperCase();
-}
-
 function statusClass(status: OrganizationResponse['verificationStatus']): string {
   switch (status) {
     case OrganizationVerificationStatus.Verified: return styles.badgeOk;
@@ -72,6 +65,17 @@ function statusClass(status: OrganizationResponse['verificationStatus']): string
     case OrganizationVerificationStatus.Rejected: return styles.badgeErr;
     default: return styles.badgeMute;
   }
+}
+
+function resolveMyRole(
+  org: OrganizationResponse,
+  members: OrganizationMemberResponse[],
+  myAccountId: string,
+): OrganizationRoleValue | null {
+  const fromMembers = members.find(m => m.accountId === myAccountId)?.role;
+  if (fromMembers) return fromMembers;
+  const embedded = org.members?.find(m => m.accountId === myAccountId)?.role;
+  return embedded ?? null;
 }
 
 export function OrganizationsSettingsPanel() {
@@ -170,8 +174,7 @@ export function OrganizationsSettingsPanel() {
                     )}
                   </div>
                   <span className={styles.orgMeta}>
-                    {org.myRole ? formatOrganizationRole(org.myRole) : 'Участник'}
-                    {org.address ? ` · ${org.address}` : ''}
+                    {org.address || 'Адрес не указан'}
                   </span>
                 </button>
               </li>
@@ -358,7 +361,7 @@ function OrganizationDetailView({
       ]);
       setOrg(o);
       setMembers(m.length ? m : (o.members ?? []));
-      setAvatarId(av ?? o.avatarId ?? null);
+      setAvatarId(av);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Не удалось загрузить организацию');
       setOrg(null);
@@ -371,11 +374,10 @@ function OrganizationDetailView({
     void reload();
   }, [reload]);
 
-  const myRole = useMemo(() => {
-    if (org?.myRole) return org.myRole;
-    const me = members.find(m => m.accountId === myAccountId);
-    return me?.role ?? null;
-  }, [org, members, myAccountId]);
+  const myRole = useMemo(
+    () => (org ? resolveMyRole(org, members, myAccountId) : null),
+    [org, members, myAccountId],
+  );
 
   const isOwner = myRole === OrganizationRole.Owner;
   const canEdit = myRole === OrganizationRole.Owner || myRole === OrganizationRole.Manager;
@@ -712,13 +714,13 @@ function OrganizationMembersSection({
               <li key={m.accountId} className={styles.memberRow}>
                 <UserAvatar
                   accountId={m.accountId}
-                  avatarId={m.avatarId ?? null}
-                  initials={memberInitials(m)}
+                  avatarId={organizationMemberAvatarId(m)}
+                  initials={organizationMemberInitials(m)}
                   size={32}
                 />
                 <div className={styles.memberInfo}>
                   <div className={styles.memberName}>
-                    {memberName(m)}
+                    {organizationMemberDisplayName(m)}
                     {isMe && <span className={styles.youTag}>вы</span>}
                   </div>
                   <div className={styles.memberMeta}>
@@ -826,7 +828,7 @@ function OrganizationSalesSection({
   onChanged: () => Promise<void>;
 }) {
   const [legalForm, setLegalForm] = useState<OrganizationLegalFormValue>(
-    OrganizationLegalForm.IndividualEntrepreneur,
+    OrganizationLegalForm.Ip,
   );
   const [inn, setInn] = useState('');
   const [ogrn, setOgrn] = useState('');
@@ -1001,9 +1003,8 @@ function OrganizationSalesSection({
         </ul>
         {rejected && (
           <div className={styles.bannerWarn}>
-            Верификация отклонена
-            {org.rejectReason ? `: ${org.rejectReason}` : ''}.
-            Исправьте данные и отправьте заявку снова. Организация не блокируется — бесплатные анонсы работают.
+            Верификация отклонена. Исправьте данные и отправьте заявку снова.
+            Организация не блокируется — бесплатные анонсы работают.
           </div>
         )}
         {pending && (
@@ -1045,7 +1046,7 @@ function OrganizationSalesSection({
               disabled={!isOwner}
               onChange={v => setLegalForm(v as OrganizationLegalFormValue)}
               options={[
-                { value: OrganizationLegalForm.IndividualEntrepreneur, label: formatLegalForm(OrganizationLegalForm.IndividualEntrepreneur) },
+                { value: OrganizationLegalForm.Ip, label: formatLegalForm(OrganizationLegalForm.Ip) },
                 { value: OrganizationLegalForm.LegalEntity, label: formatLegalForm(OrganizationLegalForm.LegalEntity) },
                 { value: OrganizationLegalForm.SelfEmployed, label: formatLegalForm(OrganizationLegalForm.SelfEmployed) },
               ]}

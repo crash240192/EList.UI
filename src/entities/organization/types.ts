@@ -1,40 +1,52 @@
-// entities/organization/types.ts — модели API организаций
+// entities/organization/types.ts — модели по swagger EList API
 
-/** Роль участника организации */
+/** Роль участника (OrganizationMemberRole) */
 export const OrganizationRole = {
-  Owner: 'owner',
-  Manager: 'manager',
+  Owner: 'Owner',
+  Manager: 'Manager',
 } as const;
 
 export type OrganizationRoleValue = (typeof OrganizationRole)[keyof typeof OrganizationRole];
 
-/** Статус верификации для продажи билетов */
+/** Статус верификации (OrganizationVerificationStatus) */
 export const OrganizationVerificationStatus = {
-  Unverified: 'unverified',
-  Pending: 'pending',
-  Verified: 'verified',
-  Rejected: 'rejected',
+  Unverified: 'Unverified',
+  Pending: 'Pending',
+  Verified: 'Verified',
+  Rejected: 'Rejected',
 } as const;
 
 export type OrganizationVerificationStatusValue =
   (typeof OrganizationVerificationStatus)[keyof typeof OrganizationVerificationStatus];
 
-/** Правовая форма (продажа билетов) */
+/** Правовая форма (OrganizationLegalForm) */
 export const OrganizationLegalForm = {
-  SelfEmployed: 'self_employed',
-  IndividualEntrepreneur: 'individual_entrepreneur',
-  LegalEntity: 'legal_entity',
+  SelfEmployed: 'SelfEmployed',
+  Ip: 'Ip',
+  LegalEntity: 'LegalEntity',
 } as const;
 
 export type OrganizationLegalFormValue =
   (typeof OrganizationLegalForm)[keyof typeof OrganizationLegalForm];
 
-/** Статус онбординга выплат у провайдера */
+/** Платёжный провайдер (PaymentProvider) */
+export const PaymentProvider = {
+  Yookassa: 'Yookassa',
+  Tbank: 'Tbank',
+  Sberpay: 'Sberpay',
+  Payanyway: 'Payanyway',
+  Paygine: 'Paygine',
+  Other: 'Other',
+} as const;
+
+export type PaymentProviderValue = (typeof PaymentProvider)[keyof typeof PaymentProvider];
+
+/** Онбординг выплат (ProviderOnboardingStatus) */
 export const OrganizationOnboardingStatus = {
-  None: 'none',
-  Pending: 'pending',
-  Active: 'active',
-  Rejected: 'rejected',
+  None: 'None',
+  Pending: 'Pending',
+  Active: 'Active',
+  Rejected: 'Rejected',
 } as const;
 
 export type OrganizationOnboardingStatusValue =
@@ -58,67 +70,80 @@ export interface TransferOwnershipRequest {
 
 export interface OrganizationLegalRequest {
   legalForm: OrganizationLegalFormValue;
-  inn: string;
+  inn?: string | null;
   ogrn?: string | null;
   kpp?: string | null;
-  legalAddress: string;
-  headName: string;
+  legalAddress?: string | null;
+  headName?: string | null;
   headBasis?: string | null;
 }
 
 export interface OrganizationPayoutRequest {
-  bankAccount: string;
-  bik: string;
-  bankName: string;
+  bankAccount?: string | null;
+  bik?: string | null;
+  bankName?: string | null;
   taxRegime?: string | null;
 }
 
-export interface OrganizationMemberResponse {
-  accountId: string;
-  role: OrganizationRoleValue;
-  active: boolean;
+export interface OrganizationAccountPublicData {
+  id: string;
+  active?: boolean;
   login?: string | null;
+  avatarId?: string | null;
+}
+
+export interface OrganizationPersonInfo {
+  id?: string;
+  accountId?: string;
   firstName?: string | null;
   lastName?: string | null;
-  avatarId?: string | null;
+  patronymic?: string | null;
+  gender?: string | null;
+  birthDate?: string | null;
+}
+
+export interface OrganizationMemberResponse {
+  id: string;
+  accountId: string;
+  organizationId: string;
+  role: OrganizationRoleValue;
+  active: boolean;
   joinedAt?: string | null;
+  account?: OrganizationAccountPublicData | null;
+  personInfo?: OrganizationPersonInfo | null;
 }
 
 export interface OrganizationLegalResponse {
   legalForm: OrganizationLegalFormValue;
-  inn: string;
+  inn?: string | null;
   ogrn?: string | null;
   kpp?: string | null;
-  legalAddress: string;
-  headName: string;
+  legalAddress?: string | null;
+  headName?: string | null;
   headBasis?: string | null;
+  verifiedAt?: string | null;
 }
 
 export interface OrganizationPayoutResponse {
-  bankAccount: string;
-  bik: string;
-  bankName: string;
+  bankAccount?: string | null;
+  bik?: string | null;
+  bankName?: string | null;
   taxRegime?: string | null;
-  provider?: string | null;
-  providerSellerId?: string | null;
+  provider?: PaymentProviderValue | null;
   onboardingStatus?: OrganizationOnboardingStatusValue | null;
 }
 
 export interface OrganizationResponse {
   id: string;
+  active: boolean;
   name: string;
   description?: string | null;
   address?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  active: boolean;
   verificationStatus: OrganizationVerificationStatusValue;
   canSellTickets: boolean;
-  avatarId?: string | null;
-  creationDate?: string | null;
-  /** Роль текущего пользователя, если участник */
-  myRole?: OrganizationRoleValue | null;
-  rejectReason?: string | null;
+  createDate?: string | null;
   members?: OrganizationMemberResponse[] | null;
   legal?: OrganizationLegalResponse | null;
   payout?: OrganizationPayoutResponse | null;
