@@ -317,7 +317,7 @@ function OrganizationCreateView({
               onClick={() => setDocOpen(true)}
               disabled={!doc}
             >
-              оферту организатора
+              договор оферты с организацией
             </button>
             {!doc && agreementOk === false && (
               <span className={styles.agreeHint}> (документ пока недоступен на сервере)</span>
