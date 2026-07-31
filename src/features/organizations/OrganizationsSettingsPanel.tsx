@@ -213,8 +213,8 @@ function OrganizationCreateView({
     (async () => {
       try {
         const [ok, last] = await Promise.all([
-          checkUserAgreement(DocumentType.OrganizerAgreement).catch(() => false),
-          fetchLastDocument(DocumentType.OrganizerAgreement).catch(() => null),
+          checkUserAgreement(DocumentType.OrganizationAgreement).catch(() => false),
+          fetchLastDocument(DocumentType.OrganizationAgreement).catch(() => null),
         ]);
         if (cancelled) return;
         setAgreementOk(ok);
@@ -235,7 +235,7 @@ function OrganizationCreateView({
     setMsg(null);
     try {
       if (!agreementOk) {
-        await agreeDocument(DocumentType.OrganizerAgreement);
+        await agreeDocument(DocumentType.OrganizationAgreement);
         setAgreementOk(true);
       }
       const id = await createOrganization({
