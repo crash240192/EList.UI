@@ -22,9 +22,10 @@ import { useFiltersStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { Button } from '@/shared/ui/Button';
 import { usePageTitle } from '@/shared/hooks';
+import { OrganizationsSettingsPanel } from '@/features/organizations';
 import styles from './SettingsPage.module.css';
 
-type SettingsTab = 'profile' | 'contacts' | 'location' | 'security';
+type SettingsTab = 'profile' | 'contacts' | 'location' | 'security' | 'organizations';
 
 const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: ReactNode }[] = [
   {
@@ -56,6 +57,19 @@ const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: React
       <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
         <circle cx="12" cy="10" r="3" />
+      </svg>
+    ),
+  },
+  {
+    key: 'organizations',
+    section: 'Организации',
+    label: 'Мои организации',
+    icon: (
+      <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M3 21h18" />
+        <path d="M5 21V7l7-4 7 4v14" />
+        <path d="M9 21v-6h6v6" />
+        <path d="M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
       </svg>
     ),
   },
@@ -117,6 +131,11 @@ export default function SettingsPage() {
           {tab === 'location' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <CitySection />
+            </div>
+          )}
+          {tab === 'organizations' && (
+            <div className={`${styles.stab} ${styles.stabActive}`}>
+              <OrganizationsSettingsPanel />
             </div>
           )}
           {tab === 'security' && (

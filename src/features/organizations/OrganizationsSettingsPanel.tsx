@@ -1,0 +1,1154 @@
+// features/organizations/OrganizationsSettingsPanel.tsx
+// Список / создание / управление организациями в настройках
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  DocumentType,
+  agreeDocument,
+  checkUserAgreement,
+  fetchLastDocument,
+  type IAgreementDocument,
+} from '@/entities/agreement';
+import {
+  OrganizationLegalForm,
+  OrganizationOnboardingStatus,
+  OrganizationRole,
+  OrganizationVerificationStatus,
+  addOrganizationManager,
+  createOrganization,
+  fetchMyOrganizations,
+  fetchOrganizationById,
+  fetchOrganizationLegal,
+  fetchOrganizationMembers,
+  fetchOrganizationPayout,
+  formatLegalForm,
+  formatOnboardingStatus,
+  formatOrganizationRole,
+  formatVerificationStatus,
+  getOrganizationAvatar,
+  removeOrganizationMember,
+  saveOrganizationLegal,
+  saveOrganizationPayout,
+  setOrganizationActive,
+  setOrganizationMemberActive,
+  setOrganizationTicketsEnabled,
+  submitOrganizationVerification,
+  transferOrganizationOwnership,
+  updateOrganization,
+  type OrganizationLegalFormValue,
+  type OrganizationLegalRequest,
+  type OrganizationMemberResponse,
+  type OrganizationPayoutRequest,
+  type OrganizationResponse,
+} from '@/entities/organization';
+import { getOrFetchAccountId } from '@/entities/user/api';
+import { AgreementDocumentModal } from '@/features/agreements';
+import { Button } from '@/shared/ui/Button';
+import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
+import { Select } from '@/shared/ui/Select/Select';
+import { OrgLogoUpload } from './OrgLogoUpload';
+import styles from './OrganizationsSettingsPanel.module.css';
+
+type View =
+  | { kind: 'list' }
+  | { kind: 'create' }
+  | { kind: 'detail'; id: string };
+
+function memberName(m: OrganizationMemberResponse): string {
+  const full = [m.firstName, m.lastName].filter(Boolean).join(' ').trim();
+  if (full) return full;
+  return m.login ? `@${m.login}` : m.accountId.slice(0, 8);
+}
+
+function memberInitials(m: OrganizationMemberResponse): string {
+  if (m.firstName) return `${m.firstName[0]}${m.lastName?.[0] ?? ''}`.toUpperCase();
+  return (m.login?.[0] ?? '?').toUpperCase();
+}
+
+function statusClass(status: OrganizationResponse['verificationStatus']): string {
+  switch (status) {
+    case OrganizationVerificationStatus.Verified: return styles.badgeOk;
+    case OrganizationVerificationStatus.Pending: return styles.badgeWarn;
+    case OrganizationVerificationStatus.Rejected: return styles.badgeErr;
+    default: return styles.badgeMute;
+  }
+}
+
+export function OrganizationsSettingsPanel() {
+  const [view, setView] = useState<View>({ kind: 'list' });
+  const [items, setItems] = useState<OrganizationResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const list = await fetchMyOrganizations();
+      setItems(list);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Не удалось загрузить организации');
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  if (view.kind === 'create') {
+    return (
+      <OrganizationCreateView
+        onCancel={() => setView({ kind: 'list' })}
+        onCreated={id => {
+          void reload();
+          setView({ kind: 'detail', id });
+        }}
+      />
+    );
+  }
+
+  if (view.kind === 'detail') {
+    return (
+      <OrganizationDetailView
+        organizationId={view.id}
+        onBack={() => {
+          void reload();
+          setView({ kind: 'list' });
+        }}
+      />
+    );
+  }
+
+  return (
+    <>
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div>
+            <div className={styles.scardTitle}>Мои организации</div>
+            <div className={styles.scardDesc}>
+              Создавайте организации, добавляйте администраторов и подключайте продажу билетов
+            </div>
+          </div>
+          <Button size="sm" onClick={() => setView({ kind: 'create' })}>
+            Создать
+          </Button>
+        </div>
+
+        {loading && <div className={styles.loader}>Загрузка...</div>}
+        {!loading && err && <div className={styles.bannerErr}>{err}</div>}
+        {!loading && !err && items.length === 0 && (
+          <div className={styles.empty}>
+            <p className={styles.emptyTitle}>Организаций пока нет</p>
+            <p className={styles.emptySub}>
+              Создайте организацию, чтобы публиковать анонсы от её имени и позже подключить продажу билетов
+            </p>
+            <Button onClick={() => setView({ kind: 'create' })}>Создать организацию</Button>
+          </div>
+        )}
+        {!loading && items.length > 0 && (
+          <ul className={styles.orgList}>
+            {items.map(org => (
+              <li key={org.id}>
+                <button
+                  type="button"
+                  className={styles.orgRow}
+                  onClick={() => setView({ kind: 'detail', id: org.id })}
+                >
+                  <div className={styles.orgRowMain}>
+                    <span className={styles.orgName}>{org.name}</span>
+                    <span className={`${styles.badge} ${statusClass(org.verificationStatus)}`}>
+                      {formatVerificationStatus(org.verificationStatus)}
+                    </span>
+                    {!org.active && (
+                      <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
+                    )}
+                    {org.canSellTickets && (
+                      <span className={`${styles.badge} ${styles.badgeOk}`}>Билеты</span>
+                    )}
+                  </div>
+                  <span className={styles.orgMeta}>
+                    {org.myRole ? formatOrganizationRole(org.myRole) : 'Участник'}
+                    {org.address ? ` · ${org.address}` : ''}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  );
+}
+
+function OrganizationCreateView({
+  onCancel,
+  onCreated,
+}: {
+  onCancel: () => void;
+  onCreated: (id: string) => void;
+}) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [address, setAddress] = useState('');
+  const [accepted, setAccepted] = useState(false);
+  const [agreementOk, setAgreementOk] = useState<boolean | null>(null);
+  const [doc, setDoc] = useState<IAgreementDocument | null>(null);
+  const [docOpen, setDocOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ok, last] = await Promise.all([
+          checkUserAgreement(DocumentType.OrganizerAgreement).catch(() => false),
+          fetchLastDocument(DocumentType.OrganizerAgreement).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setAgreementOk(ok);
+        setDoc(last);
+        if (ok) setAccepted(true);
+      } catch {
+        if (!cancelled) setAgreementOk(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const canSubmit = name.trim().length > 0 && accepted && !saving;
+
+  const handleCreate = async () => {
+    if (!canSubmit) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      if (!agreementOk) {
+        await agreeDocument(DocumentType.OrganizerAgreement);
+        setAgreementOk(true);
+      }
+      const id = await createOrganization({
+        name: name.trim(),
+        description: description.trim() || null,
+        address: address.trim() || null,
+        latitude: null,
+        longitude: null,
+      });
+      onCreated(id);
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось создать организацию', ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={styles.scard}>
+      <div className={styles.scardHead}>
+        <div>
+          <div className={styles.scardTitle}>Новая организация</div>
+          <div className={styles.scardDesc}>
+            После создания вы станете владельцем. Продажа билетов подключается отдельно после верификации.
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onCancel}>Назад</Button>
+      </div>
+      <div className={styles.formBody}>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Название *</span>
+          <input
+            className={styles.input}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Название организации"
+            maxLength={200}
+          />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Описание</span>
+          <textarea
+            className={`${styles.input} ${styles.textarea}`}
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Кратко об организации"
+            rows={3}
+          />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Адрес</span>
+          <input
+            className={styles.input}
+            value={address}
+            onChange={e => setAddress(e.target.value)}
+            placeholder="Город, улица, площадка"
+          />
+        </label>
+
+        <div className={styles.agreeRow}>
+          <input
+            id="org-agree"
+            type="checkbox"
+            checked={accepted}
+            disabled={agreementOk === true}
+            onChange={e => setAccepted(e.target.checked)}
+          />
+          <label htmlFor="org-agree" className={styles.agreeLabel}>
+            Принимаю{' '}
+            <button
+              type="button"
+              className={styles.linkBtn}
+              onClick={() => setDocOpen(true)}
+              disabled={!doc}
+            >
+              оферту организатора
+            </button>
+            {!doc && agreementOk === false && (
+              <span className={styles.agreeHint}> (документ пока недоступен на сервере)</span>
+            )}
+          </label>
+        </div>
+
+        {msg && <div className={msg.ok ? styles.bannerOk : styles.bannerErr}>{msg.text}</div>}
+      </div>
+      <div className={styles.scardFooter}>
+        <Button variant="secondary" onClick={onCancel}>Отмена</Button>
+        <Button loading={saving} disabled={!canSubmit} onClick={() => { void handleCreate(); }}>
+          Создать
+        </Button>
+      </div>
+
+      {docOpen && (
+        <AgreementDocumentModal
+          doc={doc}
+          onClose={() => setDocOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function OrganizationDetailView({
+  organizationId,
+  onBack,
+}: {
+  organizationId: string;
+  onBack: () => void;
+}) {
+  const [org, setOrg] = useState<OrganizationResponse | null>(null);
+  const [members, setMembers] = useState<OrganizationMemberResponse[]>([]);
+  const [avatarId, setAvatarId] = useState<string | null>(null);
+  const [myAccountId, setMyAccountId] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [section, setSection] = useState<'profile' | 'members' | 'sales'>('profile');
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const accountId = await getOrFetchAccountId();
+      setMyAccountId(accountId);
+      const [o, m, av] = await Promise.all([
+        fetchOrganizationById(organizationId),
+        fetchOrganizationMembers(organizationId).catch(() => [] as OrganizationMemberResponse[]),
+        getOrganizationAvatar(organizationId),
+      ]);
+      setOrg(o);
+      setMembers(m.length ? m : (o.members ?? []));
+      setAvatarId(av ?? o.avatarId ?? null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Не удалось загрузить организацию');
+      setOrg(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [organizationId]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const myRole = useMemo(() => {
+    if (org?.myRole) return org.myRole;
+    const me = members.find(m => m.accountId === myAccountId);
+    return me?.role ?? null;
+  }, [org, members, myAccountId]);
+
+  const isOwner = myRole === OrganizationRole.Owner;
+  const canEdit = myRole === OrganizationRole.Owner || myRole === OrganizationRole.Manager;
+
+  if (loading) return <div className={styles.loader}>Загрузка...</div>;
+  if (err || !org) {
+    return (
+      <div className={styles.scard}>
+        <div className={styles.bannerErr}>{err ?? 'Организация не найдена'}</div>
+        <div className={styles.scardFooter}>
+          <Button variant="secondary" onClick={onBack}>Назад</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.detailHead}>
+            <Button variant="ghost" size="sm" onClick={onBack}>← К списку</Button>
+            <div>
+              <div className={styles.scardTitle}>{org.name}</div>
+              <div className={styles.scardDesc}>
+                <span className={`${styles.badge} ${statusClass(org.verificationStatus)}`}>
+                  {formatVerificationStatus(org.verificationStatus)}
+                </span>
+                {myRole && (
+                  <span className={`${styles.badge} ${styles.badgeMute}`}>
+                    {formatOrganizationRole(myRole)}
+                  </span>
+                )}
+                {!org.active && (
+                  <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.subTabs}>
+          {(
+            [
+              { id: 'profile' as const, label: 'Профиль' },
+              { id: 'members' as const, label: 'Команда' },
+              { id: 'sales' as const, label: 'Продажа билетов' },
+            ]
+          ).map(t => (
+            <button
+              key={t.id}
+              type="button"
+              className={`${styles.subTab} ${section === t.id ? styles.subTabActive : ''}`}
+              onClick={() => setSection(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {section === 'profile' && (
+        <OrganizationProfileSection
+          org={org}
+          avatarId={avatarId}
+          canEdit={canEdit}
+          isOwner={isOwner}
+          onAvatarChanged={setAvatarId}
+          onUpdated={reload}
+        />
+      )}
+      {section === 'members' && (
+        <OrganizationMembersSection
+          organizationId={organizationId}
+          members={members}
+          isOwner={isOwner}
+          myAccountId={myAccountId}
+          onChanged={reload}
+        />
+      )}
+      {section === 'sales' && (
+        <OrganizationSalesSection
+          organizationId={organizationId}
+          org={org}
+          isOwner={isOwner}
+          canEdit={canEdit}
+          onChanged={reload}
+        />
+      )}
+    </>
+  );
+}
+
+function OrganizationProfileSection({
+  org,
+  avatarId,
+  canEdit,
+  isOwner,
+  onAvatarChanged,
+  onUpdated,
+}: {
+  org: OrganizationResponse;
+  avatarId: string | null;
+  canEdit: boolean;
+  isOwner: boolean;
+  onAvatarChanged: (id: string) => void;
+  onUpdated: () => Promise<void>;
+}) {
+  const [name, setName] = useState(org.name);
+  const [description, setDescription] = useState(org.description ?? '');
+  const [address, setAddress] = useState(org.address ?? '');
+  const [saving, setSaving] = useState(false);
+  const [toggling, setToggling] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    setName(org.name);
+    setDescription(org.description ?? '');
+    setAddress(org.address ?? '');
+  }, [org]);
+
+  const handleSave = async () => {
+    if (!canEdit || !name.trim()) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      await updateOrganization(org.id, {
+        name: name.trim(),
+        description: description.trim() || null,
+        address: address.trim() || null,
+        latitude: org.latitude ?? null,
+        longitude: org.longitude ?? null,
+      });
+      setMsg({ text: 'Сохранено', ok: true });
+      await onUpdated();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Ошибка сохранения', ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleActive = async () => {
+    if (!isOwner) return;
+    setToggling(true);
+    setMsg(null);
+    try {
+      await setOrganizationActive(org.id, !org.active);
+      setMsg({ text: org.active ? 'Организация отключена' : 'Организация включена', ok: true });
+      await onUpdated();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось изменить статус', ok: false });
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const initials = name.trim().slice(0, 2) || 'Орг';
+
+  return (
+    <div className={styles.scard}>
+      <div className={styles.scardHead}>
+        <div className={styles.scardTitle}>Профиль организации</div>
+      </div>
+      <div className={styles.formBody}>
+        <div className={styles.logoRow}>
+          {canEdit ? (
+            <OrgLogoUpload
+              organizationId={org.id}
+              fileId={avatarId}
+              initials={initials}
+              onChanged={onAvatarChanged}
+            />
+          ) : (
+            <div className={styles.logoBtn}>
+              <span className={styles.logoInitials}>{initials.slice(0, 2).toUpperCase()}</span>
+            </div>
+          )}
+          <div>
+            <div className={styles.logoTitle}>Логотип</div>
+            <div className={styles.scardDesc}>JPG, PNG · до 5 МБ</div>
+          </div>
+        </div>
+
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Название *</span>
+          <input
+            className={styles.input}
+            value={name}
+            disabled={!canEdit}
+            onChange={e => setName(e.target.value)}
+          />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Описание</span>
+          <textarea
+            className={`${styles.input} ${styles.textarea}`}
+            value={description}
+            disabled={!canEdit}
+            onChange={e => setDescription(e.target.value)}
+            rows={3}
+          />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Адрес</span>
+          <input
+            className={styles.input}
+            value={address}
+            disabled={!canEdit}
+            onChange={e => setAddress(e.target.value)}
+          />
+        </label>
+
+        {msg && <div className={msg.ok ? styles.bannerOk : styles.bannerErr}>{msg.text}</div>}
+      </div>
+      <div className={styles.scardFooter}>
+        {isOwner && (
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={toggling}
+            onClick={() => { void handleToggleActive(); }}
+          >
+            {org.active ? 'Отключить' : 'Включить'}
+          </Button>
+        )}
+        <div className={styles.footerSpacer} />
+        {canEdit && (
+          <Button loading={saving} disabled={!name.trim()} onClick={() => { void handleSave(); }}>
+            Сохранить
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OrganizationMembersSection({
+  organizationId,
+  members,
+  isOwner,
+  myAccountId,
+  onChanged,
+}: {
+  organizationId: string;
+  members: OrganizationMemberResponse[];
+  isOwner: boolean;
+  myAccountId: string;
+  onChanged: () => Promise<void>;
+}) {
+  const [accountId, setAccountId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [transferId, setTransferId] = useState('');
+
+  const handleAdd = async () => {
+    const id = accountId.trim();
+    if (!id || !isOwner) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await addOrganizationManager(organizationId, { accountId: id });
+      setAccountId('');
+      setMsg({ text: 'Администратор добавлен', ok: true });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось добавить', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemove = async (memberAccountId: string) => {
+    if (!isOwner) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await removeOrganizationMember(organizationId, memberAccountId);
+      setMsg({ text: 'Участник удалён', ok: true });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось удалить', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleToggleMember = async (memberAccountId: string, active: boolean) => {
+    if (!isOwner) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await setOrganizationMemberActive(organizationId, memberAccountId, active);
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось изменить статус', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    const id = transferId.trim();
+    if (!id || !isOwner) return;
+    if (!window.confirm('Передать владение организацией? Вы станете администратором.')) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await transferOrganizationOwnership(organizationId, { newOwnerAccountId: id });
+      setTransferId('');
+      setMsg({ text: 'Владение передано', ok: true });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось передать владение', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Команда</div>
+          <div className={styles.scardDesc}>
+            Администраторы могут редактировать профиль. Владелец управляет составом и продажами.
+          </div>
+        </div>
+        <ul className={styles.memberList}>
+          {members.map(m => {
+            const isMe = m.accountId === myAccountId;
+            const isMemberOwner = m.role === OrganizationRole.Owner;
+            return (
+              <li key={m.accountId} className={styles.memberRow}>
+                <UserAvatar
+                  accountId={m.accountId}
+                  avatarId={m.avatarId ?? null}
+                  initials={memberInitials(m)}
+                  size={32}
+                />
+                <div className={styles.memberInfo}>
+                  <div className={styles.memberName}>
+                    {memberName(m)}
+                    {isMe && <span className={styles.youTag}>вы</span>}
+                  </div>
+                  <div className={styles.memberMeta}>
+                    {formatOrganizationRole(m.role)}
+                    {!m.active && ' · приостановлен'}
+                  </div>
+                </div>
+                {isOwner && !isMemberOwner && (
+                  <div className={styles.memberActions}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => { void handleToggleMember(m.accountId, !m.active); }}
+                    >
+                      {m.active ? 'Приостановить' : 'Включить'}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => { void handleRemove(m.accountId); }}
+                    >
+                      Удалить
+                    </Button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+          {members.length === 0 && (
+            <li className={styles.emptyInline}>Участники не загружены</li>
+          )}
+        </ul>
+      </div>
+
+      {isOwner && (
+        <div className={styles.scard}>
+          <div className={styles.scardHead}>
+            <div className={styles.scardTitle}>Добавить администратора</div>
+            <div className={styles.scardDesc}>Укажите accountId пользователя</div>
+          </div>
+          <div className={styles.formBody}>
+            <div className={styles.inlineForm}>
+              <input
+                className={styles.input}
+                value={accountId}
+                onChange={e => setAccountId(e.target.value)}
+                placeholder="UUID аккаунта"
+              />
+              <Button
+                loading={busy}
+                disabled={!accountId.trim()}
+                onClick={() => { void handleAdd(); }}
+              >
+                Добавить
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isOwner && (
+        <div className={styles.scard}>
+          <div className={styles.scardHead}>
+            <div className={styles.scardTitle}>Передать владение</div>
+          </div>
+          <div className={styles.formBody}>
+            <div className={styles.inlineForm}>
+              <input
+                className={styles.input}
+                value={transferId}
+                onChange={e => setTransferId(e.target.value)}
+                placeholder="UUID нового владельца"
+              />
+              <Button
+                variant="secondary"
+                loading={busy}
+                disabled={!transferId.trim()}
+                onClick={() => { void handleTransfer(); }}
+              >
+                Передать
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {msg && <div className={msg.ok ? styles.bannerOk : styles.bannerErr}>{msg.text}</div>}
+    </>
+  );
+}
+
+function OrganizationSalesSection({
+  organizationId,
+  org,
+  isOwner,
+  canEdit,
+  onChanged,
+}: {
+  organizationId: string;
+  org: OrganizationResponse;
+  isOwner: boolean;
+  canEdit: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const [legalForm, setLegalForm] = useState<OrganizationLegalFormValue>(
+    OrganizationLegalForm.IndividualEntrepreneur,
+  );
+  const [inn, setInn] = useState('');
+  const [ogrn, setOgrn] = useState('');
+  const [kpp, setKpp] = useState('');
+  const [legalAddress, setLegalAddress] = useState('');
+  const [headName, setHeadName] = useState('');
+  const [headBasis, setHeadBasis] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [bik, setBik] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [taxRegime, setTaxRegime] = useState('');
+  const [onboardingStatus, setOnboardingStatus] = useState(
+    OrganizationOnboardingStatus.None as string,
+  );
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [legal, payout] = await Promise.all([
+          fetchOrganizationLegal(organizationId),
+          fetchOrganizationPayout(organizationId),
+        ]);
+        if (cancelled) return;
+        const L = legal ?? org.legal;
+        const P = payout ?? org.payout;
+        if (L) {
+          setLegalForm(L.legalForm);
+          setInn(L.inn ?? '');
+          setOgrn(L.ogrn ?? '');
+          setKpp(L.kpp ?? '');
+          setLegalAddress(L.legalAddress ?? '');
+          setHeadName(L.headName ?? '');
+          setHeadBasis(L.headBasis ?? '');
+        }
+        if (P) {
+          setBankAccount(P.bankAccount ?? '');
+          setBik(P.bik ?? '');
+          setBankName(P.bankName ?? '');
+          setTaxRegime(P.taxRegime ?? '');
+          setOnboardingStatus(P.onboardingStatus ?? OrganizationOnboardingStatus.None);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [organizationId, org.legal, org.payout]);
+
+  const isSelfEmployed = legalForm === OrganizationLegalForm.SelfEmployed;
+  const legalFilled = Boolean(inn.trim() && legalAddress.trim() && headName.trim() && !isSelfEmployed);
+  const payoutFilled = Boolean(bankAccount.trim() && bik.trim() && bankName.trim());
+  const verified = org.verificationStatus === OrganizationVerificationStatus.Verified;
+  const pending = org.verificationStatus === OrganizationVerificationStatus.Pending;
+  const rejected = org.verificationStatus === OrganizationVerificationStatus.Rejected;
+  const onboardingActive = onboardingStatus === OrganizationOnboardingStatus.Active;
+
+  const checklist = [
+    { ok: legalFilled, label: 'Юридические данные заполнены' },
+    { ok: payoutFilled, label: 'Реквизиты для выплат заполнены' },
+    { ok: verified, label: 'Верификация пройдена' },
+    { ok: onboardingActive, label: 'Онбординг выплат активен' },
+  ];
+
+  const saveLegal = async () => {
+    if (!isOwner) return;
+    if (isSelfEmployed) {
+      setMsg({
+        text: 'Платный тир доступен только для ИП и юридических лиц',
+        ok: false,
+      });
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const payload: OrganizationLegalRequest = {
+        legalForm,
+        inn: inn.trim(),
+        ogrn: ogrn.trim() || null,
+        kpp: kpp.trim() || null,
+        legalAddress: legalAddress.trim(),
+        headName: headName.trim(),
+        headBasis: headBasis.trim() || null,
+      };
+      await saveOrganizationLegal(organizationId, payload);
+      setMsg({ text: 'Юридические данные сохранены', ok: true });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Ошибка сохранения', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePayout = async () => {
+    if (!isOwner) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const payload: OrganizationPayoutRequest = {
+        bankAccount: bankAccount.trim(),
+        bik: bik.trim(),
+        bankName: bankName.trim(),
+        taxRegime: taxRegime.trim() || null,
+      };
+      await saveOrganizationPayout(organizationId, payload);
+      setMsg({ text: 'Реквизиты сохранены', ok: true });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Ошибка сохранения', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitVerification = async () => {
+    if (!isOwner) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await submitOrganizationVerification(organizationId);
+      setMsg({ text: 'Заявка отправлена на проверку', ok: true });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось отправить на проверку', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleTickets = async (enabled: boolean) => {
+    if (!isOwner) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await setOrganizationTicketsEnabled(organizationId, enabled);
+      setMsg({
+        text: enabled ? 'Продажа билетов включена' : 'Продажа билетов отключена',
+        ok: true,
+      });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось изменить статус продаж', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) return <div className={styles.loader}>Загрузка...</div>;
+
+  return (
+    <>
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Готовность к продажам</div>
+          <div className={styles.scardDesc}>
+            Бесплатные анонсы доступны всегда. Продажа билетов — после верификации и онбординга выплат.
+          </div>
+        </div>
+        <ul className={styles.checkList}>
+          {checklist.map(item => (
+            <li key={item.label} className={item.ok ? styles.checkOk : styles.checkNo}>
+              <span className={styles.checkMark} aria-hidden>{item.ok ? '✓' : '·'}</span>
+              {item.label}
+            </li>
+          ))}
+        </ul>
+        {rejected && (
+          <div className={styles.bannerWarn}>
+            Верификация отклонена
+            {org.rejectReason ? `: ${org.rejectReason}` : ''}.
+            Исправьте данные и отправьте заявку снова. Организация не блокируется — бесплатные анонсы работают.
+          </div>
+        )}
+        {pending && (
+          <div className={styles.bannerWarn}>Заявка на проверке. Обычно это занимает некоторое время.</div>
+        )}
+        <div className={styles.scardFooter}>
+          <div className={styles.footerSpacer} />
+          {isOwner && !org.canSellTickets && (
+            <Button
+              loading={busy}
+              disabled={!verified}
+              title={!verified ? 'Нужна успешная верификация' : undefined}
+              onClick={() => { void toggleTickets(true); }}
+            >
+              Включить продажу билетов
+            </Button>
+          )}
+          {isOwner && org.canSellTickets && (
+            <Button
+              variant="secondary"
+              loading={busy}
+              onClick={() => { void toggleTickets(false); }}
+            >
+              Отключить продажу билетов
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Юридические данные</div>
+        </div>
+        <div className={styles.formBody}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Правовая форма</span>
+            <Select
+              value={legalForm}
+              disabled={!isOwner}
+              onChange={v => setLegalForm(v as OrganizationLegalFormValue)}
+              options={[
+                { value: OrganizationLegalForm.IndividualEntrepreneur, label: formatLegalForm(OrganizationLegalForm.IndividualEntrepreneur) },
+                { value: OrganizationLegalForm.LegalEntity, label: formatLegalForm(OrganizationLegalForm.LegalEntity) },
+                { value: OrganizationLegalForm.SelfEmployed, label: formatLegalForm(OrganizationLegalForm.SelfEmployed) },
+              ]}
+            />
+          </label>
+          {isSelfEmployed && (
+            <div className={styles.bannerWarn}>
+              Платный тир (продажа билетов) доступен только для ИП и юридических лиц.
+            </div>
+          )}
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>ИНН *</span>
+            <input className={styles.input} value={inn} disabled={!isOwner} onChange={e => setInn(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>ОГРН / ОГРНИП</span>
+            <input className={styles.input} value={ogrn} disabled={!isOwner} onChange={e => setOgrn(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>КПП</span>
+            <input className={styles.input} value={kpp} disabled={!isOwner} onChange={e => setKpp(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Юр. адрес *</span>
+            <input className={styles.input} value={legalAddress} disabled={!isOwner} onChange={e => setLegalAddress(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>ФИО руководителя *</span>
+            <input className={styles.input} value={headName} disabled={!isOwner} onChange={e => setHeadName(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Действует на основании</span>
+            <input className={styles.input} value={headBasis} disabled={!isOwner} onChange={e => setHeadBasis(e.target.value)} placeholder="Устава / доверенности" />
+          </label>
+        </div>
+        {isOwner && (
+          <div className={styles.scardFooter}>
+            <div className={styles.footerSpacer} />
+            <Button loading={busy} onClick={() => { void saveLegal(); }}>Сохранить юр. данные</Button>
+          </div>
+        )}
+        {!isOwner && canEdit && (
+          <div className={styles.formBody}>
+            <p className={styles.scardDesc}>Редактирование доступно только владельцу</p>
+          </div>
+        )}
+      </div>
+
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Выплаты</div>
+          <div className={styles.scardDesc}>
+            Онбординг: {formatOnboardingStatus(onboardingStatus as never)}
+          </div>
+        </div>
+        <div className={styles.formBody}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Расчётный счёт *</span>
+            <input className={styles.input} value={bankAccount} disabled={!isOwner} onChange={e => setBankAccount(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>БИК *</span>
+            <input className={styles.input} value={bik} disabled={!isOwner} onChange={e => setBik(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Банк *</span>
+            <input className={styles.input} value={bankName} disabled={!isOwner} onChange={e => setBankName(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Налоговый режим</span>
+            <input className={styles.input} value={taxRegime} disabled={!isOwner} onChange={e => setTaxRegime(e.target.value)} />
+          </label>
+        </div>
+        {isOwner && (
+          <div className={styles.scardFooter}>
+            <div className={styles.footerSpacer} />
+            <Button loading={busy} onClick={() => { void savePayout(); }}>Сохранить реквизиты</Button>
+          </div>
+        )}
+      </div>
+
+      {isOwner && (
+        <div className={styles.scard}>
+          <div className={styles.scardHead}>
+            <div className={styles.scardTitle}>Верификация</div>
+            <div className={styles.scardDesc}>
+              Отправка на проверку требует заполненные юр. данные и реквизиты выплат
+            </div>
+          </div>
+          <div className={styles.scardFooter}>
+            <div className={styles.footerSpacer} />
+            <Button
+              loading={busy}
+              disabled={!legalFilled || !payoutFilled || pending}
+              onClick={() => { void submitVerification(); }}
+            >
+              {pending ? 'На проверке' : 'Отправить на проверку'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {msg && <div className={msg.ok ? styles.bannerOk : styles.bannerErr}>{msg.text}</div>}
+    </>
+  );
+}

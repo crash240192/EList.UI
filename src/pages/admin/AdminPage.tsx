@@ -30,6 +30,7 @@ const DOCUMENT_TYPE_OPTIONS: { value: DocumentTypeValue; label: string }[] = [
   { value: DocumentType.Policy, label: 'Политика обработки ПДн' },
   { value: DocumentType.Consent, label: 'Согласие на обработку ПДн' },
   { value: DocumentType.Agreement, label: 'Пользовательское соглашение' },
+  { value: DocumentType.OrganizerAgreement, label: 'Оферта организатора' },
 ];
 
 const VERSION_RE = /^\d+\.\d+\.\d+$/;

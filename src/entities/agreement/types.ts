@@ -5,6 +5,8 @@ export const DocumentType = {
   Policy: 0,
   Consent: 1,
   Agreement: 2,
+  /** Оферта организатора — принятие перед созданием организации */
+  OrganizerAgreement: 3,
 } as const;
 
 export type DocumentTypeValue = (typeof DocumentType)[keyof typeof DocumentType];
