@@ -196,6 +196,21 @@
   min-height: 72px;
 }
 
+.readonlyAddress {
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.readonlyCoords {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .agreeRow {
   display: flex;
   align-items: flex-start;

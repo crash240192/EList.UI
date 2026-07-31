@@ -46,7 +46,9 @@ import {
   type OrganizationRoleValue,
 } from '@/entities/organization';
 import { getOrFetchAccountId } from '@/entities/user/api';
+import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { AgreementDocumentModal } from '@/features/agreements';
+import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { Button } from '@/shared/ui/Button';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { Select } from '@/shared/ui/Select/Select';
@@ -196,12 +198,15 @@ function OrganizationCreateView({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [agreementOk, setAgreementOk] = useState<boolean | null>(null);
   const [doc, setDoc] = useState<IAgreementDocument | null>(null);
   const [docOpen, setDocOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const userCoords = getStoredUserCoords() ?? { lat: 55.7558, lng: 37.6173 };
 
   useEffect(() => {
     let cancelled = false;
@@ -237,8 +242,8 @@ function OrganizationCreateView({
         name: name.trim(),
         description: description.trim() || null,
         address: address.trim() || null,
-        latitude: null,
-        longitude: null,
+        latitude: lat,
+        longitude: lng,
       });
       onCreated(id);
     } catch (e) {
@@ -280,15 +285,21 @@ function OrganizationCreateView({
             rows={3}
           />
         </label>
-        <label className={styles.field}>
+        <div className={styles.field}>
           <span className={styles.fieldLabel}>Адрес</span>
-          <input
-            className={styles.input}
-            value={address}
-            onChange={e => setAddress(e.target.value)}
-            placeholder="Город, улица, площадка"
+          <YandexMapPicker
+            lat={lat}
+            lng={lng}
+            address={address}
+            initialCenter={lat === null ? [userCoords.lat, userCoords.lng] : undefined}
+            onAddressChange={setAddress}
+            onPick={(la, lo, addr) => {
+              setLat(la);
+              setLng(lo);
+              setAddress(addr);
+            }}
           />
-        </label>
+        </div>
 
         <div className={styles.agreeRow}>
           <input
@@ -489,14 +500,19 @@ function OrganizationProfileSection({
   const [name, setName] = useState(org.name);
   const [description, setDescription] = useState(org.description ?? '');
   const [address, setAddress] = useState(org.address ?? '');
+  const [lat, setLat] = useState<number | null>(org.latitude ?? null);
+  const [lng, setLng] = useState<number | null>(org.longitude ?? null);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const userCoords = getStoredUserCoords() ?? { lat: 55.7558, lng: 37.6173 };
 
   useEffect(() => {
     setName(org.name);
     setDescription(org.description ?? '');
     setAddress(org.address ?? '');
+    setLat(org.latitude ?? null);
+    setLng(org.longitude ?? null);
   }, [org]);
 
   const handleSave = async () => {
@@ -508,8 +524,8 @@ function OrganizationProfileSection({
         name: name.trim(),
         description: description.trim() || null,
         address: address.trim() || null,
-        latitude: org.latitude ?? null,
-        longitude: org.longitude ?? null,
+        latitude: lat,
+        longitude: lng,
       });
       setMsg({ text: 'Сохранено', ok: true });
       await onUpdated();
@@ -581,15 +597,30 @@ function OrganizationProfileSection({
             rows={3}
           />
         </label>
-        <label className={styles.field}>
+        <div className={styles.field}>
           <span className={styles.fieldLabel}>Адрес</span>
-          <input
-            className={styles.input}
-            value={address}
-            disabled={!canEdit}
-            onChange={e => setAddress(e.target.value)}
-          />
-        </label>
+          {canEdit ? (
+            <YandexMapPicker
+              lat={lat}
+              lng={lng}
+              address={address}
+              initialCenter={lat === null ? [userCoords.lat, userCoords.lng] : undefined}
+              onAddressChange={setAddress}
+              onPick={(la, lo, addr) => {
+                setLat(la);
+                setLng(lo);
+                setAddress(addr);
+              }}
+            />
+          ) : (
+            <div className={styles.readonlyAddress}>
+              {address || 'Адрес не указан'}
+              {lat != null && lng != null && (
+                <span className={styles.readonlyCoords}>{lat.toFixed(5)}, {lng.toFixed(5)}</span>
+              )}
+            </div>
+          )}
+        </div>
 
         {msg && <div className={msg.ok ? styles.bannerOk : styles.bannerErr}>{msg.text}</div>}
       </div>
