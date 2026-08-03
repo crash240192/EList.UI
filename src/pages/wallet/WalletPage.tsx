@@ -153,7 +153,7 @@ export default function WalletPage() {
       setWallet(w);
 
       const [tariffs, person] = await Promise.all([
-        tariffApi.getAll().catch(() => []),
+        tariffApi.getAll(false).catch(() => []),
         getMyPersonInfo().catch(() => null),
       ]);
       setAllTariffs([...tariffs].sort((a, b) => a.cost - b.cost));

@@ -684,7 +684,7 @@ function TariffsTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setTariffs(sortTariffsByCost(await tariffApi.getAll())); }
+    try { setTariffs(sortTariffsByCost(await tariffApi.getAllForAdmin())); }
     catch (e) { setError(e instanceof Error ? e.message : 'Ошибка загрузки'); }
     finally { setLoading(false); }
   }, []);
@@ -692,6 +692,44 @@ function TariffsTab() {
   useEffect(() => { load(); }, [load]);
 
   const editingId = editing && editing !== 'new' ? editing.id : null;
+  const userTariffs = tariffs.filter(t => !t.forOrganization);
+  const organizationTariffs = tariffs.filter(t => t.forOrganization);
+
+  const renderTariffRow = (t: ITariff) => (
+    <div
+      key={t.id}
+      className={`${styles.categoryRow} ${editingId === t.id ? styles.listRowActive : ''}`}
+      onClick={() => setEditing(t)}
+      style={{ cursor: 'pointer' }}
+    >
+      <div className={styles.itemInfo}>
+        <span className={styles.itemName}>{t.name}</span>
+        <span className={styles.itemSub}>
+          {t.cost === 0 ? 'Бесплатно' : `${t.cost.toLocaleString('ru-RU')} ₽`}
+          {' · '}
+          {formatPeriod(t)}
+        </span>
+      </div>
+      <div className={styles.itemActions}>
+        <EditIconBtn onClick={e => { e.stopPropagation(); setEditing(t); }} />
+        <DeleteIconBtn
+          title="Удалить тариф"
+          onClick={async e => {
+            e.stopPropagation();
+            if (!confirm(`Удалить тариф «${t.name}»? Это также удалит его валидатор.`)) return;
+            try {
+              if (t.validatorId) await tariffValidatorApi.delete(t.validatorId);
+              await tariffApi.delete(t.id);
+              if (editing !== 'new' && (editing as ITariff)?.id === t.id) setEditing(null);
+              load();
+            } catch (e) {
+              alert(e instanceof Error ? e.message : 'Ошибка удаления');
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
 
   if (loading) return <div className={styles.loader}>Загрузка...</div>;
   if (error)   return <div className={styles.errorMsg}>{error}</div>;
@@ -710,42 +748,26 @@ function TariffsTab() {
               <p>Нет тарифов. Создайте первый.</p>
             </div>
           )}
-          {tariffs.map(t => (
-            <div
-              key={t.id}
-              className={`${styles.categoryRow} ${editingId === t.id ? styles.listRowActive : ''}`}
-              onClick={() => setEditing(t)}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className={styles.itemInfo}>
-                <span className={styles.itemName}>{t.name}</span>
-                <span className={styles.itemSub}>
-                  {t.cost === 0 ? 'Бесплатно' : `${t.cost.toLocaleString('ru-RU')} ₽`}
-                  {' · '}
-                  {formatPeriod(t)}
-                </span>
+          {tariffs.length > 0 && (
+            <>
+              <div className={styles.itemGroup}>
+                <div className={styles.groupTitle}>Для пользователей</div>
+                {userTariffs.length === 0 ? (
+                  <div className={styles.groupEmpty}>Нет тарифов</div>
+                ) : (
+                  userTariffs.map(renderTariffRow)
+                )}
               </div>
-              <div className={styles.itemActions}>
-                <EditIconBtn onClick={e => { e.stopPropagation(); setEditing(t); }} />
-                <DeleteIconBtn
-                  title="Удалить тариф"
-                  onClick={async e => {
-                    e.stopPropagation();
-                    if (!confirm(`Удалить тариф «${t.name}»? Это также удалит его валидатор.`)) return;
-                    try {
-                      // Сначала удаляем валидатор, затем тариф
-                      if (t.validatorId) await tariffValidatorApi.delete(t.validatorId);
-                      await tariffApi.delete(t.id);
-                      if (editing !== 'new' && (editing as ITariff)?.id === t.id) setEditing(null);
-                      load();
-                    } catch (e) {
-                      alert(e instanceof Error ? e.message : 'Ошибка удаления');
-                    }
-                  }}
-                />
+              <div className={styles.itemGroup}>
+                <div className={styles.groupTitle}>Для организаций</div>
+                {organizationTariffs.length === 0 ? (
+                  <div className={styles.groupEmpty}>Нет тарифов</div>
+                ) : (
+                  organizationTariffs.map(renderTariffRow)
+                )}
               </div>
-            </div>
-          ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -760,23 +782,20 @@ function TariffsTab() {
             tariff={editing === 'new' ? null : editing}
             onSave={async (validatorData, tariffData) => {
               if (editing === 'new') {
-                // 1. Создаём валидатор
                 const validatorId = await tariffValidatorApi.create(validatorData);
-                // 2. Создаём тариф с validatorId
                 await tariffApi.create({ ...tariffData, validatorId });
               } else {
-                // Обновляем валидатор отдельным запросом
                 if (editing.validatorId) {
                   await tariffValidatorApi.update({ ...validatorData, id: editing.validatorId });
                 }
-                // Обновляем тариф — только нужные поля, без tariffValidator
                 await tariffApi.update({
-                  id:          editing.id,
-                  name:        tariffData.name,
-                  cost:        tariffData.cost,
-                  periodDays:  tariffData.periodDays,
-                  validatorId: editing.validatorId,
-                } as any);
+                  id:              editing.id,
+                  name:            tariffData.name,
+                  cost:            tariffData.cost,
+                  periodDays:      tariffData.periodDays,
+                  forOrganization: tariffData.forOrganization,
+                  validatorId:     editing.validatorId,
+                });
               }
               setEditing(null);
               load();
@@ -808,7 +827,8 @@ function TariffForm({ tariff, onSave, onCancel }: {
 }) {
   const [name,  setName]  = useState(tariff?.name ?? '');
   const [cost,  setCost]  = useState(String(tariff?.cost ?? 0));
-  const [days,  setDays]  = useState(String((tariff as any)?.periodDays ?? 30));
+  const [days,  setDays]  = useState(String(tariff?.periodDays ?? tariff?.period?.days ?? 30));
+  const [forOrganization, setForOrganization] = useState(!!tariff?.forOrganization);
 
   const [validatorStr, setValidatorStr] = useState(EMPTY_VALIDATOR_STR);
   const [loadingV,  setLoadingV]  = useState(!!tariff?.validatorId);
@@ -817,7 +837,8 @@ function TariffForm({ tariff, onSave, onCancel }: {
   useEffect(() => {
     setName(tariff?.name ?? '');
     setCost(String(tariff?.cost ?? 0));
-    setDays(String((tariff as any)?.periodDays ?? 30));
+    setDays(String(tariff?.periodDays ?? tariff?.period?.days ?? 30));
+    setForOrganization(!!tariff?.forOrganization);
     setValidatorStr(EMPTY_VALIDATOR_STR);
     setErr(null);
 
@@ -865,8 +886,10 @@ function TariffForm({ tariff, onSave, onCancel }: {
     };
     try {
       await onSave(validator, {
-        name, cost: parseFloat(cost) || 0,
+        name,
+        cost: parseFloat(cost) || 0,
         periodDays: parseInt(days) || 30,
+        forOrganization,
         validatorId: '',
       });
     } catch (e) {
@@ -894,6 +917,14 @@ function TariffForm({ tariff, onSave, onCancel }: {
         <input className={styles.input} type="number" min={1} value={days}
           onChange={e => setDays(e.target.value)} placeholder="30" />
       </div>
+      <label className={styles.checkboxLabel}>
+        <input
+          type="checkbox"
+          checked={forOrganization}
+          onChange={e => setForOrganization(e.target.checked)}
+        />
+        Для организаций
+      </label>
 
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -964,7 +995,7 @@ function TariffForm({ tariff, onSave, onCancel }: {
 
 // Форматирование периода
 function formatPeriod(t: ITariff): string {
-  const days = (t as any).periodDays ?? t.period?.days;
+  const days = t.periodDays ?? t.period?.days;
   return days ? `${days} дн.` : '—';
 }
 

@@ -197,7 +197,7 @@ export default function CreateEventPage() {
         const wallet = await getWalletByAccount(accountId);
         setHasWallet(!!wallet);
         if (wallet?.tariffId) {
-          const tariffs = await tariffApi.getAll().catch(() => []);
+          const tariffs = await tariffApi.getAll(false).catch(() => []);
           const t = tariffs.find(x => x.id === wallet.tariffId) ?? null;
           setTariff(t);
           if (t?.validatorId) {
