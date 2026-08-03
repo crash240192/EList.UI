@@ -46,6 +46,13 @@ import {
   type OrganizationRoleValue,
 } from '@/entities/organization';
 import { getOrFetchAccountId } from '@/entities/user/api';
+import {
+  ensureOrganizationWallet,
+  getWalletByOrganization,
+  setWalletTariff,
+  type IWallet,
+} from '@/entities/user/walletApi';
+import { tariffApi, type ITariff } from '@/entities/admin/adminApi';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { AgreementDocumentModal } from '@/features/agreements';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
@@ -59,6 +66,13 @@ type View =
   | { kind: 'list' }
   | { kind: 'create' }
   | { kind: 'detail'; id: string };
+
+function formatOrgTariffLabel(t: ITariff): string {
+  const days = t.periodDays ?? t.period?.days;
+  const price = t.cost === 0 ? 'Бесплатно' : `${t.cost.toLocaleString('ru-RU')} ₽`;
+  const period = days != null ? `${days} дн.` : null;
+  return [t.name, price, period].filter(Boolean).join(' · ');
+}
 
 function statusClass(status: OrganizationResponse['verificationStatus']): string {
   switch (status) {
@@ -514,6 +528,13 @@ function OrganizationProfileSection({
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const userCoords = getStoredUserCoords() ?? { lat: 55.7558, lng: 37.6173 };
 
+  const [wallet, setWallet] = useState<IWallet | null>(null);
+  const [orgTariffs, setOrgTariffs] = useState<ITariff[]>([]);
+  const [currentTariff, setCurrentTariff] = useState<ITariff | null>(null);
+  const [selectedTariffId, setSelectedTariffId] = useState('');
+  const [tariffLoading, setTariffLoading] = useState(true);
+  const [tariffSaving, setTariffSaving] = useState(false);
+
   useEffect(() => {
     setName(org.name);
     setDescription(org.description ?? '');
@@ -521,6 +542,29 @@ function OrganizationProfileSection({
     setLat(org.latitude ?? null);
     setLng(org.longitude ?? null);
   }, [org]);
+
+  const loadTariffState = useCallback(async () => {
+    setTariffLoading(true);
+    try {
+      const [w, tariffs] = await Promise.all([
+        getWalletByOrganization(org.id),
+        tariffApi.getAll(true).catch(() => [] as ITariff[]),
+      ]);
+      const sorted = [...tariffs].sort((a, b) => a.cost - b.cost);
+      setOrgTariffs(sorted);
+      setWallet(w);
+      const tariffId = w?.tariffId ?? null;
+      const matched = tariffId ? sorted.find(t => t.id === tariffId) ?? null : null;
+      setCurrentTariff(matched);
+      setSelectedTariffId(tariffId ?? '');
+    } finally {
+      setTariffLoading(false);
+    }
+  }, [org.id]);
+
+  useEffect(() => {
+    void loadTariffState();
+  }, [loadTariffState]);
 
   const handleSave = async () => {
     if (!canEdit || !name.trim()) return;
@@ -558,7 +602,32 @@ function OrganizationProfileSection({
     }
   };
 
+  const handleApplyTariff = async () => {
+    if (!canEdit || !selectedTariffId || selectedTariffId === currentTariff?.id) return;
+    setTariffSaving(true);
+    setMsg(null);
+    try {
+      const w = wallet?.id ? wallet : await ensureOrganizationWallet(org.id);
+      await setWalletTariff(w.id, selectedTariffId);
+      setWallet(w);
+      setMsg({ text: 'Тариф организации обновлён', ok: true });
+      await loadTariffState();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось сменить тариф', ok: false });
+    } finally {
+      setTariffSaving(false);
+    }
+  };
+
   const initials = name.trim().slice(0, 2) || 'Орг';
+  const tariffOptions = orgTariffs.map(t => ({
+    value: t.id,
+    label: formatOrgTariffLabel(t),
+  }));
+  const canApplyTariff =
+    canEdit
+    && !!selectedTariffId
+    && selectedTariffId !== (currentTariff?.id ?? wallet?.tariffId ?? '');
 
   return (
     <div className={styles.scard}>
@@ -625,6 +694,52 @@ function OrganizationProfileSection({
               {lat != null && lng != null && (
                 <span className={styles.readonlyCoords}>{lat.toFixed(5)}, {lng.toFixed(5)}</span>
               )}
+            </div>
+          )}
+        </div>
+
+        <div className={styles.tariffBlock}>
+          <div className={styles.tariffCurrent}>
+            <span className={styles.tariffCurrentLabel}>Текущий тариф</span>
+            <span className={`${styles.tariffCurrentValue} ${!currentTariff ? styles.tariffCurrentMuted : ''}`}>
+              {tariffLoading
+                ? 'Загрузка...'
+                : currentTariff
+                  ? formatOrgTariffLabel(currentTariff)
+                  : wallet?.tariffId
+                    ? `Тариф выбран (id: ${wallet.tariffId.slice(0, 8)}…)`
+                    : 'Не выбран'}
+            </span>
+          </div>
+
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Тариф организации</span>
+            {tariffLoading ? (
+              <div className={styles.tariffCurrentMuted}>Загрузка тарифов...</div>
+            ) : orgTariffs.length === 0 ? (
+              <div className={styles.tariffCurrentMuted}>
+                Нет доступных тарифов для организаций. Обратитесь к администратору.
+              </div>
+            ) : (
+              <Select
+                value={selectedTariffId}
+                disabled={!canEdit}
+                placeholder="Выберите тариф"
+                onChange={setSelectedTariffId}
+                options={tariffOptions}
+              />
+            )}
+          </div>
+
+          {canApplyTariff && (
+            <div className={styles.tariffApplyRow}>
+              <Button
+                size="sm"
+                loading={tariffSaving}
+                onClick={() => { void handleApplyTariff(); }}
+              >
+                Применить тариф
+              </Button>
             </div>
           )}
         </div>
