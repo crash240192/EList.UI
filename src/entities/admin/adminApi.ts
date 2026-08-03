@@ -102,7 +102,11 @@ export interface ITariff {
   cost: number;
   period: ITariffPeriod;
   validatorId: string;
+  /** Тариф для организаций (иначе — для пользователей) */
+  forOrganization: boolean;
   tariffValidator?: ITariffValidator | null;
+  /** Иногда приходит как periodDays вместо period */
+  periodDays?: number;
 }
 
 export interface ITariffRequest {
@@ -110,24 +114,60 @@ export interface ITariffRequest {
   cost: number;
   periodDays: number;
   validatorId: string;
+  forOrganization: boolean;
+}
+
+function normalizeTariff(raw: ITariff & Record<string, unknown>): ITariff {
+  const forOrganization = Boolean(
+    raw.forOrganization ?? raw.ForOrganization ?? false,
+  );
+  return {
+    ...raw,
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    cost: Number(raw.cost ?? 0),
+    validatorId: String(raw.validatorId ?? ''),
+    forOrganization,
+    period: raw.period ?? { days: Number(raw.periodDays ?? 30), hours: 0, minutes: 0 },
+  };
+}
+
+async function fetchTariffsByAudience(forOrganization: boolean): Promise<ITariff[]> {
+  const r = await apiClient.get<ITariff[]>(
+    `/api/Wallets/tariffs?forOrganization=${forOrganization ? 'true' : 'false'}`,
+  );
+  return (r.result ?? []).map(t => normalizeTariff(t as ITariff & Record<string, unknown>));
 }
 
 export const tariffApi = {
-  getAll: async (): Promise<ITariff[]> => {
-    const r = await apiClient.get<ITariff[]>('/api/Wallets/tariff/all');
-    return r.result ?? [];
+  /**
+   * GET /api/Wallets/tariffs?forOrganization=
+   * По умолчанию — тарифы пользователей (forOrganization=false).
+   */
+  getAll: async (forOrganization = false): Promise<ITariff[]> => {
+    return fetchTariffsByAudience(forOrganization);
+  },
+  /** Все тарифы для админки: пользователи + организации */
+  getAllForAdmin: async (): Promise<ITariff[]> => {
+    const [personal, organization] = await Promise.all([
+      fetchTariffsByAudience(false),
+      fetchTariffsByAudience(true),
+    ]);
+    const byId = new Map<string, ITariff>();
+    for (const t of [...personal, ...organization]) byId.set(t.id, t);
+    return [...byId.values()];
   },
   getById: async (id: string): Promise<ITariff | null> => {
     try {
       const r = await apiClient.get<ITariff>(`/api/Wallets/tariff/${id}`);
-      return r.result ?? null;
+      return r.result ? normalizeTariff(r.result as ITariff & Record<string, unknown>) : null;
     } catch { return null; }
   },
   create: async (payload: ITariffRequest): Promise<string> => {
     const r = await apiClient.post<string>('/api/Wallets/tariff/create', payload);
     return r.result;
   },
-  update: async (payload: ITariff): Promise<void> => {
+  update: async (payload: ITariff | (ITariffRequest & { id: string; validatorId: string })): Promise<void> => {
     await apiClient.put('/api/Wallets/tariff/update', payload);
   },
   delete: async (id: string): Promise<void> => {
