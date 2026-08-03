@@ -211,6 +211,43 @@
   font-variant-numeric: tabular-nums;
 }
 
+.tariffBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.tariffCurrent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tariffCurrentLabel {
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.tariffCurrentValue {
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.tariffCurrentMuted {
+  color: var(--text-muted);
+}
+
+.tariffApplyRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .agreeRow {
   display: flex;
   align-items: flex-start;
