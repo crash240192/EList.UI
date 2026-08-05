@@ -1,7 +1,7 @@
 // pages/create-event/CreateEventPage.tsx
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, assignEventTypes, fetchEventParameters } from '@/entities/event';
 import type { IEvent, IEventType } from '@/entities/event';
@@ -17,8 +17,12 @@ import {
 import { apiClient } from '@/shared/api/client';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { useAccountId } from '@/features/auth/useAccountId';
-import { getWalletByAccount } from '@/entities/user/walletApi';
+import { getWalletByAccount, getWalletByOrganization } from '@/entities/user/walletApi';
 import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } from '@/entities/admin/adminApi';
+import {
+  OrganizationVerificationStatus,
+  fetchMyOrganizations,
+} from '@/entities/organization';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
@@ -42,6 +46,10 @@ import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
+import {
+  CreateEventHostChooser,
+  type CreateEventHost,
+} from './CreateEventHostChooser';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
   getMaxEventAgeForTariff,
@@ -136,10 +144,23 @@ function useToast() {
 export default function CreateEventPage() {
   const navigate  = useNavigate();
   const { id }    = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isEditing = !!id;
   const goBack    = useSafeBack('/');
   usePageTitle(isEditing ? 'Редактирование события' : 'Создать событие');
   const { accountId } = useAccountId();
+
+  const hostParam = searchParams.get('host');
+  const orgIdParam = searchParams.get('organizationId');
+
+  const [hostGate, setHostGate] = useState<'checking' | 'chooser' | 'form'>(
+    isEditing ? 'form' : 'checking',
+  );
+  const [eventHost, setEventHost] = useState<CreateEventHost | null>(
+    isEditing ? { kind: 'user' } : null,
+  );
+  const [canChooseHost, setCanChooseHost] = useState(false);
+  const skipHostGateEffectRef = useRef(false);
 
   const [form,        setForm]        = useState<FormState>(EMPTY);
   const [loading,     setLoading]     = useState(isEditing);
@@ -190,31 +211,150 @@ export default function CreateEventPage() {
   const initialTypesAppliedRef = useRef(false);
   const allTypesRef = useRef<IEventType[]>([]);
 
-  // Загрузка кошелька и тарифа
+  // Выбор хозяина события (пользователь / верифицированная организация)
   useEffect(() => {
-    getOrFetchAccountId().then(async accountId => {
+    if (skipHostGateEffectRef.current) {
+      skipHostGateEffectRef.current = false;
+      return;
+    }
+    if (isEditing) {
+      setHostGate('form');
+      setEventHost({ kind: 'user' });
+      setCanChooseHost(false);
+      return;
+    }
+
+    if (hostParam === 'user') {
+      let cancelled = false;
+      fetchMyOrganizations()
+        .then(list => {
+          if (cancelled) return;
+          const verified = list.filter(
+            o => o.active !== false
+              && o.verificationStatus === OrganizationVerificationStatus.Verified,
+          );
+          setCanChooseHost(verified.length > 0);
+          setEventHost({ kind: 'user' });
+          setHostGate('form');
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setCanChooseHost(false);
+          setEventHost({ kind: 'user' });
+          setHostGate('form');
+        });
+      return () => { cancelled = true; };
+    }
+
+    if (hostParam === 'org' && orgIdParam) {
+      let cancelled = false;
+      fetchMyOrganizations()
+        .then(list => {
+          if (cancelled) return;
+          const verified = list.filter(
+            o => o.active !== false
+              && o.verificationStatus === OrganizationVerificationStatus.Verified,
+          );
+          setCanChooseHost(verified.length > 0);
+          const org = list.find(o => o.id === orgIdParam);
+          setEventHost({
+            kind: 'organization',
+            organizationId: orgIdParam,
+            organizationName: org?.name ?? 'Организация',
+          });
+          setHostGate('form');
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setEventHost({
+            kind: 'organization',
+            organizationId: orgIdParam,
+            organizationName: 'Организация',
+          });
+          setHostGate('form');
+        });
+      return () => { cancelled = true; };
+    }
+
+    let cancelled = false;
+    setHostGate('checking');
+    fetchMyOrganizations()
+      .then(list => {
+        if (cancelled) return;
+        const verified = list.filter(
+          o => o.active !== false
+            && o.verificationStatus === OrganizationVerificationStatus.Verified,
+        );
+        if (verified.length === 0) {
+          setCanChooseHost(false);
+          setEventHost({ kind: 'user' });
+          setHostGate('form');
+          setSearchParams({ host: 'user' }, { replace: true });
+        } else {
+          setCanChooseHost(true);
+          setHostGate('chooser');
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCanChooseHost(false);
+        setEventHost({ kind: 'user' });
+        setHostGate('form');
+      });
+    return () => { cancelled = true; };
+  }, [isEditing, hostParam, orgIdParam, setSearchParams]);
+
+  // Загрузка кошелька и тарифа (личный или организации)
+  useEffect(() => {
+    if (hostGate !== 'form' || !eventHost) return;
+
+    setTariffReady(false);
+    setTariff(null);
+    setTariffValidator(null);
+    setHasWallet(null);
+
+    let cancelled = false;
+    (async () => {
       try {
-        const wallet = await getWalletByAccount(accountId);
-        setHasWallet(!!wallet);
-        if (wallet?.tariffId) {
-          const tariffs = await tariffApi.getAll(false).catch(() => []);
-          const t = tariffs.find(x => x.id === wallet.tariffId) ?? null;
-          setTariff(t);
-          if (t?.validatorId) {
-            const v = await tariffValidatorApi.getByTariff(t.id).catch(() => null);
-            setTariffValidator(v);
+        if (eventHost.kind === 'organization') {
+          const wallet = await getWalletByOrganization(eventHost.organizationId);
+          if (cancelled) return;
+          setHasWallet(!!wallet);
+          if (wallet?.tariffId) {
+            const tariffs = await tariffApi.getAll(true).catch(() => []);
+            if (cancelled) return;
+            const t = tariffs.find(x => x.id === wallet.tariffId) ?? null;
+            setTariff(t);
+            if (t?.validatorId) {
+              const v = await tariffValidatorApi.getByTariff(t.id).catch(() => null);
+              if (!cancelled) setTariffValidator(v);
+            }
+          }
+        } else {
+          const accountId = await getOrFetchAccountId();
+          const wallet = await getWalletByAccount(accountId);
+          if (cancelled) return;
+          setHasWallet(!!wallet);
+          if (wallet?.tariffId) {
+            const tariffs = await tariffApi.getAll(false).catch(() => []);
+            if (cancelled) return;
+            const t = tariffs.find(x => x.id === wallet.tariffId) ?? null;
+            setTariff(t);
+            if (t?.validatorId) {
+              const v = await tariffValidatorApi.getByTariff(t.id).catch(() => null);
+              if (!cancelled) setTariffValidator(v);
+            }
           }
         }
       } catch {
-        setHasWallet(false);
+        if (!cancelled) setHasWallet(false);
       } finally {
-        setTariffReady(true);
+        if (!cancelled) setTariffReady(true);
       }
-    }).catch(() => {
-      setHasWallet(false);
-      setTariffReady(true);
-    });
-  }, []);
+    })();
+
+    return () => { cancelled = true; };
+  }, [hostGate, eventHost]);
 
   // Загрузка всех типов и категорий для чипов (цвета категорий)
   useEffect(() => {
@@ -761,7 +901,10 @@ export default function CreateEventPage() {
           },
           eventTypes: resolvedTypeIds,
           organizatorAccountIds: [accountId],
-          organizatorOrganizationIds: null,
+          organizatorOrganizationIds:
+            eventHost?.kind === 'organization'
+              ? [eventHost.organizationId]
+              : null,
         };
 
         if (form.isPrivate) {
@@ -831,6 +974,45 @@ export default function CreateEventPage() {
     return end ? `${fmtDate(start)} · ${fmt(start)} — ${fmt(end)}` : `${fmtDate(start)} · ${fmt(start)}`;
   })();
 
+  if (!isEditing && hostGate === 'checking') {
+    return (
+      <div className={styles.page}>
+        <div className={styles.pageInner}>
+          <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
+            <div className={styles.header}>
+              <HeroBackButton onClick={goBack} />
+              <h1 className={styles.title}>Новое событие</h1>
+            </div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+              Загрузка...
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isEditing && hostGate === 'chooser') {
+    return (
+      <div className={styles.page}>
+        <CreateEventHostChooser
+          onContinue={host => {
+            setEventHost(host);
+            setHostGate('form');
+            if (host.kind === 'organization') {
+              setSearchParams(
+                { host: 'org', organizationId: host.organizationId },
+                { replace: true },
+              );
+            } else {
+              setSearchParams({ host: 'user' }, { replace: true });
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   if (loading) return (
     <div className={styles.page}>
       <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
@@ -847,8 +1029,24 @@ export default function CreateEventPage() {
 
         {/* Хедер */}
         <div className={styles.header}>
-          <HeroBackButton onClick={goBack} />
-          <h1 className={styles.title}>{isEditing ? 'Редактировать мероприятие' : 'Новое мероприятие'}</h1>
+          <HeroBackButton onClick={() => {
+            if (!isEditing && canChooseHost) {
+              skipHostGateEffectRef.current = true;
+              setEventHost(null);
+              setHostGate('chooser');
+              setSearchParams({}, { replace: true });
+              return;
+            }
+            goBack();
+          }} />
+          <div>
+            <h1 className={styles.title}>{isEditing ? 'Редактировать мероприятие' : 'Новое мероприятие'}</h1>
+            {!isEditing && eventHost?.kind === 'organization' && (
+              <div className={styles.hostBadge}>
+                от имени «{eventHost.organizationName}»
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Обложка */}

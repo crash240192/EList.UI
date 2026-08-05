@@ -51,7 +51,12 @@ export {
   fetchEventOrganizators,
 } from './eventExtrasApi';
 
-export type { IEventParameters, IEventOrganizator, IAssignEventParametersRequest } from './eventExtrasApi';
+export type {
+  IEventParameters,
+  IEventOrganizator,
+  IAssignEventParametersRequest,
+  IEventOrganizatorsAssignRequest,
+} from './eventExtrasApi';
 
 export {
   fetchEventRating,

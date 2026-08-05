@@ -97,7 +97,11 @@ export function AddOrganizerModal({ eventId, currentAccountId, existingOrganizer
     if (selected.size === 0) return;
     setSaving(true); setErr(null);
     try {
-      await assignEventOrganizators(eventId, [...selected]);
+      await assignEventOrganizators({
+        eventId,
+        accountIds: [...selected],
+        organizationIds: [],
+      });
       setDone(true);
       onSuccess();
       setTimeout(onClose, 1000);
