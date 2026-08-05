@@ -15,7 +15,7 @@ import {
 } from '@/features/invitations/invitationsStore';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { useActivationRedirect } from '@/features/auth/useActivationRedirect';
-import { UserAgreementsGate } from '@/features/agreements';
+import { UserAgreementsGate, UserAgreementsInfoButton } from '@/features/agreements';
 import { useMediaQuery } from '@/shared/hooks';
 import { media } from '@/shared/lib/breakpoints';
 import styles from './AppLayout.module.css';
@@ -106,6 +106,7 @@ export function AppLayout() {
         </div>
 
         <div className={styles.headerRight}>
+          <UserAgreementsInfoButton />
           <button className={styles.themeToggle} onClick={toggleTheme} aria-label="Переключить тему" title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.themeIcoLeft}>
               <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
