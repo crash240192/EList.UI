@@ -252,7 +252,9 @@ export default function OrganizationPage() {
               <button
                 type="button"
                 className={styles.btnJoin}
-                onClick={() => navigate('/settings')}
+                onClick={() => navigate(
+                  `/settings?tab=organizations&org=${encodeURIComponent(org.id)}`,
+                )}
               >
                 Управление
               </button>

@@ -35,6 +35,7 @@ import { UserShareMenu } from '@/features/user/UserShareMenu';
 import {
   fetchMyOrganizations,
   fetchOrganizationsByAccount,
+  formatVerificationStatus,
   getOrganizationAvatar,
   type OrganizationResponse,
 } from '@/entities/organization';
@@ -625,10 +626,23 @@ export default function UserPage() {
                           </div>
                           <div className={styles.orgInfo}>
                             <div className={styles.orgName}>{org.name}</div>
-                            {org.address && (
-                              <div className={styles.orgMeta}>{org.address}</div>
-                            )}
+                            <div className={styles.orgMeta}>
+                              {org.address?.trim()
+                                || formatVerificationStatus(org.verificationStatus)}
+                            </div>
                           </div>
+                          <svg
+                            className={styles.orgChevron}
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden
+                          >
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
                         </button>
                       );
                     })}
