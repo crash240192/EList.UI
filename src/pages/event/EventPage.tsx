@@ -121,6 +121,9 @@ export default function EventPage() {
     return { orgOrganizers: orgs, personOrganizers: people };
   }, [organizers]);
 
+  /** Организация-организатор — приглашения от её имени */
+  const inviterOrganizationId = orgOrganizers[0]?.organizationId ?? null;
+
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
@@ -870,6 +873,7 @@ export default function EventPage() {
         <InviteModal
           eventId={event.id}
           currentAccountId={accountId}
+          inviterOrganizationId={inviterOrganizationId}
           isPrivate={!!event.parameters?.private}
           onClose={() => setInviteModalOpen(false)}
         />

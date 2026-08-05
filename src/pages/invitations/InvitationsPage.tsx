@@ -14,6 +14,10 @@ import { isInvitationUnviewed } from '@/entities/invitation/invitationViewed';
 import { useInvitationsStore } from '@/features/invitations/invitationsStore';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { fetchAccountById } from '@/entities/user/api';
+import {
+  fetchOrganizationById,
+  getOrganizationAvatar,
+} from '@/entities/organization';
 import { apiClient } from '@/shared/api/client';
 import { isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
 import { useToastStore } from '@/app/store';
@@ -41,20 +45,73 @@ import styles from './InvitationsPage.module.css';
 
 type Tab = 'incoming' | 'sent';
 
+type OrgInviterInfo = { name: string; logoId: string | null };
+
 function tabFromSearch(params: URLSearchParams): Tab {
   return params.get('tab') === 'sent' ? 'sent' : 'incoming';
 }
 
-function inviterName(inv: IInvitation): string {
+function personInviterName(inv: IInvitation): string {
   const p = inv.inviter?.personInfo;
   if (p?.firstName) return `${p.firstName} ${p.lastName ?? ''}`.trim();
   return inv.inviter?.account?.login ?? 'Неизвестный';
 }
 
-function inviterInitials(inv: IInvitation): string {
+function inviterName(inv: IInvitation, orgById: Record<string, OrgInviterInfo>): string {
+  if (inv.inviterOrganizationId) {
+    return orgById[inv.inviterOrganizationId]?.name ?? 'Организация';
+  }
+  return personInviterName(inv);
+}
+
+function inviterInitials(inv: IInvitation, orgById: Record<string, OrgInviterInfo>): string {
+  if (inv.inviterOrganizationId) {
+    const name = orgById[inv.inviterOrganizationId]?.name ?? 'ОР';
+    return name.slice(0, 2).toUpperCase();
+  }
   const p = inv.inviter?.personInfo;
   if (p?.firstName) return `${p.firstName[0]}${p.lastName?.[0] ?? ''}`.toUpperCase();
   return inv.inviter?.account?.login?.[0]?.toUpperCase() ?? '?';
+}
+
+function InviterAvatar({
+  inv,
+  orgById,
+  size,
+  className,
+}: {
+  inv: IInvitation;
+  orgById: Record<string, OrgInviterInfo>;
+  size: number;
+  className?: string;
+}) {
+  if (inv.inviterOrganizationId) {
+    const org = orgById[inv.inviterOrganizationId];
+    const initials = inviterInitials(inv, orgById);
+    return (
+      <div
+        className={`${styles.orgAvatar} ${className ?? ''}`}
+        style={{ width: size, height: size, fontSize: Math.max(8, Math.round(size * 0.38)) }}
+        aria-hidden
+      >
+        {org?.logoId ? (
+          <AuthImage fileId={org.logoId} alt="" className={styles.orgAvatarImg} />
+        ) : (
+          <span>{initials}</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <UserAvatar
+      accountId={inv.inviterAccountId}
+      avatarId={inv.inviter?.account?.avatarId ?? null}
+      initials={inviterInitials(inv, orgById)}
+      size={size}
+      className={className}
+    />
+  );
 }
 
 function EventTypeTags({ types, className }: { types: IEventType[]; className?: string }) {
@@ -132,6 +189,7 @@ export default function InvitationsPage() {
   const [confirmDecl, setConfirmDecl] = useState<IInvitation | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<IInvitation | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [orgById, setOrgById] = useState<Record<string, OrgInviterInfo>>({});
 
   const unviewedCount = useMemo(
     () => items.filter(isInvitationUnviewed).length,
@@ -167,6 +225,36 @@ export default function InvitationsPage() {
       });
     return () => { cancelled = true; };
   }, [tab, accountId, sentLoaded]);
+
+  // Имена/логотипы организаций-приглашающих
+  useEffect(() => {
+    const ids = [...new Set(
+      [...items, ...sentItems]
+        .map(inv => inv.inviterOrganizationId)
+        .filter((id): id is string => Boolean(id)),
+    )];
+    const missing = ids.filter(id => !orgById[id]);
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    void Promise.all(
+      missing.map(async id => {
+        try {
+          const [org, logoId] = await Promise.all([
+            fetchOrganizationById(id),
+            getOrganizationAvatar(id).catch(() => null),
+          ]);
+          return [id, { name: org.name, logoId }] as const;
+        } catch {
+          return [id, { name: 'Организация', logoId: null }] as const;
+        }
+      }),
+    ).then(entries => {
+      if (cancelled) return;
+      setOrgById(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+    });
+    return () => { cancelled = true; };
+  }, [items, sentItems, orgById]);
 
   const markViewedIfNeeded = async (inv: IInvitation) => {
     if (!isInvitationUnviewed(inv)) return;
@@ -315,6 +403,7 @@ export default function InvitationsPage() {
               <InvitationRow
                 key={inv.id}
                 inv={inv}
+                orgById={orgById}
                 onOpen={() => handleInvitationClick(inv)}
                 onPreview={() => openPreview(inv)}
                 onDecline={() => setConfirmDecl(inv)}
@@ -363,6 +452,7 @@ export default function InvitationsPage() {
       {previewInv && (
         <AcceptDialog
           inv={previewInv}
+          orgById={orgById}
           onClose={() => setPreviewInv(null)}
           onAccept={() => doAccept(previewInv)}
         />
@@ -411,11 +501,13 @@ export default function InvitationsPage() {
 
 function InvitationRow({
   inv,
+  orgById,
   onOpen,
   onPreview,
   onDecline,
 }: {
   inv: IInvitation;
+  orgById: Record<string, OrgInviterInfo>;
   onOpen: () => void;
   onPreview: () => void;
   onDecline: () => void;
@@ -423,6 +515,7 @@ function InvitationRow({
   const event = inv.event;
   const urgency = getEventUrgency(event.startTime);
   const unviewed = isInvitationUnviewed(inv);
+  const name = inviterName(inv, orgById);
 
   return (
     <EventListItem
@@ -433,15 +526,14 @@ function InvitationRow({
       bleedCover
       header={(
         <>
-          <UserAvatar
-            accountId={inv.inviterAccountId}
-            avatarId={inv.inviter?.account?.avatarId ?? null}
-            initials={inviterInitials(inv)}
+          <InviterAvatar
+            inv={inv}
+            orgById={orgById}
             size={18}
             className={styles.whoAvatar}
           />
           <span className={styles.inviterText}>
-            <span className={styles.inviterName}>{inviterName(inv)}</span> приглашает
+            <span className={styles.inviterName}>{name}</span> приглашает
           </span>
           <span className={styles.invTime}>{formatRelativeInviteTime(inv.creationDate)}</span>
         </>
@@ -517,10 +609,12 @@ function SentInvitationRow({
 
 function AcceptDialog({
   inv,
+  orgById,
   onClose,
   onAccept,
 }: {
   inv: IInvitation;
+  orgById: Record<string, OrgInviterInfo>;
   onClose: () => void;
   onAccept: () => void;
 }) {
@@ -531,6 +625,8 @@ function AcceptDialog({
   const days = getDaysUntil(event.startTime);
   const coverBg = getEventCoverBackground(event as Parameters<typeof getEventCoverBackground>[0]);
   const daysLabel = days === 0 ? 'сегодня' : days === 1 ? 'завтра' : days > 0 ? `через ${days} дн.` : '';
+  const name = inviterName(inv, orgById);
+  const fromOrg = Boolean(inv.inviterOrganizationId);
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -543,15 +639,15 @@ function AcceptDialog({
         </div>
         <div className={styles.dialogBody}>
           <div className={styles.dialogInviter}>
-            <UserAvatar
-              accountId={inv.inviterAccountId}
-              avatarId={inv.inviter?.account?.avatarId ?? null}
-              initials={inviterInitials(inv)}
+            <InviterAvatar
+              inv={inv}
+              orgById={orgById}
               size={28}
               className={styles.dialogInviterAv}
             />
             <span className={styles.dialogInviterText}>
-              <span className={styles.dialogInviterName}>{inviterName(inv)}</span> пригласил(а) вас
+              <span className={styles.dialogInviterName}>{name}</span>
+              {fromOrg ? ' приглашает вас' : ' пригласил(а) вас'}
             </span>
           </div>
           <div className={styles.dialogEventName}>{event.name}</div>

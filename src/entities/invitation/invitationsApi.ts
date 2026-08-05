@@ -36,6 +36,8 @@ export interface IInvitation {
   id: string;
   inviterAccountId: string;
   invitedAccountId: string;
+  /** Организация-приглашающий (если мероприятие от организации) */
+  inviterOrganizationId: string | null;
   eventId: string;
   creationDate: string;
   /** false — приглашение ещё не просмотрено */
@@ -94,10 +96,12 @@ function normalizeEvent(raw: unknown): IInvitationEvent {
 function normalizeInvitation(raw: Record<string, unknown>): IInvitation {
   const inviter = raw.inviter ?? raw.Inviter;
   const event = raw.event ?? raw.Event;
+  const orgRaw = raw.inviterOrganizationId ?? raw.InviterOrganizationId;
   return {
     id: String(raw.id ?? raw.Id ?? ''),
     inviterAccountId: String(raw.inviterAccountId ?? raw.InviterAccountId ?? ''),
     invitedAccountId: String(raw.invitedAccountId ?? raw.InvitedAccountId ?? ''),
+    inviterOrganizationId: orgRaw != null && orgRaw !== '' ? String(orgRaw) : null,
     eventId: String(raw.eventId ?? raw.EventId ?? ''),
     creationDate: String(raw.creationDate ?? raw.CreationDate ?? ''),
     viewed: parseInvitationViewed(raw.viewed ?? raw.Viewed),
@@ -108,8 +112,11 @@ function normalizeInvitation(raw: Record<string, unknown>): IInvitation {
 
 export interface ICreateInvitationRequest {
   accountIds: string[];
-  inviterOrganizationId?: string;
   eventId: string;
+  /** Аккаунт, от имени которого отправлено (хронология «кто пригласил») */
+  inviterAccountId?: string;
+  /** Организация-организатор мероприятия — приглашение от её имени */
+  inviterOrganizationId?: string | null;
 }
 
 /** POST /api/invitations/search */
