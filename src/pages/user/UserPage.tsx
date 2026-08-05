@@ -32,6 +32,13 @@ import { TabBar } from '@/shared/ui/TabBar';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { useAuthStore } from '@/app/store';
 import { UserShareMenu } from '@/features/user/UserShareMenu';
+import {
+  fetchMyOrganizations,
+  fetchOrganizationsByAccount,
+  formatVerificationStatus,
+  getOrganizationAvatar,
+  type OrganizationResponse,
+} from '@/entities/organization';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   countUniqueUserEvents,
@@ -280,6 +287,8 @@ export default function UserPage() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
+  const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
 
   const createdEvents = useEvents(
     { organizatorId: profileAccountId },
@@ -316,6 +325,40 @@ export default function UserPage() {
       .then(setOrganizerRating)
       .catch(() => setOrganizerRating(null));
   }, [profileAccountId]);
+
+  useEffect(() => {
+    if (!profileAccountId) {
+      setOrganizations([]);
+      setOrgLogoById({});
+      return;
+    }
+    let cancelled = false;
+    const load = isOwnProfile
+      ? fetchMyOrganizations()
+      : fetchOrganizationsByAccount(profileAccountId).catch(() => [] as OrganizationResponse[]);
+
+    load
+      .then(async list => {
+        if (cancelled) return;
+        const visible = list.filter(o => o.active !== false);
+        setOrganizations(visible);
+        const logos = await Promise.all(
+          visible.map(async o => {
+            const logo = await getOrganizationAvatar(o.id).catch(() => null);
+            return [o.id, logo] as const;
+          }),
+        );
+        if (!cancelled) setOrgLogoById(Object.fromEntries(logos));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOrganizations([]);
+          setOrgLogoById({});
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [profileAccountId, isOwnProfile]);
 
   useEffect(() => {
     if (!profileAccountId || !myAccountId || isOwnProfile) return;
@@ -558,9 +601,61 @@ export default function UserPage() {
               </section>
             )}
 
-            {upcomingPreview.length > 0 && (
+            {organizations.length > 0 && (
               <>
                 {visibleContacts.length > 0 && <div className={styles.sectionDivider} />}
+                <section>
+                  <div className={styles.secLabel}>Организации</div>
+                  <div className={styles.orgList}>
+                    {organizations.map(org => {
+                      const logoId = orgLogoById[org.id];
+                      const orgInitials = org.name.slice(0, 2).toUpperCase() || 'ОР';
+                      return (
+                        <button
+                          key={org.id}
+                          type="button"
+                          className={styles.orgRow}
+                          onClick={() => navigate(`/organization/${org.id}`)}
+                        >
+                          <div className={styles.orgLogo} aria-hidden>
+                            {logoId ? (
+                              <AuthImage fileId={logoId} alt="" className={styles.orgLogoImg} />
+                            ) : (
+                              <span className={styles.orgLogoInitials}>{orgInitials}</span>
+                            )}
+                          </div>
+                          <div className={styles.orgInfo}>
+                            <div className={styles.orgName}>{org.name}</div>
+                            <div className={styles.orgMeta}>
+                              {org.address?.trim()
+                                || formatVerificationStatus(org.verificationStatus)}
+                            </div>
+                          </div>
+                          <svg
+                            className={styles.orgChevron}
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden
+                          >
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              </>
+            )}
+
+            {upcomingPreview.length > 0 && (
+              <>
+                {(visibleContacts.length > 0 || organizations.length > 0) && (
+                  <div className={styles.sectionDivider} />
+                )}
                 <section>
                   <div className={styles.secLabel}>Ближайшие события</div>
                   <div className={styles.upcomingList}>

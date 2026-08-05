@@ -1,6 +1,7 @@
 // pages/settings/SettingsPage.tsx — макет examples/elist_settings_wallet.html
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { fetchContactTypes } from '@/features/auth/registrationApi';
 import type { IContactType } from '@/features/auth/registrationApi';
 import {
@@ -88,8 +89,55 @@ const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: React
 
 export default function SettingsPage() {
   usePageTitle('Настройки');
-  const [tab, setTab] = useState<SettingsTab>('profile');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const orgParam = searchParams.get('org');
+
+  const initialTab: SettingsTab =
+    orgParam
+      ? 'organizations'
+      : tabParam === 'contacts'
+        || tabParam === 'location'
+        || tabParam === 'security'
+        || tabParam === 'organizations'
+        || tabParam === 'profile'
+          ? tabParam
+          : 'profile';
+
+  const [tab, setTab] = useState<SettingsTab>(initialTab);
   const sections = [...new Set(NAV_ITEMS.map(i => i.section))];
+
+  useEffect(() => {
+    if (orgParam) {
+      setTab('organizations');
+      return;
+    }
+    if (
+      tabParam === 'contacts'
+      || tabParam === 'location'
+      || tabParam === 'security'
+      || tabParam === 'organizations'
+      || tabParam === 'profile'
+    ) {
+      setTab(tabParam);
+    }
+  }, [tabParam, orgParam]);
+
+  const selectTab = (next: SettingsTab) => {
+    setTab(next);
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === 'profile') nextParams.delete('tab');
+    else nextParams.set('tab', next);
+    if (next !== 'organizations') nextParams.delete('org');
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const clearOrgParam = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('org');
+    if (!nextParams.get('tab')) nextParams.set('tab', 'organizations');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   return (
     <div className={styles.page}>
@@ -107,7 +155,7 @@ export default function SettingsPage() {
                   key={item.key}
                   type="button"
                   className={`${styles.snavItem} ${tab === item.key ? styles.snavItemActive : ''}`}
-                  onClick={() => setTab(item.key)}
+                  onClick={() => selectTab(item.key)}
                 >
                   {item.icon}
                   {item.label}
@@ -135,7 +183,10 @@ export default function SettingsPage() {
           )}
           {tab === 'organizations' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
-              <OrganizationsSettingsPanel />
+              <OrganizationsSettingsPanel
+                initialOrganizationId={orgParam}
+                onLeaveOrganizationDetail={clearOrgParam}
+              />
             </div>
           )}
           {tab === 'security' && (

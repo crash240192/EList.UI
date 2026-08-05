@@ -96,8 +96,18 @@ function resolveMyRole(
   return embedded ?? null;
 }
 
-export function OrganizationsSettingsPanel() {
-  const [view, setView] = useState<View>({ kind: 'list' });
+export function OrganizationsSettingsPanel({
+  initialOrganizationId = null,
+  onLeaveOrganizationDetail,
+}: {
+  initialOrganizationId?: string | null;
+  onLeaveOrganizationDetail?: () => void;
+} = {}) {
+  const [view, setView] = useState<View>(() => (
+    initialOrganizationId
+      ? { kind: 'detail', id: initialOrganizationId }
+      : { kind: 'list' }
+  ));
   const [items, setItems] = useState<OrganizationResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -120,6 +130,18 @@ export function OrganizationsSettingsPanel() {
     void reload();
   }, [reload]);
 
+  useEffect(() => {
+    if (initialOrganizationId) {
+      setView({ kind: 'detail', id: initialOrganizationId });
+    }
+  }, [initialOrganizationId]);
+
+  const goList = () => {
+    void reload();
+    setView({ kind: 'list' });
+    onLeaveOrganizationDetail?.();
+  };
+
   if (view.kind === 'create') {
     return (
       <OrganizationCreateView
@@ -136,13 +158,12 @@ export function OrganizationsSettingsPanel() {
     return (
       <OrganizationDetailView
         organizationId={view.id}
-        onBack={() => {
-          void reload();
-          setView({ kind: 'list' });
-        }}
+        onBack={goList}
       />
     );
   }
+
+  const showHeaderCreate = !loading && !err && items.length > 0;
 
   return (
     <>
@@ -154,9 +175,11 @@ export function OrganizationsSettingsPanel() {
               Создавайте организации, добавляйте администраторов и подключайте продажу билетов
             </div>
           </div>
-          <Button size="sm" onClick={() => setView({ kind: 'create' })}>
-            Создать
-          </Button>
+          {showHeaderCreate && (
+            <Button size="sm" onClick={() => setView({ kind: 'create' })}>
+              Создать
+            </Button>
+          )}
         </div>
 
         {loading && <div className={styles.loader}>Загрузка...</div>}

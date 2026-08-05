@@ -316,6 +316,99 @@
   gap: 7px;
 }
 
+.orgList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.orgRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 4px;
+  margin: 0 -4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.orgRow:hover {
+  background: var(--surface-2);
+}
+
+.orgRow:hover .orgChevron {
+  color: var(--text-secondary);
+  transform: translateX(1px);
+}
+
+.orgLogo {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orgLogoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.orgLogoInitials {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.orgInfo {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.orgName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.orgMeta {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.orgChevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.7;
+  transition: color 0.15s, transform 0.15s;
+}
+
 .contactRow {
   display: flex;
   align-items: center;

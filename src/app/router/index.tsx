@@ -16,6 +16,7 @@ import { lazyWithRetry } from '@/shared/lib/lazyWithRetry';
 const HomePage        = lazyWithRetry(() => import('@/pages/home/HomePage'));
 const EventPage       = lazyWithRetry(() => import('@/pages/event/EventPage'));
 const UserPage        = lazyWithRetry(() => import('@/pages/user/UserPage'));
+const OrganizationPage = lazyWithRetry(() => import('@/pages/organization/OrganizationPage'));
 const MyEventsPage    = lazyWithRetry(() => import('@/pages/my-events/MyEventsPage'));
 const CreateEventPage = lazyWithRetry(() => import('@/pages/create-event/CreateEventPage'));
 const AdminPage       = lazyWithRetry(() => import('@/pages/admin/AdminPage'));
@@ -62,6 +63,7 @@ const router = createBrowserRouter([
       { index: true,              element: S(HomePage) },
       { path: 'event/:id',        element: S(EventPage) },
       { path: 'user/:id',         element: S(UserPage) },
+      { path: 'organization/:id', element: S(OrganizationPage) },
       { path: 'invitations',      element: <RequireAuth>{S(InvitationsPage)}</RequireAuth> },
       { path: 'event-albums',     element: <RequireAuth>{S(EventAlbumsPage)}</RequireAuth> },
       { path: 'my-events',        element: <RequireAuth>{S(MyEventsPage)}</RequireAuth> },
