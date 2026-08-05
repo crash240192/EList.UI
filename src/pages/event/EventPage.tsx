@@ -417,6 +417,7 @@ export default function EventPage() {
   );
 
   const cost = event.parameters?.cost ?? 0;
+  const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled);
   const maxPersons = event.parameters?.maxPersonsCount ?? null;
   const participantCap = maxPersons != null && maxPersons > 0 ? maxPersons : null;
   const isParticipantLimitFull =
@@ -660,27 +661,29 @@ export default function EventPage() {
           {/* ── Левая панель ── */}
           <div className={styles.leftPanel}>
 
-            {/* Цена */}
+            {/* Цена / билеты */}
             <div className={styles.priceBlock}>
               <div className={cost === 0 ? styles.priceVal : styles.priceValPaid}>
                 {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
               </div>
-              {cost === 0
-                ? <span className={styles.priceBadge}>Free</span>
-                : (
-                  <button
-                    type="button"
-                    className={styles.buyTicketBtn}
-                    onClick={() => {
-                      if (!authenticated) {
-                        setAuthDialogOpen(true);
-                        return;
-                      }
-                    }}
-                  >
-                    Купить билет
-                  </button>
-                )}
+              {cost === 0 ? (
+                <span className={styles.priceBadge}>Free</span>
+              ) : ticketsEnabled ? (
+                <button
+                  type="button"
+                  className={styles.buyTicketBtn}
+                  onClick={() => {
+                    if (!authenticated) {
+                      setAuthDialogOpen(true);
+                      return;
+                    }
+                  }}
+                >
+                  Купить билет
+                </button>
+              ) : (
+                <span className={styles.priceBadgeMuted}>Билеты не продаются</span>
+              )}
             </div>
 
             {showParticipantsBlock && (

@@ -36,6 +36,8 @@ export interface IEventParameters {
   ageLimit: number | null;
   allowedGender: Gender | null;
   allowUsersToInvite: boolean;
+  /** Продажа билетов (только для мероприятий от организации с canSellTickets) */
+  ticketsEnabled: boolean;
 }
 
 // ---------- Основная сущность Event ----------
@@ -127,6 +129,7 @@ export interface IEventParametersRequest {
   ageLimit?: number;
   allowedGender?: Gender;
   allowUsersToInvite?: boolean;
+  ticketsEnabled?: boolean;
 }
 
 // ---------- Пагинированный ответ ----------

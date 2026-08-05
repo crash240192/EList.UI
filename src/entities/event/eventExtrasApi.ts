@@ -14,6 +14,8 @@ export interface IEventParameters {
   ageLimit: number | null;
   allowedGender: Gender | null;
   allowUsersToInvite: boolean;
+  /** Продажа билетов на мероприятие */
+  ticketsEnabled: boolean;
 }
 
 export interface IAssignEventParametersRequest {
@@ -23,6 +25,7 @@ export interface IAssignEventParametersRequest {
   ageLimit?: number | null;
   allowedGender?: Gender | null;
   allowUsersToInvite: boolean;
+  ticketsEnabled: boolean;
 }
 
 /**
@@ -91,6 +94,7 @@ export async function fetchEventParameters(eventId: string): Promise<IEventParam
       ageLimit: ageLimit != null && Number.isFinite(ageLimit) ? ageLimit : null,
       allowedGender: (raw.allowedGender ?? raw.AllowedGender ?? null) as IEventParameters['allowedGender'],
       allowUsersToInvite: Boolean(raw.allowUsersToInvite ?? raw.AllowUsersToInvite ?? true),
+      ticketsEnabled: Boolean(raw.ticketsEnabled ?? raw.TicketsEnabled ?? false),
     };
   } catch {
     return null;

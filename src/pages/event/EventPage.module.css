@@ -187,6 +187,15 @@
 .priceBlock { display:flex; align-items:center; justify-content:space-between; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin:0; }
 .priceVal { font-size:17px; font-weight:600; color:#10b981; }
 .priceBadge { background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); color:#10b981; border-radius:20px; padding:2px 9px; font-size:10px; font-weight:600; }
+.priceBadgeMuted {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 10px;
+  font-weight: 600;
+}
 .priceValPaid { color:var(--text-primary); }
 .buyTicketBtn {
   background: var(--accent);
