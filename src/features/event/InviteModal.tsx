@@ -20,6 +20,11 @@ interface InviteModalProps {
   /** Обязателен в режиме отправки приглашений (страница события) */
   eventId?: string;
   currentAccountId: string;
+  /**
+   * Организация-организатор мероприятия.
+   * Если задана — приглашение уходит от имени организации (InviterOrganizationId).
+   */
+  inviterOrganizationId?: string | null;
   /** Закрытое мероприятие — белый список; открытое — чёрный */
   isPrivate?: boolean;
   onClose: () => void;
@@ -42,6 +47,7 @@ function getInitials(p: ISubscriptionItem): string {
 export function InviteModal({
   eventId,
   currentAccountId,
+  inviterOrganizationId = null,
   isPrivate = false,
   onClose,
   onSent,
@@ -207,7 +213,14 @@ export function InviteModal({
     setSending(true);
     setErr(null);
     try {
-      await createInvitations({ accountIds: ids, eventId });
+      await createInvitations({
+        accountIds: ids,
+        eventId,
+        inviterAccountId: currentAccountId,
+        ...(inviterOrganizationId
+          ? { inviterOrganizationId }
+          : {}),
+      });
       setSent(true);
       onSent?.(ids.length);
       setTimeout(onClose, 1200);
