@@ -95,6 +95,8 @@ export interface IEventsSearchParams {
   name?: string;
   organizatorId?: string;
   participantId?: string;
+  /** Фильтр по организации-организатору */
+  organizationId?: string;
   price?: number;
   /** Максимальная возрастная категория мероприятия (0 / 6 / 12 / 16 / 18) */
   ageLimit?: number;

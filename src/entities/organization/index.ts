@@ -1,6 +1,7 @@
 export {
   createOrganization,
   fetchMyOrganizations,
+  fetchOrganizationsByAccount,
   fetchOrganizationById,
   updateOrganization,
   setOrganizationActive,

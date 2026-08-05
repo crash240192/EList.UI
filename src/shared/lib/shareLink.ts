@@ -16,6 +16,10 @@ export function buildUserProfileUrl(accountId: string): string {
   return `${window.location.origin}/user/${accountId}`;
 }
 
+export function buildOrganizationProfileUrl(organizationId: string): string {
+  return `${window.location.origin}/organization/${organizationId}`;
+}
+
 function isAndroid(): boolean {
   return /Android/i.test(navigator.userAgent);
 }
