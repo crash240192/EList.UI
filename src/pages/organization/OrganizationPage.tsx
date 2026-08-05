@@ -38,9 +38,14 @@ import styles from './OrganizationPage.module.css';
 type EventsPhase = 'upcoming' | 'past';
 
 function splitEventsByPhase(events: IEvent[], phase: EventsPhase): IEvent[] {
-  return events.filter(e => {
-    const finished = isEventFinished(e);
-    return phase === 'past' ? finished : !finished;
+  const upcoming = events.filter(ev => !isEventFinished(ev.startTime, ev.endTime));
+  const past = events.filter(ev => isEventFinished(ev.startTime, ev.endTime));
+  const list = phase === 'upcoming' ? upcoming : past;
+
+  return [...list].sort((a, b) => {
+    const aTime = new Date(a.startTime).getTime();
+    const bTime = new Date(b.startTime).getTime();
+    return phase === 'upcoming' ? aTime - bTime : bTime - aTime;
   });
 }
 
