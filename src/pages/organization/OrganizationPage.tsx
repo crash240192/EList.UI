@@ -7,6 +7,7 @@ import {
   OrganizationRole,
   OrganizationVerificationStatus,
   fetchOrganizationById,
+  fetchOrganizationContacts,
   fetchOrganizationMembers,
   formatOrganizationRole,
   formatVerificationStatus,
@@ -21,8 +22,15 @@ import {
 import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { getOrFetchAccountId, getStoredAccountId } from '@/entities/user/api';
+import type { IContactDataItem } from '@/entities/user/profileApi';
 import { useEvents } from '@/features/event-list/useEvents';
 import { OrganizationShareMenu } from '@/features/organization/OrganizationShareMenu';
+import {
+  formatContactHref,
+  getContactIconKind,
+  isContactLink,
+  type ContactIconKind,
+} from '@/shared/lib/contactDisplay';
 import { useAuthStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
@@ -85,6 +93,91 @@ function ShareIcon() {
   );
 }
 
+function ContactIcon({ kind }: { kind: ContactIconKind }) {
+  const svgProps = {
+    width: 14,
+    height: 14,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+  };
+
+  switch (kind) {
+    case 'email':
+      return (
+        <svg {...svgProps}>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="m22 7-8.97 5.7a2 2 0 0 1-2.06 0L2 7" />
+        </svg>
+      );
+    case 'telegram':
+      return (
+        <svg {...svgProps}>
+          <path d="M22 2 11 13" />
+          <path d="m22 2-7 20-4-9-9-4z" />
+        </svg>
+      );
+    case 'phone':
+      return (
+        <svg {...svgProps}>
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+        </svg>
+      );
+    case 'site':
+      return (
+        <svg {...svgProps}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      );
+    case 'location':
+      return (
+        <svg {...svgProps}>
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+          <circle cx="12" cy="10" r="3" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...svgProps}>
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      );
+  }
+}
+
+function OrgContactRow({ contact }: { contact: IContactDataItem }) {
+  const label = contact.contactType?.name
+    ?? contact.contactType?.localizedName
+    ?? 'Контакт';
+  const href = formatContactHref(contact);
+  const linked = isContactLink(contact);
+
+  return (
+    <div className={styles.contactRow}>
+      <div className={styles.contactIco} aria-hidden>
+        <ContactIcon kind={getContactIconKind(contact)} />
+      </div>
+      <div className={styles.contactBody}>
+        <div className={styles.contactLabel}>{label}</div>
+        {linked && href ? (
+          <a className={styles.contactLink} href={href} target="_blank" rel="noreferrer noopener">
+            {contact.value}
+          </a>
+        ) : (
+          <div className={styles.contactVal}>{contact.value}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function OrganizationPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -95,6 +188,7 @@ export default function OrganizationPage() {
   const [org, setOrg] = useState<OrganizationResponse | null>(null);
   const [members, setMembers] = useState<OrganizationMemberResponse[]>([]);
   const [logoId, setLogoId] = useState<string | null>(null);
+  const [contacts, setContacts] = useState<IContactDataItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<'events'>('events');
@@ -119,11 +213,13 @@ export default function OrganizationPage() {
       fetchOrganizationById(id),
       fetchOrganizationMembers(id).catch(() => [] as OrganizationMemberResponse[]),
       getOrganizationAvatar(id),
+      fetchOrganizationContacts(id),
     ])
-      .then(([o, m, av]) => {
+      .then(([o, m, av, c]) => {
         setOrg(o);
         setMembers(m.length ? m : (o.members ?? []));
         setLogoId(av);
+        setContacts(c);
       })
       .catch(e => {
         setError(e instanceof Error ? e.message : 'Ошибка загрузки');
@@ -149,6 +245,11 @@ export default function OrganizationPage() {
 
   const canManage =
     myRole === OrganizationRole.Owner || myRole === OrganizationRole.Manager;
+
+  const visibleContacts = useMemo(
+    () => contacts.filter(c => canManage || c.show),
+    [contacts, canManage],
+  );
 
   const initials = (org?.name ?? 'Орг').slice(0, 2).toUpperCase();
   usePageTitle(org?.name ?? null);
@@ -294,16 +395,32 @@ export default function OrganizationPage() {
 
         <div className={styles.mainGrid}>
           <aside className={styles.leftPanel}>
-            {org.description?.trim() && (
+            {visibleContacts.length > 0 && (
               <section>
-                <div className={styles.secLabel}>Описание</div>
-                <p className={styles.aboutText}>{org.description.trim()}</p>
+                <div className={styles.secLabel}>Контакты</div>
+                <div className={styles.contactList}>
+                  {visibleContacts.map(contact => (
+                    <OrgContactRow key={contact.id} contact={contact} />
+                  ))}
+                </div>
               </section>
+            )}
+
+            {org.description?.trim() && (
+              <>
+                {visibleContacts.length > 0 && <div className={styles.sectionDivider} />}
+                <section>
+                  <div className={styles.secLabel}>Описание</div>
+                  <p className={styles.aboutText}>{org.description.trim()}</p>
+                </section>
+              </>
             )}
 
             {org.address && (
               <>
-                {org.description?.trim() && <div className={styles.sectionDivider} />}
+                {(visibleContacts.length > 0 || org.description?.trim()) && (
+                  <div className={styles.sectionDivider} />
+                )}
                 <section>
                   <div className={styles.secLabel}>Адрес</div>
                   <p className={styles.addressText}>{org.address}</p>
@@ -313,7 +430,7 @@ export default function OrganizationPage() {
 
             {activeMembers.length > 0 && (
               <>
-                {(org.description?.trim() || org.address) && (
+                {(visibleContacts.length > 0 || org.description?.trim() || org.address) && (
                   <div className={styles.sectionDivider} />
                 )}
                 <section>

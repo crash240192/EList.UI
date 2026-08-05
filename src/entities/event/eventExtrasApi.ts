@@ -118,22 +118,32 @@ interface IOrganizatorPersonInfo {
   birthDate: string | null;
 }
 
+interface IOrganizatorOrganization {
+  id: string;
+  name: string;
+  active?: boolean;
+  description?: string | null;
+}
+
 interface IRawOrganizator {
   id: string;
   eventId: string;
-  account: IOrganizatorAccount;
+  account: IOrganizatorAccount | null;
   personInfo: IOrganizatorPersonInfo | null;
+  organization: IOrganizatorOrganization | null;
   organizationId: string | null;
 }
 
-// Плоская модель для отображения
+/** Плоская модель для отображения (person и/или organization) */
 export interface IEventOrganizator {
-  accountId: string;
-  login: string;
+  id: string;
+  accountId: string | null;
+  login: string | null;
   firstName: string | null;
   lastName: string | null;
   avatarId?: string | null;
   organizationId?: string | null;
+  organizationName?: string | null;
 }
 
 /**
@@ -143,12 +153,32 @@ export async function fetchEventOrganizators(eventId: string): Promise<IEventOrg
   const data = await apiClient.get<IRawOrganizator[]>(
     `/api/EventOrganizators/getByEventId/${eventId}`
   );
-  return (data.result ?? []).map(o => ({
-    accountId: o.account.id,
-    login:     o.account.login,
-    firstName: o.personInfo?.firstName ?? null,
-    lastName:  o.personInfo?.lastName  ?? null,
-    avatarId:  o.account.avatarId ?? null,
-    organizationId: o.organizationId ?? null,
-  }));
+  return (data.result ?? []).map(o => {
+    const orgId = o.organizationId ?? o.organization?.id ?? null;
+    return {
+      id: o.id,
+      accountId: o.account?.id ?? null,
+      login: o.account?.login ?? null,
+      firstName: o.personInfo?.firstName ?? null,
+      lastName: o.personInfo?.lastName ?? null,
+      avatarId: o.account?.avatarId ?? null,
+      organizationId: orgId,
+      organizationName: o.organization?.name ?? null,
+    };
+  });
+}
+
+/**
+ * GET /api/EventOrganizators/isOrganizator/{eventId}
+ * BooleanCommandResult — учитывает и личное членство, и роль в организации-организаторе.
+ */
+export async function checkIsEventOrganizator(eventId: string): Promise<boolean> {
+  try {
+    const data = await apiClient.get<boolean>(
+      `/api/EventOrganizators/isOrganizator/${eventId}`,
+    );
+    return Boolean(data.result);
+  } catch {
+    return false;
+  }
 }

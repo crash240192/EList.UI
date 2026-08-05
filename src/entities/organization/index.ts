@@ -25,6 +25,12 @@ export {
 } from './avatarApi';
 
 export {
+  createOrganizationContact,
+  updateOrganizationContact,
+  fetchOrganizationContacts,
+} from './contactsApi';
+
+export {
   formatOrganizationRole,
   formatVerificationStatus,
   formatLegalForm,

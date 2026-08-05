@@ -1,18 +1,15 @@
 // features/event/useEventOrganizers.ts
-// Единая проверка организатора мероприятия через GET /api/EventOrganizators/getByEventId/{eventId}
+// Список организаторов + проверка через GET /api/EventOrganizators/isOrganizator/{eventId}
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { fetchEventOrganizators, type IEventOrganizator } from '@/entities/event';
+import {
+  checkIsEventOrganizator,
+  fetchEventOrganizators,
+  type IEventOrganizator,
+} from '@/entities/event';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
-
-export function isEventOrganizer(
-  organizers: IEventOrganizator[],
-  accountId: string | null | undefined,
-): boolean {
-  return !!accountId && organizers.some((o) => o.accountId === accountId);
-}
 
 interface UseEventOrganizersOptions {
   enabled?: boolean;
@@ -28,26 +25,22 @@ export function useEventOrganizers(
   const { enabled = true, mockAsOrganizer = false } = options;
 
   const [organizers, setOrganizers] = useState<IEventOrganizator[]>([]);
+  const [isOrganizer, setIsOrganizer] = useState(false);
   const [loading, setLoading] = useState(!!eventId && enabled);
   const [denied, setDenied] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!eventId || !enabled) {
       setOrganizers([]);
+      setIsOrganizer(false);
       setLoading(false);
       setDenied(false);
-      return;
-    }
-
-    if (USE_MOCK && mockAsOrganizer) {
-      setOrganizers([]);
-      setDenied(false);
-      setLoading(false);
       return;
     }
 
     if (USE_MOCK) {
       setOrganizers([]);
+      setIsOrganizer(Boolean(mockAsOrganizer && accountId));
       setDenied(false);
       setLoading(false);
       return;
@@ -56,27 +49,36 @@ export function useEventOrganizers(
     setLoading(true);
     setDenied(false);
     try {
-      const orgs = await fetchEventOrganizators(eventId);
+      const [orgs, organizerFlag] = await Promise.all([
+        fetchEventOrganizators(eventId).catch((e: unknown) => {
+          if (isAccessDeniedError(e)) setDenied(true);
+          return [] as IEventOrganizator[];
+        }),
+        accountId
+          ? checkIsEventOrganizator(eventId)
+          : Promise.resolve(false),
+      ]);
       setOrganizers(orgs);
-    } catch (e: unknown) {
+      setIsOrganizer(organizerFlag);
+    } catch {
       setOrganizers([]);
-      if (isAccessDeniedError(e)) setDenied(true);
+      setIsOrganizer(false);
     } finally {
       setLoading(false);
     }
-  }, [eventId, enabled, mockAsOrganizer]);
+  }, [eventId, enabled, mockAsOrganizer, accountId]);
 
   useEffect(() => {
     void refetch();
   }, [refetch]);
 
-  const isOrganizer = useMemo(() => {
-    if (USE_MOCK && mockAsOrganizer && accountId) return true;
-    return isEventOrganizer(organizers, accountId);
-  }, [organizers, accountId, mockAsOrganizer]);
-
+  /** Account IDs персональных организаторов (для участников / модалки добавления) */
   const organizerIds = useMemo(
-    () => new Set(organizers.map((o) => o.accountId)),
+    () => new Set(
+      organizers
+        .map((o) => o.accountId)
+        .filter((id): id is string => Boolean(id)),
+    ),
     [organizers],
   );
 

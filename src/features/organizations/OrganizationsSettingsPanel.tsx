@@ -27,6 +27,8 @@ import {
   formatOnboardingStatus,
   formatOrganizationRole,
   formatVerificationStatus,
+  createOrganizationContact,
+  fetchOrganizationContacts,
   getOrganizationAvatar,
   organizationMemberAvatarId,
   organizationMemberDisplayName,
@@ -40,6 +42,7 @@ import {
   submitOrganizationVerification,
   transferOrganizationOwnership,
   updateOrganization,
+  updateOrganizationContact,
   type OrganizationLegalFormValue,
   type OrganizationLegalRequest,
   type OrganizationMemberResponse,
@@ -48,6 +51,9 @@ import {
   type OrganizationRoleValue,
 } from '@/entities/organization';
 import { getOrFetchAccountId } from '@/entities/user/api';
+import type { IContactDataItem, IContactType } from '@/entities/user/profileApi';
+import type { IContactRequest } from '@/entities/user/settingsApi';
+import { fetchContactTypes } from '@/features/auth/registrationApi';
 import {
   ensureOrganizationWallet,
   getWalletByOrganization,
@@ -506,6 +512,10 @@ function OrganizationDetailView({
             onAvatarChanged={setAvatarId}
             onUpdated={reload}
           />
+          <OrganizationContactsSection
+            organizationId={organizationId}
+            canEdit={canEdit}
+          />
           <OrganizationAgreementsSection organizationId={organizationId} />
         </>
       )}
@@ -791,6 +801,221 @@ function OrganizationProfileSection({
             Сохранить
           </Button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function OrganizationContactsSection({
+  organizationId,
+  canEdit,
+}: {
+  organizationId: string;
+  canEdit: boolean;
+}) {
+  const [contacts, setContacts] = useState<IContactDataItem[]>([]);
+  const [contactTypes, setContactTypes] = useState<IContactType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [addingNew, setAddingNew] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const load = useCallback(async () => {
+    const [c, t] = await Promise.all([
+      fetchOrganizationContacts(organizationId),
+      fetchContactTypes(),
+    ]);
+    setContacts(c);
+    setContactTypes(t);
+    setLoading(false);
+  }, [organizationId]);
+
+  useEffect(() => {
+    setLoading(true);
+    setEditingId(null);
+    setAddingNew(false);
+    setMsg(null);
+    void load();
+  }, [load]);
+
+  if (loading) {
+    return <div className={styles.loader}>Загрузка контактов...</div>;
+  }
+
+  return (
+    <div className={styles.scard}>
+      <div className={styles.scardHead}>
+        <div>
+          <div className={styles.scardTitle}>Контактные данные</div>
+          <div className={styles.scardDesc}>
+            Публичные контакты видны на странице организации
+          </div>
+        </div>
+      </div>
+      {msg && (
+        <div className={msg.ok ? styles.bannerOk : styles.bannerErr}>{msg.text}</div>
+      )}
+      <div className={styles.contactBody}>
+        {contacts.length === 0 && !addingNew && (
+          <p className={styles.emptyInline}>Контактов пока нет</p>
+        )}
+        {contacts.map(c => (
+          editingId === c.id ? (
+            <OrgContactForm
+              key={c.id}
+              types={contactTypes}
+              initial={c}
+              onSave={async data => {
+                await updateOrganizationContact(c.id, data);
+                setEditingId(null);
+                setMsg({ text: 'Контакт обновлён', ok: true });
+                await load();
+              }}
+              onCancel={() => setEditingId(null)}
+            />
+          ) : (
+            <OrgContactRow
+              key={c.id}
+              contact={c}
+              canEdit={canEdit}
+              onEdit={() => {
+                setEditingId(c.id);
+                setAddingNew(false);
+              }}
+            />
+          )
+        ))}
+        {addingNew && (
+          <OrgContactForm
+            types={contactTypes}
+            onSave={async data => {
+              await createOrganizationContact(organizationId, data);
+              setAddingNew(false);
+              setMsg({ text: 'Контакт добавлен', ok: true });
+              await load();
+            }}
+            onCancel={() => setAddingNew(false)}
+          />
+        )}
+      </div>
+      {canEdit && (
+        <div className={styles.scardFooter}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setAddingNew(true);
+              setEditingId(null);
+            }}
+          >
+            + Добавить контакт
+          </Button>
+          <div className={styles.footerSpacer} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrgContactRow({
+  contact,
+  canEdit,
+  onEdit,
+}: {
+  contact: IContactDataItem;
+  canEdit: boolean;
+  onEdit: () => void;
+}) {
+  const typeName = contact.contactType?.name
+    ?? contact.contactType?.localizedName
+    ?? 'Контакт';
+
+  return (
+    <div className={styles.contactRow}>
+      <div className={styles.creInfo}>
+        <div className={styles.creType}>{typeName}</div>
+        <div className={styles.creVal}>{contact.value}</div>
+      </div>
+      <div className={styles.creBadges}>
+        {contact.show
+          ? <span className={`${styles.creBadge} ${styles.crePub}`}>публичный</span>
+          : <span className={`${styles.creBadge} ${styles.crePriv}`}>скрытый</span>}
+      </div>
+      {canEdit && (
+        <div className={styles.creActions}>
+          <button type="button" className={styles.iconBtn} onClick={onEdit} title="Редактировать">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrgContactForm({
+  types,
+  initial,
+  onSave,
+  onCancel,
+}: {
+  types: IContactType[];
+  initial?: IContactDataItem;
+  onSave: (data: IContactRequest) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<IContactRequest>({
+    typeId: initial?.contactType?.id ?? (types[0]?.id ?? ''),
+    value: initial?.value ?? '',
+    show: initial?.show ?? true,
+    isAuthorizationContact: false,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!form.value.trim() || !form.typeId) return;
+    setSaving(true);
+    try {
+      await onSave({
+        ...form,
+        value: form.value.trim(),
+        isAuthorizationContact: false,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={styles.contactForm}>
+      <Select
+        value={form.typeId}
+        onChange={v => setForm(f => ({ ...f, typeId: v }))}
+        options={types.map(t => ({ value: t.id, label: t.name || t.localizedName || '' }))}
+      />
+      <input
+        className={styles.input}
+        placeholder="Значение"
+        value={form.value}
+        onChange={e => setForm(f => ({ ...f, value: e.target.value }))}
+      />
+      <div className={styles.contactFormFlags}>
+        <label className={styles.checkLabel}>
+          <input
+            type="checkbox"
+            checked={form.show}
+            onChange={e => setForm(f => ({ ...f, show: e.target.checked }))}
+          />
+          Показывать публично
+        </label>
+      </div>
+      <div className={styles.contactFormActions}>
+        <Button variant="ghost" size="sm" onClick={onCancel}>Отмена</Button>
+        <Button size="sm" onClick={() => { void handleSave(); }} loading={saving}>
+          {initial ? 'Сохранить' : 'Добавить'}
+        </Button>
       </div>
     </div>
   );

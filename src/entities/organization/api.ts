@@ -27,14 +27,14 @@ export async function fetchMyOrganizations(): Promise<OrganizationResponse[]> {
 }
 
 /**
- * GET /api/organizations/byAccount/{accountId}
+ * GET /api/organizations/get/byAccountId/{accountId}
  * Организации, в которых состоит указанный аккаунт (публичный профиль).
  */
 export async function fetchOrganizationsByAccount(
   accountId: string,
 ): Promise<OrganizationResponse[]> {
   const r = await apiClient.get<OrganizationResponse[]>(
-    `/api/organizations/byAccount/${accountId}`,
+    `/api/organizations/get/byAccountId/${accountId}`,
   );
   return r.result ?? [];
 }
