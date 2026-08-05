@@ -4,9 +4,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DocumentType,
+  DOCUMENT_TYPE_LABELS,
   agreeOrganizationDocument,
   checkOrganizationAgreement,
   fetchLastDocument,
+  type DocumentTypeValue,
   type IAgreementDocument,
 } from '@/entities/agreement';
 import {
@@ -472,14 +474,17 @@ function OrganizationDetailView({
       </div>
 
       {section === 'profile' && (
-        <OrganizationProfileSection
-          org={org}
-          avatarId={avatarId}
-          canEdit={canEdit}
-          isOwner={isOwner}
-          onAvatarChanged={setAvatarId}
-          onUpdated={reload}
-        />
+        <>
+          <OrganizationProfileSection
+            org={org}
+            avatarId={avatarId}
+            canEdit={canEdit}
+            isOwner={isOwner}
+            onAvatarChanged={setAvatarId}
+            onUpdated={reload}
+          />
+          <OrganizationAgreementsSection organizationId={organizationId} />
+        </>
       )}
       {section === 'members' && (
         <OrganizationMembersSection
@@ -764,6 +769,107 @@ function OrganizationProfileSection({
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+const ORG_DOCUMENT_TYPES: DocumentTypeValue[] = [
+  DocumentType.OrganizationAgreement,
+  DocumentType.TicketingAgreement,
+];
+
+function OrganizationAgreementsSection({ organizationId }: { organizationId: string }) {
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<{
+    type: DocumentTypeValue;
+    label: string;
+    document: IAgreementDocument | null;
+    agreed: boolean | null;
+  }[]>([]);
+  const [viewDoc, setViewDoc] = useState<IAgreementDocument | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const next: {
+          type: DocumentTypeValue;
+          label: string;
+          document: IAgreementDocument | null;
+          agreed: boolean | null;
+        }[] = [];
+        for (const type of ORG_DOCUMENT_TYPES) {
+          const label =
+            DOCUMENT_TYPE_LABELS.find(x => x.value === type)?.label ?? String(type);
+          const [document, agreed] = await Promise.all([
+            fetchLastDocument(type).catch(() => null),
+            checkOrganizationAgreement(organizationId, type).catch(() => null),
+          ]);
+          next.push({ type, label, document, agreed });
+        }
+        if (!cancelled) setRows(next);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [organizationId]);
+
+  return (
+    <div className={styles.scard}>
+      <div className={styles.scardHead}>
+        <div className={styles.scardTitle}>Документы организации</div>
+        <div className={styles.scardDesc}>
+          Оферта и соглашение на продажу билетов — статус согласия от имени организации
+        </div>
+      </div>
+      <div className={styles.formBody}>
+        {loading ? (
+          <div className={styles.tariffCurrentMuted}>Загрузка...</div>
+        ) : (
+          <ul className={styles.orgDocsList}>
+            {rows.map(row => (
+              <li key={row.type} className={styles.orgDocRow}>
+                <div className={styles.orgDocMain}>
+                  <span className={styles.orgDocName}>{row.label}</span>
+                  <span
+                    className={`${styles.orgDocStatus} ${
+                      row.agreed === true
+                        ? styles.orgDocStatusOk
+                        : row.agreed === false
+                          ? styles.orgDocStatusNo
+                          : styles.orgDocStatusMute
+                    }`}
+                  >
+                    {row.agreed === true
+                      ? 'Принято'
+                      : row.agreed === false
+                        ? 'Не принято'
+                        : 'Нет данных'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className={styles.linkBtn}
+                  disabled={!row.document}
+                  onClick={() => {
+                    if (row.document) setViewDoc(row.document);
+                  }}
+                >
+                  {row.document ? 'Открыть документ' : 'Документ недоступен'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {viewDoc && (
+        <AgreementDocumentModal
+          doc={viewDoc}
+          onClose={() => setViewDoc(null)}
+        />
+      )}
     </div>
   );
 }

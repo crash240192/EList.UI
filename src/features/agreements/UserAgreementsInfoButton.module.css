@@ -1,0 +1,188 @@
+/* features/agreements/UserAgreementsInfoButton.module.css */
+
+.wrap {
+  position: relative;
+}
+
+.infoBtn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.infoBtn:hover,
+.infoBtnOpen {
+  background: var(--surface-2);
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 400;
+  width: min(360px, calc(100vw - 24px));
+  max-width: min(360px, calc(100dvw - 24px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+@media (max-width: 639px) {
+  .panel {
+    position: fixed;
+    top: calc(var(--header-h, 56px) + 6px);
+    right: max(10px, env(safe-area-inset-right, 0px));
+    left: max(10px, env(safe-area-inset-left, 0px));
+    width: auto;
+    max-width: none;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+  padding: 10px 14px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.rowTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.docName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.status {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.statusOk {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.statusNo {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.statusMute {
+  color: var(--text-muted);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.viewBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.viewBtn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.viewBtn:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.loader,
+.empty {
+  padding: 16px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.error {
+  margin: 8px 14px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
