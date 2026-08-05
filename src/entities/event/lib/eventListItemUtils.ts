@@ -17,6 +17,7 @@ export interface EventListItemData {
     cost?: number;
     ageLimit?: number | null;
     maxPersonsCount?: number | null;
+    ticketsEnabled?: boolean;
   } | null;
   participantsCount?: number | null;
   colors?: string[];

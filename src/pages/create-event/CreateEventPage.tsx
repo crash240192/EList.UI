@@ -3,7 +3,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
-import { fetchEventById, fetchEventTypes as fetchAllEventTypes, fetchEventCategories, MOCK_EVENTS, assignEventParameters, assignEventTypes, fetchEventParameters } from '@/entities/event';
+import {
+  fetchEventById,
+  fetchEventTypes as fetchAllEventTypes,
+  fetchEventCategories,
+  MOCK_EVENTS,
+  assignEventParameters,
+  assignEventTypes,
+  fetchEventParameters,
+  fetchEventOrganizators,
+} from '@/entities/event';
 import type { IEvent, IEventType } from '@/entities/event';
 import {
   fetchEventTypesByEvent,
@@ -22,6 +31,7 @@ import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } fr
 import {
   OrganizationVerificationStatus,
   fetchMyOrganizations,
+  fetchOrganizationById,
 } from '@/entities/organization';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
@@ -76,6 +86,7 @@ interface FormState {
   maxPersons: string;
   allowUsersToInvite: boolean;
   allowedGender: Gender | '';
+  ticketsEnabled: boolean;
 }
 
 const EMPTY: FormState = {
@@ -83,6 +94,7 @@ const EMPTY: FormState = {
   startDate: '', startTime: '', endDate: '', endTime: '',
   cost: '0', ageLimit: '', isPrivate: false,
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
+  ticketsEnabled: false,
 };
 
 /** Восстанавливает состояние пикера: категория — только если выбраны все её типы */
@@ -194,8 +206,15 @@ export default function CreateEventPage() {
   const [hasWallet,       setHasWallet]       = useState<boolean | null>(null);
   /** true, когда загрузка кошелька/тарифа завершена (чтобы не сбросить ageLimit в 0+ раньше времени) */
   const [tariffReady,     setTariffReady]     = useState(false);
+  /** Редактирование: доступность продажи билетов у организации-организатора */
+  const [editTicketsCapability, setEditTicketsCapability] = useState<'unknown' | 'yes' | 'no'>('unknown');
 
   const { toast, show: showToast } = useToast();
+
+  const canEnableTickets = useMemo(() => {
+    if (isEditing) return editTicketsCapability === 'yes';
+    return eventHost?.kind === 'organization' && eventHost.canSellTickets;
+  }, [isEditing, editTicketsCapability, eventHost]);
 
   // Refs
   const nameRef          = useRef<HTMLInputElement>(null);
@@ -261,6 +280,7 @@ export default function CreateEventPage() {
             kind: 'organization',
             organizationId: orgIdParam,
             organizationName: org?.name ?? 'Организация',
+            canSellTickets: Boolean(org?.canSellTickets),
           });
           setHostGate('form');
         })
@@ -270,6 +290,7 @@ export default function CreateEventPage() {
             kind: 'organization',
             organizationId: orgIdParam,
             organizationName: 'Организация',
+            canSellTickets: false,
           });
           setHostGate('form');
         });
@@ -455,6 +476,7 @@ export default function CreateEventPage() {
         maxPersons:         String(parameters?.maxPersonsCount ?? ''),
         allowUsersToInvite: parameters?.allowUsersToInvite ?? true,
         allowedGender:      parameters?.allowedGender ?? '',
+        ticketsEnabled:     Boolean(parameters?.ticketsEnabled),
       });
       if (ev.latitude)      setLat(ev.latitude);
       if (ev.longitude)     setLng(ev.longitude);
@@ -505,6 +527,56 @@ export default function CreateEventPage() {
       }
     }).finally(() => setLoading(false));
   }, [id, isEditing]);
+
+  // Редактирование: можно ли включать продажу билетов (организация-организатор с canSellTickets)
+  useEffect(() => {
+    if (!isEditing || !id) {
+      setEditTicketsCapability('unknown');
+      return;
+    }
+    let cancelled = false;
+    setEditTicketsCapability('unknown');
+    (async () => {
+      try {
+        const organizers = await fetchEventOrganizators(id);
+        const orgIds = [...new Set(
+          organizers
+            .map(o => o.organizationId)
+            .filter((oid): oid is string => Boolean(oid)),
+        )];
+        if (orgIds.length === 0) {
+          if (!cancelled) setEditTicketsCapability('no');
+          return;
+        }
+        const orgs = await Promise.all(
+          orgIds.map(oid => fetchOrganizationById(oid).catch(() => null)),
+        );
+        if (!cancelled) {
+          setEditTicketsCapability(
+            orgs.some(o => Boolean(o?.canSellTickets)) ? 'yes' : 'no',
+          );
+        }
+      } catch {
+        if (!cancelled) setEditTicketsCapability('no');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isEditing, id]);
+
+  // Сброс флага билетов, если продажа недоступна или стоимость 0
+  useEffect(() => {
+    if (!form.ticketsEnabled) return;
+    const cost = parseFloat(form.cost) || 0;
+    if (cost <= 0) {
+      setForm(f => (f.ticketsEnabled ? { ...f, ticketsEnabled: false } : f));
+      return;
+    }
+    // В edit не сбрасываем, пока не узнали capability (иначе гасим значение с сервера)
+    if (isEditing && editTicketsCapability === 'unknown') return;
+    if (!canEnableTickets) {
+      setForm(f => (f.ticketsEnabled ? { ...f, ticketsEnabled: false } : f));
+    }
+  }, [canEnableTickets, editTicketsCapability, form.cost, form.ticketsEnabled, isEditing]);
 
   // Если типы мероприятия загрузились раньше справочника — применить выбор после allTypes
   useEffect(() => {
@@ -871,18 +943,21 @@ export default function CreateEventPage() {
           ...(coverUrl ? { coverUrl } : {}),
           ...(coverImageId ? { coverImageId } : {}),
         });
+        const editCost = parseFloat(form.cost) || 0;
         await assignEventParameters(id!, {
-          cost:               parseFloat(form.cost) || 0,
+          cost:               editCost,
           private:            form.isPrivate,
           maxPersonsCount:    form.maxPersons ? parseInt(form.maxPersons) : null,
           ageLimit:           parseAgeLimit(),
           allowedGender:      form.allowedGender || null,
           allowUsersToInvite: form.allowUsersToInvite,
+          ticketsEnabled:     canEnableTickets && editCost > 0 && form.ticketsEnabled,
         });
         await assignEventTypes(id!, resolvedTypeIds);
         navigate(`/event/${id}`);
       } else {
         const accountId = await getOrFetchAccountId();
+        const createCost = parseFloat(form.cost) || 0;
         const createPayload: Record<string, unknown> = {
           event: {
             name: form.name, description: form.description || undefined,
@@ -892,12 +967,13 @@ export default function CreateEventPage() {
             ...(coverImageId ? { coverImageId } : {}),
           },
           eventParameters: {
-            cost:               parseFloat(form.cost) || 0,
+            cost:               createCost,
             private:            form.isPrivate,
             maxPersonsCount:    form.maxPersons ? parseInt(form.maxPersons) : undefined,
             ageLimit:           parseAgeLimit() ?? undefined,
             allowedGender:      form.allowedGender || undefined,
             allowUsersToInvite: form.allowUsersToInvite,
+            ticketsEnabled:     canEnableTickets && createCost > 0 && form.ticketsEnabled,
           },
           eventTypes: resolvedTypeIds,
           // От имени организации — права через membership; аккаунт создателя не дублируем.
@@ -1322,6 +1398,15 @@ export default function CreateEventPage() {
                 checked={form.allowUsersToInvite}
                 onChange={v => setForm(f => ({ ...f, allowUsersToInvite: v }))}
               />
+              {canEnableTickets && (
+                <Toggle
+                  label="Продажа билетов"
+                  checked={form.ticketsEnabled}
+                  locked={(parseFloat(form.cost) || 0) <= 0}
+                  onChange={v => setForm(f => ({ ...f, ticketsEnabled: v }))}
+                  lockedHint="Укажите стоимость больше 0 ₽"
+                />
+              )}
             </div>
 
             {/* Список участников: чёрный (по умолчанию) или белый (для приватных) */}

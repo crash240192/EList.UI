@@ -19,7 +19,12 @@ import styles from './CreateEventHostChooser.module.css';
 
 export type CreateEventHost =
   | { kind: 'user' }
-  | { kind: 'organization'; organizationId: string; organizationName: string };
+  | {
+      kind: 'organization';
+      organizationId: string;
+      organizationName: string;
+      canSellTickets: boolean;
+    };
 
 interface Props {
   onContinue: (host: CreateEventHost) => void;
@@ -151,6 +156,7 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                         kind: 'organization',
                         organizationId: org.id,
                         organizationName: org.name,
+                        canSellTickets: Boolean(org.canSellTickets),
                       })}
                     >
                       <div className={`${styles.hostAvatar} ${styles.hostAvatarSquare}`}>
@@ -162,7 +168,11 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                       </div>
                       <div className={styles.hostInfo}>
                         <span className={styles.hostName}>{org.name}</span>
-                        <span className={styles.hostMeta}>Организация · верифицирована</span>
+                        <span className={styles.hostMeta}>
+                          {org.canSellTickets
+                            ? 'Организация · билеты доступны'
+                            : 'Организация · верифицирована'}
+                        </span>
                       </div>
                       <span className={styles.checkMark} aria-hidden>
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
