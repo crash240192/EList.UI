@@ -26,7 +26,8 @@ export interface IContactDataItem {
   show: boolean;
   isAuthorizationContact: boolean;
   contactType: IContactType | null;
-  accountId: string;
+  accountId?: string | null;
+  organizationId?: string | null;
 }
 
 export interface IPersonInfo {

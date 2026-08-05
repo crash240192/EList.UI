@@ -900,7 +900,9 @@ export default function CreateEventPage() {
             allowUsersToInvite: form.allowUsersToInvite,
           },
           eventTypes: resolvedTypeIds,
-          organizatorAccountIds: [accountId],
+          // От имени организации — права через membership; аккаунт создателя не дублируем.
+          organizatorAccountIds:
+            eventHost?.kind === 'organization' ? [] : [accountId],
           organizatorOrganizationIds:
             eventHost?.kind === 'organization'
               ? [eventHost.organizationId]

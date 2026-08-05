@@ -292,6 +292,58 @@
   margin-bottom: 8px;
 }
 
+.contactList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.contactRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.contactIco {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.contactBody {
+  min-width: 0;
+}
+
+.contactLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.contactVal {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.contactLink {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.contactLink:hover {
+  text-decoration: underline;
+}
+
 .aboutText {
   margin: 0;
   font-size: 13px;

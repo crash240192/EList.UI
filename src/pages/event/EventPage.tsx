@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { IEvent, IParticipantView } from '@/entities/event';
+import type { IEvent, IEventOrganizator, IParticipantView } from '@/entities/event';
 import {
   fetchEventById, participateEvent, leaveEvent,
   fetchEventParticipants, fetchEventParameters,
   MOCK_EVENTS,
 } from '@/entities/event';
+import { getOrganizationAvatar } from '@/entities/organization';
 import { useEventOrganizers } from '@/features/event/useEventOrganizers';
 import { useToastStore, useAuthStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
@@ -97,6 +98,55 @@ export default function EventPage() {
     denied: organizersDenied,
     refetch: refetchOrganizers,
   } = useEventOrganizers(id, accountId);
+
+  const { orgOrganizers, personOrganizers } = useMemo(() => {
+    const orgs: IEventOrganizator[] = [];
+    const people: IEventOrganizator[] = [];
+    const seenOrgs = new Set<string>();
+    const seenPeople = new Set<string>();
+
+    for (const o of organizers) {
+      if (o.organizationId) {
+        if (!seenOrgs.has(o.organizationId)) {
+          seenOrgs.add(o.organizationId);
+          orgs.push(o);
+        }
+        continue;
+      }
+      if (o.accountId && !seenPeople.has(o.accountId)) {
+        seenPeople.add(o.accountId);
+        people.push(o);
+      }
+    }
+    return { orgOrganizers: orgs, personOrganizers: people };
+  }, [organizers]);
+
+  const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const ids = orgOrganizers
+      .map(o => o.organizationId)
+      .filter((oid): oid is string => Boolean(oid));
+    if (ids.length === 0) {
+      setOrgLogoById({});
+      return;
+    }
+    void Promise.all(
+      ids.map(async oid => {
+        try {
+          const logo = await getOrganizationAvatar(oid);
+          return [oid, logo] as const;
+        } catch {
+          return [oid, null] as const;
+        }
+      }),
+    ).then(entries => {
+      if (cancelled) return;
+      setOrgLogoById(Object.fromEntries(entries));
+    });
+    return () => { cancelled = true; };
+  }, [orgOrganizers]);
 
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
 
@@ -673,17 +723,46 @@ export default function EventPage() {
             )}
 
             {/* Организаторы */}
-            {(organizers.length > 0 || organizersDenied) && (
+            {(orgOrganizers.length > 0 || personOrganizers.length > 0 || organizersDenied) && (
               <AccessDeniedGate denied={organizersDenied} variant="section">
                 {organizersDenied ? (
                   <SectionDeniedPlaceholder lines={3} />
                 ) : (
                   <div className={styles.orgsSection}>
                     <div className={styles.secLabel}>Организаторы</div>
-                    {organizers.map(o => (
-                      <div key={o.accountId} className={styles.orgChip} onClick={() => navigate(`/user/${o.accountId}`)}>
+                    {orgOrganizers.map(o => {
+                      const orgId = o.organizationId!;
+                      const name = o.organizationName?.trim() || 'Организация';
+                      const logoId = orgLogoById[orgId] ?? null;
+                      const initials = name.slice(0, 2).toUpperCase();
+                      return (
+                        <div
+                          key={`org-${orgId}`}
+                          className={styles.orgChip}
+                          onClick={() => navigate(`/organization/${orgId}`)}
+                        >
+                          <div className={styles.orgChipLogo}>
+                            {logoId ? (
+                              <AuthImage fileId={logoId} alt={name} className={styles.orgChipLogoImg} />
+                            ) : (
+                              <span>{initials}</span>
+                            )}
+                          </div>
+                          <div>
+                            <div className={styles.orgChipName}>{name}</div>
+                            <div className={styles.orgChipRole}>Организация</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {personOrganizers.map(o => (
+                      <div
+                        key={`acc-${o.accountId}`}
+                        className={styles.orgChip}
+                        onClick={() => navigate(`/user/${o.accountId}`)}
+                      >
                         <UserAvatar
-                          accountId={o.accountId}
+                          accountId={o.accountId!}
                           avatarId={o.avatarId ?? null}
                           initials={(o.firstName?.[0] ?? o.login?.[0] ?? '?').toUpperCase()}
                           size={36}
@@ -691,7 +770,7 @@ export default function EventPage() {
                         />
                         <div>
                           <div className={styles.orgChipName}>
-                            {o.firstName ? `${o.firstName} ${o.lastName ?? ''}`.trim() : o.login}
+                            {o.firstName ? `${o.firstName} ${o.lastName ?? ''}`.trim() : (o.login ?? 'Организатор')}
                           </div>
                           <div className={styles.orgChipRole}>Организатор</div>
                         </div>
