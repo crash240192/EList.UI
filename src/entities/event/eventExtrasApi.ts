@@ -44,10 +44,23 @@ export async function assignEventTypes(eventId: string, eventTypeIds: string[]):
 }
 
 /**
- * POST /api/EventOrganizators/assign/{eventId}
+ * POST /api/EventOrganizators/assign
+ * Тело: EventOrganizatorsListRequest { accountIds, organizationIds, eventId }
  */
-export async function assignEventOrganizators(eventId: string, accountIds: string[]): Promise<void> {
-  await apiClient.post(`/api/EventOrganizators/assign/${eventId}`, accountIds);
+export interface IEventOrganizatorsAssignRequest {
+  eventId: string;
+  accountIds: string[];
+  organizationIds: string[];
+}
+
+export async function assignEventOrganizators(
+  payload: IEventOrganizatorsAssignRequest,
+): Promise<void> {
+  await apiClient.post('/api/EventOrganizators/assign', {
+    eventId: payload.eventId,
+    accountIds: payload.accountIds,
+    organizationIds: payload.organizationIds,
+  });
 }
 
 /**
@@ -120,6 +133,7 @@ export interface IEventOrganizator {
   firstName: string | null;
   lastName: string | null;
   avatarId?: string | null;
+  organizationId?: string | null;
 }
 
 /**
@@ -135,5 +149,6 @@ export async function fetchEventOrganizators(eventId: string): Promise<IEventOrg
     firstName: o.personInfo?.firstName ?? null,
     lastName:  o.personInfo?.lastName  ?? null,
     avatarId:  o.account.avatarId ?? null,
+    organizationId: o.organizationId ?? null,
   }));
 }
