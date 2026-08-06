@@ -2,6 +2,10 @@ export interface IConversation {
   id: string;
   name: string;
   eventId?: string | null;
+  /** Видно только участникам мероприятия */
+  participantsOnlyVisible: boolean;
+  /** Участники могут только читать (без комментариев) */
+  participantsReadonly: boolean;
   createDate: string;
   updateDate: string;
 }
@@ -35,6 +39,8 @@ export interface IConversationRequest {
   id?: string | null;
   name: string;
   eventId?: string | null;
+  participantsOnlyVisible?: boolean;
+  participantsReadonly?: boolean;
 }
 
 export interface IMessageRequest {

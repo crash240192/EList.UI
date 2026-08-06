@@ -28,7 +28,7 @@ interface MessageRowProps {
   activeReplyId?: string | null;
   conversationId: string;
   currentAccountId: string | null;
-  onReply: (message: IMessage) => void;
+  onReply?: (message: IMessage) => void;
   onDeleted?: (messageId: string) => void;
 }
 
@@ -308,7 +308,7 @@ export function MessageRow({
 
             {!editing && (
               <footer className={styles.foot}>
-                {currentAccountId && (
+                {currentAccountId && onReply && (
                   <button type="button" className={styles.actionBtn} onClick={() => onReply(message)}>
                     <ReplyIcon />
                     Ответить

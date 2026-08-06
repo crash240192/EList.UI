@@ -21,6 +21,8 @@ export function DiscussionsManageModal({
 }: DiscussionsManageModalProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editOnlyVisible, setEditOnlyVisible] = useState(false);
+  const [editReadonly, setEditReadonly] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [checkingMessages, setCheckingMessages] = useState(false);
@@ -33,48 +35,62 @@ export function DiscussionsManageModal({
     setDeleteStage('confirm');
   };
 
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName('');
+    setEditOnlyVisible(false);
+    setEditReadonly(false);
+  };
+
   const handleModalBack = useCallback(() => {
     if (deleteTarget) {
       closeDeleteDialog();
       return;
     }
     if (editingId) {
-      setEditingId(null);
-      setEditName('');
+      cancelEdit();
     } else onClose();
   }, [deleteTarget, editingId, onClose]);
 
   useModalBackButton(handleModalBack);
 
-  const startRename = (conversation: IConversation) => {
+  const startEdit = (conversation: IConversation) => {
     setError(null);
     setEditingId(conversation.id);
     setEditName(conversation.name);
+    setEditOnlyVisible(Boolean(conversation.participantsOnlyVisible));
+    setEditReadonly(Boolean(conversation.participantsReadonly));
   };
 
-  const cancelRename = () => {
-    setEditingId(null);
-    setEditName('');
-  };
-
-  const saveRename = async (conversationId: string) => {
+  const saveEdit = async (conversationId: string) => {
     const trimmed = editName.trim();
     if (!trimmed || savingId) return;
 
     const current = conversations.find(c => c.id === conversationId);
-    if (current && current.name === trimmed) {
-      cancelRename();
+    if (
+      current
+      && current.name === trimmed
+      && current.participantsOnlyVisible === editOnlyVisible
+      && current.participantsReadonly === editReadonly
+    ) {
+      cancelEdit();
       return;
     }
 
     setSavingId(conversationId);
     setError(null);
     try {
-      await updateConversation({ id: conversationId, name: trimmed, eventId });
-      cancelRename();
+      await updateConversation({
+        id: conversationId,
+        name: trimmed,
+        eventId,
+        participantsOnlyVisible: editOnlyVisible,
+        participantsReadonly: editReadonly,
+      });
+      cancelEdit();
       await onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось переименовать обсуждение');
+      setError(e instanceof Error ? e.message : 'Не удалось сохранить обсуждение');
     } finally {
       setSavingId(null);
     }
@@ -86,7 +102,7 @@ export function DiscussionsManageModal({
     setError(null);
     try {
       await deleteConversation(deleteTarget.id);
-      if (editingId === deleteTarget.id) cancelRename();
+      if (editingId === deleteTarget.id) cancelEdit();
       closeDeleteDialog();
       await onChanged();
     } catch (e) {
@@ -151,7 +167,11 @@ export function DiscussionsManageModal({
                   <div className={styles.rowMain}>
                     {isEditing ? (
                       <div className={styles.renameField}>
+                        <label className={styles.fieldLabel} htmlFor={`discussion-name-${c.id}`}>
+                          Название
+                        </label>
                         <input
+                          id={`discussion-name-${c.id}`}
                           className={styles.renameInput}
                           value={editName}
                           disabled={busy}
@@ -160,20 +180,51 @@ export function DiscussionsManageModal({
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
-                              void saveRename(c.id);
+                              void saveEdit(c.id);
                             }
                             if (e.key === 'Escape') {
                               e.preventDefault();
-                              cancelRename();
+                              cancelEdit();
                             }
                           }}
                         />
+
+                        <label className={styles.toggleRow}>
+                          <input
+                            type="checkbox"
+                            checked={editOnlyVisible}
+                            disabled={busy}
+                            onChange={e => setEditOnlyVisible(e.target.checked)}
+                          />
+                          <span>
+                            <span className={styles.toggleTitle}>Только для участников</span>
+                            <span className={styles.toggleHint}>
+                              Обсуждение видно только записавшимся на мероприятие
+                            </span>
+                          </span>
+                        </label>
+
+                        <label className={styles.toggleRow}>
+                          <input
+                            type="checkbox"
+                            checked={editReadonly}
+                            disabled={busy}
+                            onChange={e => setEditReadonly(e.target.checked)}
+                          />
+                          <span>
+                            <span className={styles.toggleTitle}>Участники только читают</span>
+                            <span className={styles.toggleHint}>
+                              Участники не могут писать комментарии — только организаторы
+                            </span>
+                          </span>
+                        </label>
+
                         <div className={styles.renameActions}>
                           <button
                             type="button"
                             className={styles.saveBtn}
                             disabled={busy || !editName.trim()}
-                            onClick={() => void saveRename(c.id)}
+                            onClick={() => void saveEdit(c.id)}
                           >
                             {savingId === c.id ? 'Сохранение…' : 'Сохранить'}
                           </button>
@@ -181,14 +232,26 @@ export function DiscussionsManageModal({
                             type="button"
                             className={styles.cancelBtn}
                             disabled={busy}
-                            onClick={cancelRename}
+                            onClick={cancelEdit}
                           >
                             Отмена
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <div className={styles.name}>{c.name}</div>
+                      <>
+                        <div className={styles.name}>{c.name}</div>
+                        {(c.participantsOnlyVisible || c.participantsReadonly) && (
+                          <div className={styles.flagChips}>
+                            {c.participantsOnlyVisible && (
+                              <span className={styles.flagChip}>Только участники</span>
+                            )}
+                            {c.participantsReadonly && (
+                              <span className={styles.flagChip}>Только чтение</span>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -198,9 +261,9 @@ export function DiscussionsManageModal({
                         type="button"
                         className={styles.renameBtn}
                         disabled={busy || !!editingId}
-                        onClick={() => startRename(c)}
+                        onClick={() => startEdit(c)}
                       >
-                        Переименовать
+                        Настроить
                       </button>
                       <button
                         type="button"

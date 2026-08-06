@@ -31,12 +31,15 @@ interface MessageThreadProps {
   currentAccountId: string | null;
   /** Границы колонки обсуждения (для fixed-формы по ширине экрана) */
   layoutBoundsRef?: RefObject<HTMLElement | null>;
+  /** Можно ли писать комментарии (false — только чтение) */
+  canComment?: boolean;
 }
 
 function MessageThreadInner({
   conversationId,
   currentAccountId,
   layoutBoundsRef,
+  canComment = true,
 }: MessageThreadProps) {
   const location = useLocation();
   const { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh, removeMessage } =
@@ -54,7 +57,7 @@ function MessageThreadInner({
 
   useEffect(() => {
     const node = anchorRef.current;
-    if (!node || !currentAccountId) return;
+    if (!node || !currentAccountId || !canComment) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => setDockVisible(entry.isIntersecting),
@@ -62,7 +65,7 @@ function MessageThreadInner({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [currentAccountId, messages.length, loading]);
+  }, [currentAccountId, canComment, messages.length, loading]);
 
   const closeSheet = useCallback(() => {
     setSheetOpen(false);
@@ -72,11 +75,12 @@ function MessageThreadInner({
   }, []);
 
   const handleReply = useCallback((message: IMessage) => {
+    if (!canComment) return;
     const reserve = getReplyComposerReservePx(getDefaultComposerHeightEstimate());
     setReplyScrollTailPx(computeReplyScrollTailPx(message.id, reserve));
     setReplyTarget(message);
     setSheetOpen(true);
-  }, []);
+  }, [canComment]);
 
   const handleDeleted = useCallback((messageId: string) => {
     removeMessage(messageId);
@@ -201,8 +205,9 @@ function MessageThreadInner({
   };
 
   const activeReplyId = sheetOpen ? replyTarget?.id ?? null : null;
-  const showDock = !!currentAccountId && dockVisible && !sheetOpen;
-  const showFab = !!currentAccountId && !dockVisible && !sheetOpen;
+  const allowCompose = !!currentAccountId && canComment;
+  const showDock = allowCompose && dockVisible && !sheetOpen;
+  const showFab = allowCompose && !dockVisible && !sheetOpen;
 
   const trackSlot = sheetOpen || showFab;
   const slot = useDiscussionSlotRect(boundsRef, trackSlot);
@@ -244,7 +249,7 @@ function MessageThreadInner({
               activeReplyId={activeReplyId}
               conversationId={conversationId}
               currentAccountId={currentAccountId}
-              onReply={handleReply}
+              onReply={canComment ? handleReply : undefined}
               onDeleted={handleDeleted}
             />
           ))}
@@ -294,6 +299,10 @@ function MessageThreadInner({
           </Link>
           , чтобы оставить комментарий
         </p>
+      )}
+
+      {currentAccountId && !canComment && (
+        <p className={styles.muted}>В этом обсуждении участники могут только читать сообщения</p>
       )}
 
       {showFab && (
