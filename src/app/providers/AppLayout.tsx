@@ -148,7 +148,7 @@ export function AppLayout() {
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `${styles.navItem} ${to === '/create-event' ? styles.navCreate : ''} ${isActive ? styles.navActive : ''}`}
+                `${styles.navItem} ${isActive ? styles.navActive : ''}`}
               title={label}
               onClick={() => { if (!isWide) setSidebarExpanded(false); }}
             >
