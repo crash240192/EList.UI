@@ -12,6 +12,9 @@ import {
   assignEventTypes,
   fetchEventParameters,
   fetchEventOrganizators,
+  createEventTemplate,
+  type ICreateEventPayload,
+  type IEventTemplate,
 } from '@/entities/event';
 import type { IEvent, IEventType } from '@/entities/event';
 import {
@@ -206,6 +209,12 @@ export default function CreateEventPage() {
   const [tariffReady,     setTariffReady]     = useState(false);
   /** Редактирование: доступность продажи билетов у организации-организатора */
   const [editTicketsCapability, setEditTicketsCapability] = useState<'unknown' | 'yes' | 'no'>('unknown');
+  /** Шаблон, выбранный на chooser — применяем к форме один раз */
+  const [pendingTemplate, setPendingTemplate] = useState<IEventTemplate | null>(null);
+  const templateAppliedRef = useRef(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [templateNameDraft, setTemplateNameDraft] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   const { toast, show: showToast } = useToast();
 
@@ -297,27 +306,16 @@ export default function CreateEventPage() {
     let cancelled = false;
     setHostGate('checking');
     fetchMyOrganizations()
-      .then(list => {
+      .then(() => {
         if (cancelled) return;
-        const verified = list.filter(
-          o => o.active !== false
-            && o.verificationStatus === OrganizationVerificationStatus.Verified,
-        );
-        if (verified.length === 0) {
-          setCanChooseHost(false);
-          setEventHost({ kind: 'user' });
-          setHostGate('form');
-          setSearchParams({ host: 'user' }, { replace: true });
-        } else {
-          setCanChooseHost(true);
-          setHostGate('chooser');
-        }
+        // Chooser нужен всегда: хост (если есть org) + шаблоны
+        setCanChooseHost(true);
+        setHostGate('chooser');
       })
       .catch(() => {
         if (cancelled) return;
-        setCanChooseHost(false);
-        setEventHost({ kind: 'user' });
-        setHostGate('form');
+        setCanChooseHost(true);
+        setHostGate('chooser');
       });
     return () => { cancelled = true; };
   }, [isEditing, hostParam, orgIdParam, setSearchParams]);
@@ -417,7 +415,68 @@ export default function CreateEventPage() {
     loadedBWListsRef.current = new Set();
     initialEventTypeIdsRef.current = null;
     initialTypesAppliedRef.current = false;
+    templateAppliedRef.current = false;
   }, [isEditing, id]);
+
+  // Применение шаблона с chooser (даты/время не переносим — выбираются заново)
+  useEffect(() => {
+    if (isEditing || hostGate !== 'form' || !pendingTemplate || templateAppliedRef.current) return;
+    const body = pendingTemplate.templateBody;
+    if (!body) {
+      templateAppliedRef.current = true;
+      setPendingTemplate(null);
+      return;
+    }
+
+    const ev = body.event ?? {};
+    const params = body.eventParameters ?? {};
+    const typeIds = Array.isArray(body.eventTypes) ? body.eventTypes.map(String) : [];
+
+    setForm(f => ({
+      ...f,
+      name: ev.name ?? '',
+      description: (ev.description as string | null | undefined) ?? '',
+      address: (ev.address as string | null | undefined) ?? '',
+      cost: String(params.cost ?? 0),
+      ageLimit: params.ageLimit == null || Number.isNaN(Number(params.ageLimit))
+        ? ''
+        : String(Math.max(0, Math.trunc(Number(params.ageLimit)))),
+      isPrivate: Boolean(params.private),
+      maxPersons: params.maxPersonsCount != null ? String(params.maxPersonsCount) : '',
+      allowUsersToInvite: params.allowUsersToInvite ?? true,
+      allowedGender: (params.allowedGender as Gender | '' | null | undefined) ?? '',
+      ticketsEnabled: Boolean(params.ticketsEnabled),
+      // даты оставляем пустыми
+      startDate: '',
+      startTime: '',
+      endDate: '',
+      endTime: '',
+    }));
+
+    if (typeof ev.latitude === 'number') setLat(ev.latitude);
+    if (typeof ev.longitude === 'number') setLng(ev.longitude);
+    if (ev.coverUrl) setCoverUrl(String(ev.coverUrl));
+    if (ev.coverImageId) setCoverImageId(String(ev.coverImageId));
+
+    // Списки и автоприглашения из шаблона не переносим — только контент мероприятия
+
+    if (typeIds.length > 0) {
+      const catalog = allTypesRef.current;
+      if (catalog.length > 0) {
+        const selection = deriveCategoryTypeSelection(typeIds, catalog);
+        setSelectedCategories(selection.selectedCategories);
+        setSelectedTypes(selection.selectedTypes);
+      } else {
+        setSelectedTypes(typeIds);
+        initialEventTypeIdsRef.current = typeIds;
+        initialTypesAppliedRef.current = false;
+      }
+    }
+
+    templateAppliedRef.current = true;
+    setPendingTemplate(null);
+    showToast('Шаблон применён — укажите дату и время');
+  }, [isEditing, hostGate, pendingTemplate, showToast]);
 
   // Загрузка события для редактирования
   useEffect(() => {
@@ -961,47 +1020,12 @@ export default function CreateEventPage() {
         navigate(`/event/${id}`);
       } else {
         const accountId = await getOrFetchAccountId();
-        const createCost = parseFloat(form.cost) || 0;
-        const createPayload: Record<string, unknown> = {
-          event: {
-            name: form.name, description: form.description || undefined,
-            address: form.address, latitude: lat!, longitude: lng!,
-            startTime, endTime, active: true,
-            ...(coverUrl ? { coverUrl } : {}),
-            ...(coverImageId ? { coverImageId } : {}),
-          },
-          eventParameters: {
-            cost:               createCost,
-            private:            form.isPrivate,
-            maxPersonsCount:    form.maxPersons ? parseInt(form.maxPersons) : undefined,
-            ageLimit:           parseAgeLimit() ?? undefined,
-            allowedGender:      form.allowedGender || undefined,
-            allowUsersToInvite: form.allowUsersToInvite,
-            ticketsEnabled:     canEnableTickets && createCost > 0 && form.ticketsEnabled,
-          },
-          eventTypes: resolvedTypeIds,
-          // От имени организации — права через membership; аккаунт создателя не дублируем.
-          organizatorAccountIds:
-            eventHost?.kind === 'organization' ? [] : [accountId],
-          organizatorOrganizationIds:
-            eventHost?.kind === 'organization'
-              ? [eventHost.organizationId]
-              : null,
-        };
-
-        if (form.isPrivate) {
-          if (draftWhiteListIds.length > 0) createPayload.WhiteList = draftWhiteListIds;
-        } else if (draftBlackListIds.length > 0) {
-          createPayload.BlackList = draftBlackListIds;
-        }
-
-        if (autoInviteEnabled) {
-          if (autoInviteMode === 'all') {
-            createPayload.InviteAllSubscribers = true;
-          } else if (inviteUserIds.length > 0) {
-            createPayload.InviteUsers = inviteUserIds;
-          }
-        }
+        const createPayload = await buildCreateEventPayload({
+          accountId,
+          startTime,
+          endTime,
+          includeInvites: true,
+        });
 
         const createResult = await apiClient.post<string>('/api/events/create', createPayload);
         const newEventId = createResult?.result ?? createResult as unknown as string;
@@ -1015,6 +1039,121 @@ export default function CreateEventPage() {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Ошибка сохранения');
     } finally { setSaving(false); }
+  };
+
+  /** Собирает тело CreateEventRequest из текущей формы (для create и шаблона) */
+  const buildCreateEventPayload = async (opts: {
+    accountId?: string;
+    startTime?: string;
+    endTime?: string;
+    includeInvites?: boolean;
+  } = {}): Promise<ICreateEventPayload> => {
+    const accountId = opts.accountId ?? await getOrFetchAccountId();
+    const createCost = parseFloat(form.cost) || 0;
+    const startTime = opts.startTime
+      ?? (form.startDate && form.startTime
+        ? localPartsToApiIso(form.startDate, form.startTime)
+        : undefined);
+    const endTime = opts.endTime ?? (
+      form.startDate && form.startTime
+        ? (endMode === 'duration'
+          ? new Date(new Date(`${form.startDate}T${form.startTime}`).getTime()
+            + (parseInt(durationH) || 0) * 3600000
+            + (parseInt(durationM) || 0) * 60000).toISOString()
+          : (form.endDate && form.endTime ? localPartsToApiIso(form.endDate, form.endTime) : undefined))
+        : undefined
+    );
+
+    const payload: ICreateEventPayload = {
+      event: {
+        name: form.name,
+        description: form.description || undefined,
+        address: form.address || undefined,
+        ...(lat !== null && lng !== null ? { latitude: lat, longitude: lng } : {}),
+        ...(startTime ? { startTime } : {}),
+        ...(endTime ? { endTime } : {}),
+        active: true,
+        ...(coverUrl ? { coverUrl } : {}),
+        ...(coverImageId ? { coverImageId } : {}),
+      },
+      eventParameters: {
+        cost: createCost,
+        private: form.isPrivate,
+        maxPersonsCount: form.maxPersons ? parseInt(form.maxPersons) : undefined,
+        ageLimit: parseAgeLimit() ?? undefined,
+        allowedGender: form.allowedGender || undefined,
+        allowUsersToInvite: form.allowUsersToInvite,
+        ticketsEnabled: canEnableTickets && createCost > 0 && form.ticketsEnabled,
+      },
+      eventTypes: resolvedTypeIds,
+      organizatorAccountIds:
+        eventHost?.kind === 'organization' ? [] : [accountId],
+      organizatorOrganizationIds:
+        eventHost?.kind === 'organization'
+          ? [eventHost.organizationId]
+          : null,
+    };
+
+    if (form.isPrivate) {
+      if (draftWhiteListIds.length > 0) {
+        payload.whiteList = draftWhiteListIds;
+        payload.WhiteList = draftWhiteListIds;
+      }
+    } else if (draftBlackListIds.length > 0) {
+      payload.blackList = draftBlackListIds;
+      payload.BlackList = draftBlackListIds;
+    }
+
+    if (opts.includeInvites && autoInviteEnabled) {
+      if (autoInviteMode === 'all') {
+        payload.inviteAllSubscribers = true;
+        payload.InviteAllSubscribers = true;
+      } else if (inviteUserIds.length > 0) {
+        payload.inviteUsers = inviteUserIds;
+        payload.InviteUsers = inviteUserIds;
+      }
+    }
+
+    return payload;
+  };
+
+  const openSaveTemplate = () => {
+    const defaultName = form.name.trim()
+      ? `Шаблон: ${form.name.trim()}`
+      : 'Новый шаблон';
+    setTemplateNameDraft(defaultName);
+    setSaveTemplateOpen(true);
+  };
+
+  const handleSaveTemplate = async () => {
+    const name = templateNameDraft.trim();
+    if (!name) {
+      showToast('Укажите название шаблона');
+      return;
+    }
+    if (!form.name.trim() && resolvedTypeIds.length === 0 && !form.address.trim()) {
+      showToast('Заполните хотя бы название, тип или место');
+      return;
+    }
+    setSavingTemplate(true);
+    try {
+      const templateBody = await buildCreateEventPayload({ includeInvites: false });
+      // В шаблоне даты не обязательны — убираем одноразовые поля приглашений
+      delete templateBody.inviteAllSubscribers;
+      delete templateBody.inviteUsers;
+      await createEventTemplate({
+        name,
+        templateBody,
+        organizationId:
+          eventHost?.kind === 'organization' ? eventHost.organizationId : null,
+      });
+      setSaveTemplateOpen(false);
+      showToast('Шаблон сохранён');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Не удалось сохранить шаблон');
+    } finally {
+      setSavingTemplate(false);
+    }
   };
 
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -1078,8 +1217,11 @@ export default function CreateEventPage() {
     return (
       <div className={styles.page}>
         <CreateEventHostChooser
-          onContinue={host => {
+          onContinue={(host, template) => {
+            templateAppliedRef.current = false;
+            setPendingTemplate(template);
             setEventHost(host);
+            setCanChooseHost(true);
             setHostGate('form');
             if (host.kind === 'organization') {
               setSearchParams(
@@ -1115,6 +1257,8 @@ export default function CreateEventPage() {
             if (!isEditing && canChooseHost) {
               skipHostGateEffectRef.current = true;
               setEventHost(null);
+              setPendingTemplate(null);
+              templateAppliedRef.current = false;
               setHostGate('chooser');
               setSearchParams({}, { replace: true });
               return;
@@ -1552,11 +1696,24 @@ export default function CreateEventPage() {
 
         {/* Кнопки */}
         <div className={styles.actions}>
-          <button className={styles.cancelBtn} onClick={goBack}>Отмена</button>
-          <button className={styles.saveBtn} onClick={handlePublishClick} disabled={saving}>
+          <button type="button" className={styles.cancelBtn} onClick={goBack}>Отмена</button>
+          <button
+            type="button"
+            className={styles.saveBtn}
+            onClick={handlePublishClick}
+            disabled={saving}
+          >
             {saving ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Опубликовать'}
           </button>
         </div>
+        <button
+          type="button"
+          className={styles.templateSaveBtn}
+          onClick={openSaveTemplate}
+          disabled={savingTemplate}
+        >
+          Сохранить как шаблон
+        </button>
         {!isEditing && (
           <div className={styles.autoInviteBox}>
             <label className={styles.autoInviteToggle}>
@@ -1664,6 +1821,55 @@ export default function CreateEventPage() {
           onAdd={handleAddToList}
           onClose={() => setListModalOpen(false)}
         />
+      )}
+
+      {saveTemplateOpen && (
+        <div className={styles.templateOverlay} onClick={() => !savingTemplate && setSaveTemplateOpen(false)}>
+          <div
+            className={styles.templateDialog}
+            role="dialog"
+            aria-modal
+            aria-label="Сохранить шаблон"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={styles.templateDialogTitle}>Сохранить как шаблон</div>
+            <p className={styles.templateDialogHint}>
+              Сохранится текущая форма
+              {eventHost?.kind === 'organization'
+                ? ` для организации «${eventHost.organizationName}»`
+                : ' в ваши шаблоны'}
+              . Дату и время при следующем создании можно указать заново.
+            </p>
+            <input
+              className={styles.input}
+              value={templateNameDraft}
+              onChange={e => setTemplateNameDraft(e.target.value)}
+              placeholder="Название шаблона"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === 'Enter') void handleSaveTemplate();
+              }}
+            />
+            <div className={styles.templateDialogActions}>
+              <button
+                type="button"
+                className={styles.cancelBtn}
+                disabled={savingTemplate}
+                onClick={() => setSaveTemplateOpen(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={styles.saveBtn}
+                disabled={savingTemplate || !templateNameDraft.trim()}
+                onClick={() => { void handleSaveTemplate(); }}
+              >
+                {savingTemplate ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className={`${styles.toast} ${toast.visible ? styles.toastVisible : ''}`}>{toast.message}</div>

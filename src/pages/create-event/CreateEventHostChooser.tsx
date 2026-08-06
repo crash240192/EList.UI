@@ -1,7 +1,11 @@
 // pages/create-event/CreateEventHostChooser.tsx
-// Выбор: создать событие от своего имени или от верифицированной организации
+// Выбор: создать событие от своего имени или от верифицированной организации + шаблон
 
 import { useEffect, useState } from 'react';
+import {
+  searchEventTemplates,
+  type IEventTemplate,
+} from '@/entities/event';
 import {
   OrganizationVerificationStatus,
   fetchMyOrganizations,
@@ -27,7 +31,7 @@ export type CreateEventHost =
     };
 
 interface Props {
-  onContinue: (host: CreateEventHost) => void;
+  onContinue: (host: CreateEventHost, template: IEventTemplate | null) => void;
 }
 
 interface OrgOption {
@@ -45,6 +49,9 @@ export function CreateEventHostChooser({ onContinue }: Props) {
   const [avatarId, setAvatarId] = useState<string | null>(null);
   const [orgs, setOrgs] = useState<OrgOption[]>([]);
   const [selected, setSelected] = useState<CreateEventHost>({ kind: 'user' });
+  const [templates, setTemplates] = useState<IEventTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,7 +97,34 @@ export function CreateEventHostChooser({ onContinue }: Props) {
     return () => { cancelled = true; };
   }, []);
 
+  // Шаблоны для выбранного хоста
+  useEffect(() => {
+    let cancelled = false;
+    setTemplatesLoading(true);
+    setSelectedTemplateId(null);
+    const orgId = selected.kind === 'organization' ? selected.organizationId : undefined;
+    searchEventTemplates(orgId ? { organizationId: orgId } : {})
+      .then(list => {
+        if (cancelled) return;
+        setTemplates(list);
+      })
+      .catch(() => {
+        if (!cancelled) setTemplates([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTemplatesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selected]);
+
   const initials = (fullName || login || '?').slice(0, 2).toUpperCase();
+
+  const handleContinue = () => {
+    const template = selectedTemplateId
+      ? templates.find(t => t.id === selectedTemplateId) ?? null
+      : null;
+    onContinue(selected, template);
+  };
 
   return (
     <div className={styles.wrap}>
@@ -188,10 +222,16 @@ export function CreateEventHostChooser({ onContinue }: Props) {
             <section className={styles.section}>
               <div className={styles.sectionLabel}>Шаблон</div>
               <p className={styles.sectionHint}>
-                Сохранённые шаблоны появятся здесь позже
+                {selected.kind === 'organization'
+                  ? 'Шаблоны этой организации или пустая форма'
+                  : 'Ваши шаблоны или пустая форма'}
               </p>
               <div className={styles.templateGrid}>
-                <div className={styles.templateCard} aria-disabled>
+                <button
+                  type="button"
+                  className={`${styles.templateCard} ${styles.templateCardActive} ${selectedTemplateId === null ? styles.templateCardSelected : ''}`}
+                  onClick={() => setSelectedTemplateId(null)}
+                >
                   <div className={styles.templateIcon}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                       <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -200,23 +240,49 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                   </div>
                   <div className={styles.templateName}>С нуля</div>
                   <div className={styles.templateMeta}>Пустая форма без предзаполнения</div>
-                </div>
-                <div className={styles.templateCard} aria-disabled>
-                  <div className={styles.templateIcon}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-                    </svg>
+                </button>
+
+                {templatesLoading && (
+                  <div className={styles.templateCardMuted}>
+                    <div className={styles.templateMeta}>Загрузка шаблонов...</div>
                   </div>
-                  <div className={styles.templateName}>Мои шаблоны</div>
-                  <div className={styles.templateMeta}>Скоро — сохранение и повторное использование настроек</div>
-                </div>
+                )}
+
+                {!templatesLoading && templates.map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`${styles.templateCard} ${styles.templateCardActive} ${selectedTemplateId === t.id ? styles.templateCardSelected : ''}`}
+                    onClick={() => setSelectedTemplateId(t.id)}
+                  >
+                    <div className={styles.templateIcon}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+                      </svg>
+                    </div>
+                    <div className={styles.templateName}>{t.name}</div>
+                    <div className={styles.templateMeta}>
+                      {t.templateBody?.event?.name
+                        ? `«${t.templateBody.event.name}»`
+                        : 'Сохранённые настройки'}
+                    </div>
+                  </button>
+                ))}
+
+                {!templatesLoading && templates.length === 0 && (
+                  <div className={styles.templateCardMuted}>
+                    <div className={styles.templateMeta}>
+                      Шаблонов пока нет — сохраните форму как шаблон после заполнения
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
 
             <div className={styles.footer}>
               <Button
-                onClick={() => onContinue(selected)}
+                onClick={handleContinue}
                 disabled={!!error}
               >
                 Продолжить
