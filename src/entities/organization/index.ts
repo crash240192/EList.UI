@@ -20,6 +20,12 @@ export {
 } from './api';
 
 export {
+  isOrganizationActiveForEvents,
+  canOrganizationHostEvents,
+  filterOrganizationsEligibleToHostEvents,
+} from './hostEligibility';
+
+export {
   getOrganizationAvatar,
   setOrganizationAvatar,
   getOrganizationAvatarHistory,

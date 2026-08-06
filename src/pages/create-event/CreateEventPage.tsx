@@ -34,9 +34,10 @@ import { useAccountId } from '@/features/auth/useAccountId';
 import { getWalletByAccount, getWalletByOrganization } from '@/entities/user/walletApi';
 import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } from '@/entities/admin/adminApi';
 import {
-  OrganizationVerificationStatus,
+  canOrganizationHostEvents,
   fetchMyOrganizations,
   fetchOrganizationById,
+  filterOrganizationsEligibleToHostEvents,
 } from '@/entities/organization';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
@@ -283,7 +284,7 @@ export default function CreateEventPage() {
   const initialTypesAppliedRef = useRef(false);
   const allTypesRef = useRef<IEventType[]>([]);
 
-  // Выбор хозяина события (пользователь / верифицированная организация)
+  // Выбор хозяина события (пользователь / активная организация с офертой)
   useEffect(() => {
     if (skipHostGateEffectRef.current) {
       skipHostGateEffectRef.current = false;
@@ -298,13 +299,10 @@ export default function CreateEventPage() {
     if (hostParam === 'user') {
       let cancelled = false;
       fetchMyOrganizations()
-        .then(list => {
+        .then(list => filterOrganizationsEligibleToHostEvents(list))
+        .then(eligible => {
           if (cancelled) return;
-          const verified = list.filter(
-            o => o.active !== false
-              && o.verificationStatus === OrganizationVerificationStatus.Verified,
-          );
-          setCanChooseHost(verified.length > 0);
+          setCanChooseHost(eligible.length > 0);
           setEventHost({ kind: 'user' });
           setHostGate('form');
         })
@@ -319,15 +317,28 @@ export default function CreateEventPage() {
 
     if (hostParam === 'org' && orgIdParam) {
       let cancelled = false;
-      fetchMyOrganizations()
-        .then(list => {
+      (async () => {
+        try {
+          const list = await fetchMyOrganizations();
           if (cancelled) return;
-          const verified = list.filter(
-            o => o.active !== false
-              && o.verificationStatus === OrganizationVerificationStatus.Verified,
-          );
-          setCanChooseHost(verified.length > 0);
-          const org = list.find(o => o.id === orgIdParam);
+          const org = list.find(o => o.id === orgIdParam) ?? null;
+          const eligibleList = await filterOrganizationsEligibleToHostEvents(list);
+          if (cancelled) return;
+          setCanChooseHost(eligibleList.length > 0);
+
+          const allowed = org
+            ? await canOrganizationHostEvents(orgIdParam, org)
+            : false;
+          if (cancelled) return;
+
+          if (!allowed) {
+            // Нет активной org / оферты — вернёмся к выбору хоста
+            setEventHost(null);
+            setHostGate('chooser');
+            setSearchParams({}, { replace: true });
+            return;
+          }
+
           setEventHost({
             kind: 'organization',
             organizationId: orgIdParam,
@@ -335,17 +346,13 @@ export default function CreateEventPage() {
             canSellTickets: Boolean(org?.canSellTickets),
           });
           setHostGate('form');
-        })
-        .catch(() => {
+        } catch {
           if (cancelled) return;
-          setEventHost({
-            kind: 'organization',
-            organizationId: orgIdParam,
-            organizationName: 'Организация',
-            canSellTickets: false,
-          });
-          setHostGate('form');
-        });
+          setEventHost(null);
+          setHostGate('chooser');
+          setSearchParams({}, { replace: true });
+        }
+      })();
       return () => { cancelled = true; };
     }
 
