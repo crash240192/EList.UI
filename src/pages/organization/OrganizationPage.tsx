@@ -68,6 +68,12 @@ function verificationBadgeClass(
   }
 }
 
+/** «Не верифицирована» не показываем, если билеты не подключены */
+function shouldShowVerificationBadge(org: OrganizationResponse): boolean {
+  if (org.canSellTickets) return true;
+  return org.verificationStatus !== OrganizationVerificationStatus.Unverified;
+}
+
 function OrgCoverBackground({ logoId }: { logoId: string | null }) {
   return (
     <div className={styles.coverBg}>
@@ -339,9 +345,11 @@ export default function OrganizationPage() {
           <div className={styles.profileInfo}>
             <div className={styles.nameRow}>
               <h1 className={styles.fullName}>{org.name}</h1>
-              <span className={`${styles.badge} ${verificationBadgeClass(org.verificationStatus)}`}>
-                {formatVerificationStatus(org.verificationStatus)}
-              </span>
+              {shouldShowVerificationBadge(org) && (
+                <span className={`${styles.badge} ${verificationBadgeClass(org.verificationStatus)}`}>
+                  {formatVerificationStatus(org.verificationStatus)}
+                </span>
+              )}
               {!org.active && (
                 <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
               )}
@@ -394,12 +402,14 @@ export default function OrganizationPage() {
               <span className={styles.statNum}>{org.canSellTickets ? 'Да' : 'Нет'}</span>
               <span className={styles.statLabel}>билеты</span>
             </div>
-            <div className={styles.statItem}>
-              <span className={styles.statNum}>
-                {org.verificationStatus === OrganizationVerificationStatus.Verified ? 'Да' : 'Нет'}
-              </span>
-              <span className={styles.statLabel}>верификация</span>
-            </div>
+            {shouldShowVerificationBadge(org) && (
+              <div className={styles.statItem}>
+                <span className={styles.statNum}>
+                  {org.verificationStatus === OrganizationVerificationStatus.Verified ? 'Да' : 'Нет'}
+                </span>
+                <span className={styles.statLabel}>верификация</span>
+              </div>
+            )}
           </div>
         </div>
 

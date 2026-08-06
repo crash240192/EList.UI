@@ -64,6 +64,7 @@ import {
 import { tariffApi, type ITariff } from '@/entities/admin/adminApi';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { AgreementDocumentModal } from '@/features/agreements';
+import { OrgAgreementAcceptDialog } from '@/features/agreements';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
@@ -92,6 +93,12 @@ function statusClass(status: OrganizationResponse['verificationStatus']): string
     case OrganizationVerificationStatus.Rejected: return styles.badgeErr;
     default: return styles.badgeMute;
   }
+}
+
+/** Плашку «Не верифицирована» скрываем, если билеты не подключены */
+function shouldShowVerificationBadge(org: OrganizationResponse): boolean {
+  if (org.canSellTickets) return true;
+  return org.verificationStatus !== OrganizationVerificationStatus.Unverified;
 }
 
 /** Снимок юр. полей после автозаполнения из реестра */
@@ -254,9 +261,11 @@ export function OrganizationsSettingsPanel({
                 >
                   <div className={styles.orgRowMain}>
                     <span className={styles.orgName}>{org.name}</span>
-                    <span className={`${styles.badge} ${statusClass(org.verificationStatus)}`}>
-                      {formatVerificationStatus(org.verificationStatus)}
-                    </span>
+                    {shouldShowVerificationBadge(org) && (
+                      <span className={`${styles.badge} ${statusClass(org.verificationStatus)}`}>
+                        {formatVerificationStatus(org.verificationStatus)}
+                      </span>
+                    )}
                     {!org.active && (
                       <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
                     )}
@@ -510,9 +519,11 @@ function OrganizationDetailView({
             <div>
               <div className={styles.scardTitle}>{org.name}</div>
               <div className={styles.scardDesc}>
-                <span className={`${styles.badge} ${statusClass(org.verificationStatus)}`}>
-                  {formatVerificationStatus(org.verificationStatus)}
-                </span>
+                {shouldShowVerificationBadge(org) && (
+                  <span className={`${styles.badge} ${statusClass(org.verificationStatus)}`}>
+                    {formatVerificationStatus(org.verificationStatus)}
+                  </span>
+                )}
                 {myRole && (
                   <span className={`${styles.badge} ${styles.badgeMute}`}>
                     {formatOrganizationRole(myRole)}
@@ -560,7 +571,11 @@ function OrganizationDetailView({
             organizationId={organizationId}
             canEdit={canEdit}
           />
-          <OrganizationAgreementsSection organizationId={organizationId} />
+          <OrganizationAgreementsSection
+            organizationId={organizationId}
+            organizationName={org.name}
+            isOwner={isOwner}
+          />
         </>
       )}
       {section === 'members' && (
@@ -1070,7 +1085,15 @@ const ORG_DOCUMENT_TYPES: DocumentTypeValue[] = [
   DocumentType.TicketingAgreement,
 ];
 
-function OrganizationAgreementsSection({ organizationId }: { organizationId: string }) {
+function OrganizationAgreementsSection({
+  organizationId,
+  organizationName,
+  isOwner,
+}: {
+  organizationId: string;
+  organizationName: string;
+  isOwner: boolean;
+}) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<{
     type: DocumentTypeValue;
@@ -1079,6 +1102,11 @@ function OrganizationAgreementsSection({ organizationId }: { organizationId: str
     agreed: boolean | null;
   }[]>([]);
   const [viewDoc, setViewDoc] = useState<IAgreementDocument | null>(null);
+  const [acceptQueue, setAcceptQueue] = useState<{
+    type: DocumentTypeValue;
+    document: IAgreementDocument;
+  }[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -1106,7 +1134,7 @@ function OrganizationAgreementsSection({ organizationId }: { organizationId: str
       }
     })();
     return () => { cancelled = true; };
-  }, [organizationId]);
+  }, [organizationId, reloadKey]);
 
   return (
     <div className={styles.scard}>
@@ -1121,38 +1149,55 @@ function OrganizationAgreementsSection({ organizationId }: { organizationId: str
           <div className={styles.tariffCurrentMuted}>Загрузка...</div>
         ) : (
           <ul className={styles.orgDocsList}>
-            {rows.map(row => (
-              <li key={row.type} className={styles.orgDocRow}>
-                <div className={styles.orgDocMain}>
-                  <span className={styles.orgDocName}>{row.label}</span>
-                  <span
-                    className={`${styles.orgDocStatus} ${
-                      row.agreed === true
-                        ? styles.orgDocStatusOk
+            {rows.map(row => {
+              const canAccept = isOwner && row.agreed === false && !!row.document;
+              return (
+                <li key={row.type} className={styles.orgDocRow}>
+                  <div className={styles.orgDocMain}>
+                    <span className={styles.orgDocName}>{row.label}</span>
+                    <span
+                      className={`${styles.orgDocStatus} ${
+                        row.agreed === true
+                          ? styles.orgDocStatusOk
+                          : row.agreed === false
+                            ? styles.orgDocStatusNo
+                            : styles.orgDocStatusMute
+                      }`}
+                    >
+                      {row.agreed === true
+                        ? 'Принято'
                         : row.agreed === false
-                          ? styles.orgDocStatusNo
-                          : styles.orgDocStatusMute
-                    }`}
-                  >
-                    {row.agreed === true
-                      ? 'Принято'
-                      : row.agreed === false
-                        ? 'Не принято'
-                        : 'Нет данных'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className={styles.linkBtn}
-                  disabled={!row.document}
-                  onClick={() => {
-                    if (row.document) setViewDoc(row.document);
-                  }}
-                >
-                  {row.document ? 'Открыть документ' : 'Документ недоступен'}
-                </button>
-              </li>
-            ))}
+                          ? 'Не принято'
+                          : 'Нет данных'}
+                    </span>
+                  </div>
+                  <div className={styles.orgDocActions}>
+                    <button
+                      type="button"
+                      className={styles.linkBtn}
+                      disabled={!row.document}
+                      onClick={() => {
+                        if (row.document) setViewDoc(row.document);
+                      }}
+                    >
+                      {row.document ? 'Открыть документ' : 'Документ недоступен'}
+                    </button>
+                    {canAccept && (
+                      <button
+                        type="button"
+                        className={styles.orgDocAcceptBtn}
+                        onClick={() => {
+                          if (!row.document) return;
+                          setAcceptQueue([{ type: row.type, document: row.document }]);
+                        }}
+                      >
+                        Принять
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -1160,6 +1205,18 @@ function OrganizationAgreementsSection({ organizationId }: { organizationId: str
         <AgreementDocumentModal
           doc={viewDoc}
           onClose={() => setViewDoc(null)}
+        />
+      )}
+      {acceptQueue.length > 0 && (
+        <OrgAgreementAcceptDialog
+          organizationId={organizationId}
+          organizationName={organizationName}
+          queue={acceptQueue}
+          onCancel={() => setAcceptQueue([])}
+          onComplete={() => {
+            setAcceptQueue([]);
+            setReloadKey(k => k + 1);
+          }}
         />
       )}
     </div>

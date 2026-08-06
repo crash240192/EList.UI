@@ -331,6 +331,29 @@
   background: rgba(148, 163, 184, 0.12);
 }
 
+.orgDocActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.orgDocAcceptBtn {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.orgDocAcceptBtn:hover {
+  opacity: 0.9;
+}
+
 .agreeRow {
   display: flex;
   align-items: flex-start;
