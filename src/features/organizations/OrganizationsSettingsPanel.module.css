@@ -286,10 +286,29 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
   padding: 12px;
   border-radius: 10px;
   background: var(--surface-2);
   border: 1px solid var(--border);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.orgDocRowClickable {
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.orgDocRowClickable:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
+}
+
+.orgDocRowDisabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .orgDocMain {
@@ -329,29 +348,6 @@
 .orgDocStatusMute {
   color: var(--text-muted);
   background: rgba(148, 163, 184, 0.12);
-}
-
-.orgDocActions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-
-.orgDocAcceptBtn {
-  border: none;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.orgDocAcceptBtn:hover {
-  opacity: 0.9;
 }
 
 .agreeRow {

@@ -1136,12 +1136,23 @@ function OrganizationAgreementsSection({
     return () => { cancelled = true; };
   }, [organizationId, reloadKey]);
 
+  const openRow = (row: (typeof rows)[number]) => {
+    if (!row.document) return;
+    const needsAccept = isOwner && row.agreed !== true;
+    if (needsAccept) {
+      setAcceptQueue([{ type: row.type, document: row.document }]);
+      return;
+    }
+    setViewDoc(row.document);
+  };
+
   return (
     <div className={styles.scard}>
       <div className={styles.scardHead}>
         <div className={styles.scardTitle}>Документы организации</div>
         <div className={styles.scardDesc}>
-          Оферта и соглашение на продажу билетов — статус согласия от имени организации
+          Нажмите на документ, чтобы прочитать
+          {isOwner ? ' или принять согласие' : ''}
         </div>
       </div>
       <div className={styles.formBody}>
@@ -1150,51 +1161,34 @@ function OrganizationAgreementsSection({
         ) : (
           <ul className={styles.orgDocsList}>
             {rows.map(row => {
-              const canAccept = isOwner && row.agreed === false && !!row.document;
+              const clickable = !!row.document;
               return (
-                <li key={row.type} className={styles.orgDocRow}>
-                  <div className={styles.orgDocMain}>
-                    <span className={styles.orgDocName}>{row.label}</span>
-                    <span
-                      className={`${styles.orgDocStatus} ${
-                        row.agreed === true
-                          ? styles.orgDocStatusOk
-                          : row.agreed === false
-                            ? styles.orgDocStatusNo
-                            : styles.orgDocStatusMute
-                      }`}
-                    >
-                      {row.agreed === true
-                        ? 'Принято'
-                        : row.agreed === false
-                          ? 'Не принято'
-                          : 'Нет данных'}
-                    </span>
-                  </div>
-                  <div className={styles.orgDocActions}>
-                    <button
-                      type="button"
-                      className={styles.linkBtn}
-                      disabled={!row.document}
-                      onClick={() => {
-                        if (row.document) setViewDoc(row.document);
-                      }}
-                    >
-                      {row.document ? 'Открыть документ' : 'Документ недоступен'}
-                    </button>
-                    {canAccept && (
-                      <button
-                        type="button"
-                        className={styles.orgDocAcceptBtn}
-                        onClick={() => {
-                          if (!row.document) return;
-                          setAcceptQueue([{ type: row.type, document: row.document }]);
-                        }}
+                <li key={row.type}>
+                  <button
+                    type="button"
+                    className={`${styles.orgDocRow} ${clickable ? styles.orgDocRowClickable : styles.orgDocRowDisabled}`}
+                    disabled={!clickable}
+                    onClick={() => openRow(row)}
+                  >
+                    <div className={styles.orgDocMain}>
+                      <span className={styles.orgDocName}>{row.label}</span>
+                      <span
+                        className={`${styles.orgDocStatus} ${
+                          row.agreed === true
+                            ? styles.orgDocStatusOk
+                            : row.agreed === false
+                              ? styles.orgDocStatusNo
+                              : styles.orgDocStatusMute
+                        }`}
                       >
-                        Принять
-                      </button>
-                    )}
-                  </div>
+                        {row.agreed === true
+                          ? 'Принято'
+                          : row.document
+                            ? 'Не принято'
+                            : 'Нет данных'}
+                      </span>
+                    </div>
+                  </button>
                 </li>
               );
             })}
