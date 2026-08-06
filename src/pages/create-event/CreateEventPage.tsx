@@ -168,9 +168,7 @@ export default function CreateEventPage() {
   const [hostGate, setHostGate] = useState<'checking' | 'chooser' | 'form'>(
     isEditing ? 'form' : 'checking',
   );
-  const [eventHost, setEventHost] = useState<CreateEventHost | null>(
-    isEditing ? { kind: 'user' } : null,
-  );
+  const [eventHost, setEventHost] = useState<CreateEventHost | null>(null);
   const [canChooseHost, setCanChooseHost] = useState(false);
   const skipHostGateEffectRef = useRef(false);
 
@@ -238,7 +236,6 @@ export default function CreateEventPage() {
     }
     if (isEditing) {
       setHostGate('form');
-      setEventHost({ kind: 'user' });
       setCanChooseHost(false);
       return;
     }
@@ -528,7 +525,7 @@ export default function CreateEventPage() {
     }).finally(() => setLoading(false));
   }, [id, isEditing]);
 
-  // Редактирование: можно ли включать продажу билетов (организация-организатор с canSellTickets)
+  // Редактирование: хост события (организация / пользователь) и тариф организации
   useEffect(() => {
     if (!isEditing || !id) {
       setEditTicketsCapability('unknown');
@@ -539,25 +536,32 @@ export default function CreateEventPage() {
     (async () => {
       try {
         const organizers = await fetchEventOrganizators(id);
-        const orgIds = [...new Set(
-          organizers
-            .map(o => o.organizationId)
-            .filter((oid): oid is string => Boolean(oid)),
-        )];
-        if (orgIds.length === 0) {
-          if (!cancelled) setEditTicketsCapability('no');
+        const orgOrganizer = organizers.find(o => o.organizationId);
+        if (orgOrganizer?.organizationId) {
+          const orgId = orgOrganizer.organizationId;
+          const org = await fetchOrganizationById(orgId).catch(() => null);
+          if (cancelled) return;
+          setEventHost({
+            kind: 'organization',
+            organizationId: orgId,
+            organizationName:
+              orgOrganizer.organizationName?.trim()
+              || org?.name
+              || 'Организация',
+            canSellTickets: Boolean(org?.canSellTickets),
+          });
+          setEditTicketsCapability(org?.canSellTickets ? 'yes' : 'no');
           return;
         }
-        const orgs = await Promise.all(
-          orgIds.map(oid => fetchOrganizationById(oid).catch(() => null)),
-        );
         if (!cancelled) {
-          setEditTicketsCapability(
-            orgs.some(o => Boolean(o?.canSellTickets)) ? 'yes' : 'no',
-          );
+          setEventHost({ kind: 'user' });
+          setEditTicketsCapability('no');
         }
       } catch {
-        if (!cancelled) setEditTicketsCapability('no');
+        if (!cancelled) {
+          setEventHost({ kind: 'user' });
+          setEditTicketsCapability('no');
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -1119,7 +1123,7 @@ export default function CreateEventPage() {
           }} />
           <div>
             <h1 className={styles.title}>{isEditing ? 'Редактировать мероприятие' : 'Новое мероприятие'}</h1>
-            {!isEditing && eventHost?.kind === 'organization' && (
+            {eventHost?.kind === 'organization' && (
               <div className={styles.hostBadge}>
                 от имени «{eventHost.organizationName}»
               </div>
