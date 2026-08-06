@@ -55,7 +55,12 @@ export function OrgLogoUpload({
         aria-label="Загрузить логотип"
       >
         {displayFileId ? (
-          <AuthImage fileId={displayFileId} alt="" className={styles.logoImg} />
+          <AuthImage
+            fileId={displayFileId}
+            alt=""
+            className={styles.logoImg}
+            fallback={<span className={styles.logoInitials}>{initials.slice(0, 2).toUpperCase()}</span>}
+          />
         ) : (
           <span className={styles.logoInitials}>{initials.slice(0, 2).toUpperCase()}</span>
         )}

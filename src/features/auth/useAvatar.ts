@@ -1,6 +1,13 @@
 // features/auth/useAvatar.ts
 // Кэш fileId аватара по accountId. Источник — поле avatarId в данных аккаунта.
 // Если avatarId неизвестен — один запрос GET /api/accounts/getData/{accountId}.
+//
+// Контракт avatarId:
+//   string     — известный fileId (сеем в кэш)
+//   undefined  — неизвестно → кэш или fetch
+//   null / ''  — «в DTO пусто»; НЕ отравляем кэш как «нет аватара»,
+//                потому что большинство call-site делают `avatarId ?? null`
+//                и тем самым превращают «неизвестно» в «пусто».
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient, isAuthenticated } from '@/shared/api/client';
@@ -30,6 +37,7 @@ function resolveAvatarId(accountId: string): Promise<string | null> {
     })
     .catch(() => {
       fetchInFlight.delete(accountId);
+      // Не кэшируем ошибку — при следующем маунте попробуем снова
       return null;
     });
 
@@ -37,11 +45,9 @@ function resolveAvatarId(accountId: string): Promise<string | null> {
   return promise;
 }
 
-function isExplicitlyEmpty(avatarId?: string | null): boolean {
-  return avatarId === null || avatarId === '';
-}
-
 export function seedAvatarCache(accountId: string, avatarId: string | null): void {
+  // Сеем только подтверждённый id; пустой null из «неизвестно» не пишем через этот хелпер
+  // с call-site — только после успешного getData / явного set.
   cache.set(accountId, avatarId);
   notifyListeners(accountId, avatarId);
 }
@@ -50,10 +56,11 @@ export function useAvatar(
   accountId: string | null | undefined,
   avatarId?: string | null,
 ): string | null {
+  const knownId = typeof avatarId === 'string' && avatarId.trim() ? avatarId.trim() : null;
+
   const [fileId, setFileId] = useState<string | null>(() => {
     if (!accountId) return null;
-    if (isExplicitlyEmpty(avatarId)) return null;
-    if (avatarId) return avatarId;
+    if (knownId) return knownId;
     return cache.has(accountId) ? (cache.get(accountId) ?? null) : null;
   });
 
@@ -68,24 +75,20 @@ export function useAvatar(
 
     const cleanup = () => { listeners.get(accountId)?.delete(setFileId); };
 
-    if (isExplicitlyEmpty(avatarId)) {
-      cache.set(accountId, null);
-      setFileId(null);
+    // Есть явный fileId из DTO — используем и сеем кэш
+    if (knownId) {
+      cache.set(accountId, knownId);
+      setFileId(knownId);
       return cleanup;
     }
 
-    if (avatarId) {
-      cache.set(accountId, avatarId);
-      setFileId(avatarId);
-      return cleanup;
-    }
-
-    // avatarId не передан — сбрасываем устаревший fileId от предыдущего accountId
-    setFileId(cache.has(accountId) ? (cache.get(accountId) ?? null) : null);
-
+    // null / undefined / '' — смотрим кэш, иначе fetch
     if (cache.has(accountId)) {
+      setFileId(cache.get(accountId) ?? null);
       return cleanup;
     }
+
+    setFileId(null);
 
     let cancelled = false;
     void resolveAvatarId(accountId).then(id => {
@@ -96,7 +99,7 @@ export function useAvatar(
       cancelled = true;
       cleanup();
     };
-  }, [accountId, avatarId]);
+  }, [accountId, knownId]);
 
   return fileId;
 }

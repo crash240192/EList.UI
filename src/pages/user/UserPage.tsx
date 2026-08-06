@@ -619,7 +619,12 @@ export default function UserPage() {
                         >
                           <div className={styles.orgLogo} aria-hidden>
                             {logoId ? (
-                              <AuthImage fileId={logoId} alt="" className={styles.orgLogoImg} />
+                              <AuthImage
+                                fileId={logoId}
+                                alt=""
+                                className={styles.orgLogoImg}
+                                fallback={<span className={styles.orgLogoInitials}>{orgInitials}</span>}
+                              />
                             ) : (
                               <span className={styles.orgLogoInitials}>{orgInitials}</span>
                             )}

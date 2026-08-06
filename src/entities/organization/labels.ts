@@ -64,6 +64,12 @@ export function organizationMemberInitials(m: OrganizationMemberResponse): strin
   return (m.account?.login?.[0] ?? '?').toUpperCase();
 }
 
-export function organizationMemberAvatarId(m: OrganizationMemberResponse): string | null {
-  return m.account?.avatarId ?? null;
+/** avatarId из вложенного account; undefined = неизвестно (пусть useAvatar сделает fetch) */
+export function organizationMemberAvatarId(
+  m: OrganizationMemberResponse,
+): string | null | undefined {
+  if (!m.account) return undefined;
+  const id = m.account.avatarId;
+  if (id == null || id === '') return undefined;
+  return id;
 }

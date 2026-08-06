@@ -195,7 +195,12 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                     >
                       <div className={`${styles.hostAvatar} ${styles.hostAvatarSquare}`}>
                         {logoId ? (
-                          <AuthImage fileId={logoId} alt="" className={styles.hostAvatarImg} />
+                          <AuthImage
+                            fileId={logoId}
+                            alt=""
+                            className={styles.hostAvatarImg}
+                            fallback={<span>{orgInitials}</span>}
+                          />
                         ) : (
                           <span>{orgInitials}</span>
                         )}
