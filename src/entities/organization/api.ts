@@ -3,15 +3,18 @@
 import { apiClient } from '@/shared/api/client';
 import type {
   AddOrganizationMemberRequest,
+  OrganizationLegalFormValue,
   OrganizationLegalRequest,
   OrganizationLegalResponse,
   OrganizationMemberResponse,
   OrganizationPayoutRequest,
   OrganizationPayoutResponse,
+  OrganizationRegistryParty,
   OrganizationRequest,
   OrganizationResponse,
   TransferOwnershipRequest,
 } from './types';
+import { OrganizationLegalForm } from './types';
 
 /** POST /api/organizations/create → organizationId */
 export async function createOrganization(payload: OrganizationRequest): Promise<string> {
@@ -108,6 +111,66 @@ export async function transferOrganizationOwnership(
   payload: TransferOwnershipRequest,
 ): Promise<void> {
   await apiClient.post(`/api/organizations/transferOwnership/${organizationId}`, payload);
+}
+
+function normalizeLegalForm(raw: unknown): OrganizationLegalFormValue | null {
+  const v = String(raw ?? '');
+  if (
+    v === OrganizationLegalForm.SelfEmployed
+    || v === OrganizationLegalForm.Ip
+    || v === OrganizationLegalForm.LegalEntity
+  ) {
+    return v;
+  }
+  return null;
+}
+
+function normalizeRegistryParty(raw: Record<string, unknown>): OrganizationRegistryParty {
+  const status = (raw.status ?? raw.Status ?? null) as string | null;
+  const isActiveRaw = raw.isActive ?? raw.IsActive;
+  const isActive = typeof isActiveRaw === 'boolean'
+    ? isActiveRaw
+    : String(status ?? '').toUpperCase() === 'ACTIVE';
+
+  return {
+    inn: (raw.inn ?? raw.Inn ?? null) as string | null,
+    ogrn: (raw.ogrn ?? raw.Ogrn ?? null) as string | null,
+    kpp: (raw.kpp ?? raw.Kpp ?? null) as string | null,
+    name: (raw.name ?? raw.Name ?? null) as string | null,
+    fullName: (raw.fullName ?? raw.FullName ?? null) as string | null,
+    legalAddress: (raw.legalAddress ?? raw.LegalAddress ?? null) as string | null,
+    headName: (raw.headName ?? raw.HeadName ?? null) as string | null,
+    headPost: (raw.headPost ?? raw.HeadPost ?? null) as string | null,
+    legalForm: normalizeLegalForm(raw.legalForm ?? raw.LegalForm),
+    status,
+    isActive,
+  };
+}
+
+/**
+ * GET /api/organizations/lookup/inn/{inn}
+ * Ответ: одна запись или массив OrganizationRegistryParty.
+ */
+export async function lookupOrganizationByInn(
+  inn: string,
+): Promise<OrganizationRegistryParty[]> {
+  const cleaned = inn.replace(/\D/g, '');
+  if (!cleaned) throw new Error('Укажите ИНН');
+
+  const r = await apiClient.get<unknown>(
+    `/api/organizations/lookup/inn/${encodeURIComponent(cleaned)}`,
+  );
+  const raw = r.result;
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((row): row is Record<string, unknown> => !!row && typeof row === 'object')
+      .map(normalizeRegistryParty);
+  }
+  if (typeof raw === 'object') {
+    return [normalizeRegistryParty(raw as Record<string, unknown>)];
+  }
+  return [];
 }
 
 /** GET /api/organizations/legal/{organizationId} */

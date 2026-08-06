@@ -47,6 +47,7 @@ import {
   type OrganizationLegalRequest,
   type OrganizationMemberResponse,
   type OrganizationPayoutRequest,
+  type OrganizationRegistryParty,
   type OrganizationResponse,
   type OrganizationRoleValue,
 } from '@/entities/organization';
@@ -65,8 +66,10 @@ import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { AgreementDocumentModal } from '@/features/agreements';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { Button } from '@/shared/ui/Button';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { Select } from '@/shared/ui/Select/Select';
+import { OrgInnLookupModal } from './OrgInnLookupModal';
 import { OrgLogoUpload } from './OrgLogoUpload';
 import styles from './OrganizationsSettingsPanel.module.css';
 
@@ -89,6 +92,47 @@ function statusClass(status: OrganizationResponse['verificationStatus']): string
     case OrganizationVerificationStatus.Rejected: return styles.badgeErr;
     default: return styles.badgeMute;
   }
+}
+
+/** Снимок юр. полей после автозаполнения из реестра */
+interface LegalFormSnapshot {
+  legalForm: OrganizationLegalFormValue;
+  inn: string;
+  ogrn: string;
+  kpp: string;
+  legalAddress: string;
+  headName: string;
+  headBasis: string;
+}
+
+function normalizeLegalText(v: string): string {
+  return v.trim().replace(/\s+/g, ' ');
+}
+
+function legalSnapshotEquals(a: LegalFormSnapshot, b: LegalFormSnapshot): boolean {
+  return a.legalForm === b.legalForm
+    && normalizeLegalText(a.inn) === normalizeLegalText(b.inn)
+    && normalizeLegalText(a.ogrn) === normalizeLegalText(b.ogrn)
+    && normalizeLegalText(a.kpp) === normalizeLegalText(b.kpp)
+    && normalizeLegalText(a.legalAddress) === normalizeLegalText(b.legalAddress)
+    && normalizeLegalText(a.headName) === normalizeLegalText(b.headName)
+    && normalizeLegalText(a.headBasis) === normalizeLegalText(b.headBasis);
+}
+
+function partyToLegalSnapshot(
+  party: OrganizationRegistryParty,
+  fallbackForm: OrganizationLegalFormValue,
+  currentHeadBasis: string,
+): LegalFormSnapshot {
+  return {
+    legalForm: party.legalForm ?? fallbackForm,
+    inn: party.inn?.trim() ?? '',
+    ogrn: party.ogrn?.trim() ?? '',
+    kpp: party.kpp?.trim() ?? '',
+    legalAddress: party.legalAddress?.trim() ?? '',
+    headName: party.headName?.trim() ?? '',
+    headBasis: currentHeadBasis,
+  };
 }
 
 function resolveMyRole(
@@ -1354,6 +1398,9 @@ function OrganizationSalesSection({
   const [ticketingAccepted, setTicketingAccepted] = useState(false);
   const [ticketingDoc, setTicketingDoc] = useState<IAgreementDocument | null>(null);
   const [ticketingDocOpen, setTicketingDocOpen] = useState(false);
+  const [innLookupOpen, setInnLookupOpen] = useState(false);
+  const [confirmLegalSaveOpen, setConfirmLegalSaveOpen] = useState(false);
+  const [registryBaseline, setRegistryBaseline] = useState<LegalFormSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -1381,6 +1428,7 @@ function OrganizationSalesSection({
           setHeadName(L.headName ?? '');
           setHeadBasis(L.headBasis ?? '');
         }
+        setRegistryBaseline(null);
         if (P) {
           setBankAccount(P.bankAccount ?? '');
           setBik(P.bik ?? '');
@@ -1406,6 +1454,16 @@ function OrganizationSalesSection({
   const rejected = org.verificationStatus === OrganizationVerificationStatus.Rejected;
   const onboardingActive = onboardingStatus === OrganizationOnboardingStatus.Active;
 
+  const currentLegalSnapshot = (): LegalFormSnapshot => ({
+    legalForm,
+    inn,
+    ogrn,
+    kpp,
+    legalAddress,
+    headName,
+    headBasis,
+  });
+
   const checklist = [
     { ok: ticketingAgreed, label: 'Соглашение на продажу билетов принято' },
     { ok: legalFilled, label: 'Юридические данные заполнены' },
@@ -1429,6 +1487,24 @@ function OrganizationSalesSection({
     }
   };
 
+  const applyRegistryParty = (party: OrganizationRegistryParty) => {
+    const next = partyToLegalSnapshot(party, legalForm, headBasis);
+    setLegalForm(next.legalForm);
+    setInn(next.inn);
+    setOgrn(next.ogrn);
+    setKpp(next.kpp);
+    setLegalAddress(next.legalAddress);
+    setHeadName(next.headName);
+    setRegistryBaseline(next);
+    setInnLookupOpen(false);
+    setMsg({
+      text: party.isActive
+        ? 'Данные из реестра подставлены в форму'
+        : 'Данные подставлены. Внимание: организация не в статусе «Действует»',
+      ok: party.isActive,
+    });
+  };
+
   const saveLegal = async () => {
     if (!isOwner) return;
     if (!ticketingAgreed) {
@@ -1444,6 +1520,7 @@ function OrganizationSalesSection({
     }
     setBusy(true);
     setMsg(null);
+    setConfirmLegalSaveOpen(false);
     try {
       const payload: OrganizationLegalRequest = {
         legalForm,
@@ -1455,6 +1532,7 @@ function OrganizationSalesSection({
         headBasis: headBasis.trim() || null,
       };
       await saveOrganizationLegal(organizationId, payload);
+      setRegistryBaseline(null);
       setMsg({ text: 'Юридические данные сохранены', ok: true });
       await onChanged();
     } catch (e) {
@@ -1462,6 +1540,26 @@ function OrganizationSalesSection({
     } finally {
       setBusy(false);
     }
+  };
+
+  const requestSaveLegal = () => {
+    if (!isOwner) return;
+    if (!ticketingAgreed) {
+      setMsg({ text: 'Сначала примите соглашение на продажу билетов', ok: false });
+      return;
+    }
+    if (isSelfEmployed) {
+      setMsg({
+        text: 'Платный тир доступен только для ИП и юридических лиц',
+        ok: false,
+      });
+      return;
+    }
+    if (registryBaseline && !legalSnapshotEquals(registryBaseline, currentLegalSnapshot())) {
+      setConfirmLegalSaveOpen(true);
+      return;
+    }
+    void saveLegal();
   };
 
   const savePayout = async () => {
@@ -1651,6 +1749,9 @@ function OrganizationSalesSection({
       <div className={styles.scard}>
         <div className={styles.scardHead}>
           <div className={styles.scardTitle}>Юридические данные</div>
+          <div className={styles.scardDesc}>
+            Можно заполнить вручную или найти организацию в реестре по ИНН
+          </div>
         </div>
         <div className={styles.formBody}>
           <label className={styles.field}>
@@ -1671,10 +1772,28 @@ function OrganizationSalesSection({
               Платный тир (продажа билетов) доступен только для ИП и юридических лиц.
             </div>
           )}
-          <label className={styles.field}>
+          <div className={styles.field}>
             <span className={styles.fieldLabel}>ИНН *</span>
-            <input className={styles.input} value={inn} disabled={!isOwner} onChange={e => setInn(e.target.value)} />
-          </label>
+            <div className={styles.innRow}>
+              <input
+                className={styles.input}
+                value={inn}
+                inputMode="numeric"
+                disabled={!isOwner}
+                onChange={e => setInn(e.target.value.replace(/\D/g, '').slice(0, 12))}
+              />
+              {isOwner && (
+                <Button
+                  variant="secondary"
+                  disabled={!ticketingAgreed}
+                  title={!ticketingAgreed ? 'Сначала примите соглашение на продажу билетов' : undefined}
+                  onClick={() => setInnLookupOpen(true)}
+                >
+                  Найти по ИНН
+                </Button>
+              )}
+            </div>
+          </div>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>ОГРН / ОГРНИП</span>
             <input className={styles.input} value={ogrn} disabled={!isOwner} onChange={e => setOgrn(e.target.value)} />
@@ -1703,7 +1822,7 @@ function OrganizationSalesSection({
               loading={busy}
               disabled={!ticketingAgreed}
               title={!ticketingAgreed ? 'Сначала примите соглашение на продажу билетов' : undefined}
-              onClick={() => { void saveLegal(); }}
+              onClick={requestSaveLegal}
             >
               Сохранить юр. данные
             </Button>
@@ -1715,6 +1834,27 @@ function OrganizationSalesSection({
           </div>
         )}
       </div>
+
+      {innLookupOpen && (
+        <OrgInnLookupModal
+          initialInn={inn}
+          onClose={() => setInnLookupOpen(false)}
+          onSelect={applyRegistryParty}
+        />
+      )}
+
+      {confirmLegalSaveOpen && (
+        <ConfirmDialog
+          title="Проверьте данные"
+          message="Вы изменили поля после автозаполнения из реестра. Подтвердите, что проверили корректность юридических данных перед сохранением."
+          confirmLabel="Данные верны, сохранить"
+          cancelLabel="Отмена"
+          variant="accent"
+          zIndex={630}
+          onCancel={() => setConfirmLegalSaveOpen(false)}
+          onConfirm={() => { void saveLegal(); }}
+        />
+      )}
 
       <div className={styles.scard}>
         <div className={styles.scardHead}>

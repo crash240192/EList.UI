@@ -39,6 +39,18 @@ export function formatLegalForm(form: OrganizationLegalFormValue): string {
   }
 }
 
+/** Статус организации в реестре (OrganizationRegistryParty.Status) */
+export function formatRegistryStatus(status: string | null | undefined): string {
+  switch (String(status ?? '').toUpperCase()) {
+    case 'ACTIVE': return 'Действует';
+    case 'LIQUIDATING': return 'В процессе ликвидации';
+    case 'LIQUIDATED': return 'Ликвидирована';
+    case 'BANKRUPT': return 'Банкротство';
+    case 'REORGANIZING': return 'Реорганизация';
+    default: return status?.trim() || 'Неизвестно';
+  }
+}
+
 export function formatOnboardingStatus(status: OrganizationOnboardingStatusValue | null | undefined): string {
   switch (status) {
     case OrganizationOnboardingStatus.None: return 'Не начат';
