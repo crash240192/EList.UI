@@ -18,7 +18,7 @@ interface MessageRepliesProps {
   activeReplyId?: string | null;
   conversationId: string;
   currentAccountId: string | null;
-  onReply: (message: IMessage) => void;
+  onReply?: (message: IMessage) => void;
   onDeleted?: (messageId: string) => void;
   onTotalLoaded?: (total: number) => void;
 }

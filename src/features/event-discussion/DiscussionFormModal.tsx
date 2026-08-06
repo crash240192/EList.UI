@@ -12,6 +12,8 @@ interface DiscussionFormModalProps {
 
 export function DiscussionFormModal({ eventId, onClose, onCreated }: DiscussionFormModalProps) {
   const [name, setName] = useState('');
+  const [participantsOnlyVisible, setParticipantsOnlyVisible] = useState(false);
+  const [participantsReadonly, setParticipantsReadonly] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +25,12 @@ export function DiscussionFormModal({ eventId, onClose, onCreated }: DiscussionF
     setSaving(true);
     setError(null);
     try {
-      const conversationId = await createConversation({ name: trimmed, eventId });
+      const conversationId = await createConversation({
+        name: trimmed,
+        eventId,
+        participantsOnlyVisible,
+        participantsReadonly,
+      });
       onCreated(conversationId);
       onClose();
     } catch (e) {
@@ -65,6 +72,37 @@ export function DiscussionFormModal({ eventId, onClose, onCreated }: DiscussionF
               }}
             />
           </div>
+
+          <label className={styles.toggleRow}>
+            <input
+              type="checkbox"
+              checked={participantsOnlyVisible}
+              disabled={saving}
+              onChange={e => setParticipantsOnlyVisible(e.target.checked)}
+            />
+            <span>
+              <span className={styles.toggleTitle}>Только для участников</span>
+              <span className={styles.toggleHint}>
+                Обсуждение видно только записавшимся на мероприятие
+              </span>
+            </span>
+          </label>
+
+          <label className={styles.toggleRow}>
+            <input
+              type="checkbox"
+              checked={participantsReadonly}
+              disabled={saving}
+              onChange={e => setParticipantsReadonly(e.target.checked)}
+            />
+            <span>
+              <span className={styles.toggleTitle}>Участники только читают</span>
+              <span className={styles.toggleHint}>
+                Участники не могут писать комментарии — только организаторы
+              </span>
+            </span>
+          </label>
+
           {error && <div className={styles.error}>{error}</div>}
         </div>
 

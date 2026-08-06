@@ -201,6 +201,7 @@ export function EventDiscussionsPanel({
             conversationId={active.id}
             currentAccountId={currentAccountId}
             layoutBoundsRef={layoutBoundsRef}
+            canComment={!active.participantsReadonly || canManage}
           />
         </div>
       ) : (

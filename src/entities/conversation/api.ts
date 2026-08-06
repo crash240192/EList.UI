@@ -27,13 +27,40 @@ function normalizePagedList<T>(
   };
 }
 
+function normalizeConversation(raw: Record<string, unknown>): IConversation {
+  return {
+    id: String(raw.id ?? raw.Id ?? ''),
+    name: String(raw.name ?? raw.Name ?? ''),
+    eventId: (raw.eventId ?? raw.EventId ?? null) as string | null,
+    participantsOnlyVisible: Boolean(
+      raw.participantsOnlyVisible ?? raw.ParticipantsOnlyVisible ?? false,
+    ),
+    participantsReadonly: Boolean(
+      raw.participantsReadonly ?? raw.ParticipantsReadonly ?? false,
+    ),
+    createDate: String(raw.createDate ?? raw.CreateDate ?? ''),
+    updateDate: String(raw.updateDate ?? raw.UpdateDate ?? ''),
+  };
+}
+
 export async function createConversation(request: IConversationRequest): Promise<string> {
-  const data = await apiClient.post<string>('/api/conversations/create', request);
+  const data = await apiClient.post<string>('/api/conversations/create', {
+    name: request.name,
+    ...(request.eventId ? { eventId: request.eventId } : {}),
+    participantsOnlyVisible: Boolean(request.participantsOnlyVisible),
+    participantsReadonly: Boolean(request.participantsReadonly),
+  });
   return data.result;
 }
 
 export async function updateConversation(request: IConversationRequest): Promise<void> {
-  await apiClient.put('/api/conversations/update', request);
+  await apiClient.put('/api/conversations/update', {
+    id: request.id,
+    name: request.name,
+    ...(request.eventId ? { eventId: request.eventId } : {}),
+    participantsOnlyVisible: Boolean(request.participantsOnlyVisible),
+    participantsReadonly: Boolean(request.participantsReadonly),
+  });
 }
 
 export async function deleteConversation(conversationId: string): Promise<void> {
@@ -41,13 +68,19 @@ export async function deleteConversation(conversationId: string): Promise<void> 
 }
 
 export async function fetchConversation(conversationId: string): Promise<IConversation> {
-  const data = await apiClient.get<IConversation>(`/api/conversations/get/${conversationId}`);
-  return data.result;
+  const data = await apiClient.get<Record<string, unknown>>(
+    `/api/conversations/get/${conversationId}`,
+  );
+  return normalizeConversation((data.result ?? {}) as Record<string, unknown>);
 }
 
 export async function fetchEventConversations(eventId: string): Promise<IConversation[]> {
-  const data = await apiClient.get<IConversation[]>(`/api/conversations/byEvent/${eventId}`);
-  return data.result ?? [];
+  const data = await apiClient.get<Record<string, unknown>[]>(
+    `/api/conversations/byEvent/${eventId}`,
+  );
+  return (data.result ?? []).map(row =>
+    normalizeConversation(row as Record<string, unknown>),
+  );
 }
 
 export async function fetchConversationMessages(
