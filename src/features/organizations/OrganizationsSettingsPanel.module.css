@@ -170,6 +170,31 @@
   font-weight: 500;
 }
 
+.innRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.innRow .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.innRow > :last-child {
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .innRow {
+    flex-direction: column;
+  }
+
+  .innRow > :last-child {
+    width: 100%;
+  }
+}
+
 .input {
   width: 100%;
   padding: 8px 11px;

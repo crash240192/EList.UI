@@ -78,6 +78,25 @@ export interface OrganizationLegalRequest {
   headBasis?: string | null;
 }
 
+/**
+ * Запись из реестра (OrganizationRegistryParty).
+ * GET /api/organizations/lookup/inn/{inn}
+ */
+export interface OrganizationRegistryParty {
+  inn: string | null;
+  ogrn: string | null;
+  kpp: string | null;
+  name: string | null;
+  fullName: string | null;
+  legalAddress: string | null;
+  headName: string | null;
+  headPost: string | null;
+  legalForm: OrganizationLegalFormValue | null;
+  /** ACTIVE | LIQUIDATING | LIQUIDATED | BANKRUPT | REORGANIZING */
+  status: string | null;
+  isActive: boolean;
+}
+
 export interface OrganizationPayoutRequest {
   bankAccount?: string | null;
   bik?: string | null;
