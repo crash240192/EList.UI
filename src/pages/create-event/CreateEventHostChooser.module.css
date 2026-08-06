@@ -181,6 +181,33 @@
   color: inherit;
 }
 
+.templateCardActive {
+  border-style: solid;
+  background: var(--surface-2);
+  opacity: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.templateCardActive:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.templateCardSelected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+  opacity: 1;
+}
+
+.templateCardMuted {
+  display: flex;
+  align-items: center;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+}
+
 .templateIcon {
   width: 32px;
   height: 32px;

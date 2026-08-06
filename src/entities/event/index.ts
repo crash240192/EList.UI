@@ -75,3 +75,21 @@ export type {
   IRatingAccount,
   IRatingPersonInfo,
 } from './ratingApi';
+
+export {
+  createEventTemplate,
+  fetchEventTemplate,
+  updateEventTemplate,
+  deleteEventTemplate,
+  searchEventTemplates,
+} from './eventTemplatesApi';
+
+export type {
+  ICreateEventPayload,
+  ICreateEventBodyEvent,
+  ICreateEventParametersBody,
+  IEventTemplate,
+  ICreateEventTemplateRequest,
+  IUpdateEventTemplateRequest,
+  IEventTemplateSearchRequest,
+} from './eventTemplatesApi';
