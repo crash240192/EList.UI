@@ -749,7 +749,12 @@ export default function EventPage() {
                         >
                           <div className={styles.orgChipLogo}>
                             {logoId ? (
-                              <AuthImage fileId={logoId} alt={name} className={styles.orgChipLogoImg} />
+                              <AuthImage
+                                fileId={logoId}
+                                alt={name}
+                                className={styles.orgChipLogoImg}
+                                fallback={<span>{initials}</span>}
+                              />
                             ) : (
                               <span>{initials}</span>
                             )}

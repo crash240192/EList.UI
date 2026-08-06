@@ -95,7 +95,12 @@ function InviterAvatar({
         aria-hidden
       >
         {org?.logoId ? (
-          <AuthImage fileId={org.logoId} alt="" className={styles.orgAvatarImg} />
+          <AuthImage
+            fileId={org.logoId}
+            alt=""
+            className={styles.orgAvatarImg}
+            fallback={<span>{initials}</span>}
+          />
         ) : (
           <span>{initials}</span>
         )}

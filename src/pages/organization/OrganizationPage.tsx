@@ -73,7 +73,12 @@ function OrgCoverBackground({ logoId }: { logoId: string | null }) {
     <div className={styles.coverBg}>
       <div className={styles.coverBgGradient} aria-hidden />
       {logoId ? (
-        <AuthImage fileId={logoId} alt="" className={styles.coverAvatarImg} />
+        <AuthImage
+          fileId={logoId}
+          alt=""
+          className={styles.coverAvatarImg}
+          fallback={<div className={styles.coverPattern} aria-hidden />}
+        />
       ) : (
         <div className={styles.coverPattern} aria-hidden />
       )}
@@ -319,7 +324,12 @@ export default function OrganizationPage() {
           >
             <div className={styles.avatar}>
               {logoId ? (
-                <AuthImage fileId={logoId} alt={org.name} className={styles.avatarImg} />
+                <AuthImage
+                  fileId={logoId}
+                  alt={org.name}
+                  className={styles.avatarImg}
+                  fallback={<span>{initials}</span>}
+                />
               ) : (
                 <span>{initials}</span>
               )}

@@ -100,15 +100,24 @@ function AuthImageSingle({
   const [src, setSrc] = useState<string | null>(() => blobCache.get(key) ?? null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(() => !blobCache.has(key));
+  const [attempt, setAttempt] = useState(0);
   const showPreloader = useDelayedVisible(loading && !src && !error, preloaderDelayMs);
+
+  useEffect(() => {
+    setAttempt(0);
+    setError(false);
+    const k = cacheKey(fileId, fullSize);
+    setSrc(blobCache.get(k) ?? null);
+    setLoading(!blobCache.has(k));
+  }, [fileId, fullSize]);
 
   useEffect(() => {
     if (!fileId) return;
     const k = cacheKey(fileId, fullSize);
-    setError(false);
     if (blobCache.has(k)) {
       setSrc(blobCache.get(k)!);
       setLoading(false);
+      setError(false);
       return;
     }
     setLoading(true);
@@ -118,17 +127,25 @@ function AuthImageSingle({
         if (!cancelled) {
           setSrc(url);
           setLoading(false);
+          setError(false);
         }
       })
       .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-          onErrorProp?.();
+        if (cancelled) return;
+        if (attempt < 1) {
+          window.setTimeout(() => {
+            if (!cancelled) setAttempt(a => a + 1);
+          }, 400);
+          return;
         }
+        setError(true);
+        setLoading(false);
+        onErrorProp?.();
       });
     return () => { cancelled = true; };
-  }, [fileId, fullSize]);
+    // onErrorProp — опциональный колбэк; не включаем в deps, чтобы не рефетчить
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileId, fullSize, attempt]);
 
   if (error) return <>{fallback ?? null}</>;
   if (!src) {
