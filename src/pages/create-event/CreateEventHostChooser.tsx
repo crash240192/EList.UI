@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  deleteEventTemplate,
   searchEventTemplates,
   type IEventTemplate,
 } from '@/entities/event';
@@ -18,6 +19,7 @@ import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { Button } from '@/shared/ui/Button';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
+import { apiIsoToLocalParts, formatLocalDateLongRu } from '@/shared/lib/datetime';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import styles from './CreateEventHostChooser.module.css';
 
@@ -39,6 +41,73 @@ interface OrgOption {
   logoId: string | null;
 }
 
+interface TemplateCardInfo {
+  eventName: string | null;
+  address: string | null;
+  when: string | null;
+  costLabel: string;
+  privacyLabel: string;
+  ageLabel: string | null;
+  inviteLabel: string | null;
+  listLabel: string | null;
+  ticketsLabel: string | null;
+  coverImageId: string | null;
+  coverUrl: string | null;
+}
+
+function buildTemplateCardInfo(t: IEventTemplate): TemplateCardInfo {
+  const body = t.templateBody;
+  const ev = body?.event;
+  const params = body?.eventParameters;
+  const blackIds = [
+    ...(body?.blackList ?? []),
+    ...(body?.BlackList ?? []),
+  ];
+  const whiteIds = [
+    ...(body?.whiteList ?? []),
+    ...(body?.WhiteList ?? []),
+  ];
+  const inviteIds = [
+    ...(body?.inviteUsers ?? []),
+    ...(body?.InviteUsers ?? []),
+  ];
+  const inviteAll = Boolean(body?.inviteAllSubscribers ?? body?.InviteAllSubscribers);
+  const isPrivate = Boolean(params?.private);
+  const cost = Number(params?.cost ?? 0);
+  const age = params?.ageLimit;
+
+  let when: string | null = null;
+  if (ev?.startTime) {
+    const parts = apiIsoToLocalParts(String(ev.startTime));
+    if (parts.date) {
+      when = `${formatLocalDateLongRu(parts.date)}${parts.time ? ` · ${parts.time}` : ''}`;
+    }
+  }
+
+  const listCount = isPrivate ? whiteIds.length : blackIds.length;
+  const listLabel = listCount > 0
+    ? (isPrivate ? `Белый список: ${listCount}` : `Чёрный список: ${listCount}`)
+    : null;
+
+  let inviteLabel: string | null = null;
+  if (inviteAll) inviteLabel = 'Пригласить всех подписчиков';
+  else if (inviteIds.length > 0) inviteLabel = `Приглашений: ${inviteIds.length}`;
+
+  return {
+    eventName: ev?.name?.trim() || null,
+    address: ev?.address?.trim() || null,
+    when,
+    costLabel: cost > 0 ? `${cost.toLocaleString('ru-RU')} ₽` : 'Бесплатно',
+    privacyLabel: isPrivate ? 'Закрытое' : 'Открытое',
+    ageLabel: age == null || Number.isNaN(Number(age)) ? null : `${Math.trunc(Number(age))}+`,
+    inviteLabel,
+    listLabel,
+    ticketsLabel: params?.ticketsEnabled ? 'Билеты' : null,
+    coverImageId: ev?.coverImageId ? String(ev.coverImageId) : null,
+    coverUrl: ev?.coverUrl ? String(ev.coverUrl) : null,
+  };
+}
+
 export function CreateEventHostChooser({ onContinue }: Props) {
   const goBack = useSafeBack('/');
   const [loading, setLoading] = useState(true);
@@ -52,6 +121,9 @@ export function CreateEventHostChooser({ onContinue }: Props) {
   const [templates, setTemplates] = useState<IEventTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +174,8 @@ export function CreateEventHostChooser({ onContinue }: Props) {
     let cancelled = false;
     setTemplatesLoading(true);
     setSelectedTemplateId(null);
+    setDeleteConfirmId(null);
+    setActionError(null);
     const orgId = selected.kind === 'organization' ? selected.organizationId : undefined;
     searchEventTemplates(orgId ? { organizationId: orgId } : {})
       .then(list => {
@@ -126,6 +200,26 @@ export function CreateEventHostChooser({ onContinue }: Props) {
     onContinue(selected, template);
   };
 
+  const handleDeleteTemplate = async () => {
+    if (!deleteConfirmId) return;
+    setDeleting(true);
+    setActionError(null);
+    try {
+      await deleteEventTemplate(deleteConfirmId);
+      setTemplates(prev => prev.filter(t => t.id !== deleteConfirmId));
+      if (selectedTemplateId === deleteConfirmId) setSelectedTemplateId(null);
+      setDeleteConfirmId(null);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Не удалось удалить шаблон');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const deleteTarget = deleteConfirmId
+    ? templates.find(t => t.id === deleteConfirmId)
+    : null;
+
   return (
     <div className={styles.wrap}>
       <div className={styles.card}>
@@ -139,6 +233,7 @@ export function CreateEventHostChooser({ onContinue }: Props) {
         ) : (
           <div className={styles.body}>
             {error && <div className={styles.error}>{error}</div>}
+            {actionError && <div className={styles.error}>{actionError}</div>}
 
             <section className={styles.section}>
               <div className={styles.sectionLabel}>От чьего лица</div>
@@ -237,14 +332,16 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                   className={`${styles.templateCard} ${styles.templateCardActive} ${selectedTemplateId === null ? styles.templateCardSelected : ''}`}
                   onClick={() => setSelectedTemplateId(null)}
                 >
-                  <div className={styles.templateIcon}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M3 9h18M9 21V9" />
+                  <div className={styles.templateBlankVisual} aria-hidden>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 5v14M5 12h14" />
                     </svg>
                   </div>
-                  <div className={styles.templateName}>С нуля</div>
-                  <div className={styles.templateMeta}>Пустая форма без предзаполнения</div>
+                  <div className={styles.templateBody}>
+                    <div className={styles.templateName}>С нуля</div>
+                    <div className={styles.templateEventName}>Пустая форма</div>
+                    <div className={styles.templateMeta}>Без предзаполнения полей</div>
+                  </div>
                 </button>
 
                 {templatesLoading && (
@@ -253,27 +350,90 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                   </div>
                 )}
 
-                {!templatesLoading && templates.map(t => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={`${styles.templateCard} ${styles.templateCardActive} ${selectedTemplateId === t.id ? styles.templateCardSelected : ''}`}
-                    onClick={() => setSelectedTemplateId(t.id)}
-                  >
-                    <div className={styles.templateIcon}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-                      </svg>
+                {!templatesLoading && templates.map(t => {
+                  const info = buildTemplateCardInfo(t);
+                  const chips = [
+                    info.privacyLabel,
+                    info.costLabel,
+                    info.ageLabel,
+                    info.ticketsLabel,
+                    info.inviteLabel,
+                    info.listLabel,
+                  ].filter(Boolean) as string[];
+
+                  return (
+                    <div
+                      key={t.id}
+                      className={`${styles.templateCard} ${styles.templateCardActive} ${selectedTemplateId === t.id ? styles.templateCardSelected : ''}`}
+                    >
+                      <button
+                        type="button"
+                        className={styles.templateSelectArea}
+                        onClick={() => setSelectedTemplateId(t.id)}
+                      >
+                        <div className={styles.templateCover}>
+                          {info.coverImageId ? (
+                            <AuthImage
+                              fileId={info.coverImageId}
+                              alt=""
+                              className={styles.templateCoverImg}
+                              fallback={<div className={styles.templateCoverFallback} />}
+                            />
+                          ) : info.coverUrl ? (
+                            <img src={info.coverUrl} alt="" className={styles.templateCoverImg} />
+                          ) : (
+                            <div className={styles.templateCoverFallback}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <path d="M14 2v6h6" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className={styles.templateBody}>
+                          <div className={styles.templateName}>{t.name}</div>
+                          {info.eventName && (
+                            <div className={styles.templateEventName}>{info.eventName}</div>
+                          )}
+                          {info.address && (
+                            <div className={styles.templateMeta}>{info.address}</div>
+                          )}
+                          {info.when && (
+                            <div className={styles.templateMeta}>{info.when}</div>
+                          )}
+                          {!info.eventName && !info.address && !info.when && (
+                            <div className={styles.templateMeta}>Сохранённые настройки</div>
+                          )}
+                          {chips.length > 0 && (
+                            <div className={styles.templateChips}>
+                              {chips.map(chip => (
+                                <span key={chip} className={styles.templateChip}>{chip}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.templateDeleteBtn}
+                        title="Удалить шаблон"
+                        aria-label={`Удалить шаблон «${t.name}»`}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setActionError(null);
+                          setDeleteConfirmId(t.id);
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <path d="M10 11v6M14 11v6" />
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                        </svg>
+                      </button>
                     </div>
-                    <div className={styles.templateName}>{t.name}</div>
-                    <div className={styles.templateMeta}>
-                      {t.templateBody?.event?.name
-                        ? `«${t.templateBody.event.name}»`
-                        : 'Сохранённые настройки'}
-                    </div>
-                  </button>
-                ))}
+                  );
+                })}
 
                 {!templatesLoading && templates.length === 0 && (
                   <div className={styles.templateCardMuted}>
@@ -296,6 +456,41 @@ export function CreateEventHostChooser({ onContinue }: Props) {
           </div>
         )}
       </div>
+
+      {deleteConfirmId && (
+        <div className={styles.confirmOverlay} onClick={() => !deleting && setDeleteConfirmId(null)}>
+          <div
+            className={styles.confirmDialog}
+            role="dialog"
+            aria-modal
+            aria-label="Удаление шаблона"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={styles.confirmTitle}>Удалить шаблон?</div>
+            <p className={styles.confirmHint}>
+              Шаблон «{deleteTarget?.name ?? 'без названия'}» будет удалён безвозвратно.
+            </p>
+            <div className={styles.confirmActions}>
+              <button
+                type="button"
+                className={styles.confirmCancel}
+                disabled={deleting}
+                onClick={() => setDeleteConfirmId(null)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={styles.confirmDelete}
+                disabled={deleting}
+                onClick={() => { void handleDeleteTemplate(); }}
+              >
+                {deleting ? 'Удаление...' : 'Удалить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,8 @@ import {
   fetchEventParameters,
   fetchEventOrganizators,
   createEventTemplate,
+  updateEventTemplate,
+  searchEventTemplates,
   type ICreateEventPayload,
   type IEventTemplate,
 } from '@/entities/event';
@@ -27,7 +29,7 @@ import {
   type IBWListUser,
 } from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
-import { getOrFetchAccountId } from '@/entities/user/api';
+import { fetchAccountById, getOrFetchAccountId } from '@/entities/user/api';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { getWalletByAccount, getWalletByOrganization } from '@/entities/user/walletApi';
 import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } from '@/entities/admin/adminApi';
@@ -99,6 +101,31 @@ const EMPTY: FormState = {
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
   ticketsEnabled: false,
 };
+
+async function resolveAccountIdsToUsers(ids: string[]): Promise<IWhitelistUser[]> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return [];
+  return Promise.all(unique.map(async accountId => {
+    try {
+      const account = await fetchAccountById(accountId);
+      return {
+        accountId: account.id,
+        login: account.login,
+        avatarId: account.avatarId ?? null,
+        firstName: null,
+        lastName: null,
+      };
+    } catch {
+      return {
+        accountId,
+        login: accountId.slice(0, 8),
+        avatarId: null,
+        firstName: null,
+        lastName: null,
+      };
+    }
+  }));
+}
 
 /** Восстанавливает состояние пикера: категория — только если выбраны все её типы */
 function deriveCategoryTypeSelection(
@@ -200,6 +227,10 @@ export default function CreateEventPage() {
   const [whitelist, setWhitelist] = useState<IWhitelistUser[]>([]);
   const [blacklist, setBlacklist] = useState<IWhitelistUser[]>([]);
   const [listModalOpen, setListModalOpen] = useState(false);
+  const [invitePickerOpen, setInvitePickerOpen] = useState(false);
+  const [inviteUserIds, setInviteUserIds] = useState<string[]>([]);
+  const [autoInviteEnabled, setAutoInviteEnabled] = useState(false);
+  const [autoInviteMode, setAutoInviteMode] = useState<'all' | 'select'>('select');
 
   // Кошелёк / тариф
   const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
@@ -211,10 +242,16 @@ export default function CreateEventPage() {
   const [editTicketsCapability, setEditTicketsCapability] = useState<'unknown' | 'yes' | 'no'>('unknown');
   /** Шаблон, выбранный на chooser — применяем к форме один раз */
   const [pendingTemplate, setPendingTemplate] = useState<IEventTemplate | null>(null);
+  /** Исходный шаблон (для предложения обновления при сохранении) */
+  const [sourceTemplate, setSourceTemplate] = useState<IEventTemplate | null>(null);
   const templateAppliedRef = useRef(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [saveTemplateMode, setSaveTemplateMode] = useState<'new' | 'update'>('new');
+  const [updateTemplateId, setUpdateTemplateId] = useState<string | null>(null);
+  const [existingTemplates, setExistingTemplates] = useState<IEventTemplate[]>([]);
   const [templateNameDraft, setTemplateNameDraft] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
 
   const { toast, show: showToast } = useToast();
 
@@ -412,18 +449,24 @@ export default function CreateEventPage() {
     setWhitelist([]);
     setBlacklist([]);
     setListModalOpen(false);
+    setInviteUserIds([]);
+    setAutoInviteEnabled(false);
+    setAutoInviteMode('select');
+    setSourceTemplate(null);
     loadedBWListsRef.current = new Set();
     initialEventTypeIdsRef.current = null;
     initialTypesAppliedRef.current = false;
     templateAppliedRef.current = false;
   }, [isEditing, id]);
 
-  // Применение шаблона с chooser (даты/время не переносим — выбираются заново)
+  // Применение шаблона с chooser (включая даты, приглашения и ч/б списки)
   useEffect(() => {
     if (isEditing || hostGate !== 'form' || !pendingTemplate || templateAppliedRef.current) return;
-    const body = pendingTemplate.templateBody;
+    const applied = pendingTemplate;
+    const body = applied.templateBody;
     if (!body) {
       templateAppliedRef.current = true;
+      setSourceTemplate(applied);
       setPendingTemplate(null);
       return;
     }
@@ -431,6 +474,8 @@ export default function CreateEventPage() {
     const ev = body.event ?? {};
     const params = body.eventParameters ?? {};
     const typeIds = Array.isArray(body.eventTypes) ? body.eventTypes.map(String) : [];
+    const startParts = ev.startTime ? apiIsoToLocalParts(String(ev.startTime)) : { date: '', time: '' };
+    const endParts = ev.endTime ? apiIsoToLocalParts(String(ev.endTime)) : { date: '', time: '' };
 
     setForm(f => ({
       ...f,
@@ -446,11 +491,10 @@ export default function CreateEventPage() {
       allowUsersToInvite: params.allowUsersToInvite ?? true,
       allowedGender: (params.allowedGender as Gender | '' | null | undefined) ?? '',
       ticketsEnabled: Boolean(params.ticketsEnabled),
-      // даты оставляем пустыми
-      startDate: '',
-      startTime: '',
-      endDate: '',
-      endTime: '',
+      startDate: startParts.date,
+      startTime: startParts.time,
+      endDate: endParts.date,
+      endTime: endParts.time,
     }));
 
     if (typeof ev.latitude === 'number') setLat(ev.latitude);
@@ -458,7 +502,18 @@ export default function CreateEventPage() {
     if (ev.coverUrl) setCoverUrl(String(ev.coverUrl));
     if (ev.coverImageId) setCoverImageId(String(ev.coverImageId));
 
-    // Списки и автоприглашения из шаблона не переносим — только контент мероприятия
+    if (ev.startTime && ev.endTime) {
+      const diff = new Date(String(ev.endTime)).getTime() - new Date(String(ev.startTime)).getTime();
+      const sameDay = new Date(String(ev.startTime)).toDateString()
+        === new Date(String(ev.endTime)).toDateString();
+      if (sameDay && diff >= 0) {
+        setEndMode('duration');
+        setDurationH(String(Math.floor(diff / 3600000)));
+        setDurationM(String(Math.max(0, Math.round((diff % 3600000) / 60000))));
+      } else {
+        setEndMode('multiday');
+      }
+    }
 
     if (typeIds.length > 0) {
       const catalog = allTypesRef.current;
@@ -473,9 +528,49 @@ export default function CreateEventPage() {
       }
     }
 
+    setSourceTemplate(applied);
     templateAppliedRef.current = true;
     setPendingTemplate(null);
-    showToast('Шаблон применён — укажите дату и время');
+    showToast('Шаблон применён');
+
+    const blackIds = [
+      ...(body.blackList ?? []),
+      ...(body.BlackList ?? []),
+    ].map(String).filter(Boolean);
+    const whiteIds = [
+      ...(body.whiteList ?? []),
+      ...(body.WhiteList ?? []),
+    ].map(String).filter(Boolean);
+    const inviteIds = [
+      ...(body.inviteUsers ?? []),
+      ...(body.InviteUsers ?? []),
+    ].map(String).filter(Boolean);
+    const inviteAll = Boolean(
+      body.inviteAllSubscribers ?? body.InviteAllSubscribers,
+    );
+
+    let cancelled = false;
+    (async () => {
+      const [blackUsers, whiteUsers] = await Promise.all([
+        resolveAccountIdsToUsers([...new Set(blackIds)]),
+        resolveAccountIdsToUsers([...new Set(whiteIds)]),
+      ]);
+      if (cancelled) return;
+      setBlacklist(blackUsers);
+      setWhitelist(whiteUsers);
+
+      if (inviteAll) {
+        setAutoInviteEnabled(true);
+        setAutoInviteMode('all');
+        setInviteUserIds([]);
+      } else if (inviteIds.length > 0) {
+        setAutoInviteEnabled(true);
+        setAutoInviteMode('select');
+        setInviteUserIds([...new Set(inviteIds)]);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [isEditing, hostGate, pendingTemplate, showToast]);
 
   // Загрузка события для редактирования
@@ -938,11 +1033,6 @@ export default function CreateEventPage() {
     if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   };
 
-  const [invitePickerOpen, setInvitePickerOpen] = useState(false);
-  const [inviteUserIds, setInviteUserIds] = useState<string[]>([]);
-  const [autoInviteEnabled, setAutoInviteEnabled] = useState(false);
-  const [autoInviteMode, setAutoInviteMode] = useState<'all' | 'select'>('select');
-
   const draftBlackListIds = useMemo(
     () => blacklist.map(u => u.accountId),
     [blacklist],
@@ -1121,11 +1211,47 @@ export default function CreateEventPage() {
     const defaultName = form.name.trim()
       ? `Шаблон: ${form.name.trim()}`
       : 'Новый шаблон';
-    setTemplateNameDraft(defaultName);
-    setSaveTemplateOpen(true);
+    setOverwriteConfirmOpen(false);
+    setSavingTemplate(false);
+
+    const orgId = eventHost?.kind === 'organization' ? eventHost.organizationId : undefined;
+    void searchEventTemplates(orgId ? { organizationId: orgId } : {})
+      .then(list => {
+        setExistingTemplates(list);
+        if (sourceTemplate && list.some(t => t.id === sourceTemplate.id)) {
+          setSaveTemplateMode('update');
+          setUpdateTemplateId(sourceTemplate.id);
+          setTemplateNameDraft(sourceTemplate.name);
+        } else if (sourceTemplate) {
+          setSaveTemplateMode('update');
+          setUpdateTemplateId(sourceTemplate.id);
+          setTemplateNameDraft(sourceTemplate.name);
+          setExistingTemplates(prev => (
+            prev.some(t => t.id === sourceTemplate.id) ? prev : [sourceTemplate, ...prev]
+          ));
+        } else {
+          setSaveTemplateMode('new');
+          setUpdateTemplateId(list[0]?.id ?? null);
+          setTemplateNameDraft(defaultName);
+        }
+        setSaveTemplateOpen(true);
+      })
+      .catch(() => {
+        setExistingTemplates(sourceTemplate ? [sourceTemplate] : []);
+        if (sourceTemplate) {
+          setSaveTemplateMode('update');
+          setUpdateTemplateId(sourceTemplate.id);
+          setTemplateNameDraft(sourceTemplate.name);
+        } else {
+          setSaveTemplateMode('new');
+          setUpdateTemplateId(null);
+          setTemplateNameDraft(defaultName);
+        }
+        setSaveTemplateOpen(true);
+      });
   };
 
-  const handleSaveTemplate = async () => {
+  const persistTemplate = async (mode: 'new' | 'update') => {
     const name = templateNameDraft.trim();
     if (!name) {
       showToast('Укажите название шаблона');
@@ -1135,25 +1261,64 @@ export default function CreateEventPage() {
       showToast('Заполните хотя бы название, тип или место');
       return;
     }
+    if (mode === 'update' && !updateTemplateId) {
+      showToast('Выберите шаблон для обновления');
+      return;
+    }
+
     setSavingTemplate(true);
     try {
-      const templateBody = await buildCreateEventPayload({ includeInvites: false });
-      // В шаблоне даты не обязательны — убираем одноразовые поля приглашений
-      delete templateBody.inviteAllSubscribers;
-      delete templateBody.inviteUsers;
-      await createEventTemplate({
-        name,
-        templateBody,
-        organizationId:
-          eventHost?.kind === 'organization' ? eventHost.organizationId : null,
-      });
+      const templateBody = await buildCreateEventPayload({ includeInvites: true });
+      if (mode === 'update' && updateTemplateId) {
+        await updateEventTemplate(updateTemplateId, { name, templateBody });
+        setSourceTemplate(prev => (
+          prev && prev.id === updateTemplateId
+            ? { ...prev, name, templateBody, updateDate: new Date().toISOString() }
+            : { id: updateTemplateId, name, templateBody, ownerAccountId: null, ownerOrganizationId: null, createDate: null, updateDate: new Date().toISOString() }
+        ));
+        showToast('Шаблон обновлён');
+      } else {
+        const newId = await createEventTemplate({
+          name,
+          templateBody,
+          organizationId:
+            eventHost?.kind === 'organization' ? eventHost.organizationId : null,
+        });
+        setSourceTemplate({
+          id: newId,
+          name,
+          templateBody,
+          ownerAccountId: null,
+          ownerOrganizationId: eventHost?.kind === 'organization' ? eventHost.organizationId : null,
+          createDate: new Date().toISOString(),
+          updateDate: null,
+        });
+        showToast('Шаблон сохранён');
+      }
+      setOverwriteConfirmOpen(false);
       setSaveTemplateOpen(false);
-      showToast('Шаблон сохранён');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Не удалось сохранить шаблон');
     } finally {
       setSavingTemplate(false);
     }
+  };
+
+  const handleSaveTemplate = () => {
+    const name = templateNameDraft.trim();
+    if (!name) {
+      showToast('Укажите название шаблона');
+      return;
+    }
+    if (saveTemplateMode === 'update') {
+      if (!updateTemplateId) {
+        showToast('Выберите шаблон для обновления');
+        return;
+      }
+      setOverwriteConfirmOpen(true);
+      return;
+    }
+    void persistTemplate('new');
   };
 
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -1258,6 +1423,7 @@ export default function CreateEventPage() {
               skipHostGateEffectRef.current = true;
               setEventHost(null);
               setPendingTemplate(null);
+              setSourceTemplate(null);
               templateAppliedRef.current = false;
               setHostGate('chooser');
               setSearchParams({}, { replace: true });
@@ -1838,16 +2004,79 @@ export default function CreateEventPage() {
               {eventHost?.kind === 'organization'
                 ? ` для организации «${eventHost.organizationName}»`
                 : ' в ваши шаблоны'}
-              . Дату и время при следующем создании можно указать заново.
+              , включая дату, время, приглашения и списки доступа.
             </p>
+
+            <div className={styles.templateModeGroup} role="radiogroup" aria-label="Способ сохранения">
+              <label className={styles.templateModeOption}>
+                <input
+                  type="radio"
+                  name="saveTemplateMode"
+                  checked={saveTemplateMode === 'new'}
+                  onChange={() => {
+                    setSaveTemplateMode('new');
+                    if (!templateNameDraft.trim() || (sourceTemplate && templateNameDraft === sourceTemplate.name)) {
+                      setTemplateNameDraft(
+                        form.name.trim() ? `Шаблон: ${form.name.trim()}` : 'Новый шаблон',
+                      );
+                    }
+                  }}
+                />
+                <span>Создать новый шаблон</span>
+              </label>
+              <label className={`${styles.templateModeOption} ${existingTemplates.length === 0 ? styles.templateModeOptionDisabled : ''}`}>
+                <input
+                  type="radio"
+                  name="saveTemplateMode"
+                  checked={saveTemplateMode === 'update'}
+                  disabled={existingTemplates.length === 0}
+                  onChange={() => {
+                    setSaveTemplateMode('update');
+                    const preferred = sourceTemplate
+                      ?? existingTemplates.find(t => t.id === updateTemplateId)
+                      ?? existingTemplates[0];
+                    if (preferred) {
+                      setUpdateTemplateId(preferred.id);
+                      setTemplateNameDraft(preferred.name);
+                    }
+                  }}
+                />
+                <span>
+                  {sourceTemplate
+                    ? `Обновить «${sourceTemplate.name}»`
+                    : 'Обновить существующий'}
+                </span>
+              </label>
+            </div>
+
+            {saveTemplateMode === 'update' && existingTemplates.length > 0 && (
+              <select
+                className={styles.input}
+                value={updateTemplateId ?? ''}
+                onChange={e => {
+                  const id = e.target.value;
+                  setUpdateTemplateId(id);
+                  const found = existingTemplates.find(t => t.id === id);
+                  if (found) setTemplateNameDraft(found.name);
+                }}
+              >
+                {existingTemplates.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                    {sourceTemplate?.id === t.id ? ' (текущий)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <input
               className={styles.input}
               value={templateNameDraft}
               onChange={e => setTemplateNameDraft(e.target.value)}
               placeholder="Название шаблона"
-              autoFocus
+              autoFocus={saveTemplateMode === 'new'}
               onKeyDown={e => {
-                if (e.key === 'Enter') void handleSaveTemplate();
+                if (e.key === 'Enter') handleSaveTemplate();
               }}
             />
             <div className={styles.templateDialogActions}>
@@ -1862,10 +2091,54 @@ export default function CreateEventPage() {
               <button
                 type="button"
                 className={styles.saveBtn}
-                disabled={savingTemplate || !templateNameDraft.trim()}
-                onClick={() => { void handleSaveTemplate(); }}
+                disabled={
+                  savingTemplate
+                  || !templateNameDraft.trim()
+                  || (saveTemplateMode === 'update' && !updateTemplateId)
+                }
+                onClick={handleSaveTemplate}
               >
-                {savingTemplate ? 'Сохранение...' : 'Сохранить'}
+                {savingTemplate
+                  ? 'Сохранение...'
+                  : saveTemplateMode === 'update'
+                    ? 'Обновить'
+                    : 'Создать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {overwriteConfirmOpen && (
+        <div className={styles.templateOverlay} onClick={() => !savingTemplate && setOverwriteConfirmOpen(false)}>
+          <div
+            className={styles.templateDialog}
+            role="dialog"
+            aria-modal
+            aria-label="Подтверждение перезаписи шаблона"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={styles.templateDialogTitle}>Перезаписать шаблон?</div>
+            <p className={styles.templateDialogHint}>
+              Шаблон «{templateNameDraft.trim() || 'без названия'}» будет заменён текущими данными формы.
+              Это действие нельзя отменить.
+            </p>
+            <div className={styles.templateDialogActions}>
+              <button
+                type="button"
+                className={styles.cancelBtn}
+                disabled={savingTemplate}
+                onClick={() => setOverwriteConfirmOpen(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={styles.saveBtn}
+                disabled={savingTemplate}
+                onClick={() => { void persistTemplate('update'); }}
+              >
+                {savingTemplate ? 'Сохранение...' : 'Перезаписать'}
               </button>
             </div>
           </div>

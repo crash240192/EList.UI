@@ -162,15 +162,16 @@
 
 .templateGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 10px;
 }
 
 .templateCard {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px;
+  gap: 0;
+  padding: 0;
   border: 1px dashed var(--border);
   border-radius: 12px;
   background: transparent;
@@ -179,6 +180,8 @@
   text-align: left;
   font-family: inherit;
   color: inherit;
+  overflow: hidden;
+  min-height: 148px;
 }
 
 .templateCardActive {
@@ -186,7 +189,7 @@
   background: var(--surface-2);
   opacity: 1;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
 .templateCardActive:hover {
@@ -196,7 +199,69 @@
 .templateCardSelected {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
   opacity: 1;
+}
+
+.templateSelectArea {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  flex: 1;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+
+.templateCover {
+  width: 100%;
+  height: 72px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.templateCoverImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.templateCoverFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 18%, var(--surface)) 0%,
+      var(--surface-2) 100%);
+}
+
+.templateBlankVisual {
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.templateBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 14px;
+  min-width: 0;
 }
 
 .templateCardMuted {
@@ -206,30 +271,142 @@
   border-radius: 12px;
   border: 1px dashed var(--border);
   color: var(--text-muted);
-}
-
-.templateIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
+  grid-column: 1 / -1;
 }
 
 .templateName {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-primary);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.templateEventName {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-secondary);
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .templateMeta {
   font-size: 11px;
   color: var(--text-muted);
   line-height: 1.35;
+  word-break: break-word;
+}
+
+.templateChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.templateChip {
+  font-size: 10px;
+  font-weight: 550;
+  line-height: 1.2;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  color: var(--text-secondary);
+}
+
+.templateDeleteBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, #ef4444 35%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: #f87171;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.92;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.templateDeleteBtn:hover {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: #f87171;
+  opacity: 1;
+}
+
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.confirmDialog {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirmTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.confirmHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.confirmCancel,
+.confirmDelete {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.confirmCancel {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.confirmDelete {
+  border: none;
+  background: #ef4444;
+  color: #fff;
+}
+
+.confirmCancel:disabled,
+.confirmDelete:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .footer {
