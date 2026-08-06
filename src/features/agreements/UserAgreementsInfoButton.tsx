@@ -12,6 +12,10 @@ import {
 } from '@/entities/agreement';
 import { useAuthStore } from '@/app/store';
 import { AgreementDocumentModal } from './AgreementDocumentModal';
+import {
+  UserAgreementAcceptDialog,
+  type PendingUserAgreement,
+} from './UserAgreementAcceptDialog';
 import styles from './UserAgreementsInfoButton.module.css';
 
 const USER_DOCUMENT_TYPES: DocumentTypeValue[] = [
@@ -40,6 +44,7 @@ export function UserAgreementsInfoButton() {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<DocRow[]>([]);
   const [viewDoc, setViewDoc] = useState<IAgreementDocument | null>(null);
+  const [acceptItem, setAcceptItem] = useState<PendingUserAgreement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -81,12 +86,13 @@ export function UserAgreementsInfoButton() {
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
+      if (viewDoc || acceptItem) return;
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
     const onEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !viewDoc) setOpen(false);
+      if (e.key === 'Escape' && !viewDoc && !acceptItem) setOpen(false);
     };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onEsc);
@@ -94,7 +100,17 @@ export function UserAgreementsInfoButton() {
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onEsc);
     };
-  }, [open, viewDoc]);
+  }, [open, viewDoc, acceptItem]);
+
+  const openRow = (row: DocRow) => {
+    if (!row.document) return;
+    const needsAccept = authenticated && row.consent !== 'yes';
+    if (needsAccept) {
+      setAcceptItem({ type: row.type, document: row.document });
+      return;
+    }
+    setViewDoc(row.document);
+  };
 
   return (
     <div className={styles.wrap} ref={wrapRef}>
@@ -125,7 +141,7 @@ export function UserAgreementsInfoButton() {
 
           {!authenticated && (
             <p className={styles.hint}>
-              Войдите в аккаунт, чтобы увидеть, какие документы вы приняли.
+              Войдите в аккаунт, чтобы принять документы. Можно открыть текст без входа.
             </p>
           )}
 
@@ -137,42 +153,40 @@ export function UserAgreementsInfoButton() {
             <div className={styles.empty}>Документы пока недоступны</div>
           ) : (
             <ul className={styles.list}>
-              {rows.map(row => (
-                <li key={row.type} className={styles.row}>
-                  <div className={styles.rowTop}>
-                    <span className={styles.docName}>{row.label}</span>
-                    <span
-                      className={`${styles.status} ${
-                        row.consent === 'yes'
-                          ? styles.statusOk
-                          : row.consent === 'no'
-                            ? styles.statusNo
-                            : styles.statusMute
-                      }`}
-                    >
-                      {row.consent === 'yes'
-                        ? 'Принято'
-                        : row.consent === 'no'
-                          ? 'Не принято'
-                          : row.consent === 'guest'
-                            ? '—'
-                            : 'Нет данных'}
-                    </span>
-                  </div>
-                  <div className={styles.rowActions}>
+              {rows.map(row => {
+                const clickable = !!row.document;
+                return (
+                  <li key={row.type}>
                     <button
                       type="button"
-                      className={styles.viewBtn}
-                      disabled={!row.document}
-                      onClick={() => {
-                        if (row.document) setViewDoc(row.document);
-                      }}
+                      className={`${styles.row} ${clickable ? styles.rowClickable : styles.rowDisabled}`}
+                      disabled={!clickable}
+                      onClick={() => openRow(row)}
                     >
-                      {row.document ? 'Открыть' : 'Нет документа'}
+                      <div className={styles.rowTop}>
+                        <span className={styles.docName}>{row.label}</span>
+                        <span
+                          className={`${styles.status} ${
+                            row.consent === 'yes'
+                              ? styles.statusOk
+                              : row.consent === 'no'
+                                ? styles.statusNo
+                                : styles.statusMute
+                          }`}
+                        >
+                          {row.consent === 'yes'
+                            ? 'Принято'
+                            : row.consent === 'no'
+                              ? 'Не принято'
+                              : row.consent === 'guest'
+                                ? '—'
+                                : 'Нет данных'}
+                        </span>
+                      </div>
                     </button>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -184,16 +198,33 @@ export function UserAgreementsInfoButton() {
           onClose={() => setViewDoc(null)}
         />
       )}
+
+      {acceptItem && (
+        <UserAgreementAcceptDialog
+          item={acceptItem}
+          onCancel={() => setAcceptItem(null)}
+          onComplete={() => {
+            setAcceptItem(null);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
 }
 
+/** i в круге: точка — filled circle, иначе stroke-линия часто обрезается */
 function InfoIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="16" x2="12" y2="12" />
-      <line x1="12" y1="8" x2="12.01" y2="8" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="8" r="1.35" fill="currentColor" />
+      <path
+        d="M12 11v5.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

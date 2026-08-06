@@ -286,10 +286,29 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
   padding: 12px;
   border-radius: 10px;
   background: var(--surface-2);
   border: 1px solid var(--border);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.orgDocRowClickable {
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.orgDocRowClickable:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
+}
+
+.orgDocRowDisabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .orgDocMain {

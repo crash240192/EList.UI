@@ -34,9 +34,10 @@ import { useAccountId } from '@/features/auth/useAccountId';
 import { getWalletByAccount, getWalletByOrganization } from '@/entities/user/walletApi';
 import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } from '@/entities/admin/adminApi';
 import {
-  OrganizationVerificationStatus,
+  canOrganizationHostEvents,
   fetchMyOrganizations,
   fetchOrganizationById,
+  filterOrganizationsEligibleToHostEvents,
 } from '@/entities/organization';
 import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
@@ -46,6 +47,12 @@ import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { DurationPicker } from '@/shared/ui/DurationPicker/DurationPicker';
 import { InviteModal } from '@/features/event/InviteModal';
+import {
+  OrgAgreementAcceptDialog,
+  collectOutdatedOrgAgreements,
+  orgAgreementMissingMessage,
+  type PendingOrgAgreement,
+} from '@/features/agreements';
 import { createConversation } from '@/entities/conversation';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
@@ -252,6 +259,9 @@ export default function CreateEventPage() {
   const [templateNameDraft, setTemplateNameDraft] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
+  const [orgAgreementQueue, setOrgAgreementQueue] = useState<PendingOrgAgreement[]>([]);
+  const [orgAgreementResume, setOrgAgreementResume] = useState<'publish' | 'enableTickets' | null>(null);
+  const [checkingOrgAgreements, setCheckingOrgAgreements] = useState(false);
 
   const { toast, show: showToast } = useToast();
 
@@ -274,7 +284,7 @@ export default function CreateEventPage() {
   const initialTypesAppliedRef = useRef(false);
   const allTypesRef = useRef<IEventType[]>([]);
 
-  // Выбор хозяина события (пользователь / верифицированная организация)
+  // Выбор хозяина события (пользователь / активная организация с офертой)
   useEffect(() => {
     if (skipHostGateEffectRef.current) {
       skipHostGateEffectRef.current = false;
@@ -289,13 +299,10 @@ export default function CreateEventPage() {
     if (hostParam === 'user') {
       let cancelled = false;
       fetchMyOrganizations()
-        .then(list => {
+        .then(list => filterOrganizationsEligibleToHostEvents(list))
+        .then(eligible => {
           if (cancelled) return;
-          const verified = list.filter(
-            o => o.active !== false
-              && o.verificationStatus === OrganizationVerificationStatus.Verified,
-          );
-          setCanChooseHost(verified.length > 0);
+          setCanChooseHost(eligible.length > 0);
           setEventHost({ kind: 'user' });
           setHostGate('form');
         })
@@ -310,15 +317,28 @@ export default function CreateEventPage() {
 
     if (hostParam === 'org' && orgIdParam) {
       let cancelled = false;
-      fetchMyOrganizations()
-        .then(list => {
+      (async () => {
+        try {
+          const list = await fetchMyOrganizations();
           if (cancelled) return;
-          const verified = list.filter(
-            o => o.active !== false
-              && o.verificationStatus === OrganizationVerificationStatus.Verified,
-          );
-          setCanChooseHost(verified.length > 0);
-          const org = list.find(o => o.id === orgIdParam);
+          const org = list.find(o => o.id === orgIdParam) ?? null;
+          const eligibleList = await filterOrganizationsEligibleToHostEvents(list);
+          if (cancelled) return;
+          setCanChooseHost(eligibleList.length > 0);
+
+          const allowed = org
+            ? await canOrganizationHostEvents(orgIdParam, org)
+            : false;
+          if (cancelled) return;
+
+          if (!allowed) {
+            // Нет активной org / оферты — вернёмся к выбору хоста
+            setEventHost(null);
+            setHostGate('chooser');
+            setSearchParams({}, { replace: true });
+            return;
+          }
+
           setEventHost({
             kind: 'organization',
             organizationId: orgIdParam,
@@ -326,17 +346,13 @@ export default function CreateEventPage() {
             canSellTickets: Boolean(org?.canSellTickets),
           });
           setHostGate('form');
-        })
-        .catch(() => {
+        } catch {
           if (cancelled) return;
-          setEventHost({
-            kind: 'organization',
-            organizationId: orgIdParam,
-            organizationName: 'Организация',
-            canSellTickets: false,
-          });
-          setHostGate('form');
-        });
+          setEventHost(null);
+          setHostGate('chooser');
+          setSearchParams({}, { replace: true });
+        }
+      })();
       return () => { cancelled = true; };
     }
 
@@ -1323,22 +1339,117 @@ export default function CreateEventPage() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handlePublishClick = () => {
-    if (isEditing) { handleSubmit(); return; }
-    const firstErr = validate();
-    if (firstErr) {
-      showToast({ name:'Укажите название', type:'Выберите тип мероприятия',
-        location:'Укажите адрес на карте',
-        startDate: startDateToastMessage,
-        startTime:'Укажите время начала', duration:'Укажите длительность',
-        endDate: endDateTimeToast, endTime:'Укажите время окончания',
-        cost: costToastMessage,
-        maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
-        ageLimit: ageLimitToastMessage,
-      }[firstErr]);
-      scrollTo(firstErr); return;
+  const wantsTicketsEnabled = canEnableTickets
+    && (parseFloat(form.cost) || 0) > 0
+    && form.ticketsEnabled;
+
+  /** Проверка актуальности оферты / соглашения на билеты перед действием */
+  const ensureOrgAgreements = useCallback(async (
+    resume: 'publish' | 'enableTickets',
+    opts: { requireOffer: boolean; requireTicketing: boolean },
+  ): Promise<boolean> => {
+    if (!eventHost || eventHost.kind !== 'organization') return true;
+
+    setCheckingOrgAgreements(true);
+    try {
+      const { outdated, missingDocs } = await collectOutdatedOrgAgreements(
+        eventHost.organizationId,
+        {
+          requireOffer: opts.requireOffer,
+          requireTicketing: opts.requireTicketing,
+        },
+      );
+
+      if (missingDocs.length > 0) {
+        showToast(orgAgreementMissingMessage(missingDocs[0]));
+        return false;
+      }
+      if (outdated.length > 0) {
+        setOrgAgreementQueue(outdated);
+        setOrgAgreementResume(resume);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Не удалось проверить соглашения организации');
+      return false;
+    } finally {
+      setCheckingOrgAgreements(false);
     }
-    setConfirmOpen(true);
+  }, [eventHost, showToast]);
+
+  const handlePublishClick = () => {
+    void (async () => {
+      if (!isEditing) {
+        const firstErr = validate();
+        if (firstErr) {
+          showToast({ name:'Укажите название', type:'Выберите тип мероприятия',
+            location:'Укажите адрес на карте',
+            startDate: startDateToastMessage,
+            startTime:'Укажите время начала', duration:'Укажите длительность',
+            endDate: endDateTimeToast, endTime:'Укажите время окончания',
+            cost: costToastMessage,
+            maxPersons: parseInt(form.maxPersons) < 0 ? 'Количество участников не может быть отрицательным' : `Кол-во участников превышает лимит тарифа (до ${maxPersons})`,
+            ageLimit: ageLimitToastMessage,
+          }[firstErr]);
+          scrollTo(firstErr);
+          return;
+        }
+      }
+
+      if (isEditing && !eventHost && editTicketsCapability === 'unknown') {
+        showToast('Загрузка данных организатора...');
+        return;
+      }
+
+      if (eventHost?.kind === 'organization') {
+        const ok = await ensureOrgAgreements('publish', {
+          requireOffer: true,
+          requireTicketing: wantsTicketsEnabled,
+        });
+        if (!ok) return;
+      }
+
+      if (isEditing) {
+        void handleSubmit();
+        return;
+      }
+      setConfirmOpen(true);
+    })();
+  };
+
+  const handleTicketsToggle = (enabled: boolean) => {
+    if (!enabled) {
+      setForm(f => ({ ...f, ticketsEnabled: false }));
+      return;
+    }
+    void (async () => {
+      if (eventHost?.kind === 'organization') {
+        const ok = await ensureOrgAgreements('enableTickets', {
+          requireOffer: false,
+          requireTicketing: true,
+        });
+        if (!ok) return;
+      }
+      setForm(f => ({ ...f, ticketsEnabled: true }));
+    })();
+  };
+
+  const handleOrgAgreementsComplete = () => {
+    const resume = orgAgreementResume;
+    setOrgAgreementQueue([]);
+    setOrgAgreementResume(null);
+    if (resume === 'enableTickets') {
+      setForm(f => ({ ...f, ticketsEnabled: true }));
+      return;
+    }
+    if (resume === 'publish') {
+      if (isEditing) {
+        void handleSubmit();
+      } else {
+        setConfirmOpen(true);
+      }
+    }
   };
   const checks = [
     { label: 'Название',          done: !!form.name.trim() },
@@ -1716,9 +1827,13 @@ export default function CreateEventPage() {
                 <Toggle
                   label="Продажа билетов"
                   checked={form.ticketsEnabled}
-                  locked={(parseFloat(form.cost) || 0) <= 0}
-                  onChange={v => setForm(f => ({ ...f, ticketsEnabled: v }))}
-                  lockedHint="Укажите стоимость больше 0 ₽"
+                  locked={(parseFloat(form.cost) || 0) <= 0 || checkingOrgAgreements}
+                  onChange={handleTicketsToggle}
+                  lockedHint={
+                    (parseFloat(form.cost) || 0) <= 0
+                      ? 'Укажите стоимость больше 0 ₽'
+                      : 'Проверка соглашений...'
+                  }
                 />
               )}
             </div>
@@ -1867,9 +1982,11 @@ export default function CreateEventPage() {
             type="button"
             className={styles.saveBtn}
             onClick={handlePublishClick}
-            disabled={saving}
+            disabled={saving || checkingOrgAgreements}
           >
-            {saving ? 'Сохранение...' : isEditing ? 'Сохранить' : 'Опубликовать'}
+            {saving || checkingOrgAgreements
+              ? (checkingOrgAgreements ? 'Проверка...' : 'Сохранение...')
+              : isEditing ? 'Сохранить' : 'Опубликовать'}
           </button>
         </div>
         <button
@@ -2143,6 +2260,19 @@ export default function CreateEventPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {orgAgreementQueue.length > 0 && eventHost?.kind === 'organization' && (
+        <OrgAgreementAcceptDialog
+          organizationId={eventHost.organizationId}
+          organizationName={eventHost.organizationName}
+          queue={orgAgreementQueue}
+          onCancel={() => {
+            setOrgAgreementQueue([]);
+            setOrgAgreementResume(null);
+          }}
+          onComplete={handleOrgAgreementsComplete}
+        />
       )}
 
       <div className={`${styles.toast} ${toast.visible ? styles.toastVisible : ''}`}>{toast.message}</div>

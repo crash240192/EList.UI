@@ -633,7 +633,9 @@ export default function UserPage() {
                             <div className={styles.orgName}>{org.name}</div>
                             <div className={styles.orgMeta}>
                               {org.address?.trim()
-                                || formatVerificationStatus(org.verificationStatus)}
+                                || (org.canSellTickets
+                                  ? formatVerificationStatus(org.verificationStatus)
+                                  : 'Организация')}
                             </div>
                           </div>
                           <svg

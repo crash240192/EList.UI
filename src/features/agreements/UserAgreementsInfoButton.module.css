@@ -101,9 +101,29 @@
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
+  width: 100%;
   padding: 10px 12px;
   border-radius: 10px;
+  border: 1px solid transparent;
   background: var(--surface-2);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.rowClickable {
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.rowClickable:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
+}
+
+.rowDisabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .rowTop {
@@ -143,31 +163,6 @@
 .statusMute {
   color: var(--text-muted);
   background: rgba(148, 163, 184, 0.12);
-}
-
-.rowActions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.viewBtn {
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--accent);
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.viewBtn:hover:not(:disabled) {
-  text-decoration: underline;
-}
-
-.viewBtn:disabled {
-  color: var(--text-muted);
-  cursor: default;
 }
 
 .loader,

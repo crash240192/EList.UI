@@ -1,5 +1,5 @@
 // pages/create-event/CreateEventHostChooser.tsx
-// Выбор: создать событие от своего имени или от верифицированной организации + шаблон
+// Выбор: создать событие от своего имени или от организации (активна + оферта) + шаблон
 
 import { useEffect, useState } from 'react';
 import {
@@ -8,8 +8,8 @@ import {
   type IEventTemplate,
 } from '@/entities/event';
 import {
-  OrganizationVerificationStatus,
   fetchMyOrganizations,
+  filterOrganizationsEligibleToHostEvents,
   getOrganizationAvatar,
   type OrganizationResponse,
 } from '@/entities/organization';
@@ -138,12 +138,11 @@ export function CreateEventHostChooser({ onContinue }: Props) {
         ]);
         if (cancelled) return;
 
-        const verified = myOrgs.filter(
-          o => o.active !== false
-            && o.verificationStatus === OrganizationVerificationStatus.Verified,
-        );
+        const eligible = await filterOrganizationsEligibleToHostEvents(myOrgs);
+        if (cancelled) return;
+
         const withLogos = await Promise.all(
-          verified.map(async org => ({
+          eligible.map(async org => ({
             org,
             logoId: await getOrganizationAvatar(org.id).catch(() => null),
           })),
@@ -238,7 +237,8 @@ export function CreateEventHostChooser({ onContinue }: Props) {
             <section className={styles.section}>
               <div className={styles.sectionLabel}>От чьего лица</div>
               <p className={styles.sectionHint}>
-                Выберите, от имени кого будет опубликовано мероприятие
+                От организации можно публиковать, если она активна и принята оферта организатора.
+                Продажа билетов — после верификации.
               </p>
               <div className={styles.hostGrid}>
                 <button
@@ -305,7 +305,7 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                         <span className={styles.hostMeta}>
                           {org.canSellTickets
                             ? 'Организация · билеты доступны'
-                            : 'Организация · верифицирована'}
+                            : 'Организация · анонсы'}
                         </span>
                       </div>
                       <span className={styles.checkMark} aria-hidden>

@@ -188,18 +188,6 @@
 }
 .navActive     { background: rgba(99,102,241,0.12) !important; color: var(--accent) !important; }
 
-/* Акцентная кнопка «Создать событие» — главное продуктовое действие */
-.navCreate {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  font-weight: 600;
-}
-.navCreate:hover {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--accent);
-}
-.navCreate .navIcon { color: var(--accent); }
-
 .navIcon {
   position: relative;
   width: 20px; display: flex; align-items: center;
