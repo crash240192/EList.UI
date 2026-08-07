@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   OrganizationRole,
-  OrganizationVerificationStatus,
   fetchOrganizationById,
   fetchOrganizationContacts,
   fetchOrganizationMembers,
@@ -25,6 +24,8 @@ import { getOrFetchAccountId, getStoredAccountId } from '@/entities/user/api';
 import type { IContactDataItem } from '@/entities/user/profileApi';
 import { useEvents } from '@/features/event-list/useEvents';
 import { OrganizationShareMenu } from '@/features/organization/OrganizationShareMenu';
+import { OrgMembersListModal } from '@/features/organizations/OrgMembersListModal';
+import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
 import {
   formatContactHref,
   getContactIconKind,
@@ -44,6 +45,12 @@ import type { IEvent } from '@/entities/event';
 import styles from './OrganizationPage.module.css';
 
 type EventsPhase = 'upcoming' | 'past';
+type MainTab = 'events' | 'albums';
+
+const MAIN_TABS: { key: MainTab; label: string }[] = [
+  { key: 'events', label: 'События' },
+  { key: 'albums', label: 'Альбомы' },
+];
 
 function splitEventsByPhase(events: IEvent[], phase: EventsPhase): IEvent[] {
   const upcoming = events.filter(ev => !isEventFinished(ev.startTime, ev.endTime));
@@ -55,23 +62,6 @@ function splitEventsByPhase(events: IEvent[], phase: EventsPhase): IEvent[] {
     const bTime = new Date(b.startTime).getTime();
     return phase === 'upcoming' ? aTime - bTime : bTime - aTime;
   });
-}
-
-function verificationBadgeClass(
-  status: OrganizationResponse['verificationStatus'],
-): string {
-  switch (status) {
-    case OrganizationVerificationStatus.Verified: return styles.badgeOk;
-    case OrganizationVerificationStatus.Pending: return styles.badgeWarn;
-    case OrganizationVerificationStatus.Rejected: return styles.badgeErr;
-    default: return styles.badgeMute;
-  }
-}
-
-/** «Не верифицирована» не показываем, если билеты не подключены */
-function shouldShowVerificationBadge(org: OrganizationResponse): boolean {
-  if (org.canSellTickets) return true;
-  return org.verificationStatus !== OrganizationVerificationStatus.Unverified;
 }
 
 function OrgCoverBackground({ logoId }: { logoId: string | null }) {
@@ -202,8 +192,10 @@ export default function OrganizationPage() {
   const [contacts, setContacts] = useState<IContactDataItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mainTab, setMainTab] = useState<'events'>('events');
+  const [mainTab, setMainTab] = useState<MainTab>('events');
   const [eventsPhase, setEventsPhase] = useState<EventsPhase>('upcoming');
+  const [albumsCount, setAlbumsCount] = useState(0);
+  const [showTeamModal, setShowTeamModal] = useState(false);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
@@ -262,6 +254,16 @@ export default function OrganizationPage() {
     [contacts, canManage],
   );
 
+  const activeMembers = useMemo(
+    () => members.filter(m => m.active !== false),
+    [members],
+  );
+
+  const tabCounts: Record<MainTab, number> = {
+    events: orgEvents.total || orgEvents.events.length,
+    albums: albumsCount,
+  };
+
   const initials = (org?.name ?? 'Орг').slice(0, 2).toUpperCase();
   usePageTitle(org?.name ?? null);
 
@@ -297,7 +299,12 @@ export default function OrganizationPage() {
     );
   }
 
-  const activeMembers = members.filter(m => m.active !== false);
+  const hasSidebarContent =
+    visibleContacts.length > 0
+    || Boolean(org.description?.trim())
+    || Boolean(org.address)
+    || activeMembers.length > 0
+    || canManage;
 
   return (
     <div className={styles.page}>
@@ -345,23 +352,14 @@ export default function OrganizationPage() {
           <div className={styles.profileInfo}>
             <div className={styles.nameRow}>
               <h1 className={styles.fullName}>{org.name}</h1>
-              {shouldShowVerificationBadge(org) && (
-                <span className={`${styles.badge} ${verificationBadgeClass(org.verificationStatus)}`}>
-                  {formatVerificationStatus(org.verificationStatus)}
-                </span>
-              )}
               {!org.active && (
                 <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
               )}
             </div>
             <div className={styles.loginLine}>Организация</div>
-            {(org.address || org.canSellTickets) && (
+            {org.address && (
               <div className={styles.profileMeta}>
-                {org.address && <span>{org.address}</span>}
-                {org.address && org.canSellTickets && (
-                  <span className={styles.profileMetaDot} aria-hidden>·</span>
-                )}
-                {org.canSellTickets && <span>Продажа билетов</span>}
+                <span>{org.address}</span>
               </div>
             )}
           </div>
@@ -383,158 +381,184 @@ export default function OrganizationPage() {
 
         <div className={styles.statsBar}>
           <div className={styles.statGroup}>
-            <div className={`${styles.statItem} ${styles.statItemActive}`}>
+            <button
+              type="button"
+              className={`${styles.statItem} ${styles.statItemClickable} ${mainTab === 'events' ? styles.statItemActive : ''}`}
+              onClick={() => setMainTab('events')}
+            >
               <span className={styles.statNum}>
                 {orgEvents.total || orgEvents.events.length}
               </span>
               <span className={styles.statLabel}>события</span>
-            </div>
-            <div className={styles.statItem}>
+            </button>
+            <button
+              type="button"
+              className={`${styles.statItem} ${styles.statItemClickable} ${showTeamModal ? styles.statItemActive : ''}`}
+              onClick={() => setShowTeamModal(true)}
+            >
               <span className={styles.statNum}>{activeMembers.length}</span>
               <span className={styles.statLabel}>команда</span>
-            </div>
-          </div>
-
-          <div className={styles.statGroupDivider} aria-hidden />
-
-          <div className={styles.statGroup}>
-            <div className={styles.statItem}>
-              <span className={styles.statNum}>{org.canSellTickets ? 'Да' : 'Нет'}</span>
-              <span className={styles.statLabel}>билеты</span>
-            </div>
-            {shouldShowVerificationBadge(org) && (
-              <div className={styles.statItem}>
-                <span className={styles.statNum}>
-                  {org.verificationStatus === OrganizationVerificationStatus.Verified ? 'Да' : 'Нет'}
-                </span>
-                <span className={styles.statLabel}>верификация</span>
-              </div>
-            )}
+            </button>
           </div>
         </div>
 
-        <div className={styles.mainGrid}>
-          <aside className={styles.leftPanel}>
-            {visibleContacts.length > 0 && (
-              <section>
-                <div className={styles.secLabel}>Контакты</div>
-                <div className={styles.contactList}>
-                  {visibleContacts.map(contact => (
-                    <OrgContactRow key={contact.id} contact={contact} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {org.description?.trim() && (
-              <>
-                {visibleContacts.length > 0 && <div className={styles.sectionDivider} />}
+        <div className={`${styles.mainGrid} ${!hasSidebarContent ? styles.mainGridSolo : ''}`}>
+          {hasSidebarContent && (
+            <aside className={styles.leftPanel}>
+              {canManage && (
                 <section>
-                  <div className={styles.secLabel}>Описание</div>
-                  <p className={styles.aboutText}>{org.description.trim()}</p>
-                </section>
-              </>
-            )}
-
-            {org.address && (
-              <>
-                {(visibleContacts.length > 0 || org.description?.trim()) && (
-                  <div className={styles.sectionDivider} />
-                )}
-                <section>
-                  <div className={styles.secLabel}>Адрес</div>
-                  <p className={styles.addressText}>{org.address}</p>
-                </section>
-              </>
-            )}
-
-            {activeMembers.length > 0 && (
-              <>
-                {(visibleContacts.length > 0 || org.description?.trim() || org.address) && (
-                  <div className={styles.sectionDivider} />
-                )}
-                <section>
-                  <div className={styles.secLabel}>Команда</div>
-                  <div className={styles.memberList}>
-                    {activeMembers.map(m => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        className={styles.memberRow}
-                        onClick={() => navigate(`/user/${m.accountId}`)}
-                      >
-                        <UserAvatar
-                          accountId={m.accountId}
-                          avatarId={organizationMemberAvatarId(m)}
-                          initials={organizationMemberInitials(m)}
-                          size={36}
-                        />
-                        <div className={styles.memberInfo}>
-                          <span className={styles.memberName}>
-                            {organizationMemberDisplayName(m)}
-                          </span>
-                          <span className={styles.memberRole}>
-                            {formatOrganizationRole(m.role)}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
+                  <div className={styles.secLabel}>Системная информация</div>
+                  <div className={styles.systemInfo}>
+                    <div className={styles.systemInfoRow}>
+                      <span className={styles.systemInfoKey}>Верификация</span>
+                      <span className={styles.systemInfoVal}>
+                        {formatVerificationStatus(org.verificationStatus)}
+                      </span>
+                    </div>
+                    <div className={styles.systemInfoRow}>
+                      <span className={styles.systemInfoKey}>Продажа билетов</span>
+                      <span className={styles.systemInfoVal}>
+                        {org.canSellTickets ? 'Включена' : 'Выключена'}
+                      </span>
+                    </div>
                   </div>
                 </section>
-              </>
-            )}
-          </aside>
+              )}
+
+              {visibleContacts.length > 0 && (
+                <>
+                  {canManage && <div className={styles.sectionDivider} />}
+                  <section>
+                    <div className={styles.secLabel}>Контакты</div>
+                    <div className={styles.contactList}>
+                      {visibleContacts.map(contact => (
+                        <OrgContactRow key={contact.id} contact={contact} />
+                      ))}
+                    </div>
+                  </section>
+                </>
+              )}
+
+              {org.description?.trim() && (
+                <>
+                  {(canManage || visibleContacts.length > 0) && <div className={styles.sectionDivider} />}
+                  <section>
+                    <div className={styles.secLabel}>Описание</div>
+                    <p className={styles.aboutText}>{org.description.trim()}</p>
+                  </section>
+                </>
+              )}
+
+              {org.address && (
+                <>
+                  {(canManage || visibleContacts.length > 0 || org.description?.trim()) && (
+                    <div className={styles.sectionDivider} />
+                  )}
+                  <section>
+                    <div className={styles.secLabel}>Адрес</div>
+                    <p className={styles.addressText}>{org.address}</p>
+                  </section>
+                </>
+              )}
+
+              {activeMembers.length > 0 && (
+                <>
+                  {(canManage || visibleContacts.length > 0 || org.description?.trim() || org.address) && (
+                    <div className={styles.sectionDivider} />
+                  )}
+                  <section>
+                    <div className={styles.secLabel}>Команда</div>
+                    <div className={styles.memberList}>
+                      {activeMembers.map(m => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          className={styles.memberRow}
+                          onClick={() => navigate(`/user/${m.accountId}`)}
+                        >
+                          <UserAvatar
+                            accountId={m.accountId}
+                            avatarId={organizationMemberAvatarId(m)}
+                            initials={organizationMemberInitials(m)}
+                            size={36}
+                          />
+                          <div className={styles.memberInfo}>
+                            <span className={styles.memberName}>
+                              {organizationMemberDisplayName(m)}
+                            </span>
+                            <span className={styles.memberRole}>
+                              {formatOrganizationRole(m.role)}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                </>
+              )}
+            </aside>
+          )}
 
           <section className={styles.rightPanel}>
             <TabBar
-              tabs={[
-                {
-                  id: 'events',
-                  label: 'События',
-                  count: orgEvents.total || orgEvents.events.length,
-                },
-              ]}
+              tabs={MAIN_TABS.map(tab => ({
+                id: tab.key,
+                label: tab.label,
+                count: tabCounts[tab.key],
+              }))}
               activeId={mainTab}
-              onChange={() => setMainTab('events')}
+              onChange={tabId => setMainTab(tabId as MainTab)}
             />
 
-            <div className={styles.tabContent}>
-              <TabBar
-                variant="pill"
-                className={styles.phaseTabs}
-                tabs={[
-                  { id: 'upcoming', label: 'Предстоящие' },
-                  { id: 'past', label: 'Прошедшие' },
-                ]}
-                activeId={eventsPhase}
-                onChange={phaseId => setEventsPhase(phaseId as EventsPhase)}
-              />
+            {mainTab === 'albums' ? (
+              <div className={styles.tabContent}>
+                <EventAlbumsGroupsPanel
+                  organizationId={org.id}
+                  onOpenEvent={eventId => navigate(`/event/${eventId}`)}
+                  onTotalChange={setAlbumsCount}
+                  emptyTitle="Альбомов пока нет"
+                  emptySub="Здесь появятся фотоальбомы мероприятий организации"
+                />
+              </div>
+            ) : (
+              <div className={styles.tabContent}>
+                <TabBar
+                  variant="pill"
+                  className={styles.phaseTabs}
+                  tabs={[
+                    { id: 'upcoming', label: 'Предстоящие' },
+                    { id: 'past', label: 'Прошедшие' },
+                  ]}
+                  activeId={eventsPhase}
+                  onChange={phaseId => setEventsPhase(phaseId as EventsPhase)}
+                />
 
-              {orgEvents.isLoading && (
-                <div className={styles.emptyEvents}>Загрузка...</div>
-              )}
+                {orgEvents.isLoading && (
+                  <div className={styles.emptyEvents}>Загрузка...</div>
+                )}
 
-              {!orgEvents.isLoading && filteredEvents.length === 0 && (
-                <p className={styles.emptyEvents}>
-                  {eventsPhase === 'upcoming'
-                    ? 'Нет предстоящих мероприятий'
-                    : 'Нет прошедших мероприятий'}
-                </p>
-              )}
+                {!orgEvents.isLoading && filteredEvents.length === 0 && (
+                  <p className={styles.emptyEvents}>
+                    {eventsPhase === 'upcoming'
+                      ? 'Нет предстоящих мероприятий'
+                      : 'Нет прошедших мероприятий'}
+                  </p>
+                )}
 
-              {!orgEvents.isLoading && filteredEvents.length > 0 && (
-                <EventList>
-                  {filteredEvents.map(event => (
-                    <EventListItem
-                      key={event.id}
-                      event={event}
-                      onClick={() => navigate(`/event/${event.id}`)}
-                      bleedCover
-                    />
-                  ))}
-                </EventList>
-              )}
-            </div>
+                {!orgEvents.isLoading && filteredEvents.length > 0 && (
+                  <EventList>
+                    {filteredEvents.map(event => (
+                      <EventListItem
+                        key={event.id}
+                        event={event}
+                        onClick={() => navigate(`/event/${event.id}`)}
+                        bleedCover
+                      />
+                    ))}
+                  </EventList>
+                )}
+              </div>
+            )}
           </section>
         </div>
       </div>
@@ -553,6 +577,14 @@ export default function OrganizationPage() {
           organizationId={org.id}
           name={org.name}
           onClose={() => setShowShareMenu(false)}
+        />
+      )}
+
+      {showTeamModal && (
+        <OrgMembersListModal
+          members={members}
+          currentAccountId={myAccountId}
+          onClose={() => setShowTeamModal(false)}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   getAlbumsByEvents,
+  getAlbumsByOrganizationEvents,
   getAlbumFiles,
   type IAlbum,
   type IEventAlbumsGroup,
@@ -92,7 +93,10 @@ function EventGroupSection({
 }
 
 interface EventAlbumsGroupsPanelProps {
-  accountId: string;
+  /** Альбомы мероприятий, доступные аккаунту */
+  accountId?: string;
+  /** Альбомы мероприятий организации */
+  organizationId?: string;
   onOpenEvent: (eventId: string) => void;
   onTotalChange?: (total: number) => void;
   emptyTitle?: string;
@@ -102,6 +106,7 @@ interface EventAlbumsGroupsPanelProps {
 
 export function EventAlbumsGroupsPanel({
   accountId,
+  organizationId,
   onOpenEvent,
   onTotalChange,
   emptyTitle = 'Альбомов пока нет',
@@ -116,19 +121,23 @@ export function EventAlbumsGroupsPanel({
   const [error, setError] = useState<string | null>(null);
   const [gridAlbum, setGridAlbum] = useState<IAlbum | null>(null);
 
+  const scopeKey = organizationId ? `org:${organizationId}` : `acc:${accountId ?? ''}`;
+  const hasScope = Boolean(organizationId || accountId);
   const hasMore = groups.length < total;
 
   const fetchPage = useCallback(async (idx: number, append: boolean) => {
-    if (!accountId) return;
-    const data = await getAlbumsByEvents(accountId, idx, PAGE_SIZE);
+    if (!organizationId && !accountId) return;
+    const data = organizationId
+      ? await getAlbumsByOrganizationEvents(organizationId, idx, PAGE_SIZE)
+      : await getAlbumsByEvents(accountId!, idx, PAGE_SIZE);
     setGroups(prev => append ? [...prev, ...data.result] : data.result);
     setTotal(data.total);
     onTotalChange?.(data.total);
     setPageIndex(idx);
-  }, [accountId, onTotalChange]);
+  }, [accountId, organizationId, onTotalChange]);
 
   useEffect(() => {
-    if (!accountId) {
+    if (!hasScope) {
       setLoading(false);
       setGroups([]);
       setTotal(0);
@@ -141,15 +150,15 @@ export function EventAlbumsGroupsPanel({
     fetchPage(0, false)
       .catch(() => setError('Не удалось загрузить альбомы'))
       .finally(() => setLoading(false));
-  }, [accountId, fetchPage, onTotalChange]);
+  }, [scopeKey, hasScope, fetchPage, onTotalChange]);
 
   const loadMore = useCallback(() => {
-    if (!accountId || loadingMore || loading || !hasMore) return;
+    if (!hasScope || loadingMore || loading || !hasMore) return;
     setLoadingMore(true);
     fetchPage(pageIndex + 1, true)
       .catch(() => setError('Не удалось загрузить ещё'))
       .finally(() => setLoadingMore(false));
-  }, [accountId, loadingMore, loading, hasMore, pageIndex, fetchPage]);
+  }, [hasScope, loadingMore, loading, hasMore, pageIndex, fetchPage]);
 
   const sentinelRef = useInfiniteScroll(loadMore, { enabled: hasMore && !loading && !loadingMore });
 

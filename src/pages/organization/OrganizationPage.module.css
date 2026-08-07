@@ -250,6 +250,11 @@
   background: var(--surface-2);
 }
 
+.statItemClickable:hover .statNum,
+.statItemActive .statNum {
+  color: var(--accent);
+}
+
 .statNum {
   font-size: 16px;
   font-weight: 700;
@@ -264,10 +269,43 @@
   line-height: 1.2;
 }
 
+.systemInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+}
+
+.systemInfoRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.systemInfoKey {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.systemInfoVal {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
 .mainGrid {
   display: grid;
   grid-template-columns: 290px 1fr;
   min-height: 360px;
+}
+
+.mainGridSolo {
+  grid-template-columns: 1fr;
 }
 
 .leftPanel {
