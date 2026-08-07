@@ -22,9 +22,17 @@ import {
   type IAgreementDocument,
   type IDocumentRequest,
 } from '@/entities/agreement';
+import { BugReportCategoriesTab } from './BugReportCategoriesTab';
+import { BugReportsTab } from './BugReportsTab';
 import styles from './AdminPage.module.css';
 
-type AdminTab = 'eventTypes' | 'contactTypes' | 'tariffs' | 'agreements';
+type AdminTab =
+  | 'eventTypes'
+  | 'contactTypes'
+  | 'tariffs'
+  | 'agreements'
+  | 'bugReports'
+  | 'bugReportCategories';
 
 /** Типы документов на вкладке «Соглашения» (включая OrganizationAgreement и TicketingAgreement) */
 const DOCUMENT_TYPE_OPTIONS = DOCUMENT_TYPE_LABELS;
@@ -64,6 +72,8 @@ export default function AdminPage() {
           { id: 'contactTypes', label: 'Типы контактов' },
           { id: 'tariffs', label: 'Тарифы' },
           { id: 'agreements', label: 'Соглашения' },
+          { id: 'bugReports', label: 'Багрепорты' },
+          { id: 'bugReportCategories', label: 'Категории ошибок' },
         ]}
         activeId={tab}
         onChange={id => setTab(id as AdminTab)}
@@ -74,6 +84,8 @@ export default function AdminPage() {
         {tab === 'contactTypes' && <ContactTypesTab />}
         {tab === 'tariffs'      && <TariffsTab />}
         {tab === 'agreements'   && <AgreementsTab />}
+        {tab === 'bugReports'   && <BugReportsTab />}
+        {tab === 'bugReportCategories' && <BugReportCategoriesTab />}
       </div>
     </div>
   );
