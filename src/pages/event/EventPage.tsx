@@ -610,9 +610,6 @@ export default function EventPage() {
             </div>
             {(event.address || (event.latitude != null && event.longitude != null)) && (
               <div className={styles.actionMetaPlace}>
-                {event.address && (
-                  <div className={styles.actionMetaSecondary}>{event.address}</div>
-                )}
                 {event.latitude != null && event.longitude != null && (
                   <button
                     type="button"
@@ -626,6 +623,9 @@ export default function EventPage() {
                       <circle cx="12" cy="10" r="2.5" />
                     </svg>
                   </button>
+                )}
+                {event.address && (
+                  <div className={styles.actionMetaSecondary}>{event.address}</div>
                 )}
               </div>
             )}
