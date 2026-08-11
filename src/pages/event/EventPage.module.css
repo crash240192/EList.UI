@@ -437,10 +437,9 @@
     padding: 8px 16px 24px;
   }
   .detailsGrid { grid-template-columns:repeat(2,1fr); }
-  .actionRow { align-items: flex-start; padding: 12px 14px; }
+  .actionRow { padding: 12px 14px; }
   .actionMetaPrimary { font-size:13px; }
   .actionMetaSecondary { font-size:11px; }
-  .actionBtns { padding-top: 2px; }
   .heroTagsRight { max-width: 48%; }
 }
 .errorIcon { font-size: 36px; }
