@@ -590,25 +590,25 @@ export default function EventPage() {
           </div>
         </div>
 
-        {/* ── Action row: дата + адрес + действия ── */}
+        {/* ── Action row: дата; ниже — место + действия на одной линии ── */}
         <div className={styles.actionRow}>
-          <div className={styles.actionMeta}>
-            <div className={styles.actionMetaPrimary}>
-              {isSameDay(event.startTime, event.endTime) ? (
-                <>
-                  {formatDateStart(event.startTime)}
-                  <span className={styles.actionMetaDot}>·</span>
-                  {formatTime(event.startTime)}
-                  {event.endTime ? ` — ${formatTime(event.endTime)}` : ''}
-                </>
-              ) : (
-                <>
-                  {formatDateStart(event.startTime)}, {formatTime(event.startTime)}
-                  {event.endTime ? ` → ${formatDateStart(event.endTime)}, ${formatTime(event.endTime)}` : ''}
-                </>
-              )}
-            </div>
-            {(event.address || (event.latitude != null && event.longitude != null)) && (
+          <div className={styles.actionMetaPrimary}>
+            {isSameDay(event.startTime, event.endTime) ? (
+              <>
+                {formatDateStart(event.startTime)}
+                <span className={styles.actionMetaDot}>·</span>
+                {formatTime(event.startTime)}
+                {event.endTime ? ` — ${formatTime(event.endTime)}` : ''}
+              </>
+            ) : (
+              <>
+                {formatDateStart(event.startTime)}, {formatTime(event.startTime)}
+                {event.endTime ? ` → ${formatDateStart(event.endTime)}, ${formatTime(event.endTime)}` : ''}
+              </>
+            )}
+          </div>
+          <div className={styles.actionRowMain}>
+            {(event.address || (event.latitude != null && event.longitude != null)) ? (
               <div className={styles.actionMetaPlace}>
                 {event.latitude != null && event.longitude != null && (
                   <button
@@ -628,71 +628,73 @@ export default function EventPage() {
                   <div className={styles.actionMetaSecondary}>{event.address}</div>
                 )}
               </div>
+            ) : (
+              <div className={styles.actionMetaPlaceSpacer} />
             )}
-          </div>
-          <RatingWidget
-            eventId={id!}
-            eventStartTime={event.startTime}
-            eventEndTime={event.endTime}
-            accountId={accountId}
-            eventActive={isEventActive}
-            onAuthRequired={() => setAuthDialogOpen(true)}
-          />
-          <div className={styles.actionBtns}>
-            {canShowInviteButton && (
-              <button
-                className={styles.btnInvite}
-                title="Пригласить"
-                onClick={() => {
-                  if (!authenticated) {
-                    setAuthDialogOpen(true);
-                    return;
-                  }
-                  setInviteModalOpen(true);
-                }}
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round">
-                  <circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/>
-                  <line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/>
-                </svg>
-              </button>
-            )}
-            {ticketsEnabled && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  if (!authenticated) {
-                    setAuthDialogOpen(true);
-                    return;
-                  }
-                }}
-              >
-                Купить билет
-              </Button>
-            )}
-            {!eventFinished && !isOrganizer && (
-              <div className={styles.joinBtnWrap}>
-                {limitNotice && isParticipantLimitFull && (
-                  <div className={styles.joinLimitNotice} role="status">
-                    Достигнут лимит участников ({participantCap})
-                  </div>
-                )}
-                <Button
-                  variant={isParticipating ? 'secondary' : 'primary'}
-                  loading={actionLoading}
-                  className={joinShake ? styles.btnJoinShake : undefined}
-                  onClick={onJoinClick}
-                  disabled={joinDisabled}
-                  title={
-                    isParticipantLimitFull
-                      ? `Достигнут лимит участников (${participantCap})`
-                      : undefined
-                  }
+            <RatingWidget
+              eventId={id!}
+              eventStartTime={event.startTime}
+              eventEndTime={event.endTime}
+              accountId={accountId}
+              eventActive={isEventActive}
+              onAuthRequired={() => setAuthDialogOpen(true)}
+            />
+            <div className={styles.actionBtns}>
+              {canShowInviteButton && (
+                <button
+                  className={styles.btnInvite}
+                  title="Пригласить"
+                  onClick={() => {
+                    if (!authenticated) {
+                      setAuthDialogOpen(true);
+                      return;
+                    }
+                    setInviteModalOpen(true);
+                  }}
                 >
-                  {isParticipating ? 'Покинуть' : 'Участвовать'}
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round">
+                    <circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/>
+                    <line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/>
+                  </svg>
+                </button>
+              )}
+              {ticketsEnabled && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    if (!authenticated) {
+                      setAuthDialogOpen(true);
+                      return;
+                    }
+                  }}
+                >
+                  Купить билет
                 </Button>
-              </div>
-            )}
+              )}
+              {!eventFinished && !isOrganizer && (
+                <div className={styles.joinBtnWrap}>
+                  {limitNotice && isParticipantLimitFull && (
+                    <div className={styles.joinLimitNotice} role="status">
+                      Достигнут лимит участников ({participantCap})
+                    </div>
+                  )}
+                  <Button
+                    variant={isParticipating ? 'secondary' : 'primary'}
+                    loading={actionLoading}
+                    className={joinShake ? styles.btnJoinShake : undefined}
+                    onClick={onJoinClick}
+                    disabled={joinDisabled}
+                    title={
+                      isParticipantLimitFull
+                        ? `Достигнут лимит участников (${participantCap})`
+                        : undefined
+                    }
+                  >
+                    {isParticipating ? 'Покинуть' : 'Участвовать'}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
