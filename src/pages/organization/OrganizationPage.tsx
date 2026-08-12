@@ -326,11 +326,6 @@ export default function OrganizationPage() {
 
   const nameBadges = (
     <>
-      {shouldShowVerificationBadge(org) && (
-        <span className={`${styles.badge} ${isMobileLayout ? styles.badgeOnHero : ''} ${verificationBadgeClass(org.verificationStatus)}`}>
-          {formatVerificationStatus(org.verificationStatus)}
-        </span>
-      )}
       {!org.active && (
         <span className={`${styles.badge} ${isMobileLayout ? styles.badgeOnHero : ''} ${styles.badgeMute}`}>Неактивна</span>
       )}
