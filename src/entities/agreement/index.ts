@@ -15,6 +15,7 @@ export {
   DOCUMENT_TYPE_NAMES,
   DOCUMENT_TYPE_LABELS,
   parseDocumentType,
+  documentRequiresConsent,
   type DocumentTypeValue,
   type IAgreementDocument,
   type IDocumentRequest,

@@ -45,6 +45,11 @@ export function parseDocumentType(raw: unknown): DocumentTypeValue {
   return DocumentType.Policy;
 }
 
+/** Policy (0) — справочный текст, без галочки согласия */
+export function documentRequiresConsent(type: DocumentTypeValue): boolean {
+  return type !== DocumentType.Policy;
+}
+
 export interface IAgreementDocument {
   id: string;
   header: string;

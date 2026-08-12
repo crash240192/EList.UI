@@ -6,6 +6,7 @@ import {
   DocumentType,
   DOCUMENT_TYPE_LABELS,
   checkUserAgreement,
+  documentRequiresConsent,
   fetchLastDocument,
   type DocumentTypeValue,
   type IAgreementDocument,
@@ -37,9 +38,22 @@ function labelFor(type: DocumentTypeValue): string {
   return DOCUMENT_TYPE_LABELS.find(x => x.value === type)?.label ?? String(type);
 }
 
-export function UserAgreementsInfoButton() {
+interface UserAgreementsInfoButtonProps {
+  /** Скрыть кнопку «i» — панель открывается снаружи (мобильное меню аватара) */
+  hideTrigger?: boolean;
+  panelOpen?: boolean;
+  onPanelOpenChange?: (open: boolean) => void;
+}
+
+export function UserAgreementsInfoButton({
+  hideTrigger = false,
+  panelOpen: panelOpenProp,
+  onPanelOpenChange,
+}: UserAgreementsInfoButtonProps = {}) {
   const authenticated = useAuthStore(s => s.isAuthenticated());
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = panelOpenProp ?? internalOpen;
+  const setOpen = onPanelOpenChange ?? setInternalOpen;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<DocRow[]>([]);
@@ -104,7 +118,9 @@ export function UserAgreementsInfoButton() {
 
   const openRow = (row: DocRow) => {
     if (!row.document) return;
-    const needsAccept = authenticated && row.consent !== 'yes';
+    const needsAccept = authenticated
+      && documentRequiresConsent(row.type)
+      && row.consent !== 'yes';
     if (needsAccept) {
       setAcceptItem({ type: row.type, document: row.document });
       return;
@@ -112,18 +128,35 @@ export function UserAgreementsInfoButton() {
     setViewDoc(row.document);
   };
 
+  const consentStatusLabel = (row: DocRow): string => {
+    if (!documentRequiresConsent(row.type)) return 'Информация';
+    if (row.consent === 'yes') return 'Принято';
+    if (row.consent === 'no') return 'Не принято';
+    if (row.consent === 'guest') return '—';
+    return 'Нет данных';
+  };
+
+  const consentStatusClass = (row: DocRow): string => {
+    if (!documentRequiresConsent(row.type)) return styles.statusInfo;
+    if (row.consent === 'yes') return styles.statusOk;
+    if (row.consent === 'no') return styles.statusNo;
+    return styles.statusMute;
+  };
+
   return (
     <div className={styles.wrap} ref={wrapRef}>
+      {!hideTrigger && (
       <button
         type="button"
         className={`${styles.infoBtn} ${open ? styles.infoBtnOpen : ''}`}
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen(!open)}
         aria-label="Документы и согласия"
         aria-expanded={open}
         title="Документы и согласия"
       >
         <InfoIcon />
       </button>
+      )}
 
       {open && (
         <div className={styles.panel} role="dialog" aria-label="Документы и согласия">
@@ -166,21 +199,9 @@ export function UserAgreementsInfoButton() {
                       <div className={styles.rowTop}>
                         <span className={styles.docName}>{row.label}</span>
                         <span
-                          className={`${styles.status} ${
-                            row.consent === 'yes'
-                              ? styles.statusOk
-                              : row.consent === 'no'
-                                ? styles.statusNo
-                                : styles.statusMute
-                          }`}
+                          className={`${styles.status} ${consentStatusClass(row)}`}
                         >
-                          {row.consent === 'yes'
-                            ? 'Принято'
-                            : row.consent === 'no'
-                              ? 'Не принято'
-                              : row.consent === 'guest'
-                                ? '—'
-                                : 'Нет данных'}
+                          {consentStatusLabel(row)}
                         </span>
                       </div>
                     </button>

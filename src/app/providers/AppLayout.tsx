@@ -5,8 +5,6 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useThemeStore, useAuthStore, useFiltersStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
-import { useMyAvatar } from '@/features/auth/useAvatar';
-import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
 import {
@@ -17,6 +15,7 @@ import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { useActivationRedirect } from '@/features/auth/useActivationRedirect';
 import { UserAgreementsGate, UserAgreementsInfoButton } from '@/features/agreements';
 import { BugReportButton } from '@/features/bug-reports';
+import { HeaderAvatarMenu } from '@/features/user/HeaderAvatarMenu';
 import { useMediaQuery } from '@/shared/hooks';
 import { media } from '@/shared/lib/breakpoints';
 import styles from './AppLayout.module.css';
@@ -50,9 +49,6 @@ export function AppLayout() {
     : NAV_ITEMS.filter(({ to }) => to === '/');
 
   useActivationRedirect();
-
-  const myAvatar = useMyAvatar();
-  const myAvatarFileId = authenticated ? myAvatar.fileId : null;
 
   const handleLogout = () => {
     logout();
@@ -107,9 +103,20 @@ export function AppLayout() {
         </div>
 
         <div className={styles.headerRight}>
-          <UserAgreementsInfoButton />
-          {authenticated && <BugReportButton />}
-          <button className={styles.themeToggle} onClick={toggleTheme} aria-label="Переключить тему" title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
+          <span className={authenticated ? styles.hideOnMobile : undefined}>
+            <UserAgreementsInfoButton />
+          </span>
+          {authenticated && (
+            <span className={styles.hideOnMobile}>
+              <BugReportButton />
+            </span>
+          )}
+          <button
+            className={`${styles.themeToggle} ${authenticated ? styles.hideOnMobile : ''}`}
+            onClick={toggleTheme}
+            aria-label="Переключить тему"
+            title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+          >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.themeIcoLeft}>
               <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
             </svg>
@@ -127,15 +134,8 @@ export function AppLayout() {
           )}
           {authenticated && (
             <>
-            <NotificationBell />
-            <button className={styles.avatarBtn} onClick={() => navigate('/user/me')} aria-label="Профиль">
-              {myAvatarFileId
-                ? <AuthImage fileId={myAvatarFileId} alt="Аватар" className={styles.avatarImg} />
-                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#fff' }}>
-                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                  </svg>
-              }
-            </button>
+              <NotificationBell />
+              <HeaderAvatarMenu />
             </>
           )}
         </div>
