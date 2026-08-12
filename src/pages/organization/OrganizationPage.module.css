@@ -62,73 +62,6 @@
   composes: heroTopRight from '../../shared/styles/hero.module.css';
 }
 
-/* Не compose heroBottom: иначе bottom:14px из общего модуля
-   может перебить локальный отступ и название наползает на аватар. */
-.heroBottom {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  /* Аватар 88px с margin-top:-44px — оставляем зазор над ним */
-  bottom: 72px;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  max-width: none;
-  pointer-events: none;
-}
-
-.heroBottom::before {
-  content: '';
-  position: absolute;
-  left: -14px;
-  right: -14px;
-  bottom: -72px;
-  height: calc(100% + 120px);
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.78) 0%,
-    rgba(0, 0, 0, 0.45) 45%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: -1;
-}
-
-.heroNameRow {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-  width: 100%;
-}
-
-.heroTitle {
-  position: relative;
-  margin: 0;
-  color: #fff;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.25;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 2px 12px rgba(0, 0, 0, 0.7);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.badgeOnHero {
-  backdrop-filter: blur(6px);
-  border: 0.5px solid rgba(255, 255, 255, 0.22);
-  flex-shrink: 0;
-}
-
 .profileHeader {
   display: flex;
   align-items: flex-end;
@@ -138,18 +71,6 @@
   position: relative;
   z-index: 2;
   flex-wrap: wrap;
-}
-
-@media (max-width: 639px) {
-  /* На мобилке имя в hero — чуть меньше нахлёста аватара на обложку */
-  .profileHeader {
-    margin-top: -36px;
-  }
-
-  .avatar {
-    width: 80px;
-    height: 80px;
-  }
 }
 
 .avatarWrap {
@@ -203,11 +124,28 @@
   padding-bottom: 10px;
 }
 
+.nameRowMobile {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .nameRowDesktop {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 639px) {
+  .nameRowMobile {
+    display: flex;
+  }
+
+  .nameRowDesktop {
+    display: none;
+  }
 }
 
 .fullName {
@@ -217,6 +155,8 @@
   color: var(--text-primary);
   line-height: 1.2;
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .profileMeta {
@@ -258,26 +198,6 @@
 .badgeMute {
   color: var(--text-muted);
   background: rgba(148, 163, 184, 0.12);
-}
-
-.badgeOnHero.badgeOk {
-  color: #ecfdf5;
-  background: rgba(16, 185, 129, 0.55);
-}
-
-.badgeOnHero.badgeWarn {
-  color: #fffbeb;
-  background: rgba(245, 158, 11, 0.55);
-}
-
-.badgeOnHero.badgeErr {
-  color: #fef2f2;
-  background: rgba(239, 68, 68, 0.55);
-}
-
-.badgeOnHero.badgeMute {
-  color: #fff;
-  background: rgba(0, 0, 0, 0.4);
 }
 
 .statsBar {

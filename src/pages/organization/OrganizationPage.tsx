@@ -284,15 +284,6 @@ export default function OrganizationPage() {
     else if (logoId) setLightboxFileIds([logoId]);
   }, [id, logoId]);
 
-  const [isMobileLayout, setIsMobileLayout] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)');
-    const sync = () => setIsMobileLayout(mq.matches);
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
-  }, []);
-
   if (loading) {
     return (
       <div className={styles.page}>
@@ -324,13 +315,9 @@ export default function OrganizationPage() {
     || activeMembers.length > 0
     || canManage;
 
-  const nameBadges = (
-    <>
-      {!org.active && (
-        <span className={`${styles.badge} ${isMobileLayout ? styles.badgeOnHero : ''} ${styles.badgeMute}`}>Неактивна</span>
-      )}
-    </>
-  );
+  const inactiveBadge = !org.active ? (
+    <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
+  ) : null;
 
   return (
     <div className={styles.page}>
@@ -365,14 +352,6 @@ export default function OrganizationPage() {
               )}
             </div>
           </div>
-          {isMobileLayout && (
-            <div className={styles.heroBottom}>
-              <div className={styles.heroNameRow}>
-                <h1 className={styles.heroTitle}>{org.name}</h1>
-                {nameBadges}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className={styles.profileHeader}>
@@ -397,12 +376,14 @@ export default function OrganizationPage() {
           </button>
 
           <div className={styles.profileInfo}>
-            {!isMobileLayout && (
-              <div className={styles.nameRowDesktop}>
-                <h1 className={styles.fullName}>{org.name}</h1>
-                {nameBadges}
-              </div>
-            )}
+            <div className={styles.nameRowMobile}>
+              <h1 className={styles.fullName}>{org.name}</h1>
+              {inactiveBadge}
+            </div>
+            <div className={styles.nameRowDesktop}>
+              <h1 className={styles.fullName}>{org.name}</h1>
+              {inactiveBadge}
+            </div>
             {org.address && (
               <div className={styles.profileMeta}>
                 <span>{org.address}</span>
