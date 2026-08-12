@@ -104,6 +104,15 @@ function ShareIcon() {
   );
 }
 
+function SettingsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 function ContactIcon({ kind }: { kind: ContactIconKind }) {
   const svgProps = {
     width: 14,
@@ -317,6 +326,32 @@ export default function OrganizationPage() {
               >
                 <ShareIcon />
               </button>
+              {canManage && (
+                <button
+                  type="button"
+                  className={`${heroStyles.heroBtn} noHoverGlow`}
+                  onClick={() => navigate(
+                    `/settings?tab=organizations&org=${encodeURIComponent(org.id)}`,
+                  )}
+                  aria-label="Настройки организации"
+                  title="Настройки"
+                >
+                  <SettingsIcon />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className={styles.heroBottom}>
+            <div className={styles.heroNameRow}>
+              <h1 className={styles.heroTitle}>{org.name}</h1>
+              {shouldShowVerificationBadge(org) && (
+                <span className={`${styles.badge} ${styles.badgeOnHero} ${verificationBadgeClass(org.verificationStatus)}`}>
+                  {formatVerificationStatus(org.verificationStatus)}
+                </span>
+              )}
+              {!org.active && (
+                <span className={`${styles.badge} ${styles.badgeOnHero} ${styles.badgeMute}`}>Неактивна</span>
+              )}
             </div>
           </div>
         </div>
@@ -342,20 +377,8 @@ export default function OrganizationPage() {
             </div>
           </button>
 
-          <div className={styles.profileInfo}>
-            <div className={styles.nameRow}>
-              <h1 className={styles.fullName}>{org.name}</h1>
-              {shouldShowVerificationBadge(org) && (
-                <span className={`${styles.badge} ${verificationBadgeClass(org.verificationStatus)}`}>
-                  {formatVerificationStatus(org.verificationStatus)}
-                </span>
-              )}
-              {!org.active && (
-                <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
-              )}
-            </div>
-            <div className={styles.loginLine}>Организация</div>
-            {(org.address || org.canSellTickets) && (
+          {(org.address || org.canSellTickets) && (
+            <div className={styles.profileInfo}>
               <div className={styles.profileMeta}>
                 {org.address && <span>{org.address}</span>}
                 {org.address && org.canSellTickets && (
@@ -363,20 +386,6 @@ export default function OrganizationPage() {
                 )}
                 {org.canSellTickets && <span>Продажа билетов</span>}
               </div>
-            )}
-          </div>
-
-          {canManage && (
-            <div className={styles.profileActions}>
-              <button
-                type="button"
-                className={styles.btnJoin}
-                onClick={() => navigate(
-                  `/settings?tab=organizations&org=${encodeURIComponent(org.id)}`,
-                )}
-              >
-                Управление
-              </button>
             </div>
           )}
         </div>
