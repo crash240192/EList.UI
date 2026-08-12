@@ -37,36 +37,39 @@
 }
 
 .menu {
-  position: fixed;
-  top: calc(var(--header-h, 49px) + 6px);
-  right: max(10px, env(safe-area-inset-right, 0px));
-  left: max(10px, env(safe-area-inset-left, 0px));
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
   z-index: 400;
+  width: max-content;
+  min-width: 0;
+  max-width: calc(100vw - 16px);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
   overflow: hidden;
-  padding: 6px;
+  padding: 4px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .menuItem {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 11px 12px;
+  padding: 8px 10px;
   border: none;
-  border-radius: 8px;
+  border-radius: 7px;
   background: none;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   font-family: inherit;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -78,4 +81,74 @@
 .menuItem svg {
   flex-shrink: 0;
   color: var(--text-secondary);
+}
+
+.themeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.themeRow svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.themeLabel {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.themeToggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.themeTrack {
+  width: 34px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  position: relative;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.themeTrackLight {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.themeThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.themeTrackLight .themeThumb {
+  transform: translateX(14px);
+  background: #fff;
+}
+
+.menuSeparator {
+  height: 1px;
+  margin: 3px 8px;
+  background: var(--border);
 }

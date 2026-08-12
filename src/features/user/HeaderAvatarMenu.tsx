@@ -86,17 +86,25 @@ export function HeaderAvatarMenu() {
             <span>Мой профиль</span>
           </button>
 
-          <button
-            type="button"
-            className={styles.menuItem}
-            role="menuitem"
-            onClick={() => {
-              toggleTheme();
-            }}
-          >
+          <div className={styles.themeRow}>
             <ThemeIcon />
-            <span>{theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}</span>
-          </button>
+            <span className={styles.themeLabel}>
+              {theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+            </span>
+            <button
+              type="button"
+              className={styles.themeToggle}
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
+              title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+            >
+              <div className={`${styles.themeTrack} ${theme === 'light' ? styles.themeTrackLight : ''}`}>
+                <div className={styles.themeThumb} />
+              </div>
+            </button>
+          </div>
+
+          <div className={styles.menuSeparator} role="separator" />
 
           <button
             type="button"
