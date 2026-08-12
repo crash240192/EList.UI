@@ -548,22 +548,24 @@
     width: 100%;
     justify-content: flex-start;
     gap: 5px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
   .actionBtns {
     gap: 5px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex: 1;
+    min-width: 0;
     justify-content: flex-start;
-    width: 100%;
   }
   .actionJoinSep {
-    display: none;
+    margin-left: auto;
   }
   .joinBtnWrap {
-    flex-basis: 100%;
-    display: flex;
-    justify-content: flex-start;
-    margin-top: 2px;
+    margin-left: auto;
+  }
+  /* Если есть разделитель перед «Покинуть» — auto только на нём, иначе на кнопке */
+  .actionJoinSep + .joinBtnWrap {
+    margin-left: 0;
   }
   .actionControls > button,
   .actionBtns :global(button) {
