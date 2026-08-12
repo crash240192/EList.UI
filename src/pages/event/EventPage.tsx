@@ -645,8 +645,8 @@ export default function EventPage() {
               <div className={styles.actionBtns}>
                 {canShowInviteButton && (
                   <button
+                    type="button"
                     className={styles.btnInvite}
-                    title="Пригласить"
                     onClick={() => {
                       if (!authenticated) {
                         setAuthDialogOpen(true);
@@ -655,15 +655,13 @@ export default function EventPage() {
                       setInviteModalOpen(true);
                     }}
                   >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round">
-                      <circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/>
-                      <line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/>
-                    </svg>
+                    Пригласить
                   </button>
                 )}
                 {ticketsEnabled && (
                   <Button
                     variant="secondary"
+                    className={styles.btnTicket}
                     onClick={() => {
                       if (!authenticated) {
                         setAuthDialogOpen(true);
@@ -682,7 +680,7 @@ export default function EventPage() {
                       </div>
                     )}
                     <Button
-                      variant={isParticipating ? 'secondary' : 'primary'}
+                      variant="primary"
                       loading={actionLoading}
                       className={joinShake ? styles.btnJoinShake : undefined}
                       onClick={onJoinClick}

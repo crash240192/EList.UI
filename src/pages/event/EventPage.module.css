@@ -218,7 +218,37 @@
   row-gap: 6px;
 }
 .btnInvite {
-  composes: btnIcon from '../../shared/styles/actionButtons.module.css';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control-height);
+  padding: 0 var(--control-padding-x);
+  border-radius: var(--control-radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: var(--control-font-size);
+  font-weight: var(--control-font-weight);
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btnInvite:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btnTicket {
+  background: var(--surface-2) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+.btnTicket:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
 }
 
 .mapThumbBtn {
@@ -522,12 +552,6 @@
     padding-left: 10px;
     padding-right: 10px;
     font-size: 12px;
-  }
-  .btnInvite {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    padding: 0;
   }
   .heroTagsRight { max-width: 48%; }
 }
