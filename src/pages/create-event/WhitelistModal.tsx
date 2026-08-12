@@ -5,8 +5,9 @@ import { fetchSubscribers } from '@/entities/user/subscriptionApi';
 import type { ISubscriptionItem } from '@/entities/user/subscriptionApi';
 import { useDebounce, useInfiniteScroll } from '@/shared/hooks';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
-import styles from './WhitelistModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import { formatSubscribersCount } from '@/shared/lib/plural.ru';
+import styles from './WhitelistModal.module.css';
 
 const PAGE_SIZE = 20;
 
@@ -124,7 +125,7 @@ export function WhitelistModal({ myAccountId, current, listType, onAdd, onClose 
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <h3 className={styles.title}>{title}</h3>
-            {!loading && <span className={styles.count}>{total} подписчиков</span>}
+            {!loading && <span className={styles.count}>{formatSubscribersCount(total)}</span>}
           </div>
           <button className={styles.closeBtn} onClick={onClose}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

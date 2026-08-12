@@ -25,6 +25,7 @@ import { getOrFetchAccountId, getStoredAccountId } from '@/entities/user/api';
 import type { IContactDataItem } from '@/entities/user/profileApi';
 import { useEvents } from '@/features/event-list/useEvents';
 import { OrganizationShareMenu } from '@/features/organization/OrganizationShareMenu';
+import { OrgMembersModal } from '@/features/organization/OrgMembersModal';
 import {
   formatContactHref,
   getContactIconKind,
@@ -215,6 +216,7 @@ export default function OrganizationPage() {
   const [eventsPhase, setEventsPhase] = useState<EventsPhase>('upcoming');
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [membersModalOpen, setMembersModalOpen] = useState(false);
 
   useEffect(() => {
     if (!authenticated || myAccountId) return;
@@ -421,10 +423,14 @@ export default function OrganizationPage() {
               </span>
               <span className={styles.statLabel}>события</span>
             </div>
-            <div className={styles.statItem}>
+            <button
+              type="button"
+              className={`${styles.statItem} ${styles.statItemClickable} ${membersModalOpen ? styles.statItemActive : ''}`}
+              onClick={() => setMembersModalOpen(true)}
+            >
               <span className={styles.statNum}>{activeMembers.length}</span>
               <span className={styles.statLabel}>команда</span>
-            </div>
+            </button>
           </div>
 
           <div className={styles.statGroupDivider} aria-hidden />
@@ -585,6 +591,13 @@ export default function OrganizationPage() {
           organizationId={org.id}
           name={org.name}
           onClose={() => setShowShareMenu(false)}
+        />
+      )}
+
+      {membersModalOpen && (
+        <OrgMembersModal
+          members={activeMembers}
+          onClose={() => setMembersModalOpen(false)}
         />
       )}
     </div>
