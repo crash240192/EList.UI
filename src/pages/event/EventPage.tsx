@@ -20,7 +20,6 @@ import { ParticipantsModal } from '@/features/event/ParticipantsModal';
 import { InviteModal } from '@/features/event/InviteModal';
 import { AddOrganizerModal } from '@/features/event/AddOrganizerModal';
 import { BWListModal } from '@/features/event/BWListModal';
-import { YandexMap } from '@/features/event-map/YandexMap';
 import { EventMapModal } from '@/features/event-map/EventMapModal';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
@@ -88,6 +87,8 @@ export default function EventPage() {
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [addressStacked, setAddressStacked] = useState(false);
+  const addressRef = useRef<HTMLDivElement | null>(null);
 
   usePageTitle(event?.name ?? null);
 
@@ -205,6 +206,37 @@ export default function EventPage() {
     setShowScrollTop(false);
     setHeroCollapse(0);
   }, [loading]);
+
+  // На мобилке, если адрес занимает больше ~2 строк,
+  // раскладываем его под кнопкой карты, чтобы правые кнопки не наезжали.
+  useEffect(() => {
+    const el = addressRef.current;
+    if (!el) return;
+
+    const recalc = () => {
+      if (!addressRef.current) return;
+      if (window.innerWidth > 639) {
+        setAddressStacked(false);
+        return;
+      }
+
+      const el2 = addressRef.current;
+      const cs = window.getComputedStyle(el2);
+      const lineHeight = parseFloat(cs.lineHeight);
+      const fallbackLineHeight = parseFloat(cs.fontSize) * 1.35;
+      const lh = Number.isFinite(lineHeight) ? lineHeight : fallbackLineHeight;
+      const maxH = lh * 2 + 1; // запас
+      const height = el2.getBoundingClientRect().height;
+      setAddressStacked(height > maxH);
+    };
+
+    const t = window.requestAnimationFrame(recalc);
+    window.addEventListener('resize', recalc);
+    return () => {
+      window.cancelAnimationFrame(t);
+      window.removeEventListener('resize', recalc);
+    };
+  }, [event?.address]);
 
   const reloadAfterAgeAgreeRef = useRef<() => Promise<void>>(async () => {});
   const onAgeGranted = useCallback(() => reloadAfterAgeAgreeRef.current(), []);
@@ -557,124 +589,118 @@ export default function EventPage() {
 
           <div className={styles.heroBottom}>
             <h1 className={styles.heroTitle}>{event.name}</h1>
-            <div className={styles.heroTags}>
-              {getEventListTypes(event).map(t => (
-                <EventTypeChip
-                  key={t.id}
-                  type={t}
-                  variant="overlay"
-                  invert
-                  className={styles.tagType}
-                  iconSize={10}
-                />
-              ))}
-              {cost === 0 && <span className={styles.tagFree}>Бесплатно</span>}
-              <span className={styles.tagAge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
-              {event.parameters?.private && (
-                <span className={styles.tagPrivate}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-                  </svg>
-                  Закрытое
-                </span>
-              )}
-              {!isEventActive && <span className={styles.tagCancelled}>Отменено</span>}
+            <div className={styles.heroTagsRow}>
+              <div className={styles.heroTagsLeft}>
+                {getEventListTypes(event).map(t => (
+                  <EventTypeChip
+                    key={t.id}
+                    type={t}
+                    variant="overlay"
+                    invert
+                    className={styles.tagType}
+                    iconSize={10}
+                  />
+                ))}
+              </div>
+              <div className={styles.heroTagsRight}>
+                {cost === 0 ? (
+                  <span className={styles.tagFree}>Бесплатно</span>
+                ) : (
+                  <span className={styles.tagPaid}>{cost.toLocaleString('ru-RU')} ₽</span>
+                )}
+                <span className={styles.tagAge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
+                {event.parameters?.private && (
+                  <span className={styles.tagPrivate}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                    </svg>
+                    Закрытое
+                  </span>
+                )}
+                {!isEventActive && <span className={styles.tagCancelled}>Отменено</span>}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ── Action row: дата + адрес + действия ── */}
+        {/* ── Action row: дата; ниже — место + действия на одной линии ── */}
         <div className={styles.actionRow}>
-          <div className={styles.actionMeta}>
-            <div className={styles.actionMetaPrimary}>
-              {isSameDay(event.startTime, event.endTime) ? (
-                <>
-                  {formatDateStart(event.startTime)}
-                  <span className={styles.actionMetaDot}>·</span>
-                  {formatTime(event.startTime)}
-                  {event.endTime ? ` — ${formatTime(event.endTime)}` : ''}
-                </>
-              ) : (
-                <>
-                  {formatDateStart(event.startTime)}, {formatTime(event.startTime)}
-                  {event.endTime ? ` → ${formatDateStart(event.endTime)}, ${formatTime(event.endTime)}` : ''}
-                </>
-              )}
-            </div>
-            {event.address && (
-              <div className={styles.actionMetaSecondary}>{event.address}</div>
+          <div className={styles.actionMetaPrimary}>
+            {isSameDay(event.startTime, event.endTime) ? (
+              <>
+                {formatDateStart(event.startTime)}
+                <span className={styles.actionMetaDot}>·</span>
+                {formatTime(event.startTime)}
+                {event.endTime ? ` — ${formatTime(event.endTime)}` : ''}
+              </>
+            ) : (
+              <>
+                {formatDateStart(event.startTime)}, {formatTime(event.startTime)}
+                {event.endTime ? ` → ${formatDateStart(event.endTime)}, ${formatTime(event.endTime)}` : ''}
+              </>
             )}
           </div>
-          <RatingWidget
-            eventId={id!}
-            eventStartTime={event.startTime}
-            eventEndTime={event.endTime}
-            accountId={accountId}
-            eventActive={isEventActive}
-            onAuthRequired={() => setAuthDialogOpen(true)}
-          />
-          <div className={styles.actionBtns}>
-            {canShowInviteButton && (
-              <button
-                className={styles.btnInvite}
-                title="Пригласить"
-                onClick={() => {
-                  if (!authenticated) {
-                    setAuthDialogOpen(true);
-                    return;
-                  }
-                  setInviteModalOpen(true);
-                }}
+          <div className={styles.actionRowMain}>
+            {(event.address || (event.latitude != null && event.longitude != null)) ? (
+              <div
+                className={`${styles.actionMetaPlace} ${addressStacked ? styles.actionMetaPlaceStacked : ''}`}
               >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round">
-                  <circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/>
-                  <line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/>
-                </svg>
-              </button>
-            )}
-            {!eventFinished && !isOrganizer && (
-              <div className={styles.joinBtnWrap}>
-                {limitNotice && isParticipantLimitFull && (
-                  <div className={styles.joinLimitNotice} role="status">
-                    Достигнут лимит участников ({participantCap})
+                {event.latitude != null && event.longitude != null && (
+                  <button
+                    type="button"
+                    className={styles.mapThumbBtn}
+                    onClick={() => setMapModalOpen(true)}
+                    aria-label="Открыть карту"
+                    title="На карте"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                      <path d="M12 21s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />
+                      <circle cx="12" cy="10" r="2.5" />
+                    </svg>
+                  </button>
+                )}
+                {event.address && (
+                  <div
+                    ref={addressRef}
+                    className={styles.actionMetaSecondary}
+                  >
+                    {event.address}
                   </div>
                 )}
-                <Button
-                  variant={isParticipating ? 'secondary' : 'primary'}
-                  loading={actionLoading}
-                  className={joinShake ? styles.btnJoinShake : undefined}
-                  onClick={onJoinClick}
-                  disabled={joinDisabled}
-                  title={
-                    isParticipantLimitFull
-                      ? `Достигнут лимит участников (${participantCap})`
-                      : undefined
-                  }
-                >
-                  {isParticipating ? 'Покинуть' : 'Участвовать'}
-                </Button>
               </div>
+            ) : (
+              <div className={styles.actionMetaPlaceSpacer} />
             )}
-          </div>
-        </div>
-
-        {/* ── Основная сетка ── */}
-        <div className={styles.mainGrid}>
-
-          {/* ── Левая панель ── */}
-          <div className={styles.leftPanel}>
-
-            {/* Цена / билеты */}
-            <div className={styles.priceBlock}>
-              <div className={cost === 0 ? styles.priceVal : styles.priceValPaid}>
-                {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
-              </div>
-              {cost === 0 ? (
-                <span className={styles.priceBadge}>Free</span>
-              ) : ticketsEnabled ? (
+            <RatingWidget
+              eventId={id!}
+              eventStartTime={event.startTime}
+              eventEndTime={event.endTime}
+              accountId={accountId}
+              eventActive={isEventActive}
+              onAuthRequired={() => setAuthDialogOpen(true)}
+            />
+            <div className={styles.actionBtns}>
+              {canShowInviteButton && (
                 <button
-                  type="button"
-                  className={styles.buyTicketBtn}
+                  className={styles.btnInvite}
+                  title="Пригласить"
+                  onClick={() => {
+                    if (!authenticated) {
+                      setAuthDialogOpen(true);
+                      return;
+                    }
+                    setInviteModalOpen(true);
+                  }}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round">
+                    <circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/>
+                    <line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/>
+                  </svg>
+                </button>
+              )}
+              {ticketsEnabled && (
+                <Button
+                  variant="secondary"
                   onClick={() => {
                     if (!authenticated) {
                       setAuthDialogOpen(true);
@@ -683,11 +709,67 @@ export default function EventPage() {
                   }}
                 >
                   Купить билет
-                </button>
-              ) : (
-                <span className={styles.priceBadgeMuted}>Билеты не продаются</span>
+                </Button>
+              )}
+              {!eventFinished && !isOrganizer && (
+                <div className={styles.joinBtnWrap}>
+                  {limitNotice && isParticipantLimitFull && (
+                    <div className={styles.joinLimitNotice} role="status">
+                      Достигнут лимит участников ({participantCap})
+                    </div>
+                  )}
+                  <Button
+                    variant={isParticipating ? 'secondary' : 'primary'}
+                    loading={actionLoading}
+                    className={joinShake ? styles.btnJoinShake : undefined}
+                    onClick={onJoinClick}
+                    disabled={joinDisabled}
+                    title={
+                      isParticipantLimitFull
+                        ? `Достигнут лимит участников (${participantCap})`
+                        : undefined
+                    }
+                  >
+                    {isParticipating ? 'Покинуть' : 'Участвовать'}
+                  </Button>
+                </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* ── Основная сетка ── */}
+        <div className={styles.mainGrid}>
+
+          {/* Описание — на мобилке первым, на десктопе справа сверху */}
+          <div className={styles.descSection}>
+            <div className={styles.secLabel}>О мероприятии</div>
+            <p className={`${styles.desc} ${descExpanded ? '' : styles.descClamped}`}>
+              {event.description ?? 'Описание отсутствует'}
+            </p>
+            {(event.description?.length ?? 0) > 200 && (
+              <button
+                type="button"
+                className={styles.descToggle}
+                onClick={() => setDescExpanded(v => !v)}
+                aria-expanded={descExpanded}
+              >
+                <span className={styles.descToggleLine} aria-hidden />
+                <span className={styles.descToggleBody}>
+                  <span className={styles.descToggleTitle}>
+                    {descExpanded ? 'Свернуть' : 'Показать полностью'}
+                  </span>
+                  <span className={styles.descToggleHint}>
+                    {descExpanded ? 'Скрыть описание' : 'Развернуть описание'}
+                  </span>
+                </span>
+                {descExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+              </button>
+            )}
+          </div>
+
+          {/* Сайдбар: участники → альбомы → организаторы */}
+          <div className={styles.sidePanel}>
 
             {showParticipantsBlock && (
               <AccessDeniedGate denied={participantsDenied} variant="section">
@@ -728,7 +810,14 @@ export default function EventPage() {
               </AccessDeniedGate>
             )}
 
-            {/* Организаторы */}
+            <EventAlbums
+              eventId={id!}
+              compact
+              canManage={isOrganizer}
+              isParticipating={isParticipating}
+              accountId={accountId}
+            />
+
             {(orgOrganizers.length > 0 || personOrganizers.length > 0 || organizersDenied) && (
               <AccessDeniedGate denied={organizersDenied} variant="section">
                 {organizersDenied ? (
@@ -792,68 +881,9 @@ export default function EventPage() {
               </AccessDeniedGate>
             )}
 
-            {/* Альбомы */}
-            <EventAlbums
-              eventId={id!}
-              compact
-              canManage={isOrganizer}
-              isParticipating={isParticipating}
-              accountId={accountId}
-            />
-
           </div>
 
-          {/* ── Правая панель ── */}
-          <div className={styles.rightPanel}>
-
-            {/* Описание */}
-            <div>
-              <div className={styles.secLabel}>О мероприятии</div>
-              <p className={`${styles.desc} ${descExpanded ? '' : styles.descClamped}`}>
-                {event.description ?? 'Описание отсутствует'}
-              </p>
-              {(event.description?.length ?? 0) > 200 && (
-                <button
-                  type="button"
-                  className={styles.descToggle}
-                  onClick={() => setDescExpanded(v => !v)}
-                  aria-expanded={descExpanded}
-                >
-                  <span className={styles.descToggleLine} aria-hidden />
-                  <span className={styles.descToggleBody}>
-                    <span className={styles.descToggleTitle}>
-                      {descExpanded ? 'Свернуть' : 'Показать полностью'}
-                    </span>
-                    <span className={styles.descToggleHint}>
-                      {descExpanded ? 'Скрыть описание' : 'Развернуть описание'}
-                    </span>
-                  </span>
-                  {descExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                </button>
-              )}
-            </div>
-
-            {/* Карта */}
-            {event.latitude != null && event.longitude != null && (
-              <div>
-                <div className={styles.secLabel}>Место проведения</div>
-                <div className={styles.mapBlock}>
-                  <button
-                    type="button"
-                    className={styles.mapExpandBtn}
-                    onClick={() => setMapModalOpen(true)}
-                    aria-label="Развернуть карту"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" />
-                    </svg>
-                    Развернуть
-                  </button>
-                  <YandexMap lat={event.latitude} lng={event.longitude} label={event.name} zoom={14} draggable={false} />
-                </div>
-              </div>
-            )}
-
+          <div className={styles.discussionsSection}>
             {id && (
               <EventDiscussionsPanel
                 eventId={id}
@@ -861,7 +891,6 @@ export default function EventPage() {
                 canManage={isOrganizer}
               />
             )}
-
           </div>
         </div>{/* end mainGrid */}
       </div>{/* end card */}

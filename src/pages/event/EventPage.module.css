@@ -73,7 +73,7 @@
 .heroBottom {
   composes: heroBottom from '../../shared/styles/hero.module.css';
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 8px;
   right: 14px;
   max-width: calc(100% - 28px);
@@ -99,45 +99,127 @@
 .heroTitle {
   composes: heroTitle from '../../shared/styles/hero.module.css';
   position: relative;
+  font-size: 20px;
+  font-weight: 700;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 2px 16px rgba(0, 0, 0, 0.8), 0 0 2px rgba(0, 0, 0, 0.9);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.heroTags {
+.heroTagsRow {
   position: relative;
   display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
 }
-.tagType,.tagFree { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); display:inline-flex; align-items:center; gap:4px; }
+.heroTagsLeft,
+.heroTagsRight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+.heroTagsLeft {
+  flex: 1;
+  justify-content: flex-start;
+}
+.heroTagsRight {
+  flex-shrink: 0;
+  justify-content: flex-end;
+  max-width: 55%;
+}
+.tagType,.tagFree,.tagPaid { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); display:inline-flex; align-items:center; gap:4px; }
 .tagFree { background:rgba(16,185,129,.65); color:#fff; border:.5px solid rgba(16,185,129,.4); }
+.tagPaid { background:rgba(0,0,0,.45); color:#fff; border:.5px solid rgba(255,255,255,.28); font-weight:600; }
 
 /* Action row */
-.actionRow { display:flex; align-items:center; gap:10px; padding:12px 20px; border-bottom:1px solid var(--border); min-height:58px; }
-.actionMeta { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.actionRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  min-height: 58px;
+}
 .actionMetaPrimary {
   font-size: var(--font-md);
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.3;
-  white-space: nowrap;
+}
+.actionRowMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.actionMetaPlace {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  column-gap: 8px;
+  align-items: start;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+.actionMetaPlaceSpacer {
+  flex: 1;
+  min-width: 0;
 }
 .actionMetaSecondary {
   font-size: 12px;
   color: var(--text-secondary);
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.actionMetaPlaceStacked .actionMetaSecondary {
+  grid-column: 1 / -1;
+}
+
+.actionMetaPlaceStacked {
+  /* используется для переключения раскладки адреса */
 }
 .actionMetaDot { margin: 0 5px; color: var(--text-muted); font-weight: 500; }
-.actionBtns { display:flex; gap:7px; flex-shrink:0; align-items:center; }
+.actionBtns {
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: flex-start;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
 .btnInvite {
   composes: btnIcon from '../../shared/styles/actionButtons.module.css';
+}
+
+.mapThumbBtn {
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 18%, var(--surface-2)) 0%, var(--surface-2) 55%),
+    var(--surface-2);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.mapThumbBtn:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--text-primary);
+  background: var(--surface);
 }
 
 .joinBtnWrap { position:relative; flex-shrink:0; }
@@ -169,10 +251,35 @@
   border:.5px solid rgba(239,68,68,.5);
 }
 
-/* Main grid */
-.mainGrid { display:grid; grid-template-columns:280px 1fr; align-items:start; }
-.leftPanel { border-right:1px solid var(--border); padding:16px 14px 24px; display:flex; flex-direction:column; gap:8px; min-width:0; }
-.rightPanel { padding:18px 20px 28px; display:flex; flex-direction:column; gap:16px; min-width:0; }
+/* Main grid: desktop — сайдбар слева, описание+обсуждения справа;
+   mobile — описание → сайдбар → обсуждения */
+.mainGrid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-areas:
+    "side desc"
+    "side discussions";
+  align-items: start;
+}
+.sidePanel {
+  grid-area: side;
+  border-right: 1px solid var(--border);
+  padding: 16px 14px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.descSection {
+  grid-area: desc;
+  padding: 18px 20px 8px;
+  min-width: 0;
+}
+.discussionsSection {
+  grid-area: discussions;
+  padding: 8px 20px 28px;
+  min-width: 0;
+}
 
 /* Left meta */
 .secLabel { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-bottom:8px; }
@@ -182,36 +289,6 @@
 .metaLbl { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
 .metaVal { font-size:12px; color:var(--text-primary); font-weight:500; line-height:1.4; }
 .metaValSub { font-size:11px; color:var(--text-secondary); font-weight:400; }
-
-/* Price */
-.priceBlock { display:flex; align-items:center; justify-content:space-between; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin:0; }
-.priceVal { font-size:17px; font-weight:600; color:#10b981; }
-.priceBadge { background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); color:#10b981; border-radius:20px; padding:2px 9px; font-size:10px; font-weight:600; }
-.priceBadgeMuted {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  border-radius: 20px;
-  padding: 2px 9px;
-  font-size: 10px;
-  font-weight: 600;
-}
-.priceValPaid { color:var(--text-primary); }
-.buyTicketBtn {
-  background: var(--accent);
-  border: none;
-  border-radius: 20px;
-  padding: 5px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: background .15s;
-  font-family: inherit;
-}
-.buyTicketBtn:hover { background: var(--accent-hover, #4f46e5); }
 
 /* Fill */
 .fillWrap { margin-top:10px; }
@@ -361,20 +438,6 @@
 .detailLbl { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
 .detailVal { font-size:12px; font-weight:500; color:var(--text-primary); margin-top:2px; }
 
-/* Map */
-.mapBlock { position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--border); height:312px; }
-.mapExpandBtn {
-  position:absolute; top:10px; left:10px; z-index:2;
-  display:flex; align-items:center; gap:5px;
-  padding:6px 10px; border-radius:8px;
-  border:1px solid var(--border); background:var(--surface);
-  color:var(--text-secondary); font-size:11px; font-weight:500;
-  cursor:pointer; font-family:inherit;
-  box-shadow:0 2px 8px rgba(0,0,0,0.12);
-  transition:background .15s, color .15s;
-}
-.mapExpandBtn:hover { background:var(--surface-2); color:var(--text-primary); }
-
 /* Discussion stub */
 .discussionStub { border:1px dashed var(--border); border-radius:10px; padding:20px; text-align:center; color:var(--text-muted); font-size:12px; line-height:1.6; }
 
@@ -389,11 +452,30 @@
 @media (max-width: 639px) {
   .page { padding:0; }
   .card { border-radius:0; border-left:none; border-right:none; }
-  .mainGrid { grid-template-columns:1fr; }
-  .leftPanel { border-right:none; border-bottom:1px solid var(--border); }
+  .mainGrid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "desc"
+      "side"
+      "discussions";
+  }
+  .sidePanel {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 14px 18px;
+  }
+  .descSection {
+    padding: 16px 16px 8px;
+  }
+  .discussionsSection {
+    padding: 8px 16px 24px;
+  }
   .detailsGrid { grid-template-columns:repeat(2,1fr); }
+  .actionRow { padding: 12px 14px; }
   .actionMetaPrimary { font-size:13px; }
   .actionMetaSecondary { font-size:11px; }
+  .actionBtns { max-width: 170px; }
+  .heroTagsRight { max-width: 48%; }
 }
 .errorIcon { font-size: 36px; }
 
@@ -440,7 +522,6 @@
 }
 
 @media (max-width: 639px) {
-  .mapBlock { height:228px; }
   .scrollTopBtn {
     left: 16px;
     bottom: 16px;
