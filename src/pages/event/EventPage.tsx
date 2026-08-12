@@ -668,6 +668,9 @@ export default function EventPage() {
                     Купить билет
                   </Button>
                 )}
+                {!eventFinished && !isOrganizer && isParticipating && (
+                  <span className={styles.actionJoinSep} aria-hidden />
+                )}
                 {!eventFinished && !isOrganizer && (
                   <div className={styles.joinBtnWrap}>
                     {limitNotice && isParticipantLimitFull && (
