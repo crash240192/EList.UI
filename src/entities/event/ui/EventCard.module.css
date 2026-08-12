@@ -22,9 +22,7 @@
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  overflow: clip;
   flex-shrink: 0;
-  isolation: isolate;
 }
 .coverImg { width: 100%; height: 100%; object-fit: cover; display: block; }
 .coverOverlay {
@@ -38,7 +36,7 @@
   pointer-events: none;
 }
 
-/* Бейджи на обложке — одна строка, лишнее обрезается с мягким fade */
+/* Типы на обложке — перенос строк, как на предпросмотре */
 .typeBadges {
   position: absolute;
   bottom: 8px;
@@ -46,26 +44,17 @@
   right: 8px;
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 4px;
   align-items: center;
-  min-width: 0;
-  max-width: calc(100% - 16px);
-  overflow: hidden;
-  pointer-events: none;
-  mask-image: linear-gradient(to right, #000 72%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, #000 72%, transparent 100%);
+  z-index: 2;
 }
 .typeBadge {
   backdrop-filter: blur(6px);
   font-size: var(--font-2xs);
   padding: 3px 9px;
   border-radius: 20px;
-  flex: 0 0 auto;
-  white-space: nowrap;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 .ageBadge {
   background: rgba(239,68,68,0.8); color: #fff;

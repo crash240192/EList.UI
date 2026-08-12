@@ -3,10 +3,10 @@
 import React, { createContext, useContext } from 'react';
 import type { IEvent } from '../types';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { EventTypeChip } from '@/shared/ui/EventTypeChip';
+import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { getEventListTypes } from '@/entities/event/lib/eventListItemUtils';
+import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
 import styles from './EventCard.module.css';
 
 interface EventCardContextValue { event: IEvent; }
@@ -66,19 +66,17 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
 
       <div className={styles.coverOverlay} />
 
-      {/* Бейджи типов — одна строка, лишнее обрезается по ширине обложки */}
-      <div className={styles.typeBadges}>
-        {getEventListTypes(event).map(t => (
-          <EventTypeChip
-            key={t.id}
-            type={t}
-            variant="overlay"
-            invert
-            className={styles.typeBadge}
-            iconSize={12}
-          />
-        ))}
-      </div>
+      {/* Типы — с переносом строк, как на предпросмотре карты */}
+      {getEventTypes(event).length > 0 && (
+        <EventTypeChipsOverflow
+          event={event}
+          variant="overlay"
+          invert
+          iconSize={12}
+          chipClassName={styles.typeBadge}
+          className={styles.typeBadges}
+        />
+      )}
       <div className={styles.coverTopLeft}>
         <span className={styles.ageBadge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
         {event.parameters?.private && (
