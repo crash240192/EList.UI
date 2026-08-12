@@ -555,6 +555,21 @@ export default function EventPage() {
 
           <div className={styles.heroBottom}>
             <h1 className={styles.heroTitle}>{event.name}</h1>
+            <div className={styles.heroDateTime}>
+              {isSameDay(event.startTime, event.endTime) ? (
+                <>
+                  {formatDateStart(event.startTime)}
+                  <span className={styles.heroDateDot}>·</span>
+                  {formatTime(event.startTime)}
+                  {event.endTime ? ` — ${formatTime(event.endTime)}` : ''}
+                </>
+              ) : (
+                <>
+                  {formatDateStart(event.startTime)}, {formatTime(event.startTime)}
+                  {event.endTime ? ` → ${formatDateStart(event.endTime)}, ${formatTime(event.endTime)}` : ''}
+                </>
+              )}
+            </div>
             <div className={styles.heroTagsRow}>
               <div className={styles.heroTagsLeft}>
                 <EventTypeChipsOverflow
@@ -586,23 +601,8 @@ export default function EventPage() {
           </div>
         </div>
 
-        {/* ── Action row: дата; ниже — место + действия на одной линии ── */}
+        {/* ── Action row: место + действия ── */}
         <div className={styles.actionRow}>
-          <div className={styles.actionMetaPrimary}>
-            {isSameDay(event.startTime, event.endTime) ? (
-              <>
-                {formatDateStart(event.startTime)}
-                <span className={styles.actionMetaDot}>·</span>
-                {formatTime(event.startTime)}
-                {event.endTime ? ` — ${formatTime(event.endTime)}` : ''}
-              </>
-            ) : (
-              <>
-                {formatDateStart(event.startTime)}, {formatTime(event.startTime)}
-                {event.endTime ? ` → ${formatDateStart(event.endTime)}, ${formatTime(event.endTime)}` : ''}
-              </>
-            )}
-          </div>
           <div className={styles.actionRowMain}>
             {(event.address || (event.latitude != null && event.longitude != null)) ? (
               <div className={styles.actionMetaPlace}>
