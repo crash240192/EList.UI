@@ -87,8 +87,6 @@ export default function EventPage() {
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
-  const [addressStacked, setAddressStacked] = useState(false);
-  const addressRef = useRef<HTMLDivElement | null>(null);
 
   usePageTitle(event?.name ?? null);
 
@@ -206,37 +204,6 @@ export default function EventPage() {
     setShowScrollTop(false);
     setHeroCollapse(0);
   }, [loading]);
-
-  // На мобилке, если адрес занимает больше ~2 строк,
-  // раскладываем его под кнопкой карты, чтобы правые кнопки не наезжали.
-  useEffect(() => {
-    const el = addressRef.current;
-    if (!el) return;
-
-    const recalc = () => {
-      if (!addressRef.current) return;
-      if (window.innerWidth > 639) {
-        setAddressStacked(false);
-        return;
-      }
-
-      const el2 = addressRef.current;
-      const cs = window.getComputedStyle(el2);
-      const lineHeight = parseFloat(cs.lineHeight);
-      const fallbackLineHeight = parseFloat(cs.fontSize) * 1.35;
-      const lh = Number.isFinite(lineHeight) ? lineHeight : fallbackLineHeight;
-      const maxH = lh * 2 + 1; // запас
-      const height = el2.getBoundingClientRect().height;
-      setAddressStacked(height > maxH);
-    };
-
-    const t = window.requestAnimationFrame(recalc);
-    window.addEventListener('resize', recalc);
-    return () => {
-      window.cancelAnimationFrame(t);
-      window.removeEventListener('resize', recalc);
-    };
-  }, [event?.address]);
 
   const reloadAfterAgeAgreeRef = useRef<() => Promise<void>>(async () => {});
   const onAgeGranted = useCallback(() => reloadAfterAgeAgreeRef.current(), []);
@@ -642,9 +609,7 @@ export default function EventPage() {
           </div>
           <div className={styles.actionRowMain}>
             {(event.address || (event.latitude != null && event.longitude != null)) ? (
-              <div
-                className={`${styles.actionMetaPlace} ${addressStacked ? styles.actionMetaPlaceStacked : ''}`}
-              >
+              <div className={styles.actionMetaPlace}>
                 {event.latitude != null && event.longitude != null && (
                   <button
                     type="button"
@@ -660,10 +625,7 @@ export default function EventPage() {
                   </button>
                 )}
                 {event.address && (
-                  <div
-                    ref={addressRef}
-                    className={styles.actionMetaSecondary}
-                  >
+                  <div className={styles.actionMetaSecondary}>
                     {event.address}
                   </div>
                 )}
@@ -671,69 +633,71 @@ export default function EventPage() {
             ) : (
               <div className={styles.actionMetaPlaceSpacer} />
             )}
-            <RatingWidget
-              eventId={id!}
-              eventStartTime={event.startTime}
-              eventEndTime={event.endTime}
-              accountId={accountId}
-              eventActive={isEventActive}
-              onAuthRequired={() => setAuthDialogOpen(true)}
-            />
-            <div className={styles.actionBtns}>
-              {canShowInviteButton && (
-                <button
-                  className={styles.btnInvite}
-                  title="Пригласить"
-                  onClick={() => {
-                    if (!authenticated) {
-                      setAuthDialogOpen(true);
-                      return;
-                    }
-                    setInviteModalOpen(true);
-                  }}
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round">
-                    <circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/>
-                    <line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/>
-                  </svg>
-                </button>
-              )}
-              {ticketsEnabled && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    if (!authenticated) {
-                      setAuthDialogOpen(true);
-                      return;
-                    }
-                  }}
-                >
-                  Купить билет
-                </Button>
-              )}
-              {!eventFinished && !isOrganizer && (
-                <div className={styles.joinBtnWrap}>
-                  {limitNotice && isParticipantLimitFull && (
-                    <div className={styles.joinLimitNotice} role="status">
-                      Достигнут лимит участников ({participantCap})
-                    </div>
-                  )}
-                  <Button
-                    variant={isParticipating ? 'secondary' : 'primary'}
-                    loading={actionLoading}
-                    className={joinShake ? styles.btnJoinShake : undefined}
-                    onClick={onJoinClick}
-                    disabled={joinDisabled}
-                    title={
-                      isParticipantLimitFull
-                        ? `Достигнут лимит участников (${participantCap})`
-                        : undefined
-                    }
+            <div className={styles.actionControls}>
+              <RatingWidget
+                eventId={id!}
+                eventStartTime={event.startTime}
+                eventEndTime={event.endTime}
+                accountId={accountId}
+                eventActive={isEventActive}
+                onAuthRequired={() => setAuthDialogOpen(true)}
+              />
+              <div className={styles.actionBtns}>
+                {canShowInviteButton && (
+                  <button
+                    className={styles.btnInvite}
+                    title="Пригласить"
+                    onClick={() => {
+                      if (!authenticated) {
+                        setAuthDialogOpen(true);
+                        return;
+                      }
+                      setInviteModalOpen(true);
+                    }}
                   >
-                    {isParticipating ? 'Покинуть' : 'Участвовать'}
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round">
+                      <circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/>
+                      <line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/>
+                    </svg>
+                  </button>
+                )}
+                {ticketsEnabled && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      if (!authenticated) {
+                        setAuthDialogOpen(true);
+                        return;
+                      }
+                    }}
+                  >
+                    Купить билет
                   </Button>
-                </div>
-              )}
+                )}
+                {!eventFinished && !isOrganizer && (
+                  <div className={styles.joinBtnWrap}>
+                    {limitNotice && isParticipantLimitFull && (
+                      <div className={styles.joinLimitNotice} role="status">
+                        Достигнут лимит участников ({participantCap})
+                      </div>
+                    )}
+                    <Button
+                      variant={isParticipating ? 'secondary' : 'primary'}
+                      loading={actionLoading}
+                      className={joinShake ? styles.btnJoinShake : undefined}
+                      onClick={onJoinClick}
+                      disabled={joinDisabled}
+                      title={
+                        isParticipantLimitFull
+                          ? `Достигнут лимит участников (${participantCap})`
+                          : undefined
+                      }
+                    >
+                      {isParticipating ? 'Покинуть' : 'Участвовать'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
