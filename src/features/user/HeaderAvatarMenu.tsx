@@ -129,7 +129,7 @@ export function HeaderAvatarMenu() {
             }}
           >
             <InfoIcon />
-            <span>Документы и согласия</span>
+            <span>Условия использования</span>
           </button>
         </div>
       )}

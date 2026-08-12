@@ -150,18 +150,18 @@ export function UserAgreementsInfoButton({
         type="button"
         className={`${styles.infoBtn} ${open ? styles.infoBtnOpen : ''}`}
         onClick={() => setOpen(!open)}
-        aria-label="Документы и согласия"
+        aria-label="Условия использования"
         aria-expanded={open}
-        title="Документы и согласия"
+        title="Условия использования"
       >
         <InfoIcon />
       </button>
       )}
 
       {open && (
-        <div className={styles.panel} role="dialog" aria-label="Документы и согласия">
+        <div className={styles.panel} role="dialog" aria-label="Условия использования">
           <div className={styles.head}>
-            <h2 className={styles.title}>Документы и согласия</h2>
+            <h2 className={styles.title}>Условия использования</h2>
             <button
               type="button"
               className={styles.closeBtn}
