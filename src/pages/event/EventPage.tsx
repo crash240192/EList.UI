@@ -676,7 +676,7 @@ export default function EventPage() {
                       </div>
                     )}
                     <Button
-                      variant="primary"
+                      variant={isParticipating ? 'danger' : 'primary'}
                       loading={actionLoading}
                       className={joinShake ? styles.btnJoinShake : undefined}
                       onClick={onJoinClick}
