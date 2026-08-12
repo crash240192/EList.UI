@@ -6,7 +6,7 @@ import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
+import { getEventListTypes } from '@/entities/event/lib/eventListItemUtils';
 import styles from './EventCard.module.css';
 
 interface EventCardContextValue { event: IEvent; }
@@ -31,9 +31,7 @@ function formatDateTimeRange(start: string, end: string | null | undefined) {
   if (!end) return formatDateTime(start);
   return `${formatDateTime(start)} — ${formatDateTime(end)}`;
 }
-function formatPrice(cost: number) {
-  return cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`;
-}
+
 // ---- Root ----
 interface EventCardProps { event: IEvent; onClick?: (e: IEvent) => void; className?: string; children: React.ReactNode; }
 function EventCard({ event, onClick, className = '', children }: EventCardProps) {
@@ -68,9 +66,9 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
 
       <div className={styles.coverOverlay} />
 
-      {/* Бейджи типов — одна строка, сколько влезло по ширине */}
+      {/* Бейджи типов — одна строка, лишнее обрезается по ширине обложки */}
       <div className={styles.typeBadges}>
-        {getEventTypes(event).map(t => (
+        {getEventListTypes(event).map(t => (
           <EventTypeChip
             key={t.id}
             type={t}

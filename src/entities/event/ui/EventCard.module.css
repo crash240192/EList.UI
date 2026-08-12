@@ -21,7 +21,10 @@
 .cover {
   position: relative;
   aspect-ratio: 16 / 9;
-  overflow: hidden; flex-shrink: 0;
+  overflow: hidden;
+  overflow: clip;
+  flex-shrink: 0;
+  isolation: isolate;
 }
 .coverImg { width: 100%; height: 100%; object-fit: cover; display: block; }
 .coverOverlay {
@@ -35,7 +38,7 @@
   pointer-events: none;
 }
 
-/* Бейджи на обложке — одна горизонтальная строка, лишнее обрезается */
+/* Бейджи на обложке — одна строка, лишнее обрезается с мягким fade */
 .typeBadges {
   position: absolute;
   bottom: 8px;
@@ -46,15 +49,23 @@
   flex-wrap: nowrap;
   gap: 4px;
   align-items: center;
+  min-width: 0;
+  max-width: calc(100% - 16px);
   overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to right, #000 72%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 72%, transparent 100%);
 }
 .typeBadge {
   backdrop-filter: blur(6px);
   font-size: var(--font-2xs);
   padding: 3px 9px;
   border-radius: 20px;
-  flex-shrink: 0;
-  max-width: 100%;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ageBadge {
   background: rgba(239,68,68,0.8); color: #fff;
@@ -100,10 +111,11 @@
 .footerLeft { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 
 .price {
-  font-size: var(--font-xs); font-weight: 600; padding: 2px 9px; border-radius: 20px;
+  font-size: var(--font-xs);
+  font-weight: 600;
 }
-.priceFree { background: rgba(34,197,94,0.12); color: #22c55e; }
-.pricePaid { background: rgba(99,102,241,0.12); color: var(--accent); }
+.priceFree { color: var(--success); }
+.pricePaid { color: var(--warning); }
 
 .rating {
   display: flex; align-items: center; gap: 3px;
