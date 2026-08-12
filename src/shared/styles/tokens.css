@@ -42,9 +42,9 @@
 
   /* Hero navigation controls */
   --hero-btn-size: 34px;
-  --hero-btn-bg: rgba(255, 255, 255, 0.18);
-  --hero-btn-bg-hover: rgba(255, 255, 255, 0.3);
-  --hero-btn-border: 0.5px solid rgba(255, 255, 255, 0.25);
+  --hero-btn-bg: rgba(0, 0, 0, 0.48);
+  --hero-btn-bg-hover: rgba(0, 0, 0, 0.62);
+  --hero-btn-border: 0.5px solid rgba(255, 255, 255, 0.28);
   --hero-btn-blur: blur(8px);
 
   /* Action / nav buttons */
