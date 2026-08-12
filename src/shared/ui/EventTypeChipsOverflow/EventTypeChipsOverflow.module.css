@@ -1,0 +1,78 @@
+.row {
+  position: relative;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.moreChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.moreOverlay {
+  background: rgba(0, 0, 0, 0.45);
+  border: 0.5px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  backdrop-filter: blur(4px);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.28);
+}
+
+.moreOverlay:hover {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.moreSoft {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.moreSoft:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.panel {
+  position: fixed;
+  z-index: 600;
+  width: min(260px, calc(100vw - 16px));
+  max-height: min(240px, 50dvh);
+  overflow: auto;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
+}
+
+.panelTitle {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.panelList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}

@@ -21,7 +21,7 @@ import { InviteModal } from '@/features/event/InviteModal';
 import { AddOrganizerModal } from '@/features/event/AddOrganizerModal';
 import { BWListModal } from '@/features/event/BWListModal';
 import { EventMapModal } from '@/features/event-map/EventMapModal';
-import { EventTypeChip } from '@/shared/ui/EventTypeChip';
+import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import { EventDiscussionsPanel } from '@/features/event-discussion';
@@ -29,7 +29,6 @@ import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { getEventListTypes } from '@/entities/event/lib/eventListItemUtils';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
@@ -558,16 +557,13 @@ export default function EventPage() {
             <h1 className={styles.heroTitle}>{event.name}</h1>
             <div className={styles.heroTagsRow}>
               <div className={styles.heroTagsLeft}>
-                {getEventListTypes(event).map(t => (
-                  <EventTypeChip
-                    key={t.id}
-                    type={t}
-                    variant="overlay"
-                    invert
-                    className={styles.tagType}
-                    iconSize={10}
-                  />
-                ))}
+                <EventTypeChipsOverflow
+                  event={event}
+                  variant="overlay"
+                  invert
+                  iconSize={10}
+                  chipClassName={styles.tagType}
+                />
               </div>
               <div className={styles.heroTagsRight}>
                 {cost === 0 ? (

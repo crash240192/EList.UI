@@ -5,10 +5,10 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { EventTypeChip } from '@/shared/ui/EventTypeChip';
+import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { getEventListTypes } from '@/entities/event/lib/eventListItemUtils';
+import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
 import styles from './EventModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
@@ -72,19 +72,15 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
           {/* Название + типы снизу обложки */}
           <div className={styles.heroBottom}>
             <h2 className={styles.heroTitle}>{event.name}</h2>
-            {((event.eventTypes?.length ?? 0) > 0 || event.eventType) && (
-              <div className={styles.typeRow}>
-                {getEventListTypes(event).map(t => (
-                  <EventTypeChip
-                    key={t.id}
-                    type={t}
-                    variant="overlay"
-                    invert
-                    className={styles.typeChip}
-                    iconSize={12}
-                  />
-                ))}
-              </div>
+            {getEventTypes(event).length > 0 && (
+              <EventTypeChipsOverflow
+                event={event}
+                variant="overlay"
+                invert
+                iconSize={12}
+                chipClassName={styles.typeChip}
+                className={styles.typeRow}
+              />
             )}
           </div>
         </div>
