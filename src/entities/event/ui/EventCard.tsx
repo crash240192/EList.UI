@@ -17,13 +17,19 @@ function useEventCard() {
   return ctx;
 }
 
-/** «сб, 18 июл.» → «Сб, 18 июл» — якорь сканирования списка */
-function formatDateBadge(iso: string) {
-  const s = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(iso));
-  return (s.charAt(0).toUpperCase() + s.slice(1)).replace(/\./g, '');
+/** Дата и время как на предпросмотре карты: «18 июл., 14:30» */
+function formatDateTime(iso: string) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
 }
-function formatTime(iso: string) {
-  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+
+function formatDateTimeRange(start: string, end: string | null | undefined) {
+  if (!end) return formatDateTime(start);
+  return `${formatDateTime(start)} — ${formatDateTime(end)}`;
 }
 function formatPrice(cost: number) {
   return cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`;
@@ -75,9 +81,8 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
           />
         ))}
       </div>
-      <span className={styles.ageBadge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
       <div className={styles.coverTopLeft}>
-        <span className={styles.dateBadge}>{formatDateBadge(event.startTime)}</span>
+        <span className={styles.ageBadge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
         {event.parameters?.private && (
           <span className={styles.privateBadge} aria-label="Приватное">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
@@ -102,7 +107,7 @@ function Meta() {
     <div className={styles.meta}>
       <span className={styles.metaItem}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        {formatTime(event.startTime)}
+        {formatDateTimeRange(event.startTime, event.endTime)}
       </span>
       {event.address && (
         <span className={styles.metaItem}>

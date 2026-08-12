@@ -155,7 +155,7 @@
     0 3px 10px rgba(0, 0, 0, 0.3);
 }
 .tagFree { background:rgba(16,185,129,.65); color:#fff; border:.5px solid rgba(16,185,129,.4); }
-.tagPaid { background:rgba(0,0,0,.45); color:#fff; border:.5px solid rgba(255,255,255,.28); font-weight:600; }
+.tagPaid { background:rgba(0,0,0,.45); color:var(--warning); border:.5px solid rgba(255,255,255,.28); font-weight:600; }
 
 /* Action row */
 .actionRow {
