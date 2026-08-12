@@ -11,6 +11,7 @@ import {
 } from '@/entities/user/subscriptionApi';
 import { useDebounce, useInfiniteScroll } from '@/shared/hooks';
 import { UserChip } from '@/entities/user/ui/UserChip';
+import { formatPeopleCount } from '@/shared/lib/plural.ru';
 import styles from './SubscribersListModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { SubscribeModal } from './SubscribeModal';
@@ -144,9 +145,9 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
       <div className={styles.backdrop} onClick={() => { void handleClose(); }} />
       <div className={styles.modal} role="dialog" aria-modal>
         <div className={styles.header}>
-          <div>
+          <div className={styles.headerLeft}>
             <h3 className={styles.title}>{title}</h3>
-            {!loading && <span className={styles.count}>{total}</span>}
+            {!loading && <span className={styles.count}>{formatPeopleCount(total)}</span>}
           </div>
           <div className={styles.headerActions}>
             {canManageSubscriptions && (

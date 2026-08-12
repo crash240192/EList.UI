@@ -4,6 +4,7 @@ import type { IConversation } from '@/entities/conversation';
 import { deleteConversation, fetchConversationMessages, updateConversation } from '@/entities/conversation';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import { formatDiscussionsCount } from '@/shared/lib/plural.ru';
 import styles from './DiscussionsManageModal.module.css';
 
 interface DiscussionsManageModalProps {
@@ -144,9 +145,9 @@ export function DiscussionsManageModal({
       <div className={styles.backdrop} onClick={handleModalBack} />
       <div className={styles.modal} role="dialog" aria-modal aria-labelledby="discussions-manage-title">
         <div className={styles.header}>
-          <div>
+          <div className={styles.headerLeft}>
             <h3 id="discussions-manage-title" className={styles.title}>Обсуждения</h3>
-            <span className={styles.count}>{conversations.length}</span>
+            <span className={styles.count}>{formatDiscussionsCount(conversations.length)}</span>
           </div>
           <button type="button" className={styles.closeBtn} onClick={handleModalBack} aria-label="Закрыть">
             ✕

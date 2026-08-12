@@ -11,6 +11,7 @@ import {
 } from '@/entities/organization';
 import { UserChip } from '@/entities/user/ui/UserChip';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import { formatPeopleCount } from '@/shared/lib/plural.ru';
 import styles from '@/features/subscriptions/SubscribersListModal.module.css';
 
 interface Props {
@@ -59,9 +60,9 @@ export function OrgMembersListModal({ members, currentAccountId, onClose }: Prop
       <div className={styles.backdrop} onClick={onClose} />
       <div className={styles.modal} role="dialog" aria-modal aria-label="Команда">
         <div className={styles.header}>
-          <div>
+          <div className={styles.headerLeft}>
             <h3 className={styles.title}>Команда</h3>
-            <span className={styles.count}>{activeMembers.length}</span>
+            <span className={styles.count}>{formatPeopleCount(activeMembers.length)}</span>
           </div>
           <div className={styles.headerActions}>
             <button type="button" className={styles.closeBtn} onClick={onClose}>✕</button>

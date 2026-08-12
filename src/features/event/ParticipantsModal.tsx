@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import type { IParticipantView } from '@/entities/event';
 import { fetchEventParticipantsPage } from '@/entities/event/participationApi';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
+import { formatPeopleCount } from '@/shared/lib/plural.ru';
 import styles from './ParticipantsModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
@@ -126,7 +127,7 @@ export function ParticipantsModal({
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <h3 className={styles.title}>Участники</h3>
-            {total > 0 && <span className={styles.count}>{total} человек</span>}
+            {total > 0 && <span className={styles.count}>{formatPeopleCount(total)}</span>}
           </div>
           <button className={styles.closeBtn} onClick={onClose}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

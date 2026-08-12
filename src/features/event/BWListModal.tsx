@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { getBWList, removeFromBWList } from '@/entities/event/participationApi';
 import type { IBWListUser, BWListType } from '@/entities/event/participationApi';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
+import { formatPeopleCount } from '@/shared/lib/plural.ru';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import styles from './InviteModal.module.css';
 
@@ -71,7 +72,7 @@ export function BWListModal({ eventId, listType, onClose }: Props) {
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <h3 className={styles.title}>{title}</h3>
-            {!loading && <span className={styles.count}>{items.length} чел.</span>}
+            {!loading && <span className={styles.count}>{formatPeopleCount(items.length)}</span>}
           </div>
           <button className={styles.closeBtn} onClick={onClose}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
