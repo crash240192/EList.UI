@@ -534,22 +534,14 @@ export default function UserPage() {
 
         <div className={styles.statsBar}>
           <div className={styles.statGroup}>
-            <button
-              type="button"
-              className={`${styles.statItem} ${mainTab === 'created' ? styles.statItemActive : ''}`}
-              onClick={() => { setMainTab('created'); }}
-            >
+            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
               <span className={styles.statNum}>{createdEvents.total || createdEvents.events.length}</span>
               <span className={styles.statLabel}>организовал</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.statItem} ${mainTab === 'participating' ? styles.statItemActive : ''}`}
-              onClick={() => { setMainTab('participating'); }}
-            >
+            </div>
+            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
               <span className={styles.statNum}>{participatingEvents.total || participatingEvents.events.length}</span>
               <span className={styles.statLabel}>посетил</span>
-            </button>
+            </div>
           </div>
 
           <div className={styles.statGroupDivider} aria-hidden />

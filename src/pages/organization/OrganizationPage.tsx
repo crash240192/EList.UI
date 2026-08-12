@@ -308,6 +308,28 @@ export default function OrganizationPage() {
 
   const activeMembers = members.filter(m => m.active !== false);
 
+  const [isMobileLayout, setIsMobileLayout] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const sync = () => setIsMobileLayout(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  const nameBadges = (
+    <>
+      {shouldShowVerificationBadge(org) && (
+        <span className={`${styles.badge} ${isMobileLayout ? styles.badgeOnHero : ''} ${verificationBadgeClass(org.verificationStatus)}`}>
+          {formatVerificationStatus(org.verificationStatus)}
+        </span>
+      )}
+      {!org.active && (
+        <span className={`${styles.badge} ${isMobileLayout ? styles.badgeOnHero : ''} ${styles.badgeMute}`}>Неактивна</span>
+      )}
+    </>
+  );
+
   return (
     <div className={styles.page}>
       <div className={styles.card}>
@@ -341,19 +363,14 @@ export default function OrganizationPage() {
               )}
             </div>
           </div>
-          <div className={styles.heroBottom}>
-            <div className={styles.heroNameRow}>
-              <h1 className={styles.heroTitle}>{org.name}</h1>
-              {shouldShowVerificationBadge(org) && (
-                <span className={`${styles.badge} ${styles.badgeOnHero} ${verificationBadgeClass(org.verificationStatus)}`}>
-                  {formatVerificationStatus(org.verificationStatus)}
-                </span>
-              )}
-              {!org.active && (
-                <span className={`${styles.badge} ${styles.badgeOnHero} ${styles.badgeMute}`}>Неактивна</span>
-              )}
+          {isMobileLayout && (
+            <div className={styles.heroBottom}>
+              <div className={styles.heroNameRow}>
+                <h1 className={styles.heroTitle}>{org.name}</h1>
+                {nameBadges}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className={styles.profileHeader}>
@@ -377,8 +394,14 @@ export default function OrganizationPage() {
             </div>
           </button>
 
-          {(org.address || org.canSellTickets) && (
-            <div className={styles.profileInfo}>
+          <div className={styles.profileInfo}>
+            {!isMobileLayout && (
+              <div className={styles.nameRowDesktop}>
+                <h1 className={styles.fullName}>{org.name}</h1>
+                {nameBadges}
+              </div>
+            )}
+            {(org.address || org.canSellTickets) && (
               <div className={styles.profileMeta}>
                 {org.address && <span>{org.address}</span>}
                 {org.address && org.canSellTickets && (
@@ -386,8 +409,8 @@ export default function OrganizationPage() {
                 )}
                 {org.canSellTickets && <span>Продажа билетов</span>}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className={styles.statsBar}>
