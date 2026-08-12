@@ -87,6 +87,8 @@ export default function EventPage() {
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [addressStacked, setAddressStacked] = useState(false);
+  const addressRef = useRef<HTMLDivElement | null>(null);
 
   usePageTitle(event?.name ?? null);
 
@@ -204,6 +206,37 @@ export default function EventPage() {
     setShowScrollTop(false);
     setHeroCollapse(0);
   }, [loading]);
+
+  // На мобилке, если адрес занимает больше ~2 строк,
+  // раскладываем его под кнопкой карты, чтобы правые кнопки не наезжали.
+  useEffect(() => {
+    const el = addressRef.current;
+    if (!el) return;
+
+    const recalc = () => {
+      if (!addressRef.current) return;
+      if (window.innerWidth > 639) {
+        setAddressStacked(false);
+        return;
+      }
+
+      const el2 = addressRef.current;
+      const cs = window.getComputedStyle(el2);
+      const lineHeight = parseFloat(cs.lineHeight);
+      const fallbackLineHeight = parseFloat(cs.fontSize) * 1.35;
+      const lh = Number.isFinite(lineHeight) ? lineHeight : fallbackLineHeight;
+      const maxH = lh * 2 + 1; // запас
+      const height = el2.getBoundingClientRect().height;
+      setAddressStacked(height > maxH);
+    };
+
+    const t = window.requestAnimationFrame(recalc);
+    window.addEventListener('resize', recalc);
+    return () => {
+      window.cancelAnimationFrame(t);
+      window.removeEventListener('resize', recalc);
+    };
+  }, [event?.address]);
 
   const reloadAfterAgeAgreeRef = useRef<() => Promise<void>>(async () => {});
   const onAgeGranted = useCallback(() => reloadAfterAgeAgreeRef.current(), []);
@@ -609,7 +642,9 @@ export default function EventPage() {
           </div>
           <div className={styles.actionRowMain}>
             {(event.address || (event.latitude != null && event.longitude != null)) ? (
-              <div className={styles.actionMetaPlace}>
+              <div
+                className={`${styles.actionMetaPlace} ${addressStacked ? styles.actionMetaPlaceStacked : ''}`}
+              >
                 {event.latitude != null && event.longitude != null && (
                   <button
                     type="button"
@@ -625,7 +660,12 @@ export default function EventPage() {
                   </button>
                 )}
                 {event.address && (
-                  <div className={styles.actionMetaSecondary}>{event.address}</div>
+                  <div
+                    ref={addressRef}
+                    className={styles.actionMetaSecondary}
+                  >
+                    {event.address}
+                  </div>
                 )}
               </div>
             ) : (
