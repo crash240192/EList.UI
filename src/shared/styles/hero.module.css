@@ -107,24 +107,6 @@
   align-items: center;
 }
 
-/* Затемнение под кнопками hero — читаемость на светлых обложках */
-.heroTop::before {
-  content: '';
-  position: absolute;
-  left: -14px;
-  right: -14px;
-  top: -14px;
-  height: 88px;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.62) 0%,
-    rgba(0, 0, 0, 0.32) 48%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: -1;
-}
-
 .heroTopInline {
   position: relative;
   z-index: 2;
@@ -179,6 +161,10 @@
   font-family: inherit;
   padding: 0;
   flex-shrink: 0;
+  /* Читаемость на светлых обложках без верхнего градиента */
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .heroBtn:hover:not(:disabled) {

@@ -60,6 +60,14 @@
 
 .heroOverlay {
   composes: heroOverlay from '../../shared/styles/hero.module.css';
+  /* Без верхнего затемнения — читаемость снизу через локальный градиент и тени */
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 42%,
+    rgba(0, 0, 0, 0.22) 72%,
+    rgba(0, 0, 0, 0.48) 100%
+  );
 }
 
 .heroTop {
@@ -84,13 +92,12 @@
   left: -14px;
   right: -14px;
   bottom: -14px;
-  height: calc(100% + 88px);
+  height: calc(100% + 56px);
   background: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0.92) 0%,
-    rgba(0, 0, 0, 0.72) 36%,
-    rgba(0, 0, 0, 0.42) 62%,
-    rgba(0, 0, 0, 0.12) 82%,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.28) 42%,
+    rgba(0, 0, 0, 0.1) 72%,
     transparent 100%
   );
   pointer-events: none;
@@ -101,7 +108,10 @@
   position: relative;
   font-size: 20px;
   font-weight: 700;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 2px 16px rgba(0, 0, 0, 0.8), 0 0 2px rgba(0, 0, 0, 0.9);
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.85),
+    0 2px 10px rgba(0, 0, 0, 0.55),
+    0 0 1px rgba(0, 0, 0, 0.8);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -131,7 +141,19 @@
   justify-content: flex-end;
   max-width: 55%;
 }
-.tagType,.tagFree,.tagPaid { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); display:inline-flex; align-items:center; gap:4px; }
+.tagType,.tagFree,.tagPaid {
+  padding:3px 10px;
+  border-radius:20px;
+  font-size:10px;
+  font-weight:500;
+  backdrop-filter:blur(6px);
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.3);
+}
 .tagFree { background:rgba(16,185,129,.65); color:#fff; border:.5px solid rgba(16,185,129,.4); }
 .tagPaid { background:rgba(0,0,0,.45); color:#fff; border:.5px solid rgba(255,255,255,.28); font-weight:600; }
 
@@ -486,14 +508,48 @@
   .actionControls {
     width: 100%;
     justify-content: flex-end;
+    gap: 5px;
+    flex-wrap: nowrap;
+  }
+  .actionBtns {
+    gap: 5px;
+    flex-wrap: nowrap;
+  }
+  .actionControls > button,
+  .actionBtns :global(button) {
+    height: 32px;
+    min-height: 32px;
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 12px;
+  }
+  .btnInvite {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    padding: 0;
   }
   .heroTagsRight { max-width: 48%; }
 }
 .errorIcon { font-size: 36px; }
 
 /* Hero badges */
-.tagAge     { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:600; backdrop-filter:blur(6px); background:rgba(239,68,68,.6); color:#fff; border:.5px solid rgba(239,68,68,.4); }
-.tagPrivate { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500; backdrop-filter:blur(6px); background:rgba(0,0,0,.35); color:#fff; border:.5px solid rgba(255,255,255,.2); display:inline-flex; align-items:center; gap:4px; }
+.tagAge     {
+  padding:3px 10px; border-radius:20px; font-size:10px; font-weight:600;
+  backdrop-filter:blur(6px); background:rgba(239,68,68,.6); color:#fff;
+  border:.5px solid rgba(239,68,68,.4);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.3);
+}
+.tagPrivate {
+  padding:3px 10px; border-radius:20px; font-size:10px; font-weight:500;
+  backdrop-filter:blur(6px); background:rgba(0,0,0,.35); color:#fff;
+  border:.5px solid rgba(255,255,255,.2); display:inline-flex; align-items:center; gap:4px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.3);
+}
 
 /* Dots menu (organizer controls) — rendered via HeroContextMenu portal */
 
