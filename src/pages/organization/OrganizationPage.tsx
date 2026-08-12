@@ -284,6 +284,15 @@ export default function OrganizationPage() {
     else if (logoId) setLightboxFileIds([logoId]);
   }, [id, logoId]);
 
+  const [isMobileLayout, setIsMobileLayout] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const sync = () => setIsMobileLayout(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -314,15 +323,6 @@ export default function OrganizationPage() {
     || Boolean(org.address)
     || activeMembers.length > 0
     || canManage;
-
-  const [isMobileLayout, setIsMobileLayout] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)');
-    const sync = () => setIsMobileLayout(mq.matches);
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
-  }, []);
 
   const nameBadges = (
     <>
