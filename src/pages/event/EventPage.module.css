@@ -565,14 +565,10 @@
     justify-content: flex-start;
   }
   .actionJoinSep {
-    margin-left: auto;
+    display: none;
   }
   .joinBtnWrap {
     margin-left: auto;
-  }
-  /* Если есть разделитель перед «Покинуть» — auto только на нём, иначе на кнопке */
-  .actionJoinSep + .joinBtnWrap {
-    margin-left: 0;
   }
   .actionControls > button,
   .actionBtns :global(button) {
