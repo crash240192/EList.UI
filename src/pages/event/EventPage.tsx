@@ -40,7 +40,7 @@ import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialo
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
-import { ContentReportModal } from '@/features/content-reports';
+import { ContentReportModal, OrganizerReportsModal, useOrganizerReportsCount } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
@@ -73,6 +73,7 @@ export default function EventPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [organizerReportsOpen, setOrganizerReportsOpen] = useState(false);
   const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
   const [bwListOpen,      setBwListOpen]      = useState(false);
   const [mapModalOpen,    setMapModalOpen]    = useState(false);
@@ -101,6 +102,12 @@ export default function EventPage() {
     denied: organizersDenied,
     refetch: refetchOrganizers,
   } = useEventOrganizers(id, accountId);
+
+  const {
+    count: organizerReportsCount,
+    refresh: refreshOrganizerReportsCount,
+    setCount: setOrganizerReportsCount,
+  } = useOrganizerReportsCount(id, Boolean(isOrganizer && id));
 
   const { orgOrganizers, personOrganizers } = useMemo(() => {
     const orgs: IEventOrganizator[] = [];
@@ -562,7 +569,7 @@ export default function EventPage() {
                   <button
                     ref={organizerMenuRef}
                     type="button"
-                    className={`${heroStyles.heroBtn} noHoverGlow`}
+                    className={`${heroStyles.heroBtn} noHoverGlow ${styles.heroMenuBtn}`}
                     onClick={() => setMobileMenuOpen(v => !v)}
                     aria-label="Меню"
                     aria-expanded={mobileMenuOpen}
@@ -570,6 +577,11 @@ export default function EventPage() {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                       <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
                     </svg>
+                    {organizerReportsCount > 0 && (
+                      <span className={styles.heroMenuBadge} aria-label={`Активных жалоб: ${organizerReportsCount}`}>
+                        {organizerReportsCount > 99 ? '99+' : organizerReportsCount}
+                      </span>
+                    )}
                   </button>
                   <HeroContextMenu
                     open={mobileMenuOpen}
@@ -584,6 +596,9 @@ export default function EventPage() {
                     </HeroContextMenuItem>
                     <HeroContextMenuItem onClick={() => { setBwListOpen(true); setMobileMenuOpen(false); }}>
                       {event.parameters?.private ? 'Белый список' : 'Черный список'}
+                    </HeroContextMenuItem>
+                    <HeroContextMenuItem onClick={() => { setOrganizerReportsOpen(true); setMobileMenuOpen(false); }}>
+                      Жалобы{organizerReportsCount > 0 ? ` (${organizerReportsCount})` : ''}
                     </HeroContextMenuItem>
                     {event.active && (
                       <HeroContextMenuItem danger onClick={() => { setCancelConfirm(true); setMobileMenuOpen(false); }}>
@@ -908,6 +923,16 @@ export default function EventPage() {
           targetType={ReportTargetType.Event}
           targetId={event.id}
           onClose={() => setReportModalOpen(false)}
+        />
+      )}
+      {organizerReportsOpen && event?.id && (
+        <OrganizerReportsModal
+          eventId={event.id}
+          onClose={() => {
+            setOrganizerReportsOpen(false);
+            void refreshOrganizerReportsCount();
+          }}
+          onCountChange={setOrganizerReportsCount}
         />
       )}
       {participantsModalOpen && (

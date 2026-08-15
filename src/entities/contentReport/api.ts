@@ -4,6 +4,7 @@ import { apiClient } from '@/shared/api/client';
 import type { PagedList } from '@/shared/api/types';
 import type {
   IContentReport,
+  IContentReportAccount,
   IContentReportAction,
   IContentReportsSearchRequest,
   ICreateContentReportRequest,
@@ -166,6 +167,17 @@ function normalizeAction(raw: unknown): IContentReportAction {
   };
 }
 
+function normalizeAccount(raw: unknown): IContentReportAccount | null {
+  if (!raw) return null;
+  const r = raw as Raw;
+  const avatar = r.avatarId ?? r.AvatarId;
+  return {
+    id: pickStr(r, 'id', 'Id'),
+    login: pickStr(r, 'login', 'Login'),
+    avatarId: avatar != null && avatar !== '' ? String(avatar) : null,
+  };
+}
+
 export function normalizeContentReport(raw: unknown): IContentReport {
   const r = (raw ?? {}) as Raw;
   const reasonRaw = r.reason ?? r.Reason ?? null;
@@ -192,6 +204,8 @@ export function normalizeContentReport(raw: unknown): IContentReport {
     createdAt: pickStr(r, 'createdAt', 'CreatedAt'),
     updatedAt: pickStr(r, 'updatedAt', 'UpdatedAt'),
     reason: reasonRaw ? normalizeReportReason(reasonRaw) : null,
+    reporter: normalizeAccount(r.reporter ?? r.Reporter),
+    assignedToAccount: normalizeAccount(r.assignedToAccount ?? r.AssignedToAccount),
     actions: actionsRaw.map(normalizeAction),
   };
 }

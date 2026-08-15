@@ -70,6 +70,27 @@ export const REPORT_SEVERITY_LABELS: Record<ReportSeverityValue, string> = {
   Safety: 'Серьёзное нарушение',
 };
 
+/** Действия resolve для организатора (без CancelEvent / Escalate) */
+export const ORGANIZER_RESOLUTION_ACTIONS = [
+  ReportResolutionAction.HideContent,
+  ReportResolutionAction.DeleteContent,
+  ReportResolutionAction.Warn,
+  ReportResolutionAction.BanFromEvent,
+  ReportResolutionAction.Dismiss,
+  ReportResolutionAction.Other,
+] as const;
+
+export const REPORT_RESOLUTION_ACTION_LABELS: Record<ReportResolutionActionValue, string> = {
+  HideContent: 'Скрыть контент',
+  DeleteContent: 'Удалить контент',
+  Warn: 'Предупреждение',
+  BanFromEvent: 'Забанить на мероприятии',
+  CancelEvent: 'Отменить мероприятие',
+  Dismiss: 'Отклонить жалобу',
+  Escalate: 'Эскалировать',
+  Other: 'Другое',
+};
+
 export interface IReportReason {
   id: string;
   code: string;
@@ -150,6 +171,12 @@ export interface IContentReportAction {
   createdAt: string;
 }
 
+export interface IContentReportAccount {
+  id: string;
+  login: string;
+  avatarId: string | null;
+}
+
 export interface IContentReport {
   id: string;
   reporterAccountId: string;
@@ -172,5 +199,7 @@ export interface IContentReport {
   createdAt: string;
   updatedAt: string;
   reason: IReportReason | null;
+  reporter: IContentReportAccount | null;
+  assignedToAccount: IContentReportAccount | null;
   actions: IContentReportAction[];
 }

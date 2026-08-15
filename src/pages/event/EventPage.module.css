@@ -78,6 +78,28 @@
   composes: heroTopRight from '../../shared/styles/hero.module.css';
 }
 
+.heroMenuBtn {
+  position: relative;
+}
+
+.heroMenuBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
 .heroBottom {
   composes: heroBottom from '../../shared/styles/hero.module.css';
   flex-direction: column;

@@ -1,3 +1,17 @@
+export {
+  ReportTargetType,
+  ReportSeverity,
+  ReportStatus,
+  ReportTargetScope,
+  ReportQueue,
+  ReportResolutionAction,
+  ReportActorContext,
+  REPORT_STATUS_LABELS,
+  REPORT_SEVERITY_LABELS,
+  ORGANIZER_RESOLUTION_ACTIONS,
+  REPORT_RESOLUTION_ACTION_LABELS,
+} from './types';
+
 export type {
   ReportTargetTypeValue,
   ReportSeverityValue,
@@ -14,19 +28,8 @@ export type {
   IResolveContentReportRequest,
   IEscalateContentReportRequest,
   IContentReportAction,
+  IContentReportAccount,
   IContentReport,
-} from './types';
-
-export {
-  ReportTargetType,
-  ReportSeverity,
-  ReportStatus,
-  ReportTargetScope,
-  ReportQueue,
-  ReportResolutionAction,
-  ReportActorContext,
-  REPORT_STATUS_LABELS,
-  REPORT_SEVERITY_LABELS,
 } from './types';
 
 export {
