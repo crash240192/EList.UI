@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useThemeStore, useAuthStore, useFiltersStore } from '../store';
+import { useThemeStore, useAuthStore, useFiltersStore, usePlatformRoleStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
@@ -26,7 +26,7 @@ const NAV_ITEMS = [
   { to: '/invitations',  label: 'Приглашения',      icon: <InviteIcon /> },
   { to: '/event-albums', label: 'Альбомы мероприятий', icon: <AlbumsIcon /> },
   { to: '/create-event', label: 'Создать событие',  icon: <PlusIcon /> },
-  { to: '/admin',        label: 'Администрирование', icon: <AdminIcon /> },
+  { to: '/admin',        label: 'Администрирование', icon: <AdminIcon />, platformOnly: true },
 ];
 
 export function AppLayout() {
@@ -37,13 +37,26 @@ export function AppLayout() {
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout } = useAuthStore();
   const authenticated = isAuthenticated();
+  const platformRole = usePlatformRoleStore(s => s.role);
+  const platformActive = usePlatformRoleStore(s => s.active);
+  const hasPlatformAccess = platformActive && platformRole != null;
+  const refreshPlatformRole = usePlatformRoleStore(s => s.refresh);
+  const clearPlatformRole = usePlatformRoleStore(s => s.clear);
   const notViewedInvitations = useInvitationsStore(s => s.notViewedCount);
   useInvitationsNotViewedCount(authenticated);
   const { filters } = useFiltersStore();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (!authenticated) {
+      clearPlatformRole();
+      return;
+    }
+    void refreshPlatformRole();
+  }, [authenticated, refreshPlatformRole, clearPlatformRole]);
+
   const visibleNavItems = authenticated
-    ? NAV_ITEMS
+    ? NAV_ITEMS.filter(item => !item.platformOnly || hasPlatformAccess)
     : NAV_ITEMS.filter(({ to }) => to === '/');
 
   useActivationRedirect();

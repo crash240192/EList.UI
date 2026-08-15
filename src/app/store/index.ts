@@ -12,6 +12,9 @@ import { getActivationRequired, setActivationRequired, logout as apiLogout } fro
 import { clearLocationSession } from '@/features/auth/locationSession';
 import { useInvitationsStore } from '@/features/invitations/invitationsStore';
 import { useNotificationsStore } from '@/features/notifications/notificationsStore';
+import { usePlatformRoleStore } from './platformRoleStore';
+
+export { usePlatformRoleStore } from './platformRoleStore';
 
 // ---- Theme Store ----
 
@@ -111,6 +114,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     useFiltersStore.getState().setMapCenter(null);
     useNotificationsStore.getState().reset();
     useInvitationsStore.getState().reset();
+    usePlatformRoleStore.getState().clear();
     set({ token: null, accountId: null, activationRequired: false });
   },
 

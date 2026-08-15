@@ -40,6 +40,8 @@ import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialo
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
+import { ContentReportModal } from '@/features/content-reports';
+import { ReportTargetType } from '@/entities/contentReport';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   calcEventPageExpandedHeroHeight,
@@ -69,6 +71,8 @@ export default function EventPage() {
   const [descExpanded,  setDescExpanded]  = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [reportMenuOpen, setReportMenuOpen] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
   const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
   const [bwListOpen,      setBwListOpen]      = useState(false);
   const [mapModalOpen,    setMapModalOpen]    = useState(false);
@@ -80,6 +84,7 @@ export default function EventPage() {
   const pageRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
+  const reportMenuRef = useRef<HTMLButtonElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedHeroHeight, setExpandedHeroHeight] = useState(EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
   const [coverNaturalSize, setCoverNaturalSize] = useState<CoverNaturalSize | null>(null);
@@ -514,6 +519,44 @@ export default function EventPage() {
               <button type="button" className={`${heroStyles.heroBtn} noHoverGlow`} onClick={() => void handleShare()} aria-label="Поделиться" title="Поделиться">
                 <ShareIcon />
               </button>
+              {!isOrganizer && (
+                <>
+                  <button
+                    ref={reportMenuRef}
+                    type="button"
+                    className={`${heroStyles.heroBtn} noHoverGlow`}
+                    onClick={() => {
+                      if (!authenticated) {
+                        setAuthDialogOpen(true);
+                        return;
+                      }
+                      setReportMenuOpen(v => !v);
+                    }}
+                    aria-label="Ещё"
+                    aria-expanded={reportMenuOpen}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                    </svg>
+                  </button>
+                  {authenticated && (
+                    <HeroContextMenu
+                      open={reportMenuOpen}
+                      onClose={() => setReportMenuOpen(false)}
+                      anchorRef={reportMenuRef}
+                    >
+                      <HeroContextMenuItem
+                        onClick={() => {
+                          setReportMenuOpen(false);
+                          setReportModalOpen(true);
+                        }}
+                      >
+                        Пожаловаться
+                      </HeroContextMenuItem>
+                    </HeroContextMenu>
+                  )}
+                </>
+              )}
               {isOrganizer && (
                 <>
                   <button
@@ -859,6 +902,13 @@ export default function EventPage() {
       {cancelConfirm && (
         <CancelConfirmDialog eventName={event.name} loading={actionLoading}
           onConfirm={handleCancelEvent} onClose={() => setCancelConfirm(false)} />
+      )}
+      {reportModalOpen && event?.id && (
+        <ContentReportModal
+          targetType={ReportTargetType.Event}
+          targetId={event.id}
+          onClose={() => setReportModalOpen(false)}
+        />
       )}
       {participantsModalOpen && (
         <ParticipantsModal eventId={id!} organizerIds={organizerIds}

@@ -6,6 +6,8 @@ import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
 import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
+import { ContentReportModal } from '@/features/content-reports';
+import { ReportTargetType } from '@/entities/contentReport';
 import {
   messageAuthorName,
   messageInitials,
@@ -58,6 +60,15 @@ function DeleteIcon() {
   );
 }
 
+function FlagIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  );
+}
+
 function ChevronUpIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
@@ -96,10 +107,12 @@ export function MessageRow({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const replyBump = useDiscussionRefresh(message.id);
   const prevReplyBump = useRef(replyBump);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
+  const canReport = !!currentAccountId && !isMine;
   const hasReplies = messageHasReplies(message, replyBump, replyTotal);
   const canDelete = isMine && canDeleteMessage(message, replyBump, replyTotal);
   const accountId = message.accountId ?? message.account?.id ?? '';
@@ -331,6 +344,16 @@ export function MessageRow({
                     Удалить
                   </button>
                 )}
+                {canReport && (
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    onClick={() => setReportOpen(true)}
+                  >
+                    <FlagIcon />
+                    Пожаловаться
+                  </button>
+                )}
                 {hasReplies && expanded && (
                   <button
                     type="button"
@@ -356,6 +379,14 @@ export function MessageRow({
           cancelLabel="Отмена"
           onConfirm={() => void performDelete()}
           onCancel={() => setDeleteConfirmOpen(false)}
+        />
+      )}
+
+      {reportOpen && (
+        <ContentReportModal
+          targetType={ReportTargetType.Message}
+          targetId={message.id}
+          onClose={() => setReportOpen(false)}
         />
       )}
 

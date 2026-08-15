@@ -1,6 +1,7 @@
 // pages/admin/AdminPage.tsx
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Navigate } from 'react-router-dom';
 import {
   categoriesApi, typesApi, contactTypesApi,
   type IEventCategory, type IEventType, type IContactType,
@@ -22,6 +23,7 @@ import {
   type IAgreementDocument,
   type IDocumentRequest,
 } from '@/entities/agreement';
+import { usePlatformRoleStore } from '@/app/store';
 import { BugReportCategoriesTab } from './BugReportCategoriesTab';
 import { BugReportsTab } from './BugReportsTab';
 import styles from './AdminPage.module.css';
@@ -58,6 +60,33 @@ function icoToDisplayUrl(ico: string): string {
 export default function AdminPage() {
   usePageTitle('Администрирование');
   const [tab, setTab] = useState<AdminTab>('eventTypes');
+  const platformLoaded = usePlatformRoleStore(s => s.loaded);
+  const platformLoading = usePlatformRoleStore(s => s.loading);
+  const platformRole = usePlatformRoleStore(s => s.role);
+  const platformActive = usePlatformRoleStore(s => s.active);
+  const hasPlatformAccess = platformActive && platformRole != null;
+  const refreshPlatformRole = usePlatformRoleStore(s => s.refresh);
+
+  useEffect(() => {
+    if (!platformLoaded && !platformLoading) {
+      void refreshPlatformRole();
+    }
+  }, [platformLoaded, platformLoading, refreshPlatformRole]);
+
+  if (!platformLoaded || platformLoading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <h1 className={styles.title}>Администрирование</h1>
+        </div>
+        <p className={styles.emptyHint}>Проверка доступа…</p>
+      </div>
+    );
+  }
+
+  if (!hasPlatformAccess) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className={styles.page}>
