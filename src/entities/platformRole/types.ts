@@ -21,6 +21,14 @@ export interface IAccountPlatformRole {
   active: boolean;
   assignedAt: string;
   assignedBy: string | null;
+  account: IPlatformRoleAccount | null;
+  assignedByAccount: IPlatformRoleAccount | null;
+}
+
+export interface IPlatformRoleAccount {
+  id: string;
+  login: string;
+  avatarId: string | null;
 }
 
 export interface IAssignPlatformRoleRequest {

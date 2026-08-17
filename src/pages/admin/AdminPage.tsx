@@ -30,6 +30,7 @@ import { BugReportCategoriesTab } from './BugReportCategoriesTab';
 import { BugReportsTab } from './BugReportsTab';
 import { PlatformModerationTab } from './PlatformModerationTab';
 import { ReportReasonsTab } from './ReportReasonsTab';
+import { PlatformRolesTab } from './PlatformRolesTab';
 import styles from './AdminPage.module.css';
 
 type AdminTab =
@@ -40,7 +41,8 @@ type AdminTab =
   | 'agreements'
   | 'bugReports'
   | 'bugReportCategories'
-  | 'reportReasons';
+  | 'reportReasons'
+  | 'platformRoles';
 
 /** Типы документов на вкладке «Соглашения» (включая OrganizationAgreement и TicketingAgreement) */
 const DOCUMENT_TYPE_OPTIONS = DOCUMENT_TYPE_LABELS;
@@ -115,7 +117,12 @@ export default function AdminPage() {
     { id: 'agreements', label: 'Соглашения' },
     { id: 'bugReports', label: 'Багрепорты' },
     { id: 'bugReportCategories', label: 'Категории ошибок' },
-    ...(isAdminOrAbove ? [{ id: 'reportReasons', label: 'Причины жалоб' }] : []),
+    ...(isAdminOrAbove
+      ? [
+          { id: 'reportReasons', label: 'Причины жалоб' },
+          { id: 'platformRoles', label: 'Роли площадки' },
+        ]
+      : []),
   ];
 
   const activeTab = tabs.some(t => t.id === tab) ? tab : 'moderation';
@@ -144,6 +151,7 @@ export default function AdminPage() {
         {activeTab === 'bugReports'   && <BugReportsTab />}
         {activeTab === 'bugReportCategories' && <BugReportCategoriesTab />}
         {activeTab === 'reportReasons' && isAdminOrAbove && <ReportReasonsTab />}
+        {activeTab === 'platformRoles' && isAdminOrAbove && <PlatformRolesTab />}
       </div>
     </div>
   );

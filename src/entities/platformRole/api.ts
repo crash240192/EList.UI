@@ -1,7 +1,7 @@
 // entities/platformRole/api.ts
 
 import { apiClient } from '@/shared/api/client';
-import type { IAccountPlatformRole, IAssignPlatformRoleRequest, PlatformRoleValue } from './types';
+import type { IAccountPlatformRole, IAssignPlatformRoleRequest, IPlatformRoleAccount, PlatformRoleValue } from './types';
 import { PlatformRole } from './types';
 
 type Raw = Record<string, unknown>;
@@ -27,6 +27,20 @@ function normalizeRole(raw: unknown): PlatformRoleValue {
   return PlatformRole.Moderator;
 }
 
+function normalizeAccount(raw: unknown): IPlatformRoleAccount | null {
+  if (!raw) return null;
+  const r = raw as Raw;
+  const avatar = r.avatarId ?? r.AvatarId;
+  const id = pickStr(r, 'id', 'Id');
+  const login = pickStr(r, 'login', 'Login');
+  if (!id && !login) return null;
+  return {
+    id,
+    login,
+    avatarId: avatar != null && avatar !== '' ? String(avatar) : null,
+  };
+}
+
 function normalizeAccountPlatformRole(raw: unknown): IAccountPlatformRole {
   const r = (raw ?? {}) as Raw;
   const assignedBy = r.assignedBy ?? r.AssignedBy;
@@ -37,6 +51,8 @@ function normalizeAccountPlatformRole(raw: unknown): IAccountPlatformRole {
     active: Boolean(r.active ?? r.Active ?? true),
     assignedAt: pickStr(r, 'assignedAt', 'AssignedAt'),
     assignedBy: assignedBy != null && assignedBy !== '' ? String(assignedBy) : null,
+    account: normalizeAccount(r.account ?? r.Account),
+    assignedByAccount: normalizeAccount(r.assignedByAccount ?? r.AssignedByAccount),
   };
 }
 

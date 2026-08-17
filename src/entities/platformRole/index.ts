@@ -1,6 +1,7 @@
 export type {
   PlatformRoleValue,
   IAccountPlatformRole,
+  IPlatformRoleAccount,
   IAssignPlatformRoleRequest,
 } from './types';
 
