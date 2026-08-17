@@ -24,10 +24,12 @@ import {
   type IDocumentRequest,
 } from '@/entities/agreement';
 import { fetchPlatformContentReportsCount } from '@/entities/contentReport';
+import { PlatformRole } from '@/entities/platformRole';
 import { usePlatformRoleStore } from '@/app/store';
 import { BugReportCategoriesTab } from './BugReportCategoriesTab';
 import { BugReportsTab } from './BugReportsTab';
 import { PlatformModerationTab } from './PlatformModerationTab';
+import { ReportReasonsTab } from './ReportReasonsTab';
 import styles from './AdminPage.module.css';
 
 type AdminTab =
@@ -37,7 +39,8 @@ type AdminTab =
   | 'tariffs'
   | 'agreements'
   | 'bugReports'
-  | 'bugReportCategories';
+  | 'bugReportCategories'
+  | 'reportReasons';
 
 /** Типы документов на вкладке «Соглашения» (включая OrganizationAgreement и TicketingAgreement) */
 const DOCUMENT_TYPE_OPTIONS = DOCUMENT_TYPE_LABELS;
@@ -69,6 +72,9 @@ export default function AdminPage() {
   const platformRole = usePlatformRoleStore(s => s.role);
   const platformActive = usePlatformRoleStore(s => s.active);
   const hasPlatformAccess = platformActive && platformRole != null;
+  const isAdminOrAbove =
+    platformActive
+    && (platformRole === PlatformRole.Admin || platformRole === PlatformRole.Superuser);
   const refreshPlatformRole = usePlatformRoleStore(s => s.refresh);
 
   useEffect(() => {
@@ -101,6 +107,19 @@ export default function AdminPage() {
     return <Navigate to="/" replace />;
   }
 
+  const tabs = [
+    { id: 'moderation', label: 'Модерация', count: moderationCount },
+    { id: 'eventTypes', label: 'Типы мероприятий' },
+    { id: 'contactTypes', label: 'Типы контактов' },
+    { id: 'tariffs', label: 'Тарифы' },
+    { id: 'agreements', label: 'Соглашения' },
+    { id: 'bugReports', label: 'Багрепорты' },
+    { id: 'bugReportCategories', label: 'Категории ошибок' },
+    ...(isAdminOrAbove ? [{ id: 'reportReasons', label: 'Причины жалоб' }] : []),
+  ];
+
+  const activeTab = tabs.some(t => t.id === tab) ? tab : 'moderation';
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -109,29 +128,22 @@ export default function AdminPage() {
 
       <TabBar
         className={styles.topTabs}
-        tabs={[
-          { id: 'moderation', label: 'Модерация', count: moderationCount },
-          { id: 'eventTypes', label: 'Типы мероприятий' },
-          { id: 'contactTypes', label: 'Типы контактов' },
-          { id: 'tariffs', label: 'Тарифы' },
-          { id: 'agreements', label: 'Соглашения' },
-          { id: 'bugReports', label: 'Багрепорты' },
-          { id: 'bugReportCategories', label: 'Категории ошибок' },
-        ]}
-        activeId={tab}
+        tabs={tabs}
+        activeId={activeTab}
         onChange={id => setTab(id as AdminTab)}
       />
 
       <div className={styles.content}>
-        {tab === 'moderation'   && (
+        {activeTab === 'moderation'   && (
           <PlatformModerationTab onActiveCountChange={setModerationCount} />
         )}
-        {tab === 'eventTypes'   && <EventTypesTab />}
-        {tab === 'contactTypes' && <ContactTypesTab />}
-        {tab === 'tariffs'      && <TariffsTab />}
-        {tab === 'agreements'   && <AgreementsTab />}
-        {tab === 'bugReports'   && <BugReportsTab />}
-        {tab === 'bugReportCategories' && <BugReportCategoriesTab />}
+        {activeTab === 'eventTypes'   && <EventTypesTab />}
+        {activeTab === 'contactTypes' && <ContactTypesTab />}
+        {activeTab === 'tariffs'      && <TariffsTab />}
+        {activeTab === 'agreements'   && <AgreementsTab />}
+        {activeTab === 'bugReports'   && <BugReportsTab />}
+        {activeTab === 'bugReportCategories' && <BugReportCategoriesTab />}
+        {activeTab === 'reportReasons' && isAdminOrAbove && <ReportReasonsTab />}
       </div>
     </div>
   );

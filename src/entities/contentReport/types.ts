@@ -70,6 +70,18 @@ export const REPORT_SEVERITY_LABELS: Record<ReportSeverityValue, string> = {
   Safety: 'Серьёзное нарушение',
 };
 
+export const REPORT_TARGET_SCOPE_LABELS: Record<ReportTargetScopeValue, string> = {
+  Event: 'Мероприятие',
+  Message: 'Сообщение',
+  Both: 'Событие и сообщение',
+};
+
+export const REPORT_QUEUE_LABELS: Record<ReportQueueValue, string> = {
+  Organizers: 'Организаторы',
+  Platform: 'Площадка',
+  Both: 'Оба',
+};
+
 /** Действия resolve для организатора (без CancelEvent / Escalate) */
 export const ORGANIZER_RESOLUTION_ACTIONS = [
   ReportResolutionAction.HideContent,
