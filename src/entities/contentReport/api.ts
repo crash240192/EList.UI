@@ -206,8 +206,15 @@ export function normalizeContentReport(raw: unknown): IContentReport {
     reason: reasonRaw ? normalizeReportReason(reasonRaw) : null,
     reporter: normalizeAccount(r.reporter ?? r.Reporter),
     assignedToAccount: normalizeAccount(r.assignedToAccount ?? r.AssignedToAccount),
+    eventName: pickEventName(r.event ?? r.Event),
     actions: actionsRaw.map(normalizeAction),
   };
+}
+
+function pickEventName(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Raw;
+  return pickNullableStr(r, 'name', 'Name');
 }
 
 function sortReasons(list: IReportReason[]): IReportReason[] {

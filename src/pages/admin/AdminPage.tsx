@@ -26,9 +26,12 @@ import {
 import { usePlatformRoleStore } from '@/app/store';
 import { BugReportCategoriesTab } from './BugReportCategoriesTab';
 import { BugReportsTab } from './BugReportsTab';
+import { PlatformModerationTab } from './PlatformModerationTab';
+import { fetchPlatformContentReportsCount } from '@/entities/contentReport';
 import styles from './AdminPage.module.css';
 
 type AdminTab =
+  | 'moderation'
   | 'eventTypes'
   | 'contactTypes'
   | 'tariffs'
@@ -59,7 +62,8 @@ function icoToDisplayUrl(ico: string): string {
 
 export default function AdminPage() {
   usePageTitle('Администрирование');
-  const [tab, setTab] = useState<AdminTab>('eventTypes');
+  const [tab, setTab] = useState<AdminTab>('moderation');
+  const [moderationCount, setModerationCount] = useState(0);
   const platformLoaded = usePlatformRoleStore(s => s.loaded);
   const platformLoading = usePlatformRoleStore(s => s.loading);
   const platformRole = usePlatformRoleStore(s => s.role);
@@ -72,6 +76,15 @@ export default function AdminPage() {
       void refreshPlatformRole();
     }
   }, [platformLoaded, platformLoading, refreshPlatformRole]);
+
+  useEffect(() => {
+    if (!hasPlatformAccess) return;
+    let cancelled = false;
+    fetchPlatformContentReportsCount(true)
+      .then(n => { if (!cancelled) setModerationCount(n); })
+      .catch(() => { if (!cancelled) setModerationCount(0); });
+    return () => { cancelled = true; };
+  }, [hasPlatformAccess]);
 
   if (!platformLoaded || platformLoading) {
     return (
@@ -97,6 +110,7 @@ export default function AdminPage() {
       <TabBar
         className={styles.topTabs}
         tabs={[
+          { id: 'moderation', label: 'Модерация', count: moderationCount },
           { id: 'eventTypes', label: 'Типы мероприятий' },
           { id: 'contactTypes', label: 'Типы контактов' },
           { id: 'tariffs', label: 'Тарифы' },
@@ -109,6 +123,9 @@ export default function AdminPage() {
       />
 
       <div className={styles.content}>
+        {tab === 'moderation'   && (
+          <PlatformModerationTab onActiveCountChange={setModerationCount} />
+        )}
         {tab === 'eventTypes'   && <EventTypesTab />}
         {tab === 'contactTypes' && <ContactTypesTab />}
         {tab === 'tariffs'      && <TariffsTab />}

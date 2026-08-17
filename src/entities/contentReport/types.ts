@@ -91,6 +91,17 @@ export const REPORT_RESOLUTION_ACTION_LABELS: Record<ReportResolutionActionValue
   Other: 'Другое',
 };
 
+/** Действия resolve для площадки (включая CancelEvent, без Escalate) */
+export const PLATFORM_RESOLUTION_ACTIONS = [
+  ReportResolutionAction.HideContent,
+  ReportResolutionAction.DeleteContent,
+  ReportResolutionAction.Warn,
+  ReportResolutionAction.BanFromEvent,
+  ReportResolutionAction.CancelEvent,
+  ReportResolutionAction.Dismiss,
+  ReportResolutionAction.Other,
+] as const;
+
 export interface IReportReason {
   id: string;
   code: string;
@@ -201,5 +212,6 @@ export interface IContentReport {
   reason: IReportReason | null;
   reporter: IContentReportAccount | null;
   assignedToAccount: IContentReportAccount | null;
+  eventName: string | null;
   actions: IContentReportAction[];
 }
