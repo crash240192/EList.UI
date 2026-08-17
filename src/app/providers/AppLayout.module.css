@@ -185,6 +185,48 @@
 }
 .navActive     { background: rgba(99,102,241,0.12) !important; color: var(--accent) !important; }
 
+.navStaffBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.navStaffDivider {
+  height: 1px;
+  margin: 0 4px 8px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.navStaffLabel {
+  display: none;
+  font-size: var(--font-2xs, 10px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0 10px 6px;
+  white-space: nowrap;
+}
+
+.sidebarExpanded .navStaffLabel {
+  display: block;
+}
+
+.navItemStaff {
+  color: var(--text-muted);
+}
+
+.navItemStaff:hover {
+  color: var(--text-primary);
+}
+
+.navItemStaff.navActive {
+  color: var(--accent) !important;
+}
+
 .navIcon {
   position: relative;
   width: 20px; display: flex; align-items: center;

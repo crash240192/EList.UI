@@ -20,6 +20,7 @@ const OrganizationPage = lazyWithRetry(() => import('@/pages/organization/Organi
 const MyEventsPage    = lazyWithRetry(() => import('@/pages/my-events/MyEventsPage'));
 const CreateEventPage = lazyWithRetry(() => import('@/pages/create-event/CreateEventPage'));
 const PlatformModerationPage = lazyWithRetry(() => import('@/pages/moderation/PlatformModerationPage'));
+const BugReportsPage    = lazyWithRetry(() => import('@/pages/bug-reports/BugReportsPage'));
 const AdminPage       = lazyWithRetry(() => import('@/pages/admin/AdminPage'));
 const SettingsPage    = lazyWithRetry(() => import('@/pages/settings/SettingsPage'));
 const WalletPage      = lazyWithRetry(() => import('@/pages/wallet/WalletPage'));
@@ -74,6 +75,7 @@ const router = createBrowserRouter([
       { path: 'edit-event/:id',   element: <RequireAuth>{S(CreateEventPage)}</RequireAuth> },
       { path: 'admin',            element: <RequireAuth>{S(AdminPage)}</RequireAuth> },
       { path: 'moderation',       element: <RequireAuth>{S(PlatformModerationPage)}</RequireAuth> },
+      { path: 'bug-reports',      element: <RequireAuth>{S(BugReportsPage)}</RequireAuth> },
       { path: 'settings',         element: <RequireAuth>{S(SettingsPage)}</RequireAuth> },
       { path: 'wallet',           element: <RequireAuth>{S(WalletPage)}</RequireAuth> },
       { path: 'my-reports',       element: <RequireAuth>{S(MyReportsPage)}</RequireAuth> },

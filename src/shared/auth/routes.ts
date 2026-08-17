@@ -18,6 +18,7 @@ export const AUTH_REQUIRED_ROUTE_PREFIXES = [
   '/reports-against-me',
   '/admin',
   '/moderation',
+  '/bug-reports',
 ] as const;
 
 export function isPublicAuthRoute(pathname = window.location.pathname): boolean {
@@ -50,4 +51,5 @@ export const AUTH_REQUIRED_NAV_PATHS = new Set<string>([
   '/reports-against-me',
   '/admin',
   '/moderation',
+  '/bug-reports',
 ]);

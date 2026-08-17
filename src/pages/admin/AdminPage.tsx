@@ -26,7 +26,6 @@ import {
 import { PlatformRole } from '@/entities/platformRole';
 import { usePlatformRoleStore } from '@/app/store';
 import { BugReportCategoriesTab } from './BugReportCategoriesTab';
-import { BugReportsTab } from './BugReportsTab';
 import { ReportReasonsTab } from './ReportReasonsTab';
 import { PlatformRolesTab } from './PlatformRolesTab';
 import styles from './AdminPage.module.css';
@@ -36,23 +35,21 @@ type AdminTab =
   | 'contactTypes'
   | 'tariffs'
   | 'agreements'
-  | 'bugReports'
   | 'bugReportCategories'
   | 'reportReasons'
   | 'platformRoles';
 
 type AdminNavItem = { key: AdminTab; label: string };
 
-const CONTENT_NAV: AdminNavItem[] = [
+const PRODUCT_NAV: AdminNavItem[] = [
   { key: 'eventTypes', label: 'Типы мероприятий' },
   { key: 'contactTypes', label: 'Типы контактов' },
   { key: 'tariffs', label: 'Тарифы' },
 ];
 
-const SYSTEM_NAV: AdminNavItem[] = [
+const POLICY_NAV: AdminNavItem[] = [
   { key: 'agreements', label: 'Соглашения' },
   { key: 'bugReportCategories', label: 'Категории ошибок' },
-  { key: 'bugReports', label: 'Багрепорты' },
   { key: 'reportReasons', label: 'Причины жалоб' },
   { key: 'platformRoles', label: 'Роли площадки' },
 ];
@@ -64,7 +61,6 @@ const VALID_TABS = new Set<AdminTab>([
   'contactTypes',
   'tariffs',
   'agreements',
-  'bugReports',
   'bugReportCategories',
   'reportReasons',
   'platformRoles',
@@ -108,15 +104,18 @@ export default function AdminPage() {
   if (tabFromUrl === 'moderation') {
     return <Navigate to="/moderation" replace />;
   }
+  if (tabFromUrl === 'bugReports') {
+    return <Navigate to="/bug-reports" replace />;
+  }
 
   const initialTab: AdminTab = isAdminTab(tabFromUrl) ? tabFromUrl : 'eventTypes';
   const [tab, setTab] = useState<AdminTab>(initialTab);
 
   const navSections = useMemo(() => [
-    { section: 'Справочники', items: CONTENT_NAV },
+    { section: 'Справочники продукта', items: PRODUCT_NAV },
     {
-      section: 'Администрирование',
-      items: SYSTEM_NAV.filter(item => isAdminOrAbove || !ADMIN_ONLY_TABS.has(item.key)),
+      section: 'Политики и доступ',
+      items: POLICY_NAV.filter(item => isAdminOrAbove || !ADMIN_ONLY_TABS.has(item.key)),
     },
   ], [isAdminOrAbove]);
 
@@ -151,7 +150,7 @@ export default function AdminPage() {
       <div className={styles.page}>
         <div className={styles.header}>
           <h1 className={styles.title}>Администрирование</h1>
-          <p className={styles.subtitle}>Справочники продукта и управление площадкой</p>
+          <p className={styles.subtitle}>Справочники продукта и политики площадки</p>
         </div>
 
         <div className={styles.adminLayout}>
@@ -180,7 +179,6 @@ export default function AdminPage() {
             {activeTab === 'contactTypes' && <ContactTypesTab />}
             {activeTab === 'tariffs'      && <TariffsTab />}
             {activeTab === 'agreements'   && <AgreementsTab />}
-            {activeTab === 'bugReports'   && <BugReportsTab />}
             {activeTab === 'bugReportCategories' && <BugReportCategoriesTab />}
             {activeTab === 'reportReasons' && isAdminOrAbove && <ReportReasonsTab />}
             {activeTab === 'platformRoles' && isAdminOrAbove && <PlatformRolesTab />}
