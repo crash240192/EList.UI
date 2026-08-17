@@ -47,11 +47,11 @@ const CONTENT_NAV: AdminNavItem[] = [
   { key: 'eventTypes', label: 'Типы мероприятий' },
   { key: 'contactTypes', label: 'Типы контактов' },
   { key: 'tariffs', label: 'Тарифы' },
-  { key: 'agreements', label: 'Соглашения' },
-  { key: 'bugReportCategories', label: 'Категории ошибок' },
 ];
 
 const SYSTEM_NAV: AdminNavItem[] = [
+  { key: 'agreements', label: 'Соглашения' },
+  { key: 'bugReportCategories', label: 'Категории ошибок' },
   { key: 'bugReports', label: 'Багрепорты' },
   { key: 'reportReasons', label: 'Причины жалоб' },
   { key: 'platformRoles', label: 'Роли площадки' },
@@ -113,7 +113,7 @@ export default function AdminPage() {
   const [tab, setTab] = useState<AdminTab>(initialTab);
 
   const navSections = useMemo(() => [
-    { section: 'Контент', items: CONTENT_NAV },
+    { section: 'Справочники', items: CONTENT_NAV },
     {
       section: 'Администрирование',
       items: SYSTEM_NAV.filter(item => isAdminOrAbove || !ADMIN_ONLY_TABS.has(item.key)),
@@ -151,7 +151,7 @@ export default function AdminPage() {
       <div className={styles.page}>
         <div className={styles.header}>
           <h1 className={styles.title}>Администрирование</h1>
-          <p className={styles.subtitle}>Настройки контента и управление площадкой</p>
+          <p className={styles.subtitle}>Справочники продукта и управление площадкой</p>
         </div>
 
         <div className={styles.adminLayout}>
