@@ -23,11 +23,11 @@ import {
   type IAgreementDocument,
   type IDocumentRequest,
 } from '@/entities/agreement';
+import { fetchPlatformContentReportsCount } from '@/entities/contentReport';
 import { usePlatformRoleStore } from '@/app/store';
 import { BugReportCategoriesTab } from './BugReportCategoriesTab';
 import { BugReportsTab } from './BugReportsTab';
 import { PlatformModerationTab } from './PlatformModerationTab';
-import { fetchPlatformContentReportsCount } from '@/entities/contentReport';
 import styles from './AdminPage.module.css';
 
 type AdminTab =
