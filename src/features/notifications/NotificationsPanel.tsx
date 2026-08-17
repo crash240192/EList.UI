@@ -91,7 +91,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         );
         break;
       case 'admin-moderation':
-        navigate('/admin?tab=moderation');
+        navigate('/moderation');
         break;
       case 'event-reports':
         navigate(

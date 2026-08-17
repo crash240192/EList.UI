@@ -1,6 +1,6 @@
 // pages/admin/AdminPage.tsx
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import {
   categoriesApi, typesApi, contactTypesApi,
@@ -12,8 +12,8 @@ import {
 import { sortByNameRu } from '@/entities/event/lib/sortByNameRu';
 import { Select } from '@/shared/ui/Select/Select';
 import { EVENT_AGE_LIMIT_OPTIONS, formatTariffAgeLimitLabel, type EventAgeLimit } from '@/shared/lib/ageLimit';
-import { TabBar } from '@/shared/ui/TabBar';
 import { usePageTitle } from '@/shared/hooks';
+import { PlatformStaffGate } from '@/features/admin/PlatformStaffGate';
 import {
   DOCUMENT_TYPE_LABELS,
   addAgreementDocument,
@@ -23,18 +23,15 @@ import {
   type IAgreementDocument,
   type IDocumentRequest,
 } from '@/entities/agreement';
-import { fetchPlatformContentReportsCount } from '@/entities/contentReport';
 import { PlatformRole } from '@/entities/platformRole';
 import { usePlatformRoleStore } from '@/app/store';
 import { BugReportCategoriesTab } from './BugReportCategoriesTab';
 import { BugReportsTab } from './BugReportsTab';
-import { PlatformModerationTab } from './PlatformModerationTab';
 import { ReportReasonsTab } from './ReportReasonsTab';
 import { PlatformRolesTab } from './PlatformRolesTab';
 import styles from './AdminPage.module.css';
 
 type AdminTab =
-  | 'moderation'
   | 'eventTypes'
   | 'contactTypes'
   | 'tariffs'
@@ -43,6 +40,39 @@ type AdminTab =
   | 'bugReportCategories'
   | 'reportReasons'
   | 'platformRoles';
+
+type AdminNavItem = { key: AdminTab; label: string };
+
+const CONTENT_NAV: AdminNavItem[] = [
+  { key: 'eventTypes', label: 'Типы мероприятий' },
+  { key: 'contactTypes', label: 'Типы контактов' },
+  { key: 'tariffs', label: 'Тарифы' },
+  { key: 'agreements', label: 'Соглашения' },
+  { key: 'bugReportCategories', label: 'Категории ошибок' },
+];
+
+const SYSTEM_NAV: AdminNavItem[] = [
+  { key: 'bugReports', label: 'Багрепорты' },
+  { key: 'reportReasons', label: 'Причины жалоб' },
+  { key: 'platformRoles', label: 'Роли площадки' },
+];
+
+const ADMIN_ONLY_TABS = new Set<AdminTab>(['reportReasons', 'platformRoles']);
+
+const VALID_TABS = new Set<AdminTab>([
+  'eventTypes',
+  'contactTypes',
+  'tariffs',
+  'agreements',
+  'bugReports',
+  'bugReportCategories',
+  'reportReasons',
+  'platformRoles',
+]);
+
+function isAdminTab(value: string | null): value is AdminTab {
+  return value != null && VALID_TABS.has(value as AdminTab);
+}
 
 /** Типы документов на вкладке «Соглашения» (включая OrganizationAgreement и TicketingAgreement) */
 const DOCUMENT_TYPE_OPTIONS = DOCUMENT_TYPE_LABELS;
@@ -67,103 +97,97 @@ function icoToDisplayUrl(ico: string): string {
 
 export default function AdminPage() {
   usePageTitle('Администрирование');
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const [tab, setTab] = useState<AdminTab>(
-    tabFromUrl === 'moderation' ? 'moderation' : 'moderation',
-  );
-  const [moderationCount, setModerationCount] = useState(0);
-  const platformLoaded = usePlatformRoleStore(s => s.loaded);
-  const platformLoading = usePlatformRoleStore(s => s.loading);
   const platformRole = usePlatformRoleStore(s => s.role);
   const platformActive = usePlatformRoleStore(s => s.active);
-  const hasPlatformAccess = platformActive && platformRole != null;
   const isAdminOrAbove =
     platformActive
     && (platformRole === PlatformRole.Admin || platformRole === PlatformRole.Superuser);
-  const refreshPlatformRole = usePlatformRoleStore(s => s.refresh);
+
+  if (tabFromUrl === 'moderation') {
+    return <Navigate to="/moderation" replace />;
+  }
+
+  const initialTab: AdminTab = isAdminTab(tabFromUrl) ? tabFromUrl : 'eventTypes';
+  const [tab, setTab] = useState<AdminTab>(initialTab);
+
+  const navSections = useMemo(() => [
+    { section: 'Контент', items: CONTENT_NAV },
+    {
+      section: 'Администрирование',
+      items: SYSTEM_NAV.filter(item => isAdminOrAbove || !ADMIN_ONLY_TABS.has(item.key)),
+    },
+  ], [isAdminOrAbove]);
+
+  const allowedTabs = useMemo(
+    () => navSections.flatMap(s => s.items.map(i => i.key)),
+    [navSections],
+  );
 
   useEffect(() => {
-    if (tabFromUrl === 'moderation') {
-      setTab('moderation');
+    if (isAdminTab(tabFromUrl) && allowedTabs.includes(tabFromUrl)) {
+      setTab(tabFromUrl);
     }
-  }, [tabFromUrl]);
+  }, [tabFromUrl, allowedTabs]);
 
   useEffect(() => {
-    if (!platformLoaded && !platformLoading) {
-      void refreshPlatformRole();
-    }
-  }, [platformLoaded, platformLoading, refreshPlatformRole]);
+    if (allowedTabs.includes(tab)) return;
+    setTab(allowedTabs[0] ?? 'eventTypes');
+  }, [allowedTabs, tab]);
 
-  useEffect(() => {
-    if (!hasPlatformAccess) return;
-    let cancelled = false;
-    fetchPlatformContentReportsCount(true)
-      .then(n => { if (!cancelled) setModerationCount(n); })
-      .catch(() => { if (!cancelled) setModerationCount(0); });
-    return () => { cancelled = true; };
-  }, [hasPlatformAccess]);
+  const selectTab = (next: AdminTab) => {
+    setTab(next);
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === 'eventTypes') nextParams.delete('tab');
+    else nextParams.set('tab', next);
+    setSearchParams(nextParams, { replace: true });
+  };
 
-  if (!platformLoaded || platformLoading) {
-    return (
+  const activeTab = allowedTabs.includes(tab) ? tab : (allowedTabs[0] ?? 'eventTypes');
+
+  return (
+    <PlatformStaffGate title="Проверка доступа…">
       <div className={styles.page}>
         <div className={styles.header}>
           <h1 className={styles.title}>Администрирование</h1>
+          <p className={styles.subtitle}>Настройки контента и управление площадкой</p>
         </div>
-        <p className={styles.emptyHint}>Проверка доступа…</p>
+
+        <div className={styles.adminLayout}>
+          <nav className={styles.snav} aria-label="Разделы администрирования">
+            {navSections.map(({ section, items }) => (
+              items.length > 0 && (
+                <div key={section}>
+                  <div className={styles.snavSection}>{section}</div>
+                  {items.map(item => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={`${styles.snavItem} ${activeTab === item.key ? styles.snavItemActive : ''}`}
+                      onClick={() => selectTab(item.key)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )
+            ))}
+          </nav>
+
+          <div className={styles.content}>
+            {activeTab === 'eventTypes'   && <EventTypesTab />}
+            {activeTab === 'contactTypes' && <ContactTypesTab />}
+            {activeTab === 'tariffs'      && <TariffsTab />}
+            {activeTab === 'agreements'   && <AgreementsTab />}
+            {activeTab === 'bugReports'   && <BugReportsTab />}
+            {activeTab === 'bugReportCategories' && <BugReportCategoriesTab />}
+            {activeTab === 'reportReasons' && isAdminOrAbove && <ReportReasonsTab />}
+            {activeTab === 'platformRoles' && isAdminOrAbove && <PlatformRolesTab />}
+          </div>
+        </div>
       </div>
-    );
-  }
-
-  if (!hasPlatformAccess) {
-    return <Navigate to="/" replace />;
-  }
-
-  const tabs = [
-    { id: 'moderation', label: 'Модерация', count: moderationCount },
-    { id: 'eventTypes', label: 'Типы мероприятий' },
-    { id: 'contactTypes', label: 'Типы контактов' },
-    { id: 'tariffs', label: 'Тарифы' },
-    { id: 'agreements', label: 'Соглашения' },
-    { id: 'bugReports', label: 'Багрепорты' },
-    { id: 'bugReportCategories', label: 'Категории ошибок' },
-    ...(isAdminOrAbove
-      ? [
-          { id: 'reportReasons', label: 'Причины жалоб' },
-          { id: 'platformRoles', label: 'Роли площадки' },
-        ]
-      : []),
-  ];
-
-  const activeTab = tabs.some(t => t.id === tab) ? tab : 'moderation';
-
-  return (
-    <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Администрирование</h1>
-      </div>
-
-      <TabBar
-        className={styles.topTabs}
-        tabs={tabs}
-        activeId={activeTab}
-        onChange={id => setTab(id as AdminTab)}
-      />
-
-      <div className={styles.content}>
-        {activeTab === 'moderation'   && (
-          <PlatformModerationTab onActiveCountChange={setModerationCount} />
-        )}
-        {activeTab === 'eventTypes'   && <EventTypesTab />}
-        {activeTab === 'contactTypes' && <ContactTypesTab />}
-        {activeTab === 'tariffs'      && <TariffsTab />}
-        {activeTab === 'agreements'   && <AgreementsTab />}
-        {activeTab === 'bugReports'   && <BugReportsTab />}
-        {activeTab === 'bugReportCategories' && <BugReportCategoriesTab />}
-        {activeTab === 'reportReasons' && isAdminOrAbove && <ReportReasonsTab />}
-        {activeTab === 'platformRoles' && isAdminOrAbove && <PlatformRolesTab />}
-      </div>
-    </div>
+    </PlatformStaffGate>
   );
 }
 
