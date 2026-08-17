@@ -497,3 +497,100 @@ export interface IContentReport {
   eventName: string | null;
   actions: IContentReportAction[];
 }
+
+/** Вид жалобы для адресата (GET /againstMe/{id}) — без данных жалобщика */
+export interface IContentReportSubjectView {
+  id: string;
+  targetType: ReportTargetTypeValue;
+  targetId: string;
+  eventId: string | null;
+  messageId: string | null;
+  fileId: string | null;
+  albumId: string | null;
+  organizationId: string | null;
+  eventOrganizatorId: string | null;
+  targetSnapshot: string | null;
+  reason: IReportReason | null;
+  status: ReportStatusValue;
+  resolutionAction: ReportResolutionActionValue | null;
+  moderatorRemark: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Подписи для экрана «Жалобы на меня» — без упоминания жалобщика */
+export function subjectReportStatusLabel(
+  status: ReportStatusValue,
+  resolutionAction: ReportResolutionActionValue | null,
+): string {
+  if (
+    status === ReportStatus.Open
+    || status === ReportStatus.InReview
+    || status === ReportStatus.Escalated
+  ) {
+    return 'На рассмотрении';
+  }
+  if (status === ReportStatus.Dismissed) return 'Отклонено';
+  if (resolutionAction === ReportResolutionAction.Warn) return 'Предупреждение';
+  if (
+    resolutionAction === ReportResolutionAction.HideContent
+    || resolutionAction === ReportResolutionAction.DeleteContent
+  ) {
+    return 'Контент скрыт';
+  }
+  if (
+    resolutionAction === ReportResolutionAction.SuspendAccount
+    || resolutionAction === ReportResolutionAction.SuspendOrganization
+  ) {
+    return 'Блокировка';
+  }
+  if (resolutionAction === ReportResolutionAction.RemoveOrganizator) {
+    return 'Снят с организаторов';
+  }
+  if (resolutionAction === ReportResolutionAction.ResetAvatar) {
+    return 'Фото сброшено';
+  }
+  if (resolutionAction === ReportResolutionAction.CancelEvent) {
+    return 'Мероприятие отменено';
+  }
+  if (resolutionAction === ReportResolutionAction.BanFromEvent) {
+    return 'Ограничение на мероприятии';
+  }
+  if (status === ReportStatus.Resolved) return 'Решено';
+  return REPORT_STATUS_LABELS[status] ?? status;
+}
+
+export function subjectViewForPreview(view: IContentReportSubjectView): IContentReport {
+  return {
+    id: view.id,
+    reporterAccountId: '',
+    targetType: view.targetType,
+    targetId: view.targetId,
+    eventId: view.eventId,
+    messageId: view.messageId,
+    conversationId: null,
+    organizationId: view.organizationId,
+    albumId: view.albumId,
+    fileId: view.fileId,
+    reportedAccountId: null,
+    reasonId: view.reason?.id ?? '',
+    comment: null,
+    targetSnapshot: view.targetSnapshot,
+    status: view.status,
+    organizerStatus: null,
+    platformStatus: null,
+    assignedTo: null,
+    resolutionAction: view.resolutionAction,
+    resolutionComment: view.moderatorRemark,
+    resolvedBy: null,
+    resolvedAt: view.resolvedAt,
+    createdAt: view.createdAt,
+    updatedAt: view.updatedAt,
+    reason: view.reason,
+    reporter: null,
+    assignedToAccount: null,
+    eventName: null,
+    actions: [],
+  };
+}

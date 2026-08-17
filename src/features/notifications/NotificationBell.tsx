@@ -15,10 +15,22 @@ export function NotificationBell() {
   const panelOpen = useNotificationsStore(s => s.panelOpen);
   const togglePanel = useNotificationsStore(s => s.togglePanel);
   const setPanelOpen = useNotificationsStore(s => s.setPanelOpen);
-  const unread = useNotificationsStore(s => s.items.filter(i => !i.readAt).length);
+  const unread = useNotificationsStore(s => s.unreadCount);
+  const refreshUnreadCount = useNotificationsStore(s => s.refreshUnreadCount);
+  const loadHistory = useNotificationsStore(s => s.loadHistory);
   const wsStatus = useDebouncedWsStatus(useNotificationsStore(s => s.wsStatus));
 
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void refreshUnreadCount();
+  }, [refreshUnreadCount]);
+
+  useEffect(() => {
+    if (panelOpen) {
+      void loadHistory();
+    }
+  }, [panelOpen, loadHistory]);
 
   useEffect(() => {
     if (!panelOpen) return;

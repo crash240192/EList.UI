@@ -15,6 +15,7 @@ export const AUTH_REQUIRED_ROUTE_PREFIXES = [
   '/settings',
   '/wallet',
   '/my-reports',
+  '/reports-against-me',
   '/admin',
 ] as const;
 
@@ -45,5 +46,6 @@ export const AUTH_REQUIRED_NAV_PATHS = new Set<string>([
   '/settings',
   '/wallet',
   '/my-reports',
+  '/reports-against-me',
   '/admin',
 ]);

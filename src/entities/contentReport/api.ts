@@ -7,6 +7,7 @@ import type {
   IContentReportAccount,
   IContentReportAction,
   IContentReportsSearchRequest,
+  IContentReportSubjectView,
   ICreateContentReportRequest,
   ICreateReportReasonRequest,
   IEscalateContentReportRequest,
@@ -321,6 +322,51 @@ export async function fetchMyContentReports(
     ...page,
     result: page.result.map(normalizeContentReport),
   };
+}
+
+export function normalizeContentReportSubjectView(raw: unknown): IContentReportSubjectView {
+  const r = (raw ?? {}) as Raw;
+  const reasonRaw = r.reason ?? r.Reason ?? null;
+  const targetSnapshot = pickNullableStr(r, 'targetSnapshot', 'TargetSnapshot');
+  const snap = parseTargetSnapshot(targetSnapshot);
+  return {
+    id: pickStr(r, 'id', 'Id'),
+    targetType: normalizeTargetType(r.targetType ?? r.TargetType),
+    targetId: pickStr(r, 'targetId', 'TargetId'),
+    eventId: pickNullableStr(r, 'eventId', 'EventId') ?? snap?.eventId ?? null,
+    messageId: pickNullableStr(r, 'messageId', 'MessageId') ?? snap?.messageId ?? null,
+    fileId: pickNullableStr(r, 'fileId', 'FileId') ?? snap?.fileId ?? null,
+    albumId: pickNullableStr(r, 'albumId', 'AlbumId') ?? snap?.albumId ?? null,
+    organizationId: pickNullableStr(r, 'organizationId', 'OrganizationId') ?? snap?.organizationId ?? null,
+    eventOrganizatorId: pickNullableStr(r, 'eventOrganizatorId', 'EventOrganizatorId') ?? snap?.eventOrganizatorId ?? null,
+    targetSnapshot,
+    reason: reasonRaw ? normalizeReportReason(reasonRaw) : null,
+    status: normalizeStatus(r.status ?? r.Status),
+    resolutionAction: normalizeResolutionAction(r.resolutionAction ?? r.ResolutionAction),
+    moderatorRemark: pickNullableStr(r, 'moderatorRemark', 'ModeratorRemark'),
+    resolvedAt: pickNullableStr(r, 'resolvedAt', 'ResolvedAt'),
+    createdAt: pickStr(r, 'createdAt', 'CreatedAt'),
+    updatedAt: pickStr(r, 'updatedAt', 'UpdatedAt'),
+  };
+}
+
+export async function fetchReportsAgainstMe(
+  pageIndex = 0,
+  pageSize = 20,
+): Promise<PagedList<IContentReportSubjectView>> {
+  const data = await apiClient.get<RawPagedList<unknown>>(
+    `/api/contentReports/againstMe?pageIndex=${pageIndex}&pageSize=${pageSize}`,
+  );
+  const page = normalizePagedList(data.result, pageIndex, pageSize);
+  return {
+    ...page,
+    result: page.result.map(normalizeContentReportSubjectView),
+  };
+}
+
+export async function fetchReportAgainstMe(reportId: string): Promise<IContentReportSubjectView> {
+  const data = await apiClient.get<unknown>(`/api/contentReports/againstMe/${reportId}`);
+  return normalizeContentReportSubjectView(data.result);
 }
 
 function buildSearchBody(payload: IContentReportsSearchRequest): Record<string, unknown> {

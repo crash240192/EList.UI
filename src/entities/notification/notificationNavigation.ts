@@ -7,6 +7,22 @@ import {
   isNewInvitationNotification,
   NOTIFICATION_TYPE_NEW_INVITATION,
 } from './eventData';
+import {
+  contentReportNotificationTypeLabel,
+  isContentReportNotificationType,
+  NOTIFICATION_TYPE_CONTENT_REPORT_ACCOUNT_SUSPENDED,
+  NOTIFICATION_TYPE_CONTENT_REPORT_AVATAR_RESET,
+  NOTIFICATION_TYPE_CONTENT_REPORT_CONTENT_MODERATED,
+  NOTIFICATION_TYPE_CONTENT_REPORT_FILED_AGAINST_YOU,
+  NOTIFICATION_TYPE_CONTENT_REPORT_NEW_ORG_QUEUE,
+  NOTIFICATION_TYPE_CONTENT_REPORT_NEW_PLATFORM_QUEUE,
+  NOTIFICATION_TYPE_CONTENT_REPORT_ORG_REMOVED,
+  NOTIFICATION_TYPE_CONTENT_REPORT_ORG_SUSPENDED,
+  NOTIFICATION_TYPE_CONTENT_REPORT_REVIEWED,
+  NOTIFICATION_TYPE_CONTENT_REPORT_WARNING_ISSUED,
+  notificationTypeKey,
+  parseContentReportNotificationData,
+} from './contentReportNotification';
 
 export {
   NOTIFICATION_TYPE_NEW_INVITATION,
@@ -41,10 +57,18 @@ const EVENT_PAGE_TYPES = new Set([
 export type NotificationNavTarget =
   | { kind: 'invitations' }
   | { kind: 'event'; eventId: string }
-  | { kind: 'user'; accountId: string };
+  | { kind: 'user'; accountId: string }
+  | { kind: 'my-reports'; reportId?: string }
+  | { kind: 'reports-against-me'; reportId?: string }
+  | { kind: 'admin-moderation'; reportId?: string }
+  | { kind: 'event-reports'; eventId: string }
+  | { kind: 'organization'; organizationId: string };
 
 export function notificationTypeLabel(type: INotification['type']): string {
   if (type == null) return 'Уведомление';
+  if (isContentReportNotificationType(type)) {
+    return contentReportNotificationTypeLabel(type);
+  }
   switch (Number(type)) {
     case 0: return 'Создано событие';
     case 1: return 'Событие обновлено';
@@ -77,6 +101,54 @@ export function getNotificationNavigationTarget(
   n: INotification,
 ): NotificationNavTarget | null {
   const typeNum = Number(n.type);
+  const typeKey = notificationTypeKey(n.type);
+  const reportData = parseContentReportNotificationData(n.data);
+  const reportId = reportData?.reportId ?? undefined;
+
+  if (isContentReportNotificationType(n.type)) {
+    if (
+      typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_REVIEWED
+      || typeKey === 'ContentReportReviewed'
+    ) {
+      return { kind: 'my-reports', reportId };
+    }
+    if (
+      typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_NEW_ORG_QUEUE
+      || typeKey === 'ContentReportNewInOrganizerQueue'
+    ) {
+      const eventId = reportData?.eventId ?? n.eventId;
+      if (eventId) return { kind: 'event-reports', eventId };
+    }
+    if (
+      typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_NEW_PLATFORM_QUEUE
+      || typeKey === 'ContentReportNewInPlatformQueue'
+    ) {
+      return { kind: 'admin-moderation', reportId };
+    }
+    if (
+      typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_ORG_SUSPENDED
+      || typeKey === 'ContentReportOrganizationSuspended'
+    ) {
+      const orgId = reportData?.organizationId;
+      if (orgId) return { kind: 'organization', organizationId: orgId };
+    }
+    if (
+      typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_FILED_AGAINST_YOU
+      || typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_WARNING_ISSUED
+      || typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_CONTENT_MODERATED
+      || typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_ACCOUNT_SUSPENDED
+      || typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_ORG_REMOVED
+      || typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_AVATAR_RESET
+      || typeKey === 'ContentReportFiledAgainstYou'
+      || typeKey === 'ContentReportWarningIssued'
+      || typeKey === 'ContentReportContentModerated'
+      || typeKey === 'ContentReportAccountSuspended'
+      || typeKey === 'ContentReportOrganizatorRemoved'
+      || typeKey === 'ContentReportAvatarReset'
+    ) {
+      return { kind: 'reports-against-me', reportId };
+    }
+  }
 
   if (isNewInvitationNotification(n.type)) {
     return { kind: 'invitations' };

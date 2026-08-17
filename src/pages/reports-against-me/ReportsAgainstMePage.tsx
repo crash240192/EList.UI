@@ -1,24 +1,24 @@
-// pages/my-reports/MyReportsPage.tsx
+// pages/reports-against-me/ReportsAgainstMePage.tsx
 
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   REPORT_RESOLUTION_ACTION_LABELS,
-  REPORT_STATUS_LABELS,
   REPORT_TARGET_TYPE_LABELS,
+  ReportResolutionAction,
   ReportStatus,
-  ReportTargetType,
-  fetchContentReport,
-  fetchContentReportActions,
-  fetchMyContentReports,
-  type IContentReport,
-  type IContentReportAction,
+  fetchReportAgainstMe,
+  fetchReportsAgainstMe,
+  subjectReportStatusLabel,
+  subjectViewForPreview,
+  type IContentReportSubjectView,
+  type ReportResolutionActionValue,
   type ReportStatusValue,
 } from '@/entities/contentReport';
 import { apiIsoToLocalParts } from '@/shared/lib/datetime';
 import { usePageTitle } from '@/shared/hooks';
 import { ReportTargetPreview } from '@/features/content-reports';
-import styles from './MyReportsPage.module.css';
+import styles from './ReportsAgainstMePage.module.css';
 
 const PAGE_SIZE = 20;
 
@@ -28,33 +28,42 @@ function formatDateTime(iso: string | null | undefined): string {
   return `${date} ${time}`;
 }
 
-function statusLabel(status: ReportStatusValue | null | undefined): string {
-  if (!status) return '—';
-  return REPORT_STATUS_LABELS[status] ?? status;
-}
-
-function statusChipClass(status: ReportStatusValue | null | undefined): string {
-  if (status === ReportStatus.Resolved) return styles.statusResolved;
+function statusChipClass(
+  status: ReportStatusValue,
+  action: ReportResolutionActionValue | null,
+): string {
   if (status === ReportStatus.Dismissed) return styles.statusDismissed;
-  if (status === ReportStatus.InReview) return styles.statusReview;
-  if (status === ReportStatus.Escalated) return styles.statusEscalated;
-  return styles.statusOpen;
+  if (action === ReportResolutionAction.Warn) return styles.statusWarn;
+  if (
+    action === ReportResolutionAction.HideContent
+    || action === ReportResolutionAction.DeleteContent
+  ) {
+    return styles.statusHidden;
+  }
+  if (
+    status === ReportStatus.Open
+    || status === ReportStatus.InReview
+    || status === ReportStatus.Escalated
+  ) {
+    return styles.statusReview;
+  }
+  if (status === ReportStatus.Resolved) return styles.statusResolved;
+  return styles.statusReview;
 }
 
-export default function MyReportsPage() {
-  usePageTitle('Мои жалобы');
+export default function ReportsAgainstMePage() {
+  usePageTitle('Жалобы на меня');
   const [searchParams, setSearchParams] = useSearchParams();
   const initialReportId = searchParams.get('report');
 
-  const [reports, setReports] = useState<IContentReport[]>([]);
+  const [reports, setReports] = useState<IContentReportSubjectView[]>([]);
   const [total, setTotal] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(initialReportId);
-  const [detail, setDetail] = useState<IContentReport | null>(null);
-  const [actions, setActions] = useState<IContentReportAction[]>([]);
+  const [detail, setDetail] = useState<IContentReportSubjectView | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
@@ -63,12 +72,12 @@ export default function MyReportsPage() {
     else setLoading(true);
     setError(null);
     try {
-      const page = await fetchMyContentReports(index, PAGE_SIZE);
+      const page = await fetchReportsAgainstMe(index, PAGE_SIZE);
       setTotal(page.total);
       setPageIndex(index);
       setReports(prev => append ? [...prev, ...page.result] : page.result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить жалобы');
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить список');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -86,7 +95,6 @@ export default function MyReportsPage() {
   useEffect(() => {
     if (!selectedId) {
       setDetail(null);
-      setActions([]);
       setDetailError(null);
       if (searchParams.has('report')) {
         const next = new URLSearchParams(searchParams);
@@ -98,18 +106,14 @@ export default function MyReportsPage() {
     let cancelled = false;
     setDetailLoading(true);
     setDetailError(null);
-    Promise.all([
-      fetchContentReport(selectedId),
-      fetchContentReportActions(selectedId).catch(() => [] as IContentReportAction[]),
-    ])
-      .then(([report, acts]) => {
+    void fetchReportAgainstMe(selectedId)
+      .then(report => {
         if (cancelled) return;
         setDetail(report);
-        setActions(acts);
       })
       .catch(e => {
         if (cancelled) return;
-        setDetailError(e instanceof Error ? e.message : 'Не удалось загрузить жалобу');
+        setDetailError(e instanceof Error ? e.message : 'Не удалось загрузить');
       })
       .finally(() => {
         if (!cancelled) setDetailLoading(false);
@@ -132,7 +136,10 @@ export default function MyReportsPage() {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.cardHeader}>
-          <h1 className={styles.cardTitle}>Мои жалобы</h1>
+          <h1 className={styles.cardTitle}>Жалобы на меня</h1>
+          <p className={styles.subtitle}>
+            Замечания модерации по вашему контенту. Кто пожаловался — не показываем.
+          </p>
         </div>
         <div className={styles.content}>
           {selectedId ? (
@@ -148,8 +155,8 @@ export default function MyReportsPage() {
                 <>
                   <div className={styles.section}>
                     <span className={styles.sectionTitle}>Статус</span>
-                    <span className={`${styles.statusChip} ${statusChipClass(detail.status)}`}>
-                      {statusLabel(detail.status)}
+                    <span className={`${styles.statusChip} ${statusChipClass(detail.status, detail.resolutionAction)}`}>
+                      {subjectReportStatusLabel(detail.status, detail.resolutionAction)}
                     </span>
                     <p className={styles.meta}>{formatDateTime(detail.createdAt)}</p>
                   </div>
@@ -164,42 +171,32 @@ export default function MyReportsPage() {
                     <span className={styles.sectionTitle}>
                       {REPORT_TARGET_TYPE_LABELS[detail.targetType] || detail.targetType}
                     </span>
-                    <ReportTargetPreview report={detail} />
-                    {detail.eventId && detail.targetType !== ReportTargetType.Event && (
+                    <ReportTargetPreview report={subjectViewForPreview(detail)} />
+                    {detail.eventId && (
                       <Link className={styles.eventLink} to={`/event/${detail.eventId}`}>
-                        {detail.eventName || 'Открыть мероприятие'}
+                        Открыть мероприятие
                       </Link>
                     )}
                   </div>
-                  {detail.comment && (
+                  {detail.moderatorRemark && (
+                    detail.resolutionAction === ReportResolutionAction.Warn
+                    || detail.resolutionAction === ReportResolutionAction.Other
+                  ) && (
                     <div className={styles.section}>
-                      <span className={styles.sectionTitle}>Ваш комментарий</span>
-                      <p className={styles.sectionText}>{detail.comment}</p>
+                      <span className={styles.sectionTitle}>Замечание модератора</span>
+                      <p className={styles.sectionText}>{detail.moderatorRemark}</p>
                     </div>
                   )}
-                  {(detail.resolutionAction || detail.resolutionComment) && (
+                  {detail.resolutionAction && (
                     <div className={styles.section}>
-                      <span className={styles.sectionTitle}>Решение</span>
-                      {detail.resolutionAction && (
-                        <p className={styles.sectionText}>
-                          {REPORT_RESOLUTION_ACTION_LABELS[detail.resolutionAction]
-                            ?? detail.resolutionAction}
-                        </p>
+                      <span className={styles.sectionTitle}>Итог</span>
+                      <p className={styles.sectionText}>
+                        {REPORT_RESOLUTION_ACTION_LABELS[detail.resolutionAction]
+                          ?? detail.resolutionAction}
+                      </p>
+                      {detail.resolvedAt && (
+                        <p className={styles.meta}>{formatDateTime(detail.resolvedAt)}</p>
                       )}
-                      {detail.resolutionComment && (
-                        <p className={styles.meta}>{detail.resolutionComment}</p>
-                      )}
-                    </div>
-                  )}
-                  {actions.length > 0 && (
-                    <div className={styles.section}>
-                      <span className={styles.sectionTitle}>История</span>
-                      {actions.map(a => (
-                        <p key={a.id} className={styles.meta}>
-                          {formatDateTime(a.createdAt)} · {a.action}
-                          {a.details ? ` — ${a.details}` : ''}
-                        </p>
-                      ))}
                     </div>
                   )}
                 </>
@@ -210,7 +207,7 @@ export default function MyReportsPage() {
           ) : error ? (
             <div className={styles.error}>{error}</div>
           ) : reports.length === 0 ? (
-            <div className={styles.empty}>Вы ещё не отправляли жалоб</div>
+            <div className={styles.empty}>Жалоб на ваш контент пока нет</div>
           ) : (
             <>
               {reports.map(report => (
@@ -222,16 +219,15 @@ export default function MyReportsPage() {
                 >
                   <div className={styles.cardTop}>
                     <span className={styles.reasonName}>
-                      {report.reason?.name || 'Жалоба'}
+                      {report.reason?.name || REPORT_TARGET_TYPE_LABELS[report.targetType]}
                     </span>
-                    <span className={`${styles.statusChip} ${statusChipClass(report.status)}`}>
-                      {statusLabel(report.status)}
+                    <span className={`${styles.statusChip} ${statusChipClass(report.status, report.resolutionAction)}`}>
+                      {subjectReportStatusLabel(report.status, report.resolutionAction)}
                     </span>
                   </div>
-                  <ReportTargetPreview report={report} compact />
+                  <ReportTargetPreview report={subjectViewForPreview(report)} compact />
                   <span className={styles.meta}>
                     {REPORT_TARGET_TYPE_LABELS[report.targetType] || report.targetType}
-                    {report.eventName ? ` · ${report.eventName}` : ''}
                     {' · '}
                     {formatDateTime(report.createdAt)}
                   </span>

@@ -1,6 +1,6 @@
 // features/notifications/NotificationsPanel.tsx
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccountId } from '@/features/auth/useAccountId';
 import type { INotification } from '@/entities/notification/types';
@@ -50,11 +50,19 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const wsError = useNotificationsStore(s => s.wsError);
   const markRead = useNotificationsStore(s => s.markRead);
   const clearAll = useNotificationsStore(s => s.clearAll);
+  const loadHistory = useNotificationsStore(s => s.loadHistory);
+  const historyLoaded = useNotificationsStore(s => s.historyLoaded);
+  const historyLoading = useNotificationsStore(s => s.historyLoading);
 
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [stats, setStats] = useState<string | null>(null);
-  const visibleItems = items.filter(i => !i.readAt);
+
+  useEffect(() => {
+    if (!historyLoaded && !historyLoading) {
+      void loadHistory();
+    }
+  }, [historyLoaded, historyLoading, loadHistory]);
 
   const openNotification = useCallback((n: INotification) => {
     void markRead(n.id);
@@ -71,6 +79,29 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         break;
       case 'user':
         navigate(`/user/${target.accountId}`);
+        break;
+      case 'my-reports':
+        navigate(target.reportId ? `/my-reports?report=${target.reportId}` : '/my-reports');
+        break;
+      case 'reports-against-me':
+        navigate(
+          target.reportId
+            ? `/reports-against-me?report=${target.reportId}`
+            : '/reports-against-me',
+        );
+        break;
+      case 'admin-moderation':
+        navigate('/admin?tab=moderation');
+        break;
+      case 'event-reports':
+        navigate(
+          target.eventId
+            ? `/event/${target.eventId}?organizerReports=1`
+            : '/my-events',
+        );
+        break;
+      case 'organization':
+        navigate(`/organization/${target.organizationId}`);
         break;
     }
   }, [markRead, navigate, onClose]);
@@ -133,12 +164,14 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       </div>
 
       <ul className={styles.list}>
-        {visibleItems.length === 0 ? (
+        {historyLoading && items.length === 0 ? (
+          <li className={styles.empty}>Загрузка…</li>
+        ) : items.length === 0 ? (
           <li className={styles.empty}>
             Пока нет уведомлений. Новые появятся здесь по WebSocket.
           </li>
         ) : (
-          visibleItems.map(n => {
+          items.map(n => {
             const hasTitle = !!n.title;
             const messageText = n.message || notificationTypeLabel(n.type);
             const eventStart = formatEventStart(n.eventShort?.startTime);
@@ -149,7 +182,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
             const actorAccountId = n.relatedAccountId ?? n.ratingData?.accountId ?? null;
             return (
             <li key={n.id}>
-              <div className={`${styles.item} ${styles.itemUnread}`}>
+              <div className={`${styles.item} ${!n.readAt ? styles.itemUnread : ''}`}>
                 {actorAccountId && (
                   <div className={styles.itemAvatarCol}>
                     <UserAvatar accountId={actorAccountId} initials="?" size={32} />
@@ -249,9 +282,9 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         </div>
       )}
 
-      {visibleItems.length > 0 && (
+      {items.some(i => !i.readAt) && (
         <button type="button" className={styles.clearBtn} onClick={() => { void clearAll(); }}>
-          Очистить
+          Прочитать все
         </button>
       )}
     </div>

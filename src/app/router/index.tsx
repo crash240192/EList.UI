@@ -23,6 +23,7 @@ const AdminPage       = lazyWithRetry(() => import('@/pages/admin/AdminPage'));
 const SettingsPage    = lazyWithRetry(() => import('@/pages/settings/SettingsPage'));
 const WalletPage      = lazyWithRetry(() => import('@/pages/wallet/WalletPage'));
 const MyReportsPage   = lazyWithRetry(() => import('@/pages/my-reports/MyReportsPage'));
+const ReportsAgainstMePage = lazyWithRetry(() => import('@/pages/reports-against-me/ReportsAgainstMePage'));
 const LoginPage       = lazyWithRetry(() => import('@/pages/auth/LoginPage'));
 const ActivationPage  = lazyWithRetry(() => import('@/pages/auth/ActivationPage'));
 const RegisterPage    = lazyWithRetry(() => import('@/pages/auth/RegisterPage'));
@@ -74,6 +75,7 @@ const router = createBrowserRouter([
       { path: 'settings',         element: <RequireAuth>{S(SettingsPage)}</RequireAuth> },
       { path: 'wallet',           element: <RequireAuth>{S(WalletPage)}</RequireAuth> },
       { path: 'my-reports',       element: <RequireAuth>{S(MyReportsPage)}</RequireAuth> },
+      { path: 'reports-against-me', element: <RequireAuth>{S(ReportsAgainstMePage)}</RequireAuth> },
       { path: '*',                element: S(NotFoundPage) },
     ],
   },

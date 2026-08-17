@@ -24,6 +24,8 @@ export {
   organizerResolutionActionsFor,
   platformResolutionActionsFor,
   resolutionActionConfirm,
+  subjectReportStatusLabel,
+  subjectViewForPreview,
 } from './types';
 
 export type {
@@ -45,11 +47,13 @@ export type {
   IContentReportAccount,
   IContentReport,
   ParsedTargetSnapshot,
+  IContentReportSubjectView,
 } from './types';
 
 export {
   normalizeReportReason,
   normalizeContentReport,
+  normalizeContentReportSubjectView,
   sortReportsForQueue,
   fetchReportReasons,
   fetchReportReason,
@@ -60,6 +64,8 @@ export {
   createContentReport,
   fetchContentReport,
   fetchMyContentReports,
+  fetchReportsAgainstMe,
+  fetchReportAgainstMe,
   searchPlatformContentReports,
   fetchPlatformContentReportsCount,
   searchOrganizerContentReports,

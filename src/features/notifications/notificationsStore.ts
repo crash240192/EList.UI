@@ -2,6 +2,8 @@
 
 import { create } from 'zustand';
 import {
+  fetchMyNotifications,
+  fetchMyNotificationsUnreadCount,
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/entities/notification/api';
@@ -11,6 +13,9 @@ const MAX_ITEMS = 80;
 
 interface NotificationsState {
   items: INotification[];
+  unreadCount: number;
+  historyLoaded: boolean;
+  historyLoading: boolean;
   wsStatus: NotificationWsStatus;
   wsError: string | null;
   panelOpen: boolean;
@@ -22,6 +27,8 @@ interface NotificationsState {
   applyMarkAllRead: (readAt?: string) => void;
   markRead: (id: string) => Promise<void>;
   clearAll: () => Promise<void>;
+  loadHistory: () => Promise<void>;
+  refreshUnreadCount: () => Promise<void>;
   reset: () => void;
 }
 
@@ -31,8 +38,27 @@ function sortByDate(items: INotification[]): INotification[] {
   );
 }
 
+function mergeNotifications(
+  existing: INotification[],
+  incoming: INotification[],
+): INotification[] {
+  const byId = new Map<string, INotification>();
+  for (const item of incoming) {
+    byId.set(item.id, item);
+  }
+  for (const item of existing) {
+    if (!byId.has(item.id)) {
+      byId.set(item.id, item);
+    }
+  }
+  return sortByDate(Array.from(byId.values())).slice(0, MAX_ITEMS);
+}
+
 export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   items: [],
+  unreadCount: 0,
+  historyLoaded: false,
+  historyLoading: false,
   wsStatus: 'idle',
   wsError: null,
   panelOpen: false,
@@ -45,23 +71,32 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
 
   pushNotification: n => {
     set(s => {
-      const without = s.items.filter(i => i.id !== n.id);
-      const items = sortByDate([n, ...without]).slice(0, MAX_ITEMS);
-      return { items };
+      const items = mergeNotifications(s.items, [n]);
+      const wasUnread = s.items.find(i => i.id === n.id)?.readAt == null;
+      const isUnread = n.readAt == null;
+      let unreadCount = s.unreadCount;
+      if (isUnread && !wasUnread) unreadCount += 1;
+      return { items, unreadCount };
     });
   },
 
   applyMarkRead: (id, readAt) => {
     const at = readAt ?? new Date().toISOString();
-    set(s => ({
-      items: s.items.map(i => (i.id === id && !i.readAt ? { ...i, readAt: at } : i)),
-    }));
+    set(s => {
+      const target = s.items.find(i => i.id === id);
+      if (!target || target.readAt) return s;
+      return {
+        items: s.items.map(i => (i.id === id ? { ...i, readAt: at } : i)),
+        unreadCount: Math.max(0, s.unreadCount - 1),
+      };
+    });
   },
 
   applyMarkAllRead: readAt => {
     const at = readAt ?? new Date().toISOString();
     set(s => ({
       items: s.items.map(i => (i.readAt ? i : { ...i, readAt: at })),
+      unreadCount: 0,
     }));
   },
 
@@ -70,11 +105,12 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
     if (!item || item.readAt) return;
 
     const prev = get().items;
+    const prevUnread = get().unreadCount;
     get().applyMarkRead(id);
     try {
       await markNotificationRead(id);
     } catch {
-      set({ items: prev });
+      set({ items: prev, unreadCount: prevUnread });
     }
   },
 
@@ -82,13 +118,48 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
     if (!get().items.some(i => !i.readAt)) return;
 
     const prev = get().items;
+    const prevUnread = get().unreadCount;
     get().applyMarkAllRead();
     try {
       await markAllNotificationsRead();
     } catch {
-      set({ items: prev });
+      set({ items: prev, unreadCount: prevUnread });
     }
   },
 
-  reset: () => set({ items: [], wsStatus: 'idle', wsError: null, panelOpen: false }),
+  loadHistory: async () => {
+    if (get().historyLoading) return;
+    set({ historyLoading: true });
+    try {
+      const page = await fetchMyNotifications({ pageIndex: 0, pageSize: 50 });
+      set(s => ({
+        items: mergeNotifications(s.items, page.result),
+        historyLoaded: true,
+      }));
+      await get().refreshUnreadCount();
+    } catch (err) {
+      console.error('[notifications] load history failed', err);
+    } finally {
+      set({ historyLoading: false });
+    }
+  },
+
+  refreshUnreadCount: async () => {
+    try {
+      const count = await fetchMyNotificationsUnreadCount();
+      set({ unreadCount: count });
+    } catch (err) {
+      console.error('[notifications] unread count failed', err);
+    }
+  },
+
+  reset: () => set({
+    items: [],
+    unreadCount: 0,
+    historyLoaded: false,
+    historyLoading: false,
+    wsStatus: 'idle',
+    wsError: null,
+    panelOpen: false,
+  }),
 }));

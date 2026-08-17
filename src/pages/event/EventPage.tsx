@@ -1,7 +1,7 @@
 // pages/event/EventPage.tsx
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { IEvent, IEventOrganizator, IParticipantView } from '@/entities/event';
 import {
   fetchEventById, participateEvent, leaveEvent,
@@ -155,6 +155,7 @@ function EventOrganizerChip({
 export default function EventPage() {
   const { id }   = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const goBack   = useSafeBack('/');
   const { accountId } = useAccountId();
   const authenticated = useAuthStore(s => s.isAuthenticated());
@@ -213,6 +214,15 @@ export default function EventPage() {
     refresh: refreshOrganizerReportsCount,
     setCount: setOrganizerReportsCount,
   } = useOrganizerReportsCount(id, Boolean(isOrganizer && id));
+
+  useEffect(() => {
+    if (searchParams.get('organizerReports') !== '1') return;
+    if (!isOrganizer || !id) return;
+    setOrganizerReportsOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('organizerReports');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, isOrganizer, id]);
 
   const { orgOrganizers, personOrganizers } = useMemo(() => {
     const orgs: IEventOrganizator[] = [];

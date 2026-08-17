@@ -1,7 +1,7 @@
 // pages/admin/AdminPage.tsx
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import {
   categoriesApi, typesApi, contactTypesApi,
   type IEventCategory, type IEventType, type IContactType,
@@ -67,7 +67,11 @@ function icoToDisplayUrl(ico: string): string {
 
 export default function AdminPage() {
   usePageTitle('Администрирование');
-  const [tab, setTab] = useState<AdminTab>('moderation');
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const [tab, setTab] = useState<AdminTab>(
+    tabFromUrl === 'moderation' ? 'moderation' : 'moderation',
+  );
   const [moderationCount, setModerationCount] = useState(0);
   const platformLoaded = usePlatformRoleStore(s => s.loaded);
   const platformLoading = usePlatformRoleStore(s => s.loading);
@@ -78,6 +82,12 @@ export default function AdminPage() {
     platformActive
     && (platformRole === PlatformRole.Admin || platformRole === PlatformRole.Superuser);
   const refreshPlatformRole = usePlatformRoleStore(s => s.refresh);
+
+  useEffect(() => {
+    if (tabFromUrl === 'moderation') {
+      setTab('moderation');
+    }
+  }, [tabFromUrl]);
 
   useEffect(() => {
     if (!platformLoaded && !platformLoading) {
