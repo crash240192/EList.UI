@@ -14,6 +14,7 @@ export const AUTH_REQUIRED_ROUTE_PREFIXES = [
   '/edit-event',
   '/settings',
   '/wallet',
+  '/my-reports',
   '/admin',
 ] as const;
 
@@ -43,5 +44,6 @@ export const AUTH_REQUIRED_NAV_PATHS = new Set<string>([
   '/create-event',
   '/settings',
   '/wallet',
+  '/my-reports',
   '/admin',
 ]);
