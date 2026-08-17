@@ -61,6 +61,11 @@ export const ApiErrorCode = {
   MessageNotFound: 14001,
 
   RatingItemNotFound: 15001,
+
+  FileNotFound: 17003,
+
+  ContentReportReasonNotFound: 20001,
+  ContentReportAlreadyExists: 20003,
 } as const;
 
 export type ApiErrorCodeValue = (typeof ApiErrorCode)[keyof typeof ApiErrorCode];

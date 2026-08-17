@@ -40,3 +40,15 @@
 .itemDanger {
   color: var(--danger) !important;
 }
+
+.itemDisabled,
+.item:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.7;
+}
+
+.itemDisabled:hover,
+.item:disabled:hover {
+  background: none;
+}

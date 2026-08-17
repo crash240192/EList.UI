@@ -1,7 +1,7 @@
 // pages/organization/OrganizationPage.tsx
 // Публичная страница организации — по структуре и оформлению как UserPage
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   OrganizationRole,
@@ -36,12 +36,15 @@ import { useAuthStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
+import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { TabBar } from '@/shared/ui/TabBar';
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import heroStyles from '@/shared/styles/hero.module.css';
 import { isEventFinished } from '@/features/event/RatingWidget';
 import type { IEvent } from '@/entities/event';
+import { ContentReportModal } from '@/features/content-reports';
+import { ReportTargetType } from '@/entities/contentReport';
 import styles from './OrganizationPage.module.css';
 
 type EventsPhase = 'upcoming' | 'past';
@@ -207,6 +210,14 @@ export default function OrganizationPage() {
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [reportMenuOpen, setReportMenuOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    type: typeof ReportTargetType.Organization | typeof ReportTargetType.Photo;
+    id: string;
+  } | null>(null);
+  const [orgReported, setOrgReported] = useState(false);
+  const [reportedPhotoIds, setReportedPhotoIds] = useState<Set<string>>(() => new Set());
+  const reportMenuRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!authenticated || myAccountId) return;
@@ -257,6 +268,7 @@ export default function OrganizationPage() {
 
   const canManage =
     myRole === OrganizationRole.Owner || myRole === OrganizationRole.Manager;
+  const isMember = myRole != null;
 
   const visibleContacts = useMemo(
     () => contacts.filter(c => canManage || c.show),
@@ -337,6 +349,37 @@ export default function OrganizationPage() {
               >
                 <ShareIcon />
               </button>
+              {authenticated && !isMember && org && (
+                <>
+                  <button
+                    ref={reportMenuRef}
+                    type="button"
+                    className={`${heroStyles.heroBtn} noHoverGlow`}
+                    onClick={() => setReportMenuOpen(v => !v)}
+                    aria-label="Ещё"
+                    aria-expanded={reportMenuOpen}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                    </svg>
+                  </button>
+                  <HeroContextMenu
+                    open={reportMenuOpen}
+                    onClose={() => setReportMenuOpen(false)}
+                    anchorRef={reportMenuRef}
+                  >
+                    <HeroContextMenuItem
+                      disabled={orgReported}
+                      onClick={() => {
+                        setReportMenuOpen(false);
+                        setReportTarget({ type: ReportTargetType.Organization, id: org.id });
+                      }}
+                    >
+                      {orgReported ? 'Жалоба уже отправлена' : 'Пожаловаться на организацию'}
+                    </HeroContextMenuItem>
+                  </HeroContextMenu>
+                </>
+              )}
               {canManage && (
                 <button
                   type="button"
@@ -582,6 +625,23 @@ export default function OrganizationPage() {
           initials={initials}
           onClose={() => setLightboxFileIds(null)}
           canDelete={false}
+          canReport={authenticated && !isMember}
+          isFileReported={fileId => reportedPhotoIds.has(fileId)}
+          onReport={fileId => setReportTarget({ type: ReportTargetType.Photo, id: fileId })}
+        />
+      )}
+
+      {reportTarget && (
+        <ContentReportModal
+          targetType={reportTarget.type}
+          targetId={reportTarget.id}
+          onClose={() => setReportTarget(null)}
+          onSubmitted={() => {
+            if (reportTarget.type === ReportTargetType.Organization) setOrgReported(true);
+            if (reportTarget.type === ReportTargetType.Photo) {
+              setReportedPhotoIds(prev => new Set(prev).add(reportTarget.id));
+            }
+          }}
         />
       )}
 

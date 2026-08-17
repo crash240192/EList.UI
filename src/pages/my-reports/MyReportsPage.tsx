@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import {
   REPORT_RESOLUTION_ACTION_LABELS,
   REPORT_STATUS_LABELS,
+  REPORT_TARGET_TYPE_LABELS,
   ReportStatus,
   ReportTargetType,
   fetchContentReport,
@@ -16,6 +17,7 @@ import {
 } from '@/entities/contentReport';
 import { apiIsoToLocalParts } from '@/shared/lib/datetime';
 import { usePageTitle } from '@/shared/hooks';
+import { ReportTargetPreview } from '@/features/content-reports';
 import styles from './MyReportsPage.module.css';
 
 const PAGE_SIZE = 20;
@@ -139,10 +141,10 @@ export default function MyReportsPage() {
                   </div>
                   <div className={styles.section}>
                     <span className={styles.sectionTitle}>
-                      {detail.targetType === ReportTargetType.Message ? 'Сообщение' : 'Мероприятие'}
+                      {REPORT_TARGET_TYPE_LABELS[detail.targetType] || detail.targetType}
                     </span>
-                    <p className={styles.sectionText}>{detail.targetSnapshot?.trim() || '—'}</p>
-                    {detail.eventId && (
+                    <ReportTargetPreview report={detail} />
+                    {detail.eventId && detail.targetType !== ReportTargetType.Event && (
                       <Link className={styles.eventLink} to={`/event/${detail.eventId}`}>
                         {detail.eventName || 'Открыть мероприятие'}
                       </Link>
@@ -205,11 +207,9 @@ export default function MyReportsPage() {
                       {statusLabel(report.status)}
                     </span>
                   </div>
-                  {report.targetSnapshot && (
-                    <p className={styles.snapshot}>{report.targetSnapshot}</p>
-                  )}
+                  <ReportTargetPreview report={report} compact />
                   <span className={styles.meta}>
-                    {report.targetType === ReportTargetType.Message ? 'Сообщение' : 'Мероприятие'}
+                    {REPORT_TARGET_TYPE_LABELS[report.targetType] || report.targetType}
                     {report.eventName ? ` · ${report.eventName}` : ''}
                     {' · '}
                     {formatDateTime(report.createdAt)}

@@ -1,18 +1,21 @@
 // features/content-reports/OrganizerReportsModal.tsx
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ORGANIZER_RESOLUTION_ACTIONS,
   REPORT_RESOLUTION_ACTION_LABELS,
   REPORT_SEVERITY_LABELS,
   REPORT_STATUS_LABELS,
+  ReportResolutionAction,
   ReportSeverity,
   ReportStatus,
   ReportTargetType,
   escalateContentReport,
   fetchContentReport,
   fetchContentReportActions,
+  organizerResolutionActionsFor,
+  parseTargetSnapshot,
+  resolutionActionConfirm,
   resolveContentReport,
   searchOrganizerContentReports,
   takeContentReport,
@@ -23,9 +26,11 @@ import {
   type ReportStatusValue,
 } from '@/entities/contentReport';
 import { Select } from '@/shared/ui/Select/Select';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { apiIsoToLocalParts } from '@/shared/lib/datetime';
 import { useToastStore } from '@/app/store';
+import { ReportTargetPreview } from './ReportTargetPreview';
 import styles from './OrganizerReportsModal.module.css';
 
 const STATUS_FILTER_OPTIONS = [
@@ -43,10 +48,11 @@ const SEVERITY_FILTER_OPTIONS = [
   { value: ReportSeverity.Community, label: REPORT_SEVERITY_LABELS.Community },
 ];
 
-const RESOLUTION_OPTIONS = ORGANIZER_RESOLUTION_ACTIONS.map(action => ({
-  value: action,
-  label: REPORT_RESOLUTION_ACTION_LABELS[action],
-}));
+const TYPE_FILTER_OPTIONS = [
+  { value: '', label: 'Все типы' },
+  { value: ReportTargetType.Message, label: 'Сообщение' },
+  { value: ReportTargetType.Photo, label: 'Фото' },
+];
 
 interface OrganizerReportsModalProps {
   eventId: string;
@@ -75,6 +81,13 @@ function canEscalate(report: IContentReport): boolean {
   return report.reason?.severity === ReportSeverity.Safety;
 }
 
+function reportedWho(report: IContentReport): string {
+  const snap = parseTargetSnapshot(report.targetSnapshot);
+  if (snap?.login) return `@${snap.login}`;
+  if (report.reportedAccountId) return report.reportedAccountId;
+  return 'автора';
+}
+
 export function OrganizerReportsModal({
   eventId,
   onClose,
@@ -84,6 +97,7 @@ export function OrganizerReportsModal({
   const [onlyActive, setOnlyActive] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [reports, setReports] = useState<IContentReport[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -94,13 +108,21 @@ export function OrganizerReportsModal({
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [resolutionAction, setResolutionAction] = useState<string>(
-    ORGANIZER_RESOLUTION_ACTIONS[0],
-  );
+  const [resolutionAction, setResolutionAction] = useState('');
   const [resolutionComment, setResolutionComment] = useState('');
   const [escalateComment, setEscalateComment] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [escalateConfirmOpen, setEscalateConfirmOpen] = useState(false);
 
   useModalBackButton(onClose);
+
+  const resolutionOptions = useMemo(() => {
+    if (!detail) return [];
+    return organizerResolutionActionsFor(detail).map(action => ({
+      value: action,
+      label: REPORT_RESOLUTION_ACTION_LABELS[action],
+    }));
+  }, [detail]);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -110,6 +132,7 @@ export function OrganizerReportsModal({
         onlyActive,
         organizerStatus: (statusFilter || null) as ReportStatusValue | null,
         severity: (severityFilter || null) as ReportSeverityValue | null,
+        targetType: (typeFilter || null) as typeof ReportTargetType.Message | typeof ReportTargetType.Photo | null,
         pageIndex: 0,
         pageSize: 50,
       });
@@ -124,7 +147,7 @@ export function OrganizerReportsModal({
     } finally {
       setLoading(false);
     }
-  }, [eventId, onlyActive, statusFilter, severityFilter, onCountChange]);
+  }, [eventId, onlyActive, statusFilter, severityFilter, typeFilter, onCountChange]);
 
   useEffect(() => {
     void loadList();
@@ -148,6 +171,8 @@ export function OrganizerReportsModal({
         if (cancelled) return;
         setDetail(report);
         setActions(acts);
+        const next = organizerResolutionActionsFor(report);
+        setResolutionAction(next[0] ?? '');
       })
       .catch(e => {
         if (cancelled) return;
@@ -167,6 +192,8 @@ export function OrganizerReportsModal({
     ]);
     setDetail(report);
     setActions(acts);
+    const next = organizerResolutionActionsFor(report);
+    setResolutionAction(next[0] ?? '');
   };
 
   const handleTake = async () => {
@@ -184,10 +211,16 @@ export function OrganizerReportsModal({
     }
   };
 
-  const handleResolve = async () => {
+  const applyResolve = async () => {
     if (!detail || busy || !resolutionAction) return;
+    if (resolutionAction === ReportResolutionAction.Other && !resolutionComment.trim()) {
+      setActionError('Для действия «Другое» нужен комментарий');
+      setConfirmOpen(false);
+      return;
+    }
     setBusy(true);
     setActionError(null);
+    setConfirmOpen(false);
     try {
       await resolveContentReport(detail.id, {
         resolutionAction: resolutionAction as ReportResolutionActionValue,
@@ -203,10 +236,20 @@ export function OrganizerReportsModal({
     }
   };
 
+  const handleResolveClick = () => {
+    const confirm = resolutionActionConfirm(resolutionAction as ReportResolutionActionValue);
+    if (confirm) {
+      setConfirmOpen(true);
+      return;
+    }
+    void applyResolve();
+  };
+
   const handleEscalate = async () => {
     if (!detail || busy || !canEscalate(detail)) return;
     setBusy(true);
     setActionError(null);
+    setEscalateConfirmOpen(false);
     try {
       await escalateContentReport(detail.id, {
         comment: escalateComment.trim() || null,
@@ -220,6 +263,8 @@ export function OrganizerReportsModal({
       setBusy(false);
     }
   };
+
+  const confirmMeta = resolutionActionConfirm(resolutionAction as ReportResolutionActionValue);
 
   return createPortal(
     <>
@@ -248,6 +293,12 @@ export function OrganizerReportsModal({
               />
               Только активные
             </label>
+            <Select
+              className={styles.filterSelect}
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={TYPE_FILTER_OPTIONS}
+            />
             <Select
               className={styles.filterSelect}
               value={statusFilter}
@@ -299,19 +350,16 @@ export function OrganizerReportsModal({
                     )}
                   </div>
                   <p className={styles.meta}>
-                    {detail.targetType === ReportTargetType.Message ? 'Сообщение' : 'Мероприятие'}
-                    {' · '}
                     орг: {statusLabel(detail.organizerStatus)}
+                    {detail.platformStatus ? ` · площадка: ${statusLabel(detail.platformStatus)}` : ''}
                     {' · '}
                     {formatDateTime(detail.createdAt)}
                   </p>
                 </div>
 
                 <div className={styles.section}>
-                  <span className={styles.sectionTitle}>Контент</span>
-                  <p className={styles.sectionText}>
-                    {detail.targetSnapshot?.trim() || '—'}
-                  </p>
+                  <span className={styles.sectionTitle}>Объект</span>
+                  <ReportTargetPreview report={detail} />
                 </div>
 
                 {(detail.comment || detail.reporter) && (
@@ -358,13 +406,14 @@ export function OrganizerReportsModal({
                       <Select
                         value={resolutionAction}
                         onChange={setResolutionAction}
-                        options={RESOLUTION_OPTIONS}
+                        options={resolutionOptions}
                         disabled={busy}
                       />
                     </div>
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="org-resolve-comment">
                         Комментарий к решению
+                        {resolutionAction === ReportResolutionAction.Other ? ' *' : ''}
                       </label>
                       <textarea
                         id="org-resolve-comment"
@@ -373,7 +422,11 @@ export function OrganizerReportsModal({
                         onChange={e => setResolutionComment(e.target.value)}
                         disabled={busy}
                         rows={3}
-                        placeholder="Необязательно"
+                        placeholder={
+                          resolutionAction === ReportResolutionAction.Other
+                            ? 'Обязательный комментарий'
+                            : 'Необязательно'
+                        }
                       />
                     </div>
                     <div className={styles.actionRow}>
@@ -381,7 +434,7 @@ export function OrganizerReportsModal({
                         type="button"
                         className={styles.primaryBtn}
                         disabled={busy || !resolutionAction}
-                        onClick={() => void handleResolve()}
+                        onClick={handleResolveClick}
                       >
                         Применить
                       </button>
@@ -408,9 +461,9 @@ export function OrganizerReportsModal({
                             type="button"
                             className={styles.dangerBtn}
                             disabled={busy}
-                            onClick={() => void handleEscalate()}
+                            onClick={() => setEscalateConfirmOpen(true)}
                           >
-                            Эскалировать
+                            Передать на площадку
                           </button>
                         </div>
                       </>
@@ -453,13 +506,10 @@ export function OrganizerReportsModal({
                       {statusLabel(report.organizerStatus ?? report.status)}
                     </span>
                   </div>
-                  {report.targetSnapshot && (
-                    <p className={styles.snapshot}>{report.targetSnapshot}</p>
-                  )}
+                  <ReportTargetPreview report={report} compact />
                   <span className={styles.meta}>
-                    {report.targetType === ReportTargetType.Message ? 'Сообщение' : 'Мероприятие'}
-                    {report.reporter ? ` · @${report.reporter.login}` : ''}
-                    {' · '}
+                    {report.reporter ? `@${report.reporter.login}` : ''}
+                    {report.reporter ? ' · ' : ''}
                     {formatDateTime(report.createdAt)}
                   </span>
                 </button>
@@ -468,6 +518,31 @@ export function OrganizerReportsModal({
           )}
         </div>
       </div>
+
+      {confirmOpen && confirmMeta && (
+        <ConfirmDialog
+          title={confirmMeta.title}
+          message={
+            resolutionAction === ReportResolutionAction.BanFromEvent && detail
+              ? `${confirmMeta.message} Будет забанен ${reportedWho(detail)}.`
+              : confirmMeta.message
+          }
+          confirmLabel={busy ? '…' : confirmMeta.confirmLabel}
+          cancelLabel="Назад"
+          onConfirm={() => void applyResolve()}
+          onCancel={() => setConfirmOpen(false)}
+        />
+      )}
+      {escalateConfirmOpen && (
+        <ConfirmDialog
+          title="Передать на площадку?"
+          message="Жалоба останется у организаторов и дополнительно уйдёт модераторам площадки."
+          confirmLabel={busy ? '…' : 'Передать'}
+          cancelLabel="Назад"
+          onConfirm={() => void handleEscalate()}
+          onCancel={() => setEscalateConfirmOpen(false)}
+        />
+      )}
     </>,
     document.body,
   );

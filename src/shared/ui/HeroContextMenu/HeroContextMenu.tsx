@@ -65,17 +65,23 @@ export function HeroContextMenuItem({
   children,
   onClick,
   danger,
+  disabled,
 }: {
   children: ReactNode;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      className={`${styles.item} ${danger ? styles.itemDanger : ''}`}
+      className={`${styles.item} ${danger ? styles.itemDanger : ''} ${disabled ? styles.itemDisabled : ''}`}
       role="menuitem"
-      onClick={onClick}
+      disabled={disabled}
+      onClick={() => {
+        if (disabled) return;
+        onClick();
+      }}
     >
       {children}
     </button>

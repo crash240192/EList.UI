@@ -7,12 +7,23 @@ export {
   ReportResolutionAction,
   ReportActorContext,
   REPORT_STATUS_LABELS,
+  REPORT_TARGET_TYPE_LABELS,
   REPORT_SEVERITY_LABELS,
   REPORT_TARGET_SCOPE_LABELS,
   REPORT_QUEUE_LABELS,
+  REPORT_PHOTO_KIND_LABELS,
+  REPORT_CREATE_TITLES,
   ORGANIZER_RESOLUTION_ACTIONS,
   PLATFORM_RESOLUTION_ACTIONS,
+  DESTRUCTIVE_RESOLUTION_ACTIONS,
   REPORT_RESOLUTION_ACTION_LABELS,
+  parseTargetSnapshot,
+  snapshotPhotoKind,
+  snapshotFileId,
+  snapshotPreviewText,
+  organizerResolutionActionsFor,
+  platformResolutionActionsFor,
+  resolutionActionConfirm,
 } from './types';
 
 export type {
@@ -33,6 +44,7 @@ export type {
   IContentReportAction,
   IContentReportAccount,
   IContentReport,
+  ParsedTargetSnapshot,
 } from './types';
 
 export {

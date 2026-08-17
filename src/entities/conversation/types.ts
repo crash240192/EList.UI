@@ -31,6 +31,7 @@ export interface IMessage {
   replyTo?: string | null;
   createDate: string;
   updateDate: string;
+  hidden?: boolean;
   account?: IConversationAccount | null;
   personInfo?: IConversationPersonInfo | null;
 }

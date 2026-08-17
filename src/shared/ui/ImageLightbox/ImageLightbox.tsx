@@ -23,6 +23,9 @@ export interface ImageLightboxProps {
   /** После удаления: новый индекс и число оставшихся фото (для синхронизации с родителем) */
   onAfterDelete?: (info: { currentIndex: number; remainingCount: number }) => void;
   fallback?: ReactNode;
+  canReport?: boolean;
+  isFileReported?: (fileId: string) => boolean;
+  onReport?: (fileId: string) => void;
 }
 
 type SlideDir = 1 | -1;
@@ -61,6 +64,9 @@ export function ImageLightbox({
   onDeleted,
   onAfterDelete,
   fallback,
+  canReport = false,
+  isFileReported,
+  onReport,
 }: ImageLightboxProps) {
   const [ids, setIds] = useState(fileIds);
   const [idx, setIdx] = useState(startIndex);
@@ -167,6 +173,8 @@ export function ImageLightbox({
 
   const currentFileId = ids[idx];
   const showDelete = canDelete && !!onDelete;
+  const showMenu = showDelete || (canReport && !!onReport);
+  const reportDisabled = !!currentFileId && !!isFileReported?.(currentFileId);
   const confirmZIndex = zIndexBase + 50;
   const slideClass = slideDir === 1
     ? styles.slideFromRight
@@ -201,7 +209,7 @@ export function ImageLightbox({
             >
               {fullscreen ? <CollapseIcon /> : <ExpandIcon />}
             </button>
-            {showDelete && (
+            {showMenu && (
               <>
                 <button
                   ref={menuBtnRef}
@@ -223,15 +231,29 @@ export function ImageLightbox({
                   zIndexBase={zIndexBase + 10}
                   aria-label="Действия с фото"
                 >
-                  <HeroContextMenuItem
-                    danger
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setDeleteConfirm(true);
-                    }}
-                  >
-                    Удалить
-                  </HeroContextMenuItem>
+                  {canReport && onReport && (
+                    <HeroContextMenuItem
+                      disabled={reportDisabled}
+                      onClick={() => {
+                        if (reportDisabled || !currentFileId) return;
+                        setMenuOpen(false);
+                        onReport(currentFileId);
+                      }}
+                    >
+                      {reportDisabled ? 'Жалоба уже отправлена' : 'Пожаловаться'}
+                    </HeroContextMenuItem>
+                  )}
+                  {showDelete && (
+                    <HeroContextMenuItem
+                      danger
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setDeleteConfirm(true);
+                      }}
+                    >
+                      Удалить
+                    </HeroContextMenuItem>
+                  )}
                 </HeroContextMenu>
               </>
             )}

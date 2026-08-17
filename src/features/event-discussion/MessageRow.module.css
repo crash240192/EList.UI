@@ -134,6 +134,14 @@
   word-break: break-word;
 }
 
+.hiddenStub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .textClamped {
   display: -webkit-box;
   -webkit-line-clamp: 10;
@@ -227,6 +235,18 @@
   border-color: color-mix(in srgb, var(--border) 55%, var(--accent) 45%);
   color: var(--text-primary);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.actionBtn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.actionBtn:disabled:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-secondary);
+  box-shadow: none;
 }
 
 .actionBtnMuted {

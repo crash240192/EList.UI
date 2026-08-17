@@ -15,6 +15,9 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { ImageLightbox } from '@/shared/ui/ImageLightbox';
 import { AlbumPhotoUploadZone } from './AlbumPhotoUploadZone';
+import { ContentReportModal } from '@/features/content-reports';
+import { ReportTargetType } from '@/entities/contentReport';
+import { useAuthStore } from '@/app/store';
 import styles from './AlbumGridModal.module.css';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
@@ -150,6 +153,9 @@ export function AlbumGridModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [reportFileId, setReportFileId] = useState<string | null>(null);
+  const [reportedFileIds, setReportedFileIds] = useState<Set<string>>(() => new Set());
+  const authenticated = useAuthStore(s => s.isAuthenticated());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadingRef = useRef<UploadingItem[]>([]);
   const dirtyRef = useRef(false);
@@ -443,6 +449,21 @@ export function AlbumGridModal({
           }}
           onAfterDelete={({ currentIndex, remainingCount }) => {
             setLightboxIdx(remainingCount === 0 ? null : currentIndex);
+          }}
+          canReport={authenticated}
+          isFileReported={fileId => reportedFileIds.has(fileId)}
+          onReport={fileId => setReportFileId(fileId)}
+        />
+      )}
+
+      {reportFileId && album && (
+        <ContentReportModal
+          targetType={ReportTargetType.Photo}
+          targetId={reportFileId}
+          albumId={album.id}
+          onClose={() => setReportFileId(null)}
+          onSubmitted={() => {
+            setReportedFileIds(prev => new Set(prev).add(reportFileId));
           }}
         />
       )}

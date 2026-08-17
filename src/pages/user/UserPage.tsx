@@ -1,6 +1,6 @@
 // pages/user/UserPage.tsx — профиль пользователя (макет examples/elist_user_page.html)
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { fetchOrganizerRating } from '@/entities/event';
@@ -30,8 +30,11 @@ import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel'
 import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { TabBar } from '@/shared/ui/TabBar';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
+import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { useAuthStore } from '@/app/store';
 import { UserShareMenu } from '@/features/user/UserShareMenu';
+import { ContentReportModal } from '@/features/content-reports';
+import { ReportTargetType } from '@/entities/contentReport';
 import {
   fetchMyOrganizations,
   fetchOrganizationsByAccount,
@@ -287,6 +290,14 @@ export default function UserPage() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [reportMenuOpen, setReportMenuOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    type: typeof ReportTargetType.Account | typeof ReportTargetType.Photo;
+    id: string;
+  } | null>(null);
+  const [accountReported, setAccountReported] = useState(false);
+  const [reportedPhotoIds, setReportedPhotoIds] = useState<Set<string>>(() => new Set());
+  const reportMenuRef = useRef<HTMLButtonElement>(null);
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
 
@@ -476,6 +487,37 @@ export default function UserPage() {
               >
                 <ShareIcon />
               </button>
+              {!isOwnProfile && authenticated && (
+                <>
+                  <button
+                    ref={reportMenuRef}
+                    type="button"
+                    className={`${heroStyles.heroBtn} noHoverGlow`}
+                    onClick={() => setReportMenuOpen(v => !v)}
+                    aria-label="Ещё"
+                    aria-expanded={reportMenuOpen}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                    </svg>
+                  </button>
+                  <HeroContextMenu
+                    open={reportMenuOpen}
+                    onClose={() => setReportMenuOpen(false)}
+                    anchorRef={reportMenuRef}
+                  >
+                    <HeroContextMenuItem
+                      disabled={accountReported}
+                      onClick={() => {
+                        setReportMenuOpen(false);
+                        setReportTarget({ type: ReportTargetType.Account, id: profileAccountId });
+                      }}
+                    >
+                      {accountReported ? 'Жалоба уже отправлена' : 'Пожаловаться на профиль'}
+                    </HeroContextMenuItem>
+                  </HeroContextMenu>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -761,6 +803,23 @@ export default function UserPage() {
           onClose={() => setLightboxFileIds(null)}
           canDelete={isOwnProfile}
           onDeleted={handleAvatarDeleted}
+          canReport={!isOwnProfile && authenticated}
+          isFileReported={fileId => reportedPhotoIds.has(fileId)}
+          onReport={fileId => setReportTarget({ type: ReportTargetType.Photo, id: fileId })}
+        />
+      )}
+
+      {reportTarget && (
+        <ContentReportModal
+          targetType={reportTarget.type}
+          targetId={reportTarget.id}
+          onClose={() => setReportTarget(null)}
+          onSubmitted={() => {
+            if (reportTarget.type === ReportTargetType.Account) setAccountReported(true);
+            if (reportTarget.type === ReportTargetType.Photo) {
+              setReportedPhotoIds(prev => new Set(prev).add(reportTarget.id));
+            }
+          }}
         />
       )}
 

@@ -83,6 +83,15 @@ export async function fetchEventConversations(eventId: string): Promise<IConvers
   );
 }
 
+function normalizeMessage(raw: unknown): IMessage {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const msg = (raw ?? {}) as IMessage;
+  return {
+    ...msg,
+    hidden: Boolean(r.hidden ?? r.Hidden ?? msg.hidden),
+  };
+}
+
 export async function fetchConversationMessages(
   conversationId: string,
   pageIndex = 0,
@@ -92,7 +101,8 @@ export async function fetchConversationMessages(
   const data = await apiClient.get<PagedList<IMessage>>(
     `/api/conversations/messages/byConversationId/${conversationId}?${qs}`,
   );
-  return normalizePagedList(data.result, pageIndex, pageSize);
+  const page = normalizePagedList(data.result, pageIndex, pageSize);
+  return { ...page, result: page.result.map(normalizeMessage) };
 }
 
 export async function fetchMessageReplies(
@@ -104,7 +114,8 @@ export async function fetchMessageReplies(
   const data = await apiClient.get<PagedList<IMessage>>(
     `/api/conversations/messages/replies/${messageId}?${qs}`,
   );
-  return normalizePagedList(data.result, pageIndex, pageSize);
+  const page = normalizePagedList(data.result, pageIndex, pageSize);
+  return { ...page, result: page.result.map(normalizeMessage) };
 }
 
 export async function createMessage(request: IMessageRequest): Promise<string> {

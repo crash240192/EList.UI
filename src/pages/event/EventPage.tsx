@@ -54,6 +54,104 @@ import styles from './EventPage.module.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
+function EventOrganizerChip({
+  organizer,
+  kind,
+  logoId,
+  currentAccountId,
+  authenticated,
+  alreadyReported,
+  onOpen,
+  onReport,
+}: {
+  organizer: IEventOrganizator;
+  kind: 'org' | 'person';
+  logoId?: string | null;
+  currentAccountId: string | null;
+  authenticated: boolean;
+  alreadyReported: boolean;
+  onOpen: () => void;
+  onReport: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const isSelf = kind === 'person' && !!currentAccountId && organizer.accountId === currentAccountId;
+  const canReport = authenticated && !isSelf && !!organizer.id;
+  const name = kind === 'org'
+    ? (organizer.organizationName?.trim() || 'Организация')
+    : (organizer.firstName
+      ? `${organizer.firstName} ${organizer.lastName ?? ''}`.trim()
+      : (organizer.login ?? 'Организатор'));
+  const initials = name.slice(0, 2).toUpperCase();
+
+  return (
+    <div className={styles.orgChip}>
+      <button type="button" className={styles.orgChipMain} onClick={onOpen}>
+        {kind === 'org' ? (
+          <div className={styles.orgChipLogo}>
+            {logoId ? (
+              <AuthImage
+                fileId={logoId}
+                alt={name}
+                className={styles.orgChipLogoImg}
+                fallback={<span>{initials}</span>}
+              />
+            ) : (
+              <span>{initials}</span>
+            )}
+          </div>
+        ) : (
+          <UserAvatar
+            accountId={organizer.accountId!}
+            avatarId={organizer.avatarId ?? null}
+            initials={(organizer.firstName?.[0] ?? organizer.login?.[0] ?? '?').toUpperCase()}
+            size={36}
+            className={styles.orgChipAvatar}
+          />
+        )}
+        <div>
+          <div className={styles.orgChipName}>{name}</div>
+          <div className={styles.orgChipRole}>{kind === 'org' ? 'Организация' : 'Организатор'}</div>
+        </div>
+      </button>
+      {canReport && (
+        <>
+          <button
+            ref={menuRef}
+            type="button"
+            className={styles.orgChipMenuBtn}
+            aria-label="Действия с организатором"
+            aria-expanded={menuOpen}
+            onClick={e => {
+              e.stopPropagation();
+              setMenuOpen(v => !v);
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
+            </svg>
+          </button>
+          <HeroContextMenu
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            anchorRef={menuRef}
+          >
+            <HeroContextMenuItem
+              disabled={alreadyReported}
+              onClick={() => {
+                setMenuOpen(false);
+                onReport();
+              }}
+            >
+              {alreadyReported ? 'Жалоба уже отправлена' : 'Пожаловаться'}
+            </HeroContextMenuItem>
+          </HeroContextMenu>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function EventPage() {
   const { id }   = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -73,6 +171,13 @@ export default function EventPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    type: typeof ReportTargetType.Event | typeof ReportTargetType.Photo | typeof ReportTargetType.EventOrganizator;
+    id: string;
+  } | null>(null);
+  const [eventReported, setEventReported] = useState(false);
+  const [coverReported, setCoverReported] = useState(false);
+  const [reportedOrganizatorIds, setReportedOrganizatorIds] = useState<Set<string>>(() => new Set());
   const [organizerReportsOpen, setOrganizerReportsOpen] = useState(false);
   const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
   const [bwListOpen,      setBwListOpen]      = useState(false);
@@ -553,13 +658,27 @@ export default function EventPage() {
                       anchorRef={reportMenuRef}
                     >
                       <HeroContextMenuItem
+                        disabled={eventReported}
                         onClick={() => {
                           setReportMenuOpen(false);
+                          setReportTarget({ type: ReportTargetType.Event, id: event.id });
                           setReportModalOpen(true);
                         }}
                       >
-                        Пожаловаться
+                        {eventReported ? 'Жалоба уже отправлена' : 'Пожаловаться на мероприятие'}
                       </HeroContextMenuItem>
+                      {event.coverImageId && (
+                        <HeroContextMenuItem
+                          disabled={coverReported}
+                          onClick={() => {
+                            setReportMenuOpen(false);
+                            setReportTarget({ type: ReportTargetType.Photo, id: event.coverImageId! });
+                            setReportModalOpen(true);
+                          }}
+                        >
+                          {coverReported ? 'Жалоба уже отправлена' : 'Пожаловаться на обложку'}
+                        </HeroContextMenuItem>
+                      )}
                     </HeroContextMenu>
                   )}
                 </>
@@ -846,54 +965,37 @@ export default function EventPage() {
                     <div className={styles.secLabel}>Организаторы</div>
                     {orgOrganizers.map(o => {
                       const orgId = o.organizationId!;
-                      const name = o.organizationName?.trim() || 'Организация';
-                      const logoId = orgLogoById[orgId] ?? null;
-                      const initials = name.slice(0, 2).toUpperCase();
                       return (
-                        <div
+                        <EventOrganizerChip
                           key={`org-${orgId}`}
-                          className={styles.orgChip}
-                          onClick={() => navigate(`/organization/${orgId}`)}
-                        >
-                          <div className={styles.orgChipLogo}>
-                            {logoId ? (
-                              <AuthImage
-                                fileId={logoId}
-                                alt={name}
-                                className={styles.orgChipLogoImg}
-                                fallback={<span>{initials}</span>}
-                              />
-                            ) : (
-                              <span>{initials}</span>
-                            )}
-                          </div>
-                          <div>
-                            <div className={styles.orgChipName}>{name}</div>
-                            <div className={styles.orgChipRole}>Организация</div>
-                          </div>
-                        </div>
+                          organizer={o}
+                          kind="org"
+                          logoId={orgLogoById[orgId] ?? null}
+                          currentAccountId={accountId}
+                          authenticated={authenticated}
+                          alreadyReported={reportedOrganizatorIds.has(o.id)}
+                          onOpen={() => navigate(`/organization/${orgId}`)}
+                          onReport={() => {
+                            setReportTarget({ type: ReportTargetType.EventOrganizator, id: o.id });
+                            setReportModalOpen(true);
+                          }}
+                        />
                       );
                     })}
                     {personOrganizers.map(o => (
-                      <div
+                      <EventOrganizerChip
                         key={`acc-${o.accountId}`}
-                        className={styles.orgChip}
-                        onClick={() => navigate(`/user/${o.accountId}`)}
-                      >
-                        <UserAvatar
-                          accountId={o.accountId!}
-                          avatarId={o.avatarId ?? null}
-                          initials={(o.firstName?.[0] ?? o.login?.[0] ?? '?').toUpperCase()}
-                          size={36}
-                          className={styles.orgChipAvatar}
-                        />
-                        <div>
-                          <div className={styles.orgChipName}>
-                            {o.firstName ? `${o.firstName} ${o.lastName ?? ''}`.trim() : (o.login ?? 'Организатор')}
-                          </div>
-                          <div className={styles.orgChipRole}>Организатор</div>
-                        </div>
-                      </div>
+                        organizer={o}
+                        kind="person"
+                        currentAccountId={accountId}
+                        authenticated={authenticated}
+                        alreadyReported={reportedOrganizatorIds.has(o.id)}
+                        onOpen={() => navigate(`/user/${o.accountId}`)}
+                        onReport={() => {
+                          setReportTarget({ type: ReportTargetType.EventOrganizator, id: o.id });
+                          setReportModalOpen(true);
+                        }}
+                      />
                     ))}
                   </div>
                 )}
@@ -918,11 +1020,21 @@ export default function EventPage() {
         <CancelConfirmDialog eventName={event.name} loading={actionLoading}
           onConfirm={handleCancelEvent} onClose={() => setCancelConfirm(false)} />
       )}
-      {reportModalOpen && event?.id && (
+      {reportModalOpen && reportTarget && (
         <ContentReportModal
-          targetType={ReportTargetType.Event}
-          targetId={event.id}
-          onClose={() => setReportModalOpen(false)}
+          targetType={reportTarget.type}
+          targetId={reportTarget.id}
+          onClose={() => {
+            setReportModalOpen(false);
+            setReportTarget(null);
+          }}
+          onSubmitted={() => {
+            if (reportTarget.type === ReportTargetType.Event) setEventReported(true);
+            if (reportTarget.type === ReportTargetType.Photo) setCoverReported(true);
+            if (reportTarget.type === ReportTargetType.EventOrganizator) {
+              setReportedOrganizatorIds(prev => new Set(prev).add(reportTarget.id));
+            }
+          }}
         />
       )}
       {organizerReportsOpen && event?.id && (

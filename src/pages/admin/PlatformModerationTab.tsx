@@ -1,12 +1,12 @@
 // pages/admin/PlatformModerationTab.tsx
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  PLATFORM_RESOLUTION_ACTIONS,
   REPORT_RESOLUTION_ACTION_LABELS,
   REPORT_SEVERITY_LABELS,
   REPORT_STATUS_LABELS,
+  REPORT_TARGET_TYPE_LABELS,
   ReportResolutionAction,
   ReportSeverity,
   ReportStatus,
@@ -14,6 +14,8 @@ import {
   fetchContentReport,
   fetchContentReportActions,
   fetchPlatformContentReportsCount,
+  platformResolutionActionsFor,
+  resolutionActionConfirm,
   resolveContentReport,
   searchPlatformContentReports,
   takeContentReport,
@@ -28,6 +30,7 @@ import { Select } from '@/shared/ui/Select/Select';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { apiIsoToLocalParts } from '@/shared/lib/datetime';
 import { useToastStore } from '@/app/store';
+import { ReportTargetPreview } from '@/features/content-reports';
 import styles from './AdminPage.module.css';
 import tabStyles from './PlatformModerationTab.module.css';
 
@@ -46,16 +49,16 @@ const SEVERITY_FILTER_OPTIONS = [
   { value: ReportSeverity.Community, label: REPORT_SEVERITY_LABELS.Community },
 ];
 
-const TARGET_FILTER_OPTIONS = [
-  { value: '', label: 'Все типы' },
-  { value: ReportTargetType.Event, label: 'Мероприятие' },
-  { value: ReportTargetType.Message, label: 'Сообщение' },
+const TYPE_TABS: { value: string; label: string }[] = [
+  { value: '', label: 'Все' },
+  { value: '__safety', label: 'Safety' },
+  { value: ReportTargetType.Event, label: 'События' },
+  { value: ReportTargetType.Message, label: 'Сообщения' },
+  { value: ReportTargetType.Photo, label: 'Фото' },
+  { value: ReportTargetType.Account, label: 'Профили' },
+  { value: ReportTargetType.Organization, label: 'Организации' },
+  { value: ReportTargetType.EventOrganizator, label: 'Организаторы' },
 ];
-
-const RESOLUTION_OPTIONS = PLATFORM_RESOLUTION_ACTIONS.map(action => ({
-  value: action,
-  label: REPORT_RESOLUTION_ACTION_LABELS[action],
-}));
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -90,7 +93,7 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
   const [onlyActive, setOnlyActive] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
-  const [targetFilter, setTargetFilter] = useState('');
+  const [typeTab, setTypeTab] = useState('');
   const [reports, setReports] = useState<IContentReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,11 +103,23 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [resolutionAction, setResolutionAction] = useState<string>(
-    PLATFORM_RESOLUTION_ACTIONS[0],
-  );
+  const [resolutionAction, setResolutionAction] = useState('');
   const [resolutionComment, setResolutionComment] = useState('');
-  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const safetyTab = typeTab === '__safety';
+  const targetTypeFilter = safetyTab ? null : ((typeTab || null) as ReportTargetTypeValue | null);
+  const severityForSearch = safetyTab
+    ? ReportSeverity.Safety
+    : ((severityFilter || null) as ReportSeverityValue | null);
+
+  const resolutionOptions = useMemo(() => {
+    if (!detail) return [];
+    return platformResolutionActionsFor(detail).map(action => ({
+      value: action,
+      label: REPORT_RESOLUTION_ACTION_LABELS[action],
+    }));
+  }, [detail]);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -115,8 +130,8 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
           onlyActive,
           inPlatformQueue: true,
           platformStatus: (statusFilter || null) as ReportStatusValue | null,
-          severity: (severityFilter || null) as ReportSeverityValue | null,
-          targetType: (targetFilter || null) as ReportTargetTypeValue | null,
+          severity: severityForSearch,
+          targetType: targetTypeFilter,
           pageIndex: 0,
           pageSize: 50,
         }),
@@ -129,7 +144,7 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
     } finally {
       setLoading(false);
     }
-  }, [onlyActive, statusFilter, severityFilter, targetFilter, onActiveCountChange]);
+  }, [onlyActive, statusFilter, severityForSearch, targetTypeFilter, onActiveCountChange]);
 
   useEffect(() => {
     void loadList();
@@ -153,6 +168,8 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
         if (cancelled) return;
         setDetail(report);
         setActions(acts);
+        const next = platformResolutionActionsFor(report);
+        setResolutionAction(next[0] ?? '');
       })
       .catch(e => {
         if (cancelled) return;
@@ -172,6 +189,8 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
     ]);
     setDetail(report);
     setActions(acts);
+    const next = platformResolutionActionsFor(report);
+    setResolutionAction(next[0] ?? '');
   };
 
   const handleTake = async () => {
@@ -191,9 +210,14 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
 
   const applyResolve = async () => {
     if (!detail || busy || !resolutionAction) return;
+    if (resolutionAction === ReportResolutionAction.Other && !resolutionComment.trim()) {
+      setActionError('Для действия «Другое» нужен комментарий');
+      setConfirmOpen(false);
+      return;
+    }
     setBusy(true);
     setActionError(null);
-    setCancelConfirmOpen(false);
+    setConfirmOpen(false);
     try {
       await resolveContentReport(detail.id, {
         resolutionAction: resolutionAction as ReportResolutionActionValue,
@@ -215,20 +239,33 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
   };
 
   const handleResolveClick = () => {
-    if (resolutionAction === ReportResolutionAction.CancelEvent) {
-      setCancelConfirmOpen(true);
+    const confirm = resolutionActionConfirm(resolutionAction as ReportResolutionActionValue);
+    if (confirm) {
+      setConfirmOpen(true);
       return;
     }
     void applyResolve();
   };
-
-  const eventLabel = detail?.eventName || detail?.eventId;
 
   return (
     <div className={styles.splitPane}>
       <div className={`${styles.listPane} ${selectedId ? styles.mobileHidden : ''}`}>
         <div className={styles.paneHeader}>
           <h2 className={styles.paneTitle}>Очередь площадки</h2>
+        </div>
+        <div className={tabStyles.typeTabs} role="tablist" aria-label="Тип жалобы">
+          {TYPE_TABS.map(tab => (
+            <button
+              key={tab.value || 'all'}
+              type="button"
+              role="tab"
+              aria-selected={typeTab === tab.value}
+              className={`${tabStyles.typeTab} ${typeTab === tab.value ? tabStyles.typeTabActive : ''}`}
+              onClick={() => setTypeTab(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
         <div className={tabStyles.filters}>
           <label className={tabStyles.activeToggle}>
@@ -245,18 +282,14 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
             onChange={setStatusFilter}
             options={STATUS_FILTER_OPTIONS}
           />
-          <Select
-            className={tabStyles.filterSelect}
-            value={severityFilter}
-            onChange={setSeverityFilter}
-            options={SEVERITY_FILTER_OPTIONS}
-          />
-          <Select
-            className={tabStyles.filterSelect}
-            value={targetFilter}
-            onChange={setTargetFilter}
-            options={TARGET_FILTER_OPTIONS}
-          />
+          {!safetyTab && (
+            <Select
+              className={tabStyles.filterSelect}
+              value={severityFilter}
+              onChange={setSeverityFilter}
+              options={SEVERITY_FILTER_OPTIONS}
+            />
+          )}
         </div>
 
         <div className={styles.itemList}>
@@ -294,10 +327,10 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
                       )}
                     </span>
                     <span className={`${styles.itemSub} ${tabStyles.snapshot}`}>
-                      {report.targetType === ReportTargetType.Message ? 'Сообщение' : 'Мероприятие'}
+                      {REPORT_TARGET_TYPE_LABELS[report.targetType] || report.targetType}
                       {report.eventName ? ` · ${report.eventName}` : ''}
-                      {report.targetSnapshot ? ` · ${report.targetSnapshot}` : ''}
                     </span>
+                    <ReportTargetPreview report={report} compact />
                   </div>
                   <span className={`${tabStyles.statusChip} ${statusChipClass(st)}`}>
                     {statusLabel(st)}
@@ -327,15 +360,15 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
 
             <div className={tabStyles.badgeRow}>
               <span className={`${tabStyles.statusChip} ${statusChipClass(detail.platformStatus ?? detail.status)}`}>
-                {statusLabel(detail.platformStatus ?? detail.status)}
+                площадка: {statusLabel(detail.platformStatus ?? detail.status)}
               </span>
-              {detail.reason?.severity === ReportSeverity.Safety && (
-                <span className={`${tabStyles.statusChip} ${tabStyles.safetyChip}`}>серьёзное</span>
-              )}
               {detail.organizerStatus && (
-                <span className={tabStyles.statusChip}>
+                <span className={`${tabStyles.statusChip} ${statusChipClass(detail.organizerStatus)}`}>
                   орг: {statusLabel(detail.organizerStatus)}
                 </span>
+              )}
+              {detail.reason?.severity === ReportSeverity.Safety && (
+                <span className={`${tabStyles.statusChip} ${tabStyles.safetyChip}`}>серьёзное</span>
               )}
             </div>
 
@@ -343,7 +376,7 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
               <div>
                 <div className={styles.label}>Тип</div>
                 <div className={tabStyles.metaValue}>
-                  {detail.targetType === ReportTargetType.Message ? 'Сообщение' : 'Мероприятие'}
+                  {REPORT_TARGET_TYPE_LABELS[detail.targetType] || detail.targetType}
                 </div>
               </div>
               <div>
@@ -370,14 +403,14 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
               <div className={styles.field}>
                 <span className={styles.label}>Мероприятие</span>
                 <Link className={tabStyles.eventLink} to={`/event/${detail.eventId}`}>
-                  {eventLabel || detail.eventId}
+                  {detail.eventName || detail.eventId}
                 </Link>
               </div>
             )}
 
             <div className={styles.field}>
-              <span className={styles.label}>Контент</span>
-              <p className={tabStyles.description}>{detail.targetSnapshot?.trim() || '—'}</p>
+              <span className={styles.label}>Объект</span>
+              <ReportTargetPreview report={detail} />
             </div>
 
             {detail.comment && (
@@ -419,13 +452,14 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
                   <Select
                     value={resolutionAction}
                     onChange={setResolutionAction}
-                    options={RESOLUTION_OPTIONS}
+                    options={resolutionOptions}
                     disabled={busy}
                   />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="platform-resolve-comment">
                     Комментарий к решению
+                    {resolutionAction === ReportResolutionAction.Other ? ' *' : ''}
                   </label>
                   <textarea
                     id="platform-resolve-comment"
@@ -434,7 +468,11 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
                     onChange={e => setResolutionComment(e.target.value)}
                     disabled={busy}
                     rows={3}
-                    placeholder="Необязательно"
+                    placeholder={
+                      resolutionAction === ReportResolutionAction.Other
+                        ? 'Обязательный комментарий'
+                        : 'Необязательно'
+                    }
                   />
                 </div>
                 <div className={styles.formActions}>
@@ -455,16 +493,39 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
         )}
       </div>
 
-      {cancelConfirmOpen && (
-        <ConfirmDialog
-          title="Отменить мероприятие?"
-          message="Мероприятие будет отменено. Это действие доступно только модераторам площадки."
-          confirmLabel={busy ? 'Отмена…' : 'Отменить мероприятие'}
-          cancelLabel="Назад"
+      {confirmOpen && (
+        <PlatformResolveConfirm
+          action={resolutionAction as ReportResolutionActionValue}
+          busy={busy}
           onConfirm={() => void applyResolve()}
-          onCancel={() => setCancelConfirmOpen(false)}
+          onCancel={() => setConfirmOpen(false)}
         />
       )}
     </div>
+  );
+}
+
+function PlatformResolveConfirm({
+  action,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  action: ReportResolutionActionValue;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const meta = resolutionActionConfirm(action);
+  if (!meta) return null;
+  return (
+    <ConfirmDialog
+      title={meta.title}
+      message={meta.message}
+      confirmLabel={busy ? '…' : meta.confirmLabel}
+      cancelLabel="Назад"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
   );
 }

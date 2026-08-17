@@ -11,6 +11,9 @@ interface AvatarLightboxProps {
   onClose: () => void;
   canDelete?: boolean;
   onDeleted?: (fileId: string) => void | Promise<void>;
+  canReport?: boolean;
+  isFileReported?: (fileId: string) => boolean;
+  onReport?: (fileId: string) => void;
 }
 
 export function AvatarLightbox({
@@ -20,6 +23,9 @@ export function AvatarLightbox({
   onClose,
   canDelete = false,
   onDeleted,
+  canReport = false,
+  isFileReported,
+  onReport,
 }: AvatarLightboxProps) {
   return (
     <ImageLightbox
@@ -31,6 +37,9 @@ export function AvatarLightbox({
       onDelete={canDelete ? deleteAvatar : undefined}
       deleteMessage="Аватар будет удалён из истории профиля."
       onDeleted={onDeleted}
+      canReport={canReport}
+      isFileReported={isFileReported}
+      onReport={onReport}
       fallback={
         <div className={imageStyles.fallback}>
           <span className={imageStyles.fallbackText}>{initials}</span>

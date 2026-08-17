@@ -5,38 +5,32 @@ import { createPortal } from 'react-dom';
 import {
   createContentReport,
   fetchReportReasons,
+  REPORT_CREATE_TITLES,
   ReportSeverity,
-  ReportTargetType,
   type IReportReason,
   type ReportTargetTypeValue,
 } from '@/entities/contentReport';
-import { ApiError } from '@/shared/api/client';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { useToastStore } from '@/app/store';
+import { contentReportSubmitMessage, isAlreadyReportedError } from './reportSubmitError';
 import styles from './ContentReportModal.module.css';
 
-const COMMENT_MAX = 1000;
+const COMMENT_MAX = 2000;
 
 interface ContentReportModalProps {
   targetType: ReportTargetTypeValue;
   targetId: string;
+  albumId?: string | null;
   onClose: () => void;
-}
-
-function isAlreadyExistsError(e: unknown): boolean {
-  if (!(e instanceof ApiError)) return false;
-  const blob = `${e.message} ${e.serverMessage ?? ''}`.toLowerCase();
-  return (
-    blob.includes('contentreportalreadyexists')
-    || blob.includes('already exists')
-    || blob.includes('уже есть активн')
-  );
+  onSubmitted?: () => void;
 }
 
 export function ContentReportModal({
   targetType,
   targetId,
+  albumId,
   onClose,
+  onSubmitted,
 }: ContentReportModalProps) {
   const toast = useToastStore(s => s.add);
   const [reasons, setReasons] = useState<IReportReason[]>([]);
@@ -48,10 +42,7 @@ export function ContentReportModal({
 
   useModalBackButton(onClose);
 
-  const title =
-    targetType === ReportTargetType.Event
-      ? 'Пожаловаться на мероприятие'
-      : 'Пожаловаться на сообщение';
+  const title = REPORT_CREATE_TITLES[targetType] || 'Пожаловаться';
 
   const loadReasons = useCallback(async () => {
     setLoading(true);
@@ -87,19 +78,18 @@ export function ContentReportModal({
       await createContentReport({
         targetType,
         targetId,
+        albumId: albumId || undefined,
         reasonId,
         comment: comment.trim() || null,
       });
       toast('Жалоба отправлена', 'success');
+      onSubmitted?.();
       onClose();
     } catch (e) {
-      if (isAlreadyExistsError(e)) {
-        const msg = 'У вас уже есть активная жалоба';
-        setError(msg);
-        toast(msg, 'info');
-      } else {
-        setError(e instanceof Error ? e.message : 'Не удалось отправить жалобу');
-      }
+      const msg = contentReportSubmitMessage(e);
+      setError(msg);
+      toast(msg, isAlreadyReportedError(e) ? 'info' : 'error');
+      if (isAlreadyReportedError(e)) onSubmitted?.();
     } finally {
       setSaving(false);
     }
@@ -179,6 +169,7 @@ export function ContentReportModal({
               disabled={saving}
               maxLength={COMMENT_MAX}
             />
+            <span className={styles.charCount}>{comment.length} / {COMMENT_MAX}</span>
           </div>
 
           {error && <div className={styles.error}>{error}</div>}

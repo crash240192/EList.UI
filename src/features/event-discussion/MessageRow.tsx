@@ -108,13 +108,15 @@ export function MessageRow({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [alreadyReported, setAlreadyReported] = useState(false);
 
   const replyBump = useDiscussionRefresh(message.id);
   const prevReplyBump = useRef(replyBump);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
-  const canReport = !!currentAccountId && !isMine;
+  const isHidden = Boolean(message.hidden);
+  const canReport = !!currentAccountId && !isMine && !isHidden;
   const hasReplies = messageHasReplies(message, replyBump, replyTotal);
-  const canDelete = isMine && canDeleteMessage(message, replyBump, replyTotal);
+  const canDelete = isMine && !isHidden && canDeleteMessage(message, replyBump, replyTotal);
   const accountId = message.accountId ?? message.account?.id ?? '';
   const initials = messageInitials(message);
 
@@ -258,7 +260,9 @@ export function MessageRow({
               <time className={styles.time}>{formatMessageDate(message.createDate)}</time>
             </header>
 
-            {editing ? (
+            {isHidden ? (
+              <p className={styles.hiddenStub}>Сообщение скрыто модерацией</p>
+            ) : editing ? (
               <div className={styles.editBlock}>
                 <textarea
                   className={styles.editInput}
@@ -319,7 +323,7 @@ export function MessageRow({
               </>
             )}
 
-            {!editing && (
+            {!editing && !isHidden && (
               <footer className={styles.foot}>
                 {currentAccountId && onReply && (
                   <button type="button" className={styles.actionBtn} onClick={() => onReply(message)}>
@@ -327,7 +331,7 @@ export function MessageRow({
                     Ответить
                   </button>
                 )}
-                {isMine && (
+                {isMine && !isHidden && (
                   <button type="button" className={styles.actionBtn} onClick={startEdit}>
                     <EditIcon />
                     Редактировать
@@ -348,10 +352,13 @@ export function MessageRow({
                   <button
                     type="button"
                     className={styles.actionBtn}
-                    onClick={() => setReportOpen(true)}
+                    disabled={alreadyReported}
+                    onClick={() => {
+                      if (!alreadyReported) setReportOpen(true);
+                    }}
                   >
                     <FlagIcon />
-                    Пожаловаться
+                    {alreadyReported ? 'Жалоба уже отправлена' : 'Пожаловаться'}
                   </button>
                 )}
                 {hasReplies && expanded && (
@@ -387,6 +394,7 @@ export function MessageRow({
           targetType={ReportTargetType.Message}
           targetId={message.id}
           onClose={() => setReportOpen(false)}
+          onSubmitted={() => setAlreadyReported(true)}
         />
       )}
 

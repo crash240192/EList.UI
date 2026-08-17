@@ -22,6 +22,7 @@ import type {
   ReportTargetTypeValue,
 } from './types';
 import {
+  parseTargetSnapshot,
   ReportActorContext,
   ReportQueue,
   ReportResolutionAction,
@@ -182,17 +183,23 @@ export function normalizeContentReport(raw: unknown): IContentReport {
   const r = (raw ?? {}) as Raw;
   const reasonRaw = r.reason ?? r.Reason ?? null;
   const actionsRaw = (r.actions ?? r.Actions ?? []) as unknown[];
+  const targetSnapshot = pickNullableStr(r, 'targetSnapshot', 'TargetSnapshot');
+  const snap = parseTargetSnapshot(targetSnapshot);
   return {
     id: pickStr(r, 'id', 'Id'),
     reporterAccountId: pickStr(r, 'reporterAccountId', 'ReporterAccountId'),
     targetType: normalizeTargetType(r.targetType ?? r.TargetType),
     targetId: pickStr(r, 'targetId', 'TargetId'),
-    eventId: pickNullableStr(r, 'eventId', 'EventId'),
-    messageId: pickNullableStr(r, 'messageId', 'MessageId'),
+    eventId: pickNullableStr(r, 'eventId', 'EventId') ?? snap?.eventId ?? null,
+    messageId: pickNullableStr(r, 'messageId', 'MessageId') ?? snap?.messageId ?? null,
     conversationId: pickNullableStr(r, 'conversationId', 'ConversationId'),
+    organizationId: pickNullableStr(r, 'organizationId', 'OrganizationId') ?? snap?.organizationId ?? null,
+    albumId: pickNullableStr(r, 'albumId', 'AlbumId') ?? snap?.albumId ?? null,
+    fileId: pickNullableStr(r, 'fileId', 'FileId') ?? snap?.fileId ?? null,
+    reportedAccountId: pickNullableStr(r, 'reportedAccountId', 'ReportedAccountId') ?? snap?.accountId ?? null,
     reasonId: pickStr(r, 'reasonId', 'ReasonId'),
     comment: pickNullableStr(r, 'comment', 'Comment'),
-    targetSnapshot: pickNullableStr(r, 'targetSnapshot', 'TargetSnapshot'),
+    targetSnapshot,
     status: normalizeStatus(r.status ?? r.Status),
     organizerStatus: normalizeNullableStatus(r.organizerStatus ?? r.OrganizerStatus),
     platformStatus: normalizeNullableStatus(r.platformStatus ?? r.PlatformStatus),
@@ -206,7 +213,7 @@ export function normalizeContentReport(raw: unknown): IContentReport {
     reason: reasonRaw ? normalizeReportReason(reasonRaw) : null,
     reporter: normalizeAccount(r.reporter ?? r.Reporter),
     assignedToAccount: normalizeAccount(r.assignedToAccount ?? r.AssignedToAccount),
-    eventName: pickEventName(r.event ?? r.Event),
+    eventName: pickEventName(r.event ?? r.Event) ?? (snap?.type === 'event' ? snap.name ?? null : null),
     actions: actionsRaw.map(normalizeAction),
   };
 }
@@ -291,6 +298,7 @@ export async function createContentReport(
     targetId: payload.targetId,
     reasonId: payload.reasonId,
   };
+  if (payload.albumId) body.albumId = payload.albumId;
   if (payload.comment?.trim()) body.comment = payload.comment.trim();
   const data = await apiClient.post<string>('/api/contentReports/create', body);
   return data.result;
@@ -326,6 +334,8 @@ function buildSearchBody(payload: IContentReportsSearchRequest): Record<string, 
   if (payload.reasonId) body.reasonId = payload.reasonId;
   if (payload.severity) body.severity = payload.severity;
   if (payload.reporterAccountId) body.reporterAccountId = payload.reporterAccountId;
+  if (payload.reportedAccountId) body.reportedAccountId = payload.reportedAccountId;
+  if (payload.organizationId) body.organizationId = payload.organizationId;
   if (payload.assignedTo) body.assignedTo = payload.assignedTo;
   if (payload.status) body.status = payload.status;
   if (payload.organizerStatus) body.organizerStatus = payload.organizerStatus;

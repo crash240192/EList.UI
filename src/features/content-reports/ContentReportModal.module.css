@@ -234,3 +234,11 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.charCount {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+}
