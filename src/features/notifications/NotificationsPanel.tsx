@@ -87,7 +87,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         navigate(
           target.reportId
             ? `/reports-against-me?report=${target.reportId}`
-            : '/reports-against-me',
+            : '/settings?tab=moderation',
         );
         break;
       case 'admin-moderation':

@@ -24,9 +24,10 @@ import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { Button } from '@/shared/ui/Button';
 import { usePageTitle } from '@/shared/hooks';
 import { OrganizationsSettingsPanel } from '@/features/organizations';
+import { ModerationSettingsPanel } from '@/features/content-reports';
 import styles from './SettingsPage.module.css';
 
-type SettingsTab = 'profile' | 'contacts' | 'location' | 'security' | 'organizations';
+type SettingsTab = 'profile' | 'contacts' | 'location' | 'security' | 'organizations' | 'moderation';
 
 const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: ReactNode }[] = [
   {
@@ -85,6 +86,16 @@ const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: React
       </svg>
     ),
   },
+  {
+    key: 'moderation',
+    section: 'Безопасность',
+    label: 'Модерация',
+    icon: (
+      <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function SettingsPage() {
@@ -100,6 +111,7 @@ export default function SettingsPage() {
         || tabParam === 'location'
         || tabParam === 'security'
         || tabParam === 'organizations'
+        || tabParam === 'moderation'
         || tabParam === 'profile'
           ? tabParam
           : 'profile';
@@ -117,6 +129,7 @@ export default function SettingsPage() {
       || tabParam === 'location'
       || tabParam === 'security'
       || tabParam === 'organizations'
+      || tabParam === 'moderation'
       || tabParam === 'profile'
     ) {
       setTab(tabParam);
@@ -192,6 +205,11 @@ export default function SettingsPage() {
           {tab === 'security' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <PasswordSection />
+            </div>
+          )}
+          {tab === 'moderation' && (
+            <div className={`${styles.stab} ${styles.stabActive}`}>
+              <ModerationSettingsPanel />
             </div>
           )}
         </div>
