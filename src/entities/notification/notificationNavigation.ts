@@ -18,6 +18,7 @@ import {
   NOTIFICATION_TYPE_CONTENT_REPORT_NEW_PLATFORM_QUEUE,
   NOTIFICATION_TYPE_CONTENT_REPORT_ORG_REMOVED,
   NOTIFICATION_TYPE_CONTENT_REPORT_ORG_SUSPENDED,
+  NOTIFICATION_TYPE_CONTENT_REPORT_PENALTY_ISSUED,
   NOTIFICATION_TYPE_CONTENT_REPORT_REVIEWED,
   NOTIFICATION_TYPE_CONTENT_REPORT_WARNING_ISSUED,
   notificationTypeKey,
@@ -62,18 +63,21 @@ export type NotificationNavTarget =
   | { kind: 'reports-against-me'; reportId?: string }
   | { kind: 'admin-moderation'; reportId?: string }
   | { kind: 'event-reports'; eventId: string }
-  | { kind: 'organization'; organizationId: string };
+  | { kind: 'organization'; organizationId: string }
+  | { kind: 'settings-moderation' };
 
 export function notificationTypeLabel(type: INotification['type']): string {
   if (type == null) return 'Уведомление';
   if (isContentReportNotificationType(type)) {
     return contentReportNotificationTypeLabel(type);
   }
+  if (type === 'EventRestored') return 'Событие восстановлено';
   switch (Number(type)) {
     case 0: return 'Создано событие';
     case 1: return 'Событие обновлено';
     case 2: return 'Событие отменено';
     case 3: return 'Событие завершено';
+    case 4: return 'Событие восстановлено';
     case NOTIFICATION_TYPE_NEW_SUBSCRIPTION: return 'На вас подписались';
     case NOTIFICATION_TYPE_UNSUBSCRIBED: return 'От вас отписались';
     case NOTIFICATION_TYPE_RELATED_PERSON_SUBSCRIBED:
@@ -124,6 +128,12 @@ export function getNotificationNavigationTarget(
       || typeKey === 'ContentReportNewInPlatformQueue'
     ) {
       return { kind: 'admin-moderation', reportId };
+    }
+    if (
+      typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_PENALTY_ISSUED
+      || typeKey === 'ContentReportPenaltyIssued'
+    ) {
+      return { kind: 'settings-moderation' };
     }
     if (
       typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_ORG_SUSPENDED

@@ -6,6 +6,7 @@ export {
   ReportQueue,
   ReportResolutionAction,
   ReportActorContext,
+  ModerationPenaltyType,
   REPORT_STATUS_LABELS,
   REPORT_TARGET_TYPE_LABELS,
   REPORT_SEVERITY_LABELS,
@@ -17,6 +18,10 @@ export {
   PLATFORM_RESOLUTION_ACTIONS,
   DESTRUCTIVE_RESOLUTION_ACTIONS,
   REPORT_RESOLUTION_ACTION_LABELS,
+  MODERATION_PENALTY_TYPE_LABELS,
+  ORGANIZER_PENALTY_TYPES,
+  PLATFORM_PENALTY_TYPES,
+  PENALTY_DURATION_PRESETS,
   parseTargetSnapshot,
   snapshotPhotoKind,
   snapshotFileId,
@@ -24,6 +29,11 @@ export {
   organizerResolutionActionsFor,
   platformResolutionActionsFor,
   resolutionActionConfirm,
+  reportQueueStatus,
+  canTakeReport,
+  canResolveReport,
+  takeReportLabel,
+  needsDurationHours,
   subjectReportStatusLabel,
   subjectViewForPreview,
 } from './types';
@@ -36,6 +46,7 @@ export type {
   ReportQueueValue,
   ReportResolutionActionValue,
   ReportActorContextValue,
+  ModerationPenaltyTypeValue,
   IReportReason,
   ICreateContentReportRequest,
   ICreateReportReasonRequest,
@@ -48,6 +59,8 @@ export type {
   IContentReport,
   ParsedTargetSnapshot,
   IContentReportSubjectView,
+  IModerationPenalty,
+  IContentReportTargetStats,
 } from './types';
 
 export {
@@ -74,4 +87,8 @@ export {
   resolveContentReport,
   escalateContentReport,
   fetchContentReportActions,
+  fetchContentReportTargetStats,
+  fetchMyModerationPenalties,
+  revokeModerationPenalty,
+  restoreModerationEvent,
 } from './api';

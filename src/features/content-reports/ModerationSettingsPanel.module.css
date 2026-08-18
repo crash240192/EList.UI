@@ -123,3 +123,44 @@
 .link:hover {
   text-decoration: underline;
 }
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.penaltyCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--surface-1);
+}
+
+.revokeBtn {
+  align-self: flex-start;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.revokeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

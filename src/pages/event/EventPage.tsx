@@ -10,7 +10,7 @@ import {
 } from '@/entities/event';
 import { getOrganizationAvatar } from '@/entities/organization';
 import { useEventOrganizers } from '@/features/event/useEventOrganizers';
-import { useToastStore, useAuthStore } from '@/app/store';
+import { useToastStore, useAuthStore, usePlatformRoleStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
@@ -40,7 +40,7 @@ import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialo
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
-import { ContentReportModal, OrganizerReportsModal, useOrganizerReportsCount } from '@/features/content-reports';
+import { ContentReportModal, EventModerationStrip, OrganizerReportsModal, useOrganizerReportsCount } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
@@ -159,6 +159,7 @@ export default function EventPage() {
   const goBack   = useSafeBack('/');
   const { accountId } = useAccountId();
   const authenticated = useAuthStore(s => s.isAuthenticated());
+  const hasPlatformAccess = usePlatformRoleStore(s => s.hasPlatformAccess());
   const toast = useToastStore(s => s.add);
 
   const [event,         setEvent]         = useState<IEvent | null>(null);
@@ -459,7 +460,7 @@ export default function EventPage() {
     setActionLoading(true);
     try {
       await apiClient.delete(`/api/events/${id}/cancel`);
-      setEvent(ev => ev ? { ...ev, active: false } : ev);
+      setEvent(ev => ev ? { ...ev, active: false, cancelSource: 'organizer' } : ev);
       setCancelConfirm(false);
     } finally { setActionLoading(false); }
   }, [id]);
@@ -782,7 +783,11 @@ export default function EventPage() {
                     Закрытое
                   </span>
                 )}
-                {!isEventActive && <span className={styles.tagCancelled}>Отменено</span>}
+                {!isEventActive && (
+                  <span className={styles.tagCancelled}>
+                    {event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено'}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -885,6 +890,33 @@ export default function EventPage() {
             </div>
           </div>
         </div>
+
+        {(isOrganizer || hasPlatformAccess) && id && (
+          <EventModerationStrip
+            eventId={id}
+            isCancelled={!event.active}
+            cancelSource={event.cancelSource}
+            cancelledAt={event.cancelledAt}
+            canRestore={
+              hasPlatformAccess
+              && !event.active
+              && event.cancelSource === 'moderation'
+            }
+            canRevokePenalties={hasPlatformAccess}
+            onRestored={() => {
+              setEvent(ev => ev
+                ? {
+                  ...ev,
+                  active: true,
+                  cancelSource: null,
+                  cancelledAt: null,
+                  cancelReportId: null,
+                  cancelledByAccountId: null,
+                }
+                : ev);
+            }}
+          />
+        )}
 
         {/* ── Основная сетка ── */}
         <div className={styles.mainGrid}>

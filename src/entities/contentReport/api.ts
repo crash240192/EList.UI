@@ -8,12 +8,15 @@ import type {
   IContentReportAction,
   IContentReportsSearchRequest,
   IContentReportSubjectView,
+  IContentReportTargetStats,
   ICreateContentReportRequest,
   ICreateReportReasonRequest,
   IEscalateContentReportRequest,
+  IModerationPenalty,
   IReportReason,
   IResolveContentReportRequest,
   IUpdateReportReasonRequest,
+  ModerationPenaltyTypeValue,
   ReportActorContextValue,
   ReportQueueValue,
   ReportResolutionActionValue,
@@ -23,6 +26,7 @@ import type {
   ReportTargetTypeValue,
 } from './types';
 import {
+  ModerationPenaltyType,
   parseTargetSnapshot,
   ReportActorContext,
   ReportQueue,
@@ -130,6 +134,74 @@ function normalizeResolutionAction(raw: unknown): ReportResolutionActionValue | 
     Object.values(ReportResolutionAction),
     ReportResolutionAction.Other,
   );
+}
+
+function normalizePenaltyType(raw: unknown): ModerationPenaltyTypeValue {
+  return matchEnum(
+    raw,
+    Object.values(ModerationPenaltyType),
+    ModerationPenaltyType.BanFromEvent,
+  );
+}
+
+function pickNum(raw: Raw, ...keys: string[]): number {
+  for (const key of keys) {
+    const v = raw[key];
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
+function pickBool(raw: Raw, ...keys: string[]): boolean {
+  for (const key of keys) {
+    const v = raw[key];
+    if (typeof v === 'boolean') return v;
+    if (v === 'true' || v === 'True') return true;
+    if (v === 'false' || v === 'False') return false;
+  }
+  return false;
+}
+
+export function normalizeModerationPenalty(raw: unknown): IModerationPenalty {
+  const r = (raw ?? {}) as Raw;
+  return {
+    id: pickStr(r, 'id', 'Id'),
+    accountId: pickNullableStr(r, 'accountId', 'AccountId'),
+    organizationId: pickNullableStr(r, 'organizationId', 'OrganizationId'),
+    eventId: pickNullableStr(r, 'eventId', 'EventId'),
+    reportId: pickNullableStr(r, 'reportId', 'ReportId'),
+    penaltyType: normalizePenaltyType(r.penaltyType ?? r.PenaltyType),
+    reason: pickNullableStr(r, 'reason', 'Reason'),
+    startsAt: pickStr(r, 'startsAt', 'StartsAt'),
+    endsAt: pickNullableStr(r, 'endsAt', 'EndsAt'),
+    revokedAt: pickNullableStr(r, 'revokedAt', 'RevokedAt'),
+    revokedBy: pickNullableStr(r, 'revokedBy', 'RevokedBy'),
+    liftedAt: pickNullableStr(r, 'liftedAt', 'LiftedAt'),
+    createdBy: pickNullableStr(r, 'createdBy', 'CreatedBy'),
+    createdAt: pickStr(r, 'createdAt', 'CreatedAt'),
+    isActive: pickBool(r, 'isActive', 'IsActive'),
+  };
+}
+
+export function normalizeContentReportTargetStats(raw: unknown): IContentReportTargetStats {
+  const r = (raw ?? {}) as Raw;
+  const penaltiesRaw = (r.activePenalties ?? r.ActivePenalties ?? []) as unknown[];
+  return {
+    targetType: normalizeTargetType(r.targetType ?? r.TargetType),
+    targetId: pickStr(r, 'targetId', 'TargetId'),
+    totalReports: pickNum(r, 'totalReports', 'TotalReports'),
+    openReports: pickNum(r, 'openReports', 'OpenReports'),
+    resolvedReports: pickNum(r, 'resolvedReports', 'ResolvedReports'),
+    dismissedReports: pickNum(r, 'dismissedReports', 'DismissedReports'),
+    warningCount: pickNum(r, 'warningCount', 'WarningCount'),
+    lastWarningAt: pickNullableStr(r, 'lastWarningAt', 'LastWarningAt'),
+    lastReportAt: pickNullableStr(r, 'lastReportAt', 'LastReportAt'),
+    relatedTotalReports: pickNum(r, 'relatedTotalReports', 'RelatedTotalReports'),
+    relatedOpenReports: pickNum(r, 'relatedOpenReports', 'RelatedOpenReports'),
+    relatedWarningCount: pickNum(r, 'relatedWarningCount', 'RelatedWarningCount'),
+    activePenalties: Array.isArray(penaltiesRaw) ? penaltiesRaw.map(normalizeModerationPenalty) : [],
+  };
 }
 
 function normalizeActorContext(raw: unknown): ReportActorContextValue | string {
@@ -459,6 +531,15 @@ export async function resolveContentReport(
     body.resolutionComment = payload.resolutionComment.trim();
   }
   if (payload.targetAccountId) body.targetAccountId = payload.targetAccountId;
+  if (payload.penaltyType) body.penaltyType = payload.penaltyType;
+  if (
+    payload.resolutionAction === ReportResolutionAction.ApplyPenalty
+    || payload.resolutionAction === ReportResolutionAction.BanFromEvent
+    || payload.resolutionAction === ReportResolutionAction.SuspendAccount
+    || payload.resolutionAction === ReportResolutionAction.SuspendOrganization
+  ) {
+    body.durationHours = payload.durationHours ?? null;
+  }
   await apiClient.post(`/api/contentReports/resolve/${reportId}`, body);
 }
 
@@ -476,4 +557,37 @@ export async function fetchContentReportActions(
 ): Promise<IContentReportAction[]> {
   const data = await apiClient.get<unknown[]>(`/api/contentReports/actions/${reportId}`);
   return (data.result ?? []).map(normalizeAction);
+}
+
+export async function fetchContentReportTargetStats(
+  targetType: ReportTargetTypeValue,
+  targetId: string,
+): Promise<IContentReportTargetStats> {
+  const data = await apiClient.get<unknown>(
+    `/api/contentReports/stats/${encodeURIComponent(targetType)}/${targetId}`,
+  );
+  return normalizeContentReportTargetStats(data.result);
+}
+
+export async function fetchMyModerationPenalties(): Promise<IModerationPenalty[]> {
+  const data = await apiClient.get<unknown[]>(`/api/contentReports/penalties/my`);
+  return (data.result ?? []).map(normalizeModerationPenalty);
+}
+
+export async function revokeModerationPenalty(
+  penaltyId: string,
+  comment?: string | null,
+): Promise<void> {
+  const body: Record<string, unknown> = {};
+  if (comment?.trim()) body.comment = comment.trim();
+  await apiClient.post(`/api/contentReports/penalties/revoke/${penaltyId}`, body);
+}
+
+export async function restoreModerationEvent(
+  eventId: string,
+  comment?: string | null,
+): Promise<void> {
+  const body: Record<string, unknown> = {};
+  if (comment?.trim()) body.comment = comment.trim();
+  await apiClient.post(`/api/contentReports/restoreEvent/${eventId}`, body);
 }

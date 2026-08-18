@@ -19,6 +19,11 @@ import {
   resolveContentReport,
   searchOrganizerContentReports,
   takeContentReport,
+  canResolveReport,
+  canTakeReport,
+  takeReportLabel,
+  ORGANIZER_PENALTY_TYPES,
+  needsDurationHours,
   type IContentReport,
   type IContentReportAction,
   type ReportResolutionActionValue,
@@ -30,7 +35,15 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { apiIsoToLocalParts } from '@/shared/lib/datetime';
 import { useToastStore } from '@/app/store';
+import { useAccountId } from '@/features/auth/useAccountId';
+import { contentReportActionMessage } from './reportSubmitError';
 import { ReportTargetPreview } from './ReportTargetPreview';
+import {
+  ResolutionExtras,
+  defaultPenaltyType,
+  durationHoursFromFields,
+  durationPresetLabel,
+} from './ResolutionExtras';
 import styles from './OrganizerReportsModal.module.css';
 
 const STATUS_FILTER_OPTIONS = [
@@ -76,9 +89,10 @@ function canModerate(report: IContentReport): boolean {
   return s === ReportStatus.Open || s === ReportStatus.InReview;
 }
 
-function canEscalate(report: IContentReport): boolean {
-  if (!canModerate(report)) return false;
-  return report.reason?.severity === ReportSeverity.Safety;
+function canEscalate(report: IContentReport, accountId: string | null): boolean {
+  if (!canResolveReport(report, 'organizer', accountId)) return false;
+  const status = report.organizerStatus ?? report.status;
+  return status !== ReportStatus.Escalated;
 }
 
 function reportedWho(report: IContentReport): string {
@@ -94,6 +108,7 @@ export function OrganizerReportsModal({
   onCountChange,
 }: OrganizerReportsModalProps) {
   const toast = useToastStore(s => s.add);
+  const { accountId } = useAccountId();
   const [onlyActive, setOnlyActive] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
@@ -110,6 +125,9 @@ export function OrganizerReportsModal({
   const [actionError, setActionError] = useState<string | null>(null);
   const [resolutionAction, setResolutionAction] = useState('');
   const [resolutionComment, setResolutionComment] = useState('');
+  const [penaltyType, setPenaltyType] = useState(defaultPenaltyType(ORGANIZER_PENALTY_TYPES));
+  const [durationPreset, setDurationPreset] = useState('168');
+  const [customHours, setCustomHours] = useState('24');
   const [escalateComment, setEscalateComment] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [escalateConfirmOpen, setEscalateConfirmOpen] = useState(false);
@@ -205,7 +223,7 @@ export function OrganizerReportsModal({
       toast('Жалоба взята в работу', 'success');
       await refreshAfterAction(detail.id);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось взять жалобу');
+      setActionError(contentReportActionMessage(e));
     } finally {
       setBusy(false);
     }
@@ -218,6 +236,11 @@ export function OrganizerReportsModal({
       setConfirmOpen(false);
       return;
     }
+    if (resolutionAction === ReportResolutionAction.ApplyPenalty && !penaltyType) {
+      setActionError('Выберите тип ограничения');
+      setConfirmOpen(false);
+      return;
+    }
     setBusy(true);
     setActionError(null);
     setConfirmOpen(false);
@@ -225,12 +248,20 @@ export function OrganizerReportsModal({
       await resolveContentReport(detail.id, {
         resolutionAction: resolutionAction as ReportResolutionActionValue,
         resolutionComment: resolutionComment.trim() || null,
+        penaltyType: resolutionAction === ReportResolutionAction.ApplyPenalty
+          ? penaltyType as typeof ORGANIZER_PENALTY_TYPES[number]
+          : null,
+        durationHours: durationHoursFromFields(
+          resolutionAction as ReportResolutionActionValue,
+          durationPreset,
+          customHours,
+        ),
       });
       toast('Жалоба решена', 'success');
       setResolutionComment('');
       await refreshAfterAction(detail.id);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось решить жалобу');
+      setActionError(contentReportActionMessage(e));
     } finally {
       setBusy(false);
     }
@@ -246,7 +277,7 @@ export function OrganizerReportsModal({
   };
 
   const handleEscalate = async () => {
-    if (!detail || busy || !canEscalate(detail)) return;
+    if (!detail || busy || !canEscalate(detail, accountId)) return;
     setBusy(true);
     setActionError(null);
     setEscalateConfirmOpen(false);
@@ -258,7 +289,7 @@ export function OrganizerReportsModal({
       setEscalateComment('');
       await refreshAfterAction(detail.id);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось эскалировать');
+      setActionError(contentReportActionMessage(e));
     } finally {
       setBusy(false);
     }
@@ -388,7 +419,7 @@ export function OrganizerReportsModal({
 
                 {canModerate(detail) && (
                   <div className={styles.actions}>
-                    {(detail.organizerStatus ?? detail.status) === ReportStatus.Open && (
+                    {canTakeReport(detail, 'organizer', accountId) && (
                       <div className={styles.actionRow}>
                         <button
                           type="button"
@@ -396,9 +427,16 @@ export function OrganizerReportsModal({
                           disabled={busy}
                           onClick={() => void handleTake()}
                         >
-                          Взять в работу
+                          {takeReportLabel(detail, 'organizer', accountId)}
                         </button>
                       </div>
+                    )}
+                    {!canResolveReport(detail, 'organizer', accountId) && (
+                      <p className={styles.meta}>
+                        {detail.assignedToAccount?.login
+                          ? `В работе у @${detail.assignedToAccount.login}. Сначала возьмите жалобу в работу.`
+                          : 'Сначала возьмите жалобу в работу.'}
+                      </p>
                     )}
 
                     <div className={styles.field}>
@@ -407,9 +445,20 @@ export function OrganizerReportsModal({
                         value={resolutionAction}
                         onChange={setResolutionAction}
                         options={resolutionOptions}
-                        disabled={busy}
+                        disabled={busy || !canResolveReport(detail, 'organizer', accountId)}
                       />
                     </div>
+                    <ResolutionExtras
+                      action={resolutionAction as ReportResolutionActionValue | ''}
+                      penaltyTypes={ORGANIZER_PENALTY_TYPES}
+                      penaltyType={penaltyType}
+                      onPenaltyTypeChange={setPenaltyType}
+                      durationPreset={durationPreset}
+                      onDurationPresetChange={setDurationPreset}
+                      customHours={customHours}
+                      onCustomHoursChange={setCustomHours}
+                      disabled={busy || !canResolveReport(detail, 'organizer', accountId)}
+                    />
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="org-resolve-comment">
                         Комментарий к решению
@@ -420,7 +469,7 @@ export function OrganizerReportsModal({
                         className={styles.textarea}
                         value={resolutionComment}
                         onChange={e => setResolutionComment(e.target.value)}
-                        disabled={busy}
+                        disabled={busy || !canResolveReport(detail, 'organizer', accountId)}
                         rows={3}
                         placeholder={
                           resolutionAction === ReportResolutionAction.Other
@@ -433,14 +482,14 @@ export function OrganizerReportsModal({
                       <button
                         type="button"
                         className={styles.primaryBtn}
-                        disabled={busy || !resolutionAction}
+                        disabled={busy || !resolutionAction || !canResolveReport(detail, 'organizer', accountId)}
                         onClick={handleResolveClick}
                       >
                         Применить
                       </button>
                     </div>
 
-                    {canEscalate(detail) && (
+                    {canEscalate(detail, accountId) && (
                       <>
                         <div className={styles.field}>
                           <label className={styles.label} htmlFor="org-escalate-comment">
@@ -524,8 +573,10 @@ export function OrganizerReportsModal({
           title={confirmMeta.title}
           message={
             resolutionAction === ReportResolutionAction.BanFromEvent && detail
-              ? `${confirmMeta.message} Будет забанен ${reportedWho(detail)}.`
-              : confirmMeta.message
+              ? `${confirmMeta.message} Будет забанен ${reportedWho(detail)}. Срок: ${durationPresetLabel(durationPreset, customHours)}.`
+              : needsDurationHours(resolutionAction as ReportResolutionActionValue)
+                ? `${confirmMeta.message} Срок: ${durationPresetLabel(durationPreset, customHours)}.`
+                : confirmMeta.message
           }
           confirmLabel={busy ? '…' : confirmMeta.confirmLabel}
           cancelLabel="Назад"

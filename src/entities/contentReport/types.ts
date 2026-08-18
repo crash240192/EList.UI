@@ -57,9 +57,40 @@ export const ReportResolutionAction = {
   SuspendOrganization: 'SuspendOrganization',
   RemoveOrganizator: 'RemoveOrganizator',
   Other: 'Other',
+  ApplyPenalty: 'ApplyPenalty',
 } as const;
 export type ReportResolutionActionValue =
   (typeof ReportResolutionAction)[keyof typeof ReportResolutionAction];
+
+export const ModerationPenaltyType = {
+  SuspendAccount: 'SuspendAccount',
+  SuspendOrganization: 'SuspendOrganization',
+  BanEventCreate: 'BanEventCreate',
+  BanEventParticipate: 'BanEventParticipate',
+  BanMessaging: 'BanMessaging',
+  BanOrganize: 'BanOrganize',
+  BanFromEvent: 'BanFromEvent',
+} as const;
+export type ModerationPenaltyTypeValue =
+  (typeof ModerationPenaltyType)[keyof typeof ModerationPenaltyType];
+
+export const ORGANIZER_PENALTY_TYPES = [ModerationPenaltyType.BanFromEvent] as const;
+export const PLATFORM_PENALTY_TYPES = [
+  ModerationPenaltyType.BanFromEvent,
+  ModerationPenaltyType.BanEventCreate,
+  ModerationPenaltyType.BanEventParticipate,
+  ModerationPenaltyType.BanMessaging,
+  ModerationPenaltyType.BanOrganize,
+  ModerationPenaltyType.SuspendAccount,
+  ModerationPenaltyType.SuspendOrganization,
+] as const;
+
+export const PENALTY_DURATION_PRESETS = [
+  { hours: 24, label: '24 часа' },
+  { hours: 168, label: '7 дней' },
+  { hours: 720, label: '30 дней' },
+  { hours: 2160, label: '90 дней' },
+] as const;
 
 export const ReportActorContext = {
   Reporter: 'Reporter',
@@ -115,6 +146,7 @@ export const ORGANIZER_RESOLUTION_ACTIONS = [
   ReportResolutionAction.DeleteContent,
   ReportResolutionAction.Warn,
   ReportResolutionAction.BanFromEvent,
+  ReportResolutionAction.ApplyPenalty,
   ReportResolutionAction.ResetAvatar,
   ReportResolutionAction.Dismiss,
   ReportResolutionAction.Other,
@@ -130,6 +162,7 @@ export const PLATFORM_RESOLUTION_ACTIONS = [
   ReportResolutionAction.SuspendAccount,
   ReportResolutionAction.SuspendOrganization,
   ReportResolutionAction.RemoveOrganizator,
+  ReportResolutionAction.ApplyPenalty,
   ReportResolutionAction.Dismiss,
   ReportResolutionAction.Other,
 ] as const;
@@ -143,6 +176,7 @@ export const DESTRUCTIVE_RESOLUTION_ACTIONS = new Set<ReportResolutionActionValu
   ReportResolutionAction.SuspendAccount,
   ReportResolutionAction.SuspendOrganization,
   ReportResolutionAction.RemoveOrganizator,
+  ReportResolutionAction.ApplyPenalty,
 ]);
 
 export const REPORT_RESOLUTION_ACTION_LABELS: Record<ReportResolutionActionValue, string> = {
@@ -158,6 +192,17 @@ export const REPORT_RESOLUTION_ACTION_LABELS: Record<ReportResolutionActionValue
   SuspendOrganization: 'Заблокировать организацию',
   RemoveOrganizator: 'Снять организатора',
   Other: 'Другое',
+  ApplyPenalty: 'Временное ограничение',
+};
+
+export const MODERATION_PENALTY_TYPE_LABELS: Record<ModerationPenaltyTypeValue, string> = {
+  SuspendAccount: 'Блокировка аккаунта',
+  SuspendOrganization: 'Блокировка организации',
+  BanEventCreate: 'Запрет создавать мероприятия',
+  BanEventParticipate: 'Запрет участвовать',
+  BanMessaging: 'Запрет писать в чаты',
+  BanOrganize: 'Запрет быть организатором',
+  BanFromEvent: 'Бан на мероприятии',
 };
 
 export const REPORT_CREATE_TITLES: Record<ReportTargetTypeValue, string> = {
@@ -260,7 +305,7 @@ export function organizerResolutionActionsFor(report: {
     actions.push(ReportResolutionAction.HideContent, ReportResolutionAction.DeleteContent);
   }
   if (report.eventId && accountId) {
-    actions.push(ReportResolutionAction.BanFromEvent);
+    actions.push(ReportResolutionAction.BanFromEvent, ReportResolutionAction.ApplyPenalty);
   }
   if (report.targetType === ReportTargetType.Photo && kind === 'event_cover') {
     actions.push(ReportResolutionAction.ResetAvatar);
@@ -313,7 +358,7 @@ export function platformResolutionActionsFor(report: {
   if (report.targetType === ReportTargetType.EventOrganizator) {
     actions.push(ReportResolutionAction.RemoveOrganizator);
   }
-  actions.push(ReportResolutionAction.Other);
+  actions.push(ReportResolutionAction.ApplyPenalty, ReportResolutionAction.Other);
   return uniqueActions(actions);
 }
 
@@ -362,6 +407,12 @@ export function resolutionActionConfirm(action: ReportResolutionActionValue): {
         title: 'Снять организатора?',
         message: 'Запись организатора будет удалена у мероприятия.',
         confirmLabel: 'Снять',
+      };
+    case ReportResolutionAction.ApplyPenalty:
+      return {
+        title: 'Назначить ограничение?',
+        message: 'Ограничение будет применено к выбранному аккаунту или организации.',
+        confirmLabel: 'Назначить',
       };
     default:
       return null;
@@ -444,10 +495,101 @@ export interface IResolveContentReportRequest {
   resolutionAction: ReportResolutionActionValue;
   resolutionComment?: string | null;
   targetAccountId?: string | null;
+  penaltyType?: ModerationPenaltyTypeValue | null;
+  durationHours?: number | null;
 }
 
 export interface IEscalateContentReportRequest {
   comment?: string | null;
+}
+
+export type ReportQueueKind = 'organizer' | 'platform';
+
+export function reportQueueStatus(
+  report: Pick<IContentReport, 'status' | 'organizerStatus' | 'platformStatus'>,
+  queue: ReportQueueKind,
+): ReportStatusValue {
+  if (queue === 'organizer') return report.organizerStatus ?? report.status;
+  return report.platformStatus ?? report.status;
+}
+
+export function canTakeReport(
+  report: Pick<IContentReport, 'status' | 'organizerStatus' | 'platformStatus' | 'assignedTo'>,
+  queue: ReportQueueKind,
+  currentAccountId: string | null,
+): boolean {
+  const status = reportQueueStatus(report, queue);
+  if (status === ReportStatus.Resolved || status === ReportStatus.Dismissed) return false;
+  if (status === ReportStatus.Open) return true;
+  if (status === ReportStatus.InReview && currentAccountId && report.assignedTo !== currentAccountId) {
+    return true;
+  }
+  return false;
+}
+
+export function canResolveReport(
+  report: Pick<IContentReport, 'status' | 'organizerStatus' | 'platformStatus' | 'assignedTo'>,
+  queue: ReportQueueKind,
+  currentAccountId: string | null,
+): boolean {
+  if (!currentAccountId) return false;
+  return reportQueueStatus(report, queue) === ReportStatus.InReview
+    && report.assignedTo === currentAccountId;
+}
+
+export function takeReportLabel(
+  report: Pick<IContentReport, 'status' | 'organizerStatus' | 'platformStatus' | 'assignedTo'>,
+  queue: ReportQueueKind,
+  currentAccountId: string | null,
+): string {
+  const status = reportQueueStatus(report, queue);
+  if (status === ReportStatus.InReview && currentAccountId && report.assignedTo !== currentAccountId) {
+    return 'Перехватить';
+  }
+  return 'Взять в работу';
+}
+
+export function needsDurationHours(action: ReportResolutionActionValue): boolean {
+  return (
+    action === ReportResolutionAction.BanFromEvent
+    || action === ReportResolutionAction.SuspendAccount
+    || action === ReportResolutionAction.SuspendOrganization
+    || action === ReportResolutionAction.ApplyPenalty
+  );
+}
+
+export interface IModerationPenalty {
+  id: string;
+  accountId: string | null;
+  organizationId: string | null;
+  eventId: string | null;
+  reportId: string | null;
+  penaltyType: ModerationPenaltyTypeValue;
+  reason: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  revokedAt: string | null;
+  revokedBy: string | null;
+  liftedAt: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface IContentReportTargetStats {
+  targetType: ReportTargetTypeValue;
+  targetId: string;
+  totalReports: number;
+  openReports: number;
+  resolvedReports: number;
+  dismissedReports: number;
+  warningCount: number;
+  lastWarningAt: string | null;
+  lastReportAt: string | null;
+  relatedTotalReports: number;
+  relatedOpenReports: number;
+  relatedWarningCount: number;
+  activePenalties: IModerationPenalty[];
 }
 
 export interface IContentReportAction {
@@ -556,6 +698,9 @@ export function subjectReportStatusLabel(
   }
   if (resolutionAction === ReportResolutionAction.BanFromEvent) {
     return 'Ограничение на мероприятии';
+  }
+  if (resolutionAction === ReportResolutionAction.ApplyPenalty) {
+    return 'Ограничение модерации';
   }
   if (status === ReportStatus.Resolved) return 'Решено';
   return REPORT_STATUS_LABELS[status] ?? status;

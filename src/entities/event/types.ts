@@ -52,6 +52,11 @@ export interface IEvent {
   startTime: string;    // ISO 8601
   endTime: string | null;
   active: boolean;
+  cancelledAt?: string | null;
+  cancelledByAccountId?: string | null;
+  /** `moderation` | `organizer` */
+  cancelSource?: string | null;
+  cancelReportId?: string | null;
   eventParametersId: string | null;
   creationDate: string;
   updateDate: string;

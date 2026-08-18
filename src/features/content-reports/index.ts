@@ -3,3 +3,4 @@ export { OrganizerReportsModal } from './OrganizerReportsModal';
 export { useOrganizerReportsCount } from './useOrganizerReportsCount';
 export { ReportTargetPreview } from './ReportTargetPreview';
 export { ModerationSettingsPanel } from './ModerationSettingsPanel';
+export { EventModerationStrip } from './EventModerationStrip';

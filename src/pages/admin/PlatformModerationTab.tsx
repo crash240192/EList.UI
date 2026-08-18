@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  MODERATION_PENALTY_TYPE_LABELS,
+  PLATFORM_PENALTY_TYPES,
   REPORT_RESOLUTION_ACTION_LABELS,
   REPORT_SEVERITY_LABELS,
   REPORT_STATUS_LABELS,
@@ -11,16 +13,24 @@ import {
   ReportSeverity,
   ReportStatus,
   ReportTargetType,
+  canResolveReport,
+  canTakeReport,
   fetchContentReport,
   fetchContentReportActions,
+  fetchContentReportTargetStats,
   fetchPlatformContentReportsCount,
   platformResolutionActionsFor,
   resolutionActionConfirm,
   resolveContentReport,
+  revokeModerationPenalty,
   searchPlatformContentReports,
   takeContentReport,
+  takeReportLabel,
+  needsDurationHours,
   type IContentReport,
   type IContentReportAction,
+  type IContentReportTargetStats,
+  type IModerationPenalty,
   type ReportResolutionActionValue,
   type ReportSeverityValue,
   type ReportStatusValue,
@@ -30,7 +40,15 @@ import { Select } from '@/shared/ui/Select/Select';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { apiIsoToLocalParts } from '@/shared/lib/datetime';
 import { useToastStore } from '@/app/store';
+import { useAccountId } from '@/features/auth/useAccountId';
 import { ReportTargetPreview } from '@/features/content-reports';
+import { contentReportActionMessage } from '@/features/content-reports/reportSubmitError';
+import {
+  ResolutionExtras,
+  defaultPenaltyType,
+  durationHoursFromFields,
+  durationPresetLabel,
+} from '@/features/content-reports/ResolutionExtras';
 import styles from './AdminPage.module.css';
 import tabStyles from './PlatformModerationTab.module.css';
 
@@ -90,6 +108,7 @@ interface PlatformModerationTabProps {
 
 export function PlatformModerationTab({ onActiveCountChange }: PlatformModerationTabProps) {
   const toast = useToastStore(s => s.add);
+  const { accountId } = useAccountId();
   const [onlyActive, setOnlyActive] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
@@ -105,7 +124,13 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
   const [actionError, setActionError] = useState<string | null>(null);
   const [resolutionAction, setResolutionAction] = useState('');
   const [resolutionComment, setResolutionComment] = useState('');
+  const [penaltyType, setPenaltyType] = useState(defaultPenaltyType(PLATFORM_PENALTY_TYPES));
+  const [durationPreset, setDurationPreset] = useState('168');
+  const [customHours, setCustomHours] = useState('24');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [targetStats, setTargetStats] = useState<IContentReportTargetStats | null>(null);
+  const [listStats, setListStats] = useState<Record<string, IContentReportTargetStats>>({});
+  const [revokeBusyId, setRevokeBusyId] = useState<string | null>(null);
 
   const safetyTab = typeTab === '__safety';
   const targetTypeFilter = safetyTab ? null : ((typeTab || null) as ReportTargetTypeValue | null);
@@ -151,10 +176,46 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
   }, [loadList]);
 
   useEffect(() => {
+    const targets = reports.filter(
+      report =>
+        report.targetType === ReportTargetType.Account
+        || report.targetType === ReportTargetType.Organization,
+    );
+    const unique = new Map<string, { type: ReportTargetTypeValue; id: string }>();
+    for (const report of targets) {
+      unique.set(`${report.targetType}:${report.targetId}`, {
+        type: report.targetType,
+        id: report.targetId,
+      });
+    }
+    if (unique.size === 0) {
+      setListStats({});
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      [...unique.values()].map(item =>
+        fetchContentReportTargetStats(item.type, item.id)
+          .then(stats => [`${item.type}:${item.id}`, stats] as const)
+          .catch(() => null),
+      ),
+    ).then(rows => {
+      if (cancelled) return;
+      const next: Record<string, IContentReportTargetStats> = {};
+      for (const row of rows) {
+        if (row) next[row[0]] = row[1];
+      }
+      setListStats(next);
+    });
+    return () => { cancelled = true; };
+  }, [reports]);
+
+  useEffect(() => {
     if (!selectedId) {
       setDetail(null);
       setActions([]);
       setActionError(null);
+      setTargetStats(null);
       return;
     }
     let cancelled = false;
@@ -170,6 +231,16 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
         setActions(acts);
         const next = platformResolutionActionsFor(report);
         setResolutionAction(next[0] ?? '');
+        if (
+          report.targetType === ReportTargetType.Account
+          || report.targetType === ReportTargetType.Organization
+        ) {
+          void fetchContentReportTargetStats(report.targetType, report.targetId)
+            .then(stats => { if (!cancelled) setTargetStats(stats); })
+            .catch(() => { if (!cancelled) setTargetStats(null); });
+        } else {
+          setTargetStats(null);
+        }
       })
       .catch(e => {
         if (cancelled) return;
@@ -191,6 +262,33 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
     setActions(acts);
     const next = platformResolutionActionsFor(report);
     setResolutionAction(next[0] ?? '');
+    if (
+      report.targetType === ReportTargetType.Account
+      || report.targetType === ReportTargetType.Organization
+    ) {
+      try {
+        setTargetStats(await fetchContentReportTargetStats(report.targetType, report.targetId));
+      } catch {
+        setTargetStats(null);
+      }
+    } else {
+      setTargetStats(null);
+    }
+  };
+
+  const handleRevokePenalty = async (penalty: IModerationPenalty) => {
+    if (busy || revokeBusyId) return;
+    setRevokeBusyId(penalty.id);
+    setActionError(null);
+    try {
+      await revokeModerationPenalty(penalty.id);
+      toast('Ограничение снято', 'success');
+      if (detail) await refreshAfterAction(detail.id);
+    } catch (e) {
+      setActionError(contentReportActionMessage(e));
+    } finally {
+      setRevokeBusyId(null);
+    }
   };
 
   const handleTake = async () => {
@@ -202,7 +300,7 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
       toast('Жалоба взята в работу', 'success');
       await refreshAfterAction(detail.id);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось взять жалобу');
+      setActionError(contentReportActionMessage(e));
     } finally {
       setBusy(false);
     }
@@ -215,6 +313,11 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
       setConfirmOpen(false);
       return;
     }
+    if (resolutionAction === ReportResolutionAction.ApplyPenalty && !penaltyType) {
+      setActionError('Выберите тип ограничения');
+      setConfirmOpen(false);
+      return;
+    }
     setBusy(true);
     setActionError(null);
     setConfirmOpen(false);
@@ -222,6 +325,14 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
       await resolveContentReport(detail.id, {
         resolutionAction: resolutionAction as ReportResolutionActionValue,
         resolutionComment: resolutionComment.trim() || null,
+        penaltyType: resolutionAction === ReportResolutionAction.ApplyPenalty
+          ? penaltyType as typeof PLATFORM_PENALTY_TYPES[number]
+          : null,
+        durationHours: durationHoursFromFields(
+          resolutionAction as ReportResolutionActionValue,
+          durationPreset,
+          customHours,
+        ),
       });
       toast(
         resolutionAction === ReportResolutionAction.CancelEvent
@@ -232,7 +343,7 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
       setResolutionComment('');
       await refreshAfterAction(detail.id);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось решить жалобу');
+      setActionError(contentReportActionMessage(e));
     } finally {
       setBusy(false);
     }
@@ -331,6 +442,15 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
                       {report.eventName ? ` · ${report.eventName}` : ''}
                     </span>
                     <ReportTargetPreview report={report} compact />
+                    {(report.targetType === ReportTargetType.Account
+                      || report.targetType === ReportTargetType.Organization)
+                      && listStats[`${report.targetType}:${report.targetId}`] && (
+                      <span className={tabStyles.listStats}>
+                        жалоб: {listStats[`${report.targetType}:${report.targetId}`].openReports}
+                        {' · '}
+                        предупреждений: {listStats[`${report.targetType}:${report.targetId}`].warningCount}
+                      </span>
+                    )}
                   </div>
                   <span className={`${tabStyles.statusChip} ${statusChipClass(st)}`}>
                     {statusLabel(st)}
@@ -399,6 +519,35 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
               </div>
             </div>
 
+            {targetStats && (
+              <div className={tabStyles.statsRow}>
+                жалоб: {targetStats.openReports} · предупреждений: {targetStats.warningCount}
+                {targetStats.activePenalties.length > 0
+                  ? ` · ограничений: ${targetStats.activePenalties.length}`
+                  : ''}
+              </div>
+            )}
+            {targetStats && targetStats.activePenalties.length > 0 && (
+              <div className={styles.field}>
+                <span className={styles.label}>Действующие ограничения</span>
+                {targetStats.activePenalties.map(penalty => (
+                  <div key={penalty.id} className={tabStyles.penaltyRow}>
+                    <span>
+                      {MODERATION_PENALTY_TYPE_LABELS[penalty.penaltyType] || penalty.penaltyType}
+                      {penalty.endsAt ? ` · до ${formatDateTime(penalty.endsAt)}` : ' · бессрочно'}
+                    </span>
+                    <button
+                      type="button"
+                      className={tabStyles.revokeBtn}
+                      disabled={busy || revokeBusyId === penalty.id}
+                      onClick={() => void handleRevokePenalty(penalty)}
+                    >
+                      {revokeBusyId === penalty.id ? '…' : 'Снять'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             {detail.eventId && (
               <div className={styles.field}>
                 <span className={styles.label}>Мероприятие</span>
@@ -434,7 +583,7 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
 
             {canModerate(detail) && (
               <>
-                {(detail.platformStatus ?? detail.status) === ReportStatus.Open && (
+                {canTakeReport(detail, 'platform', accountId) && (
                   <div className={styles.formActions}>
                     <button
                       type="button"
@@ -442,9 +591,16 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
                       disabled={busy}
                       onClick={() => void handleTake()}
                     >
-                      Взять в работу
+                      {takeReportLabel(detail, 'platform', accountId)}
                     </button>
                   </div>
+                )}
+                {!canResolveReport(detail, 'platform', accountId) && (
+                  <p className={tabStyles.description}>
+                    {detail.assignedToAccount?.login
+                      ? `В работе у @${detail.assignedToAccount.login}. Сначала возьмите жалобу в работу.`
+                      : 'Сначала возьмите жалобу в работу.'}
+                  </p>
                 )}
 
                 <div className={styles.field}>
@@ -453,9 +609,20 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
                     value={resolutionAction}
                     onChange={setResolutionAction}
                     options={resolutionOptions}
-                    disabled={busy}
+                    disabled={busy || !canResolveReport(detail, 'platform', accountId)}
                   />
                 </div>
+                <ResolutionExtras
+                  action={resolutionAction as ReportResolutionActionValue | ''}
+                  penaltyTypes={PLATFORM_PENALTY_TYPES}
+                  penaltyType={penaltyType}
+                  onPenaltyTypeChange={setPenaltyType}
+                  durationPreset={durationPreset}
+                  onDurationPresetChange={setDurationPreset}
+                  customHours={customHours}
+                  onCustomHoursChange={setCustomHours}
+                  disabled={busy || !canResolveReport(detail, 'platform', accountId)}
+                />
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="platform-resolve-comment">
                     Комментарий к решению
@@ -466,7 +633,7 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
                     className={styles.textarea}
                     value={resolutionComment}
                     onChange={e => setResolutionComment(e.target.value)}
-                    disabled={busy}
+                    disabled={busy || !canResolveReport(detail, 'platform', accountId)}
                     rows={3}
                     placeholder={
                       resolutionAction === ReportResolutionAction.Other
@@ -479,7 +646,7 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
                   <button
                     type="button"
                     className={styles.saveBtn}
-                    disabled={busy || !resolutionAction}
+                    disabled={busy || !resolutionAction || !canResolveReport(detail, 'platform', accountId)}
                     onClick={handleResolveClick}
                   >
                     {busy ? '...' : 'Применить'}
@@ -496,6 +663,11 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
       {confirmOpen && (
         <PlatformResolveConfirm
           action={resolutionAction as ReportResolutionActionValue}
+          durationLabel={
+            needsDurationHours(resolutionAction as ReportResolutionActionValue)
+              ? durationPresetLabel(durationPreset, customHours)
+              : null
+          }
           busy={busy}
           onConfirm={() => void applyResolve()}
           onCancel={() => setConfirmOpen(false)}
@@ -507,21 +679,26 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
 
 function PlatformResolveConfirm({
   action,
+  durationLabel,
   busy,
   onConfirm,
   onCancel,
 }: {
   action: ReportResolutionActionValue;
+  durationLabel: string | null;
   busy: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   const meta = resolutionActionConfirm(action);
   if (!meta) return null;
+  const message = durationLabel
+    ? `${meta.message} Срок: ${durationLabel}.`
+    : meta.message;
   return (
     <ConfirmDialog
       title={meta.title}
-      message={meta.message}
+      message={message}
       confirmLabel={busy ? '…' : meta.confirmLabel}
       cancelLabel="Назад"
       onConfirm={onConfirm}

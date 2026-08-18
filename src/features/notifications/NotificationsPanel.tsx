@@ -103,6 +103,9 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       case 'organization':
         navigate(`/organization/${target.organizationId}`);
         break;
+      case 'settings-moderation':
+        navigate('/settings?tab=moderation');
+        break;
     }
   }, [markRead, navigate, onClose]);
 

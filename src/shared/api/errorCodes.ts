@@ -66,6 +66,10 @@ export const ApiErrorCode = {
 
   ContentReportReasonNotFound: 20001,
   ContentReportAlreadyExists: 20003,
+  ContentReportNotInReview: 20005,
+  ContentReportPenaltyActive: 20006,
+  ContentReportRestoreNotModerationCancel: 20007,
+  ContentReportPenaltyNotFound: 20008,
 } as const;
 
 export type ApiErrorCodeValue = (typeof ApiErrorCode)[keyof typeof ApiErrorCode];

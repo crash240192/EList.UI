@@ -96,12 +96,19 @@ export async function fetchEventsSearchShort(
 export async function fetchEventById(id: string): Promise<IEvent> {
   const data = await apiClient.get<IEvent>(`/api/events/get/${id}`);
   const ev: any = data.result;
+  const cancelSourceRaw = ev.cancelSource ?? ev.CancelSource ?? null;
   return {
     ...ev,
     eventTypes: ev.Types ?? ev.types ?? ev.eventTypes ?? [],
     eventType:  ev.eventType ?? (ev.Types ?? ev.types ?? ev.eventTypes)?.[0] ?? null,
     coverImageId: ev.coverImageId ?? ev.CoverImageId ?? null,
     coverUrl: ev.coverUrl ?? ev.CoverUrl ?? null,
+    cancelledAt: ev.cancelledAt ?? ev.CancelledAt ?? null,
+    cancelledByAccountId: ev.cancelledByAccountId ?? ev.CancelledByAccountId ?? null,
+    cancelSource: typeof cancelSourceRaw === 'string' && cancelSourceRaw
+      ? String(cancelSourceRaw).toLowerCase()
+      : null,
+    cancelReportId: ev.cancelReportId ?? ev.CancelReportId ?? null,
   };
 }
 

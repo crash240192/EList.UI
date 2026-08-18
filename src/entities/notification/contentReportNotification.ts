@@ -12,6 +12,7 @@ export const NOTIFICATION_TYPE_CONTENT_REPORT_ACCOUNT_SUSPENDED = 76;
 export const NOTIFICATION_TYPE_CONTENT_REPORT_ORG_SUSPENDED = 77;
 export const NOTIFICATION_TYPE_CONTENT_REPORT_ORG_REMOVED = 78;
 export const NOTIFICATION_TYPE_CONTENT_REPORT_AVATAR_RESET = 79;
+export const NOTIFICATION_TYPE_CONTENT_REPORT_PENALTY_ISSUED = 80;
 
 const CONTENT_REPORT_TYPE_NUMBERS = new Set([
   NOTIFICATION_TYPE_CONTENT_REPORT_FILED_AGAINST_YOU,
@@ -24,6 +25,7 @@ const CONTENT_REPORT_TYPE_NUMBERS = new Set([
   NOTIFICATION_TYPE_CONTENT_REPORT_ORG_SUSPENDED,
   NOTIFICATION_TYPE_CONTENT_REPORT_ORG_REMOVED,
   NOTIFICATION_TYPE_CONTENT_REPORT_AVATAR_RESET,
+  NOTIFICATION_TYPE_CONTENT_REPORT_PENALTY_ISSUED,
 ]);
 
 const CONTENT_REPORT_TYPE_NAMES = new Set([
@@ -37,6 +39,7 @@ const CONTENT_REPORT_TYPE_NAMES = new Set([
   'ContentReportOrganizationSuspended',
   'ContentReportOrganizatorRemoved',
   'ContentReportAvatarReset',
+  'ContentReportPenaltyIssued',
 ]);
 
 export interface IContentReportNotificationData {
@@ -165,6 +168,9 @@ export function contentReportNotificationTypeLabel(type: INotification['type']):
     case '79':
     case 'ContentReportAvatarReset':
       return 'Фото профиля сброшено';
+    case '80':
+    case 'ContentReportPenaltyIssued':
+      return 'Назначено ограничение';
     default:
       return 'Модерация';
   }

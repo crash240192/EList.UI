@@ -5,8 +5,17 @@ import type { INotificationRatingData } from './types';
 
 export const NOTIFICATION_TYPE_NEW_INVITATION = 51;
 
-/** EventCreated / Updated / Cancelled / Finished */
-export const EVENT_LIFECYCLE_TYPES = new Set([0, 1, 2, 3]);
+/** EventCreated / Updated / Cancelled / Finished / Restored */
+export const EVENT_LIFECYCLE_TYPES = new Set([0, 1, 2, 3, 4]);
+export const NOTIFICATION_TYPE_EVENT_RESTORED = 4;
+
+const EVENT_LIFECYCLE_NAMES = new Set([
+  'EventCreated',
+  'EventUpdated',
+  'EventCancelled',
+  'EventFinished',
+  'EventRestored',
+]);
 
 /** AddedToBlackList … NotInWhiteList */
 export const BW_LIST_NOTIFICATION_TYPES = new Set([41, 42, 43, 44, 45]);
@@ -26,6 +35,7 @@ export function isNewInvitationNotification(type: string | number | null | undef
 
 export function isEventShortDataType(type: string | number | null | undefined): boolean {
   if (type == null || type === '') return false;
+  if (typeof type === 'string' && EVENT_LIFECYCLE_NAMES.has(type)) return true;
   const n = Number(type);
   return Number.isFinite(n) && EVENT_SHORT_DATA_TYPES.has(n);
 }
@@ -43,6 +53,7 @@ export function isRatingNotificationType(type: string | number | null | undefine
 
 export function isEventPageNotificationType(type: string | number | null | undefined): boolean {
   if (type == null || type === '') return false;
+  if (typeof type === 'string' && EVENT_LIFECYCLE_NAMES.has(type)) return true;
   const n = Number(type);
   return Number.isFinite(n) && (EVENT_SHORT_DATA_TYPES.has(n) || RATING_NOTIFICATION_TYPES.has(n));
 }
