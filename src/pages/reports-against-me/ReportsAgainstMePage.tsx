@@ -55,6 +55,7 @@ export default function ReportsAgainstMePage() {
   usePageTitle('Жалобы на меня');
   const [searchParams, setSearchParams] = useSearchParams();
   const initialReportId = searchParams.get('report');
+  const fromSettingsModeration = searchParams.get('from') === 'settings-moderation';
 
   const [reports, setReports] = useState<IContentReportSubjectView[]>([]);
   const [total, setTotal] = useState(0);
@@ -142,6 +143,11 @@ export default function ReportsAgainstMePage() {
           </p>
         </div>
         <div className={styles.content}>
+          {fromSettingsModeration && (
+            <Link className={styles.backBtn} to="/settings?tab=moderation">
+              ← В модерацию
+            </Link>
+          )}
           {selectedId ? (
             <>
               <button type="button" className={styles.backBtn} onClick={closeDetail}>

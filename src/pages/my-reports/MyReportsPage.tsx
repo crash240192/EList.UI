@@ -45,6 +45,7 @@ export default function MyReportsPage() {
   usePageTitle('Мои жалобы');
   const [searchParams, setSearchParams] = useSearchParams();
   const initialReportId = searchParams.get('report');
+  const fromSettingsModeration = searchParams.get('from') === 'settings-moderation';
 
   const [reports, setReports] = useState<IContentReport[]>([]);
   const [total, setTotal] = useState(0);
@@ -135,6 +136,11 @@ export default function MyReportsPage() {
           <h1 className={styles.cardTitle}>Мои жалобы</h1>
         </div>
         <div className={styles.content}>
+          {fromSettingsModeration && (
+            <Link className={styles.backBtn} to="/settings?tab=moderation">
+              ← В модерацию
+            </Link>
+          )}
           {selectedId ? (
             <>
               <button type="button" className={styles.backBtn} onClick={closeDetail}>

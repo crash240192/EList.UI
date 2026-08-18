@@ -3,15 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  REPORT_RESOLUTION_ACTION_LABELS,
-  REPORT_TARGET_TYPE_LABELS,
-  ReportResolutionAction,
-  ReportStatus,
-  fetchReportsAgainstMe,
-  subjectReportStatusLabel,
-  type IContentReportSubjectView,
-  type ReportResolutionActionValue,
-} from '@/entities/contentReport';
+  contentReportNotificationTypeLabel,
+  parseContentReportNotificationData,
+  NOTIFICATION_TYPE_CONTENT_REPORT_WARNING_ISSUED,
+} from '@/entities/notification/contentReportNotification';
+import { fetchMyNotifications } from '@/entities/notification/api';
+import type { INotification } from '@/entities/notification/types';
 import { apiIsoToLocalParts } from '@/shared/lib/datetime';
 import styles from './ModerationSettingsPanel.module.css';
 
@@ -21,44 +18,12 @@ function formatDateTime(iso: string | null | undefined): string {
   return `${date} ${time}`;
 }
 
-function isModerationNotice(report: IContentReportSubjectView): boolean {
-  if (report.moderatorRemark) return true;
-  if (report.resolutionAction) return true;
-  return (
-    report.status === ReportStatus.Open
-    || report.status === ReportStatus.InReview
-    || report.status === ReportStatus.Escalated
-  );
-}
-
-function noticePriority(report: IContentReportSubjectView): number {
-  if (report.moderatorRemark) return 0;
-  if (report.resolutionAction === ReportResolutionAction.Warn) return 1;
-  if (
-    report.resolutionAction === ReportResolutionAction.HideContent
-    || report.resolutionAction === ReportResolutionAction.DeleteContent
-    || report.resolutionAction === ReportResolutionAction.SuspendAccount
-    || report.resolutionAction === ReportResolutionAction.SuspendOrganization
-  ) {
-    return 2;
-  }
-  if (
-    report.status === ReportStatus.Open
-    || report.status === ReportStatus.InReview
-    || report.status === ReportStatus.Escalated
-  ) {
-    return 3;
-  }
-  return 4;
-}
-
-function actionSummary(action: ReportResolutionActionValue | null): string | null {
-  if (!action) return null;
-  return REPORT_RESOLUTION_ACTION_LABELS[action] ?? action;
+function moderationSettingsListLink(path: '/reports-against-me' | '/my-reports'): string {
+  return `${path}?from=settings-moderation`;
 }
 
 export function ModerationSettingsPanel() {
-  const [reports, setReports] = useState<IContentReportSubjectView[]>([]);
+  const [warnings, setWarnings] = useState<INotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,10 +31,17 @@ export function ModerationSettingsPanel() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void fetchReportsAgainstMe(0, 30)
+    void fetchMyNotifications({
+      pageIndex: 0,
+      pageSize: 20,
+      type: 'ContentReportWarningIssued',
+    })
       .then(page => {
         if (cancelled) return;
-        setReports(page.result);
+        setWarnings(page.result.filter(
+          item => String(item.type) === String(NOTIFICATION_TYPE_CONTENT_REPORT_WARNING_ISSUED)
+            || item.type === 'ContentReportWarningIssued',
+        ));
       })
       .catch(e => {
         if (cancelled) return;
@@ -80,16 +52,14 @@ export function ModerationSettingsPanel() {
       });
     return () => { cancelled = true; };
   }, []);
-
   const notices = useMemo(
-    () => reports
-      .filter(isModerationNotice)
-      .sort((a, b) => {
-        const byPriority = noticePriority(a) - noticePriority(b);
-        if (byPriority !== 0) return byPriority;
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      }),
-    [reports],
+    () => warnings
+      .map(notification => ({
+        notification,
+        reportData: parseContentReportNotificationData(notification.data),
+      }))
+      .filter(item => item.reportData?.reportId),
+    [warnings],
   );
 
   return (
@@ -97,9 +67,8 @@ export function ModerationSettingsPanel() {
       <div className={styles.intro}>
         <h2 className={styles.title}>Замечания модерации</h2>
         <p className={styles.hint}>
-          Новые предупреждения и решения по вашему контенту приходят в{' '}
-          <strong>уведомления</strong> (колокольчик в шапке). Здесь — история
-          замечаний и итогов модерации.
+          Здесь показываем предупреждения модераторов из общего инбокса.
+          Полная история входящих жалоб и решений доступна по ссылке ниже.
         </p>
       </div>
 
@@ -108,37 +77,28 @@ export function ModerationSettingsPanel() {
       ) : error ? (
         <div className={styles.error}>{error}</div>
       ) : notices.length === 0 ? (
-        <div className={styles.state}>Замечаний пока нет</div>
+        <div className={styles.state}>Предупреждений модераторов пока нет</div>
       ) : (
         <ul className={styles.list}>
-          {notices.map(report => (
-            <li key={report.id}>
+          {notices.map(({ notification, reportData }) => (
+            <li key={notification.id}>
               <Link
                 className={styles.card}
-                to={`/reports-against-me?report=${report.id}`}
+                to={`/reports-against-me?report=${reportData!.reportId}&from=settings-moderation`}
               >
                 <div className={styles.cardTop}>
                   <span className={styles.cardTitle}>
-                    {report.reason?.name
-                      || REPORT_TARGET_TYPE_LABELS[report.targetType]
-                      || 'Модерация'}
+                    {notification.title
+                      || contentReportNotificationTypeLabel(notification.type)}
                   </span>
-                  <span className={styles.status}>
-                    {subjectReportStatusLabel(report.status, report.resolutionAction)}
-                  </span>
+                  {!notification.readAt && <span className={styles.status}>Новое</span>}
                 </div>
-                {report.moderatorRemark && (
-                  <p className={styles.remark}>{report.moderatorRemark}</p>
-                )}
-                {!report.moderatorRemark && report.resolutionAction && (
-                  <p className={styles.remark}>
-                    {actionSummary(report.resolutionAction)}
-                  </p>
-                )}
+                <p className={styles.remark}>
+                  {notification.message || 'Откройте карточку жалобы, чтобы посмотреть детали.'}
+                </p>
                 <span className={styles.meta}>
-                  {REPORT_TARGET_TYPE_LABELS[report.targetType] || report.targetType}
-                  {' · '}
-                  {formatDateTime(report.resolvedAt ?? report.updatedAt)}
+                  {reportData?.reasonName ? `${reportData.reasonName} · ` : ''}
+                  {formatDateTime(notification.createdAt)}
                 </span>
               </Link>
             </li>
@@ -147,10 +107,10 @@ export function ModerationSettingsPanel() {
       )}
 
       <div className={styles.links}>
-        <Link className={styles.link} to="/reports-against-me">
+        <Link className={styles.link} to={moderationSettingsListLink('/reports-against-me')}>
           Все входящие жалобы
         </Link>
-        <Link className={styles.link} to="/my-reports">
+        <Link className={styles.link} to={moderationSettingsListLink('/my-reports')}>
           Мои исходящие жалобы
         </Link>
       </div>
