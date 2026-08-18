@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   contentReportNotificationTypeLabel,
+  isContentReportWarningIssued,
   parseContentReportNotificationData,
-  NOTIFICATION_TYPE_CONTENT_REPORT_WARNING_ISSUED,
 } from '@/entities/notification/contentReportNotification';
 import { fetchMyNotifications } from '@/entities/notification/api';
 import type { INotification } from '@/entities/notification/types';
@@ -38,10 +38,7 @@ export function ModerationSettingsPanel() {
     })
       .then(page => {
         if (cancelled) return;
-        setWarnings(page.result.filter(
-          item => String(item.type) === String(NOTIFICATION_TYPE_CONTENT_REPORT_WARNING_ISSUED)
-            || item.type === 'ContentReportWarningIssued',
-        ));
+        setWarnings(page.result.filter(item => isContentReportWarningIssued(item.type)));
       })
       .catch(e => {
         if (cancelled) return;
@@ -53,12 +50,10 @@ export function ModerationSettingsPanel() {
     return () => { cancelled = true; };
   }, []);
   const notices = useMemo(
-    () => warnings
-      .map(notification => ({
-        notification,
-        reportData: parseContentReportNotificationData(notification.data),
-      }))
-      .filter(item => item.reportData?.reportId),
+    () => warnings.map(notification => ({
+      notification,
+      reportData: parseContentReportNotificationData(notification.data),
+    })),
     [warnings],
   );
 
@@ -80,29 +75,32 @@ export function ModerationSettingsPanel() {
         <div className={styles.state}>Предупреждений модераторов пока нет</div>
       ) : (
         <ul className={styles.list}>
-          {notices.map(({ notification, reportData }) => (
-            <li key={notification.id}>
-              <Link
-                className={styles.card}
-                to={`/reports-against-me?report=${reportData!.reportId}&from=settings-moderation`}
-              >
-                <div className={styles.cardTop}>
-                  <span className={styles.cardTitle}>
-                    {notification.title
-                      || contentReportNotificationTypeLabel(notification.type)}
+          {notices.map(({ notification, reportData }) => {
+            const reportId = reportData?.reportId;
+            const href = reportId
+              ? `/reports-against-me?report=${reportId}&from=settings-moderation`
+              : '/reports-against-me?from=settings-moderation';
+            return (
+              <li key={notification.id}>
+                <Link className={styles.card} to={href}>
+                  <div className={styles.cardTop}>
+                    <span className={styles.cardTitle}>
+                      {notification.title
+                        || contentReportNotificationTypeLabel(notification.type)}
+                    </span>
+                    {!notification.readAt && <span className={styles.status}>Новое</span>}
+                  </div>
+                  <p className={styles.remark}>
+                    {notification.message || 'Предупреждение по вашей жалобе'}
+                  </p>
+                  <span className={styles.meta}>
+                    {reportData?.reasonName ? `${reportData.reasonName} · ` : ''}
+                    {formatDateTime(notification.createdAt)}
                   </span>
-                  {!notification.readAt && <span className={styles.status}>Новое</span>}
-                </div>
-                <p className={styles.remark}>
-                  {notification.message || 'Откройте карточку жалобы, чтобы посмотреть детали.'}
-                </p>
-                <span className={styles.meta}>
-                  {reportData?.reasonName ? `${reportData.reasonName} · ` : ''}
-                  {formatDateTime(notification.createdAt)}
-                </span>
-              </Link>
-            </li>
-          ))}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
 

@@ -50,34 +50,62 @@ export interface IContentReportNotificationData {
   queue: string | null;
 }
 
+function unwrapScalar(value: unknown): unknown {
+  if (value == null) return null;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return null;
+    if (value.length === 1) return unwrapScalar(value[0]);
+    const firstUseful = value.find(item => unwrapScalar(item) != null);
+    return unwrapScalar(firstUseful);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === '[]' || trimmed === '{}') return null;
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}'))
+      || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try {
+        return unwrapScalar(JSON.parse(trimmed));
+      } catch {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+  return value;
+}
+
 function pickStr(raw: Record<string, unknown>, ...keys: string[]): string | null {
   for (const key of keys) {
-    const v = raw[key];
-    if (v != null && v !== '') return String(v);
+    const v = unwrapScalar(raw[key]);
+    if (v == null || v === '') continue;
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+      const s = String(v).trim();
+      if (s) return s;
+    }
+  }
+  return null;
+}
+
+function pickEnum(raw: Record<string, unknown>, ...keys: string[]): string | number | null {
+  for (const key of keys) {
+    const v = unwrapScalar(raw[key]);
+    if (v == null || v === '') continue;
+    if (typeof v === 'string' || typeof v === 'number') return v;
   }
   return null;
 }
 
 export function parseContentReportNotificationData(data: unknown): IContentReportNotificationData | null {
-  if (!data || typeof data !== 'object') return null;
-  const r = data as Record<string, unknown>;
+  const unwrapped = unwrapScalar(data);
+  if (!unwrapped || typeof unwrapped !== 'object' || Array.isArray(unwrapped)) return null;
+  const r = unwrapped as Record<string, unknown>;
   return {
     reportId: pickStr(r, 'reportId', 'ReportId'),
-    targetType: (() => {
-      const v = r.targetType ?? r.TargetType;
-      if (v == null) return null;
-      if (typeof v === 'string' || typeof v === 'number') return v;
-      return String(v);
-    })(),
+    targetType: pickEnum(r, 'targetType', 'TargetType'),
     targetId: pickStr(r, 'targetId', 'TargetId'),
     eventId: pickStr(r, 'eventId', 'EventId'),
     organizationId: pickStr(r, 'organizationId', 'OrganizationId'),
-    resolutionAction: (() => {
-      const v = r.resolutionAction ?? r.ResolutionAction;
-      if (v == null) return null;
-      if (typeof v === 'string' || typeof v === 'number') return v;
-      return String(v);
-    })(),
+    resolutionAction: pickEnum(r, 'resolutionAction', 'ResolutionAction'),
     reasonName: pickStr(r, 'reasonName', 'ReasonName'),
     queue: pickStr(r, 'queue', 'Queue'),
   };
@@ -87,6 +115,12 @@ export function notificationTypeKey(type: INotification['type']): string {
   if (type == null) return '';
   if (typeof type === 'string') return type;
   return String(type);
+}
+
+export function isContentReportWarningIssued(type: INotification['type']): boolean {
+  const key = notificationTypeKey(type);
+  return key === 'ContentReportWarningIssued'
+    || key === String(NOTIFICATION_TYPE_CONTENT_REPORT_WARNING_ISSUED);
 }
 
 export function isContentReportNotificationType(type: INotification['type']): boolean {
