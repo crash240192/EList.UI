@@ -28,6 +28,7 @@ import { usePlatformRoleStore } from '@/app/store';
 import { BugReportCategoriesTab } from './BugReportCategoriesTab';
 import { ReportReasonsTab } from './ReportReasonsTab';
 import { PlatformRolesTab } from './PlatformRolesTab';
+import { SystemNotificationsTab } from './SystemNotificationsTab';
 import styles from './AdminPage.module.css';
 
 type AdminTab =
@@ -37,7 +38,8 @@ type AdminTab =
   | 'agreements'
   | 'bugReportCategories'
   | 'reportReasons'
-  | 'platformRoles';
+  | 'platformRoles'
+  | 'systemNotifications';
 
 type AdminNavItem = { key: AdminTab; label: string };
 
@@ -52,9 +54,10 @@ const POLICY_NAV: AdminNavItem[] = [
   { key: 'bugReportCategories', label: 'Категории ошибок' },
   { key: 'reportReasons', label: 'Причины жалоб' },
   { key: 'platformRoles', label: 'Роли площадки' },
+  { key: 'systemNotifications', label: 'Системные уведомления' },
 ];
 
-const ADMIN_ONLY_TABS = new Set<AdminTab>(['reportReasons', 'platformRoles']);
+const ADMIN_ONLY_TABS = new Set<AdminTab>(['reportReasons', 'platformRoles', 'systemNotifications']);
 
 const VALID_TABS = new Set<AdminTab>([
   'eventTypes',
@@ -64,6 +67,7 @@ const VALID_TABS = new Set<AdminTab>([
   'bugReportCategories',
   'reportReasons',
   'platformRoles',
+  'systemNotifications',
 ]);
 
 function isAdminTab(value: string | null): value is AdminTab {
@@ -182,6 +186,7 @@ export default function AdminPage() {
             {activeTab === 'bugReportCategories' && <BugReportCategoriesTab />}
             {activeTab === 'reportReasons' && isAdminOrAbove && <ReportReasonsTab />}
             {activeTab === 'platformRoles' && isAdminOrAbove && <PlatformRolesTab />}
+            {activeTab === 'systemNotifications' && isAdminOrAbove && <SystemNotificationsTab />}
           </div>
         </div>
       </div>
