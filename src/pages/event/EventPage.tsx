@@ -6,6 +6,7 @@ import type { IEvent, IEventOrganizator, IParticipantView } from '@/entities/eve
 import {
   fetchEventById, participateEvent, leaveEvent,
   fetchEventParticipants, fetchEventParameters,
+  removeEventOrganizator,
   MOCK_EVENTS,
 } from '@/entities/event';
 import { getOrganizationAvatar } from '@/entities/organization';
@@ -33,6 +34,7 @@ import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import { AgeConfirmDialog } from '@/shared/ui/AgeConfirmDialog';
 import { BirthDateRequiredDialog } from '@/shared/ui/BirthDateRequiredDialog';
@@ -61,8 +63,10 @@ function EventOrganizerChip({
   currentAccountId,
   authenticated,
   alreadyReported,
+  canManage,
   onOpen,
   onReport,
+  onRemove,
 }: {
   organizer: IEventOrganizator;
   kind: 'org' | 'person';
@@ -70,13 +74,16 @@ function EventOrganizerChip({
   currentAccountId: string | null;
   authenticated: boolean;
   alreadyReported: boolean;
+  canManage: boolean;
   onOpen: () => void;
   onReport: () => void;
+  onRemove?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
   const isSelf = kind === 'person' && !!currentAccountId && organizer.accountId === currentAccountId;
   const canReport = authenticated && !isSelf && !!organizer.id;
+  const showMenu = canReport || (canManage && !isSelf);
   const name = kind === 'org'
     ? (organizer.organizationName?.trim() || 'Организация')
     : (organizer.firstName
@@ -114,7 +121,7 @@ function EventOrganizerChip({
           <div className={styles.orgChipRole}>{kind === 'org' ? 'Организация' : 'Организатор'}</div>
         </div>
       </button>
-      {canReport && (
+      {showMenu && (
         <>
           <button
             ref={menuRef}
@@ -136,15 +143,28 @@ function EventOrganizerChip({
             onClose={() => setMenuOpen(false)}
             anchorRef={menuRef}
           >
-            <HeroContextMenuItem
-              disabled={alreadyReported}
-              onClick={() => {
-                setMenuOpen(false);
-                onReport();
-              }}
-            >
-              {alreadyReported ? 'Жалоба уже отправлена' : 'Пожаловаться'}
-            </HeroContextMenuItem>
+            {canReport && (
+              <HeroContextMenuItem
+                disabled={alreadyReported}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onReport();
+                }}
+              >
+                {alreadyReported ? 'Жалоба уже отправлена' : 'Пожаловаться'}
+              </HeroContextMenuItem>
+            )}
+            {canManage && !isSelf && onRemove && (
+              <HeroContextMenuItem
+                danger
+                onClick={() => {
+                  setMenuOpen(false);
+                  onRemove();
+                }}
+              >
+                Снять организатора
+              </HeroContextMenuItem>
+            )}
           </HeroContextMenu>
         </>
       )}
@@ -184,6 +204,8 @@ export default function EventPage() {
   const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
   const [bwListOpen,      setBwListOpen]      = useState(false);
   const [mapModalOpen,    setMapModalOpen]    = useState(false);
+  const [removeOrgConfirm, setRemoveOrgConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [removeOrgBusy, setRemoveOrgBusy] = useState(false);
   const [joinShake,       setJoinShake]       = useState(false);
   const [limitNotice,     setLimitNotice]     = useState(false);
   const [pageAccessDenied, setPageAccessDenied] = useState(false);
@@ -469,6 +491,21 @@ export default function EventPage() {
     if (!event?.id) return;
     setShowShareMenu(true);
   }, [event?.id]);
+
+  const handleRemoveOrganizer = useCallback(async () => {
+    if (!id || !removeOrgConfirm || removeOrgBusy) return;
+    setRemoveOrgBusy(true);
+    try {
+      await removeEventOrganizator(id, removeOrgConfirm.id);
+      toast('Организатор снят', 'success');
+      setRemoveOrgConfirm(null);
+      void refetchOrganizers();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось снять организатора', 'error');
+    } finally {
+      setRemoveOrgBusy(false);
+    }
+  }, [id, removeOrgConfirm, removeOrgBusy, toast, refetchOrganizers]);
 
   const participantChips = useMemo(() => {
     const sorted = [
@@ -1016,11 +1053,16 @@ export default function EventPage() {
                           currentAccountId={accountId}
                           authenticated={authenticated}
                           alreadyReported={reportedOrganizatorIds.has(o.id)}
+                          canManage={isOrganizer}
                           onOpen={() => navigate(`/organization/${orgId}`)}
                           onReport={() => {
                             setReportTarget({ type: ReportTargetType.EventOrganizator, id: o.id });
                             setReportModalOpen(true);
                           }}
+                          onRemove={() => setRemoveOrgConfirm({
+                            id: o.id,
+                            name: o.organizationName?.trim() || 'Организация',
+                          })}
                         />
                       );
                     })}
@@ -1032,10 +1074,17 @@ export default function EventPage() {
                         currentAccountId={accountId}
                         authenticated={authenticated}
                         alreadyReported={reportedOrganizatorIds.has(o.id)}
+                        canManage={isOrganizer}
                         onOpen={() => navigate(`/user/${o.accountId}`)}
                         onReport={() => {
                           setReportTarget({ type: ReportTargetType.EventOrganizator, id: o.id });
                           setReportModalOpen(true);
+                        }}
+                        onRemove={() => {
+                          const n = o.firstName
+                            ? `${o.firstName} ${o.lastName ?? ''}`.trim()
+                            : (o.login ?? 'Организатор');
+                          setRemoveOrgConfirm({ id: o.id, name: n });
                         }}
                       />
                     ))}
@@ -1058,6 +1107,16 @@ export default function EventPage() {
         </div>{/* end mainGrid */}
       </div>{/* end card */}
 
+      {removeOrgConfirm && (
+        <ConfirmDialog
+          title="Снять организатора?"
+          message={`${removeOrgConfirm.name} будет снят с организаторов мероприятия.`}
+          confirmLabel={removeOrgBusy ? '…' : 'Снять'}
+          cancelLabel="Отмена"
+          onConfirm={() => void handleRemoveOrganizer()}
+          onCancel={() => setRemoveOrgConfirm(null)}
+        />
+      )}
       {cancelConfirm && (
         <CancelConfirmDialog eventName={event.name} loading={actionLoading}
           onConfirm={handleCancelEvent} onClose={() => setCancelConfirm(false)} />

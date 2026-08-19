@@ -48,7 +48,9 @@ export {
   assignEventParameters,
   assignEventTypes,
   assignEventOrganizators,
+  fetchEventOrganizator,
   fetchEventOrganizators,
+  removeEventOrganizator,
   checkIsEventOrganizator,
 } from './eventExtrasApi';
 

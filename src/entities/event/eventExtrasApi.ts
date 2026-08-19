@@ -173,6 +173,42 @@ export async function fetchEventOrganizators(eventId: string): Promise<IEventOrg
 }
 
 /**
+ * GET /api/EventOrganizators/get/{id}
+ */
+export async function fetchEventOrganizator(id: string): Promise<IEventOrganizator | null> {
+  try {
+    const data = await apiClient.get<IRawOrganizator>(
+      `/api/EventOrganizators/get/${id}`,
+    );
+    const o = data.result;
+    if (!o) return null;
+    const orgId = o.organizationId ?? o.organization?.id ?? null;
+    return {
+      id: o.id,
+      accountId: o.account?.id ?? null,
+      login: o.account?.login ?? null,
+      firstName: o.personInfo?.firstName ?? null,
+      lastName: o.personInfo?.lastName ?? null,
+      avatarId: o.account?.avatarId ?? null,
+      organizationId: orgId,
+      organizationName: o.organization?.name ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * DELETE /api/EventOrganizators/{eventId}/remove/{organizatorId}
+ */
+export async function removeEventOrganizator(
+  eventId: string,
+  organizatorId: string,
+): Promise<void> {
+  await apiClient.delete(`/api/EventOrganizators/${eventId}/remove/${organizatorId}`);
+}
+
+/**
  * GET /api/EventOrganizators/isOrganizator/{eventId}
  * BooleanCommandResult — учитывает и личное членство, и роль в организации-организаторе.
  */
