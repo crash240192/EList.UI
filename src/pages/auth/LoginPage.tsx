@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { login } from '@/features/auth/api';
+import { ApiError } from '@/shared/api/client';
+import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { storeActivationNotice, takeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
@@ -33,6 +35,7 @@ export default function LoginPage() {
   const [error, setError]   = useState<string | null>(resetError ?? null);
   const [showPass, setShow] = useState(false);
   const [activationNotice, setActivationNotice] = useState<string | null>(null);
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(f => ({ ...f, [k]: e.target.value }));
@@ -56,7 +59,11 @@ export default function LoginPage() {
       }
       navigate(returnTo, { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Неверный логин или пароль');
+      if (e instanceof ApiError && e.code === ApiErrorCode.ContentReportPenaltyActive) {
+        setBlockedMessage(e.serverMessage || 'Аккаунт заблокирован модерацией');
+      } else {
+        setError(e instanceof Error ? e.message : 'Неверный логин или пароль');
+      }
     } finally { setLoad(false); }
   };
 
@@ -126,6 +133,18 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+
+    {blockedMessage && (
+      <ConfirmDialog
+        title="Аккаунт заблокирован"
+        message={blockedMessage}
+        confirmLabel="Понятно"
+        hideCancel
+        variant="danger"
+        onConfirm={() => setBlockedMessage(null)}
+        onCancel={() => {}}
+      />
+    )}
 
     {activationNotice && (
       <ConfirmDialog

@@ -13,6 +13,7 @@ import {
   escalateContentReport,
   fetchContentReport,
   fetchContentReportActions,
+  fetchContentReportTargetStats,
   organizerResolutionActionsFor,
   parseTargetSnapshot,
   resolutionActionConfirm,
@@ -27,6 +28,7 @@ import {
   type IContentReport,
   type IContentReportAction,
   type ReportResolutionActionValue,
+  type IContentReportTargetStats,
   type ReportSeverityValue,
   type ReportStatusValue,
 } from '@/entities/contentReport';
@@ -129,6 +131,7 @@ export function OrganizerReportsModal({
   const [durationPreset, setDurationPreset] = useState('168');
   const [customHours, setCustomHours] = useState('24');
   const [escalateComment, setEscalateComment] = useState('');
+  const [targetStats, setTargetStats] = useState<IContentReportTargetStats | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [escalateConfirmOpen, setEscalateConfirmOpen] = useState(false);
 
@@ -176,6 +179,7 @@ export function OrganizerReportsModal({
       setDetail(null);
       setActions([]);
       setActionError(null);
+      setTargetStats(null);
       return;
     }
     let cancelled = false;
@@ -191,6 +195,9 @@ export function OrganizerReportsModal({
         setActions(acts);
         const next = organizerResolutionActionsFor(report);
         setResolutionAction(next[0] ?? '');
+        void fetchContentReportTargetStats(report.targetType, report.targetId)
+          .then(stats => { if (!cancelled) setTargetStats(stats); })
+          .catch(() => { if (!cancelled) setTargetStats(null); });
       })
       .catch(e => {
         if (cancelled) return;
@@ -212,6 +219,11 @@ export function OrganizerReportsModal({
     setActions(acts);
     const next = organizerResolutionActionsFor(report);
     setResolutionAction(next[0] ?? '');
+    try {
+      setTargetStats(await fetchContentReportTargetStats(report.targetType, report.targetId));
+    } catch {
+      setTargetStats(null);
+    }
   };
 
   const handleTake = async () => {
@@ -392,6 +404,31 @@ export function OrganizerReportsModal({
                   <span className={styles.sectionTitle}>Объект</span>
                   <ReportTargetPreview report={detail} />
                 </div>
+
+                {targetStats && (
+                  <div className={styles.section}>
+                    <span className={styles.sectionTitle}>Статистика объекта</span>
+                    <p className={styles.meta}>
+                      всего: {targetStats.totalReports}
+                      {' · '}открыто: {targetStats.openReports}
+                      {' · '}решено: {targetStats.resolvedReports}
+                      {' · '}отклонено: {targetStats.dismissedReports}
+                      {' · '}предупреждений: {targetStats.warningCount}
+                    </p>
+                    {(targetStats.relatedTotalReports > 0 || targetStats.relatedOpenReports > 0) && (
+                      <p className={styles.meta}>
+                        связанные: {targetStats.relatedTotalReports}
+                        {' · '}открыто: {targetStats.relatedOpenReports}
+                        {' · '}предупреждений: {targetStats.relatedWarningCount}
+                      </p>
+                    )}
+                    {targetStats.activePenalties.length > 0 && (
+                      <p className={styles.meta}>
+                        ограничений: {targetStats.activePenalties.length}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {(detail.comment || detail.reporter) && (
                   <div className={styles.section}>

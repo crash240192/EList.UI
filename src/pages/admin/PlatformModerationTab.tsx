@@ -176,13 +176,8 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
   }, [loadList]);
 
   useEffect(() => {
-    const targets = reports.filter(
-      report =>
-        report.targetType === ReportTargetType.Account
-        || report.targetType === ReportTargetType.Organization,
-    );
     const unique = new Map<string, { type: ReportTargetTypeValue; id: string }>();
-    for (const report of targets) {
+    for (const report of reports) {
       unique.set(`${report.targetType}:${report.targetId}`, {
         type: report.targetType,
         id: report.targetId,
@@ -231,16 +226,9 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
         setActions(acts);
         const next = platformResolutionActionsFor(report);
         setResolutionAction(next[0] ?? '');
-        if (
-          report.targetType === ReportTargetType.Account
-          || report.targetType === ReportTargetType.Organization
-        ) {
-          void fetchContentReportTargetStats(report.targetType, report.targetId)
-            .then(stats => { if (!cancelled) setTargetStats(stats); })
-            .catch(() => { if (!cancelled) setTargetStats(null); });
-        } else {
-          setTargetStats(null);
-        }
+        void fetchContentReportTargetStats(report.targetType, report.targetId)
+          .then(stats => { if (!cancelled) setTargetStats(stats); })
+          .catch(() => { if (!cancelled) setTargetStats(null); });
       })
       .catch(e => {
         if (cancelled) return;
@@ -262,16 +250,9 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
     setActions(acts);
     const next = platformResolutionActionsFor(report);
     setResolutionAction(next[0] ?? '');
-    if (
-      report.targetType === ReportTargetType.Account
-      || report.targetType === ReportTargetType.Organization
-    ) {
-      try {
-        setTargetStats(await fetchContentReportTargetStats(report.targetType, report.targetId));
-      } catch {
-        setTargetStats(null);
-      }
-    } else {
+    try {
+      setTargetStats(await fetchContentReportTargetStats(report.targetType, report.targetId));
+    } catch {
       setTargetStats(null);
     }
   };
@@ -442,13 +423,13 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
                       {report.eventName ? ` · ${report.eventName}` : ''}
                     </span>
                     <ReportTargetPreview report={report} compact />
-                    {(report.targetType === ReportTargetType.Account
-                      || report.targetType === ReportTargetType.Organization)
-                      && listStats[`${report.targetType}:${report.targetId}`] && (
+                    {listStats[`${report.targetType}:${report.targetId}`] && (
                       <span className={tabStyles.listStats}>
-                        жалоб: {listStats[`${report.targetType}:${report.targetId}`].openReports}
-                        {' · '}
-                        предупреждений: {listStats[`${report.targetType}:${report.targetId}`].warningCount}
+                        всего: {listStats[`${report.targetType}:${report.targetId}`].totalReports}
+                        {' · '}открыто: {listStats[`${report.targetType}:${report.targetId}`].openReports}
+                        {listStats[`${report.targetType}:${report.targetId}`].warningCount > 0
+                          ? ` · предупреждений: ${listStats[`${report.targetType}:${report.targetId}`].warningCount}`
+                          : ''}
                       </span>
                     )}
                   </div>
@@ -521,10 +502,31 @@ export function PlatformModerationTab({ onActiveCountChange }: PlatformModeratio
 
             {targetStats && (
               <div className={tabStyles.statsRow}>
-                жалоб: {targetStats.openReports} · предупреждений: {targetStats.warningCount}
-                {targetStats.activePenalties.length > 0
-                  ? ` · ограничений: ${targetStats.activePenalties.length}`
-                  : ''}
+                <div>
+                  всего: {targetStats.totalReports}
+                  {' · '}открыто: {targetStats.openReports}
+                  {' · '}решено: {targetStats.resolvedReports}
+                  {' · '}отклонено: {targetStats.dismissedReports}
+                  {' · '}предупреждений: {targetStats.warningCount}
+                </div>
+                {(targetStats.relatedTotalReports > 0 || targetStats.relatedOpenReports > 0) && (
+                  <div>
+                    связанные: {targetStats.relatedTotalReports}
+                    {' · '}открыто: {targetStats.relatedOpenReports}
+                    {' · '}предупреждений: {targetStats.relatedWarningCount}
+                  </div>
+                )}
+                {targetStats.activePenalties.length > 0 && (
+                  <div>ограничений: {targetStats.activePenalties.length}</div>
+                )}
+                {targetStats.lastReportAt && (
+                  <div className={tabStyles.statsDate}>
+                    последняя жалоба: {formatDateTime(targetStats.lastReportAt)}
+                    {targetStats.lastWarningAt
+                      ? ` · последнее предупреждение: ${formatDateTime(targetStats.lastWarningAt)}`
+                      : ''}
+                  </div>
+                )}
               </div>
             )}
             {targetStats && targetStats.activePenalties.length > 0 && (

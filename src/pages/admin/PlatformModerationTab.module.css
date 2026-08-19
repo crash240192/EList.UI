@@ -189,6 +189,15 @@
   border-radius: 8px;
   background: var(--surface-2);
   border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statsDate {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .penaltyRow {

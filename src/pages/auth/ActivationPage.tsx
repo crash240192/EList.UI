@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { activateAccount } from '@/features/auth/api';
-import { apiClient } from '@/shared/api/client';
+import { apiClient, ApiError } from '@/shared/api/client';
+import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { setPersonInfo } from '@/features/auth/registrationApi';
 import { loadPendingPersonData, clearPendingPersonData } from '@/features/auth/pendingPersonData';
 import { takeActivationNotice } from '@/features/auth/activationNotice';
@@ -39,6 +40,7 @@ export default function ActivationPage() {
   const [resending, setResending]     = useState(false);
   const [resendMsg, setResendMsg]     = useState<string | null>(null);
   const [entryNotice, setEntryNotice] = useState<string | null>(() => takeActivationNotice());
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const timerRef  = useRef<ReturnType<typeof setInterval>>();
 
   useEffect(() => {
@@ -83,7 +85,11 @@ export default function ActivationPage() {
       setSuccess(true);
       setTimeout(() => navigate('/', { replace: true }), 1200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Неверный код активации');
+      if (err instanceof ApiError && err.code === ApiErrorCode.ContentReportPenaltyActive) {
+        setBlockedMessage(err.serverMessage || 'Аккаунт заблокирован модерацией');
+      } else {
+        setError(err instanceof Error ? err.message : 'Неверный код активации');
+      }
       setCode('');
     } finally { setLoading(false); }
   };
@@ -159,6 +165,22 @@ export default function ActivationPage() {
         </div>
       </div>
     </div>
+
+    {blockedMessage && (
+      <ConfirmDialog
+        title="Аккаунт заблокирован"
+        message={blockedMessage}
+        confirmLabel="Выйти"
+        hideCancel
+        variant="danger"
+        onConfirm={() => {
+          setBlockedMessage(null);
+          logout();
+          navigate('/login', { replace: true });
+        }}
+        onCancel={() => {}}
+      />
+    )}
 
     {entryNotice && (
       <ConfirmDialog
