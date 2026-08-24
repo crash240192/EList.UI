@@ -18,7 +18,7 @@ import {
 import { apiIsoToLocalParts } from '@/shared/lib/datetime';
 import { usePageTitle } from '@/shared/hooks';
 import { ReportTargetPreview } from '@/features/content-reports';
-import styles from './ReportsAgainstMePage.module.css';
+import styles from '@/features/content-reports/reportInbox.module.css';
 
 const PAGE_SIZE = 20;
 
@@ -55,6 +55,7 @@ export default function ReportsAgainstMePage() {
   usePageTitle('Жалобы на меня');
   const [searchParams, setSearchParams] = useSearchParams();
   const initialReportId = searchParams.get('report');
+  const fromSettings = searchParams.get('from') === 'settings-moderation';
 
   const [reports, setReports] = useState<IContentReportSubjectView[]>([]);
   const [total, setTotal] = useState(0);
@@ -75,7 +76,7 @@ export default function ReportsAgainstMePage() {
       const page = await fetchReportsAgainstMe(index, PAGE_SIZE);
       setTotal(page.total);
       setPageIndex(index);
-      setReports(prev => append ? [...prev, ...page.result] : page.result);
+      setReports(prev => (append ? [...prev, ...page.result] : page.result));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось загрузить список');
     } finally {
@@ -132,16 +133,44 @@ export default function ReportsAgainstMePage() {
 
   const closeDetail = () => setSelectedId(null);
 
+  const myReportsHref = fromSettings
+    ? '/my-reports?from=settings-moderation'
+    : '/my-reports';
+
+  const showRemark = (report: IContentReportSubjectView) =>
+    Boolean(report.moderatorRemark)
+    && (report.resolutionAction === ReportResolutionAction.Warn
+      || report.resolutionAction === ReportResolutionAction.Other);
+
   return (
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.cardHeader}>
-          <h1 className={styles.cardTitle}>Жалобы на меня</h1>
-          <p className={styles.subtitle}>
-            Замечания модерации по вашему контенту. Кто пожаловался — не показываем.
-          </p>
+          <div className={styles.headerMain}>
+            <div className={styles.titleRow}>
+              <h1 className={styles.cardTitle}>Жалобы на меня</h1>
+              {!loading && !selectedId && total > 0 && (
+                <span className={styles.count}>{total}</span>
+              )}
+            </div>
+            <p className={styles.subtitle}>
+              Замечания и решения модерации по вашему контенту. Кто пожаловался — не показываем.
+            </p>
+          </div>
+          {!selectedId && (
+            <Link className={styles.headerLink} to={myReportsHref}>
+              Мои жалобы
+            </Link>
+          )}
         </div>
+
         <div className={styles.content}>
+          {fromSettings && !selectedId && (
+            <Link className={styles.backBtn} to="/settings?tab=moderation">
+              ← В модерацию
+            </Link>
+          )}
+
           {selectedId ? (
             <>
               <button type="button" className={styles.backBtn} onClick={closeDetail}>
@@ -152,25 +181,39 @@ export default function ReportsAgainstMePage() {
               ) : detailError && !detail ? (
                 <div className={styles.error}>{detailError}</div>
               ) : detail ? (
-                <>
-                  <div className={styles.section}>
-                    <span className={styles.sectionTitle}>Статус</span>
-                    <span className={`${styles.statusChip} ${statusChipClass(detail.status, detail.resolutionAction)}`}>
-                      {subjectReportStatusLabel(detail.status, detail.resolutionAction)}
-                    </span>
-                    <p className={styles.meta}>{formatDateTime(detail.createdAt)}</p>
-                  </div>
-                  <div className={styles.section}>
-                    <span className={styles.sectionTitle}>Причина</span>
-                    <p className={styles.sectionText}>{detail.reason?.name || '—'}</p>
-                    {detail.reason?.description && (
-                      <p className={styles.meta}>{detail.reason.description}</p>
-                    )}
-                  </div>
-                  <div className={styles.section}>
-                    <span className={styles.sectionTitle}>
+                <div className={styles.detail}>
+                  <div className={styles.statusBanner}>
+                    <div className={styles.statusBannerMain}>
+                      <span className={`${styles.statusChip} ${statusChipClass(detail.status, detail.resolutionAction)}`}>
+                        {subjectReportStatusLabel(detail.status, detail.resolutionAction)}
+                      </span>
+                      <span className={styles.itemMeta}>{formatDateTime(detail.createdAt)}</span>
+                    </div>
+                    <span className={styles.itemType}>
                       {REPORT_TARGET_TYPE_LABELS[detail.targetType] || detail.targetType}
                     </span>
+                  </div>
+
+                  <div>
+                    <h2 className={styles.detailTitle}>
+                      {detail.reason?.name || REPORT_TARGET_TYPE_LABELS[detail.targetType] || 'Модерация'}
+                    </h2>
+                    {detail.reason?.description && (
+                      <p className={styles.detailLead}>{detail.reason.description}</p>
+                    )}
+                  </div>
+
+                  {showRemark(detail) && (
+                    <div className={styles.block}>
+                      <span className={styles.blockLabel}>Замечание модератора</span>
+                      <p className={styles.remark}>{detail.moderatorRemark}</p>
+                    </div>
+                  )}
+
+                  <hr className={styles.divider} />
+
+                  <div className={styles.block}>
+                    <span className={styles.blockLabel}>Объект</span>
                     <ReportTargetPreview report={subjectViewForPreview(detail)} />
                     {detail.eventId && (
                       <Link className={styles.eventLink} to={`/event/${detail.eventId}`}>
@@ -178,28 +221,20 @@ export default function ReportsAgainstMePage() {
                       </Link>
                     )}
                   </div>
-                  {detail.moderatorRemark && (
-                    detail.resolutionAction === ReportResolutionAction.Warn
-                    || detail.resolutionAction === ReportResolutionAction.Other
-                  ) && (
-                    <div className={styles.section}>
-                      <span className={styles.sectionTitle}>Замечание модератора</span>
-                      <p className={styles.sectionText}>{detail.moderatorRemark}</p>
-                    </div>
-                  )}
+
                   {detail.resolutionAction && (
-                    <div className={styles.section}>
-                      <span className={styles.sectionTitle}>Итог</span>
-                      <p className={styles.sectionText}>
+                    <div className={styles.block}>
+                      <span className={styles.blockLabel}>Итог</span>
+                      <p className={styles.blockText}>
                         {REPORT_RESOLUTION_ACTION_LABELS[detail.resolutionAction]
                           ?? detail.resolutionAction}
                       </p>
                       {detail.resolvedAt && (
-                        <p className={styles.meta}>{formatDateTime(detail.resolvedAt)}</p>
+                        <p className={styles.itemMeta}>{formatDateTime(detail.resolvedAt)}</p>
                       )}
                     </div>
                   )}
-                </>
+                </div>
               ) : null}
             </>
           ) : loading ? (
@@ -207,32 +242,45 @@ export default function ReportsAgainstMePage() {
           ) : error ? (
             <div className={styles.error}>{error}</div>
           ) : reports.length === 0 ? (
-            <div className={styles.empty}>Жалоб на ваш контент пока нет</div>
+            <div className={styles.emptyState}>
+              <p className={styles.emptyTitle}>Жалоб на вас нет</p>
+              <p className={styles.emptySub}>
+                Здесь появятся замечания модерации и решения по вашему контенту.
+              </p>
+            </div>
           ) : (
             <>
-              {reports.map(report => (
-                <button
-                  key={report.id}
-                  type="button"
-                  className={styles.cardItem}
-                  onClick={() => openDetail(report.id)}
-                >
-                  <div className={styles.cardTop}>
-                    <span className={styles.reasonName}>
-                      {report.reason?.name || REPORT_TARGET_TYPE_LABELS[report.targetType]}
+              <div className={styles.list}>
+                {reports.map(report => (
+                  <button
+                    key={report.id}
+                    type="button"
+                    className={styles.item}
+                    onClick={() => openDetail(report.id)}
+                  >
+                    <div className={styles.itemTop}>
+                      <div className={styles.itemTitleBlock}>
+                        <span className={styles.itemType}>
+                          {REPORT_TARGET_TYPE_LABELS[report.targetType] || report.targetType}
+                        </span>
+                        <span className={styles.itemTitle}>
+                          {report.reason?.name || REPORT_TARGET_TYPE_LABELS[report.targetType]}
+                        </span>
+                      </div>
+                      <span className={`${styles.statusChip} ${statusChipClass(report.status, report.resolutionAction)}`}>
+                        {subjectReportStatusLabel(report.status, report.resolutionAction)}
+                      </span>
+                    </div>
+                    {showRemark(report) && report.moderatorRemark && (
+                      <p className={styles.blockText}>{report.moderatorRemark}</p>
+                    )}
+                    <ReportTargetPreview report={subjectViewForPreview(report)} compact />
+                    <span className={styles.itemMeta}>
+                      {formatDateTime(report.resolvedAt ?? report.createdAt)}
                     </span>
-                    <span className={`${styles.statusChip} ${statusChipClass(report.status, report.resolutionAction)}`}>
-                      {subjectReportStatusLabel(report.status, report.resolutionAction)}
-                    </span>
-                  </div>
-                  <ReportTargetPreview report={subjectViewForPreview(report)} compact />
-                  <span className={styles.meta}>
-                    {REPORT_TARGET_TYPE_LABELS[report.targetType] || report.targetType}
-                    {' · '}
-                    {formatDateTime(report.createdAt)}
-                  </span>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
               {hasMore && (
                 <button
                   type="button"
