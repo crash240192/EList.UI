@@ -663,6 +663,18 @@
   font-size: 11px;
 }
 
+.sentinel {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loadingMore {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 .eventSkeletons {
   display: flex;
   flex-direction: column;
