@@ -21,6 +21,9 @@ import { usePlatformRoleStore, useToastStore } from '@/app/store';
 import { contentReportActionMessage } from './reportSubmitError';
 import styles from './ModerationSettingsPanel.module.css';
 
+const WARNINGS_PREVIEW = 5;
+const WARNINGS_ALL_PAGE_SIZE = 100;
+
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
   const { date, time } = apiIsoToLocalParts(iso);
@@ -36,12 +39,21 @@ function moderationListLink(path: '/reports-against-me' | '/my-reports'): string
   return `${path}?from=settings-moderation`;
 }
 
+function warningReportHref(reportId: string | null | undefined): string {
+  return reportId
+    ? `/reports-against-me?report=${reportId}&from=settings-moderation`
+    : '/reports-against-me?from=settings-moderation';
+}
+
 export function ModerationSettingsPanel() {
   const toast = useToastStore(s => s.add);
   const canRevoke = usePlatformRoleStore(s => s.hasPlatformAccess());
   const [warnings, setWarnings] = useState<INotification[]>([]);
+  const [warningsTotal, setWarningsTotal] = useState(0);
+  const [warningsExpanded, setWarningsExpanded] = useState(false);
   const [penalties, setPenalties] = useState<IModerationPenalty[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandingWarnings, setExpandingWarnings] = useState(false);
   const [penaltiesLoading, setPenaltiesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [penaltiesError, setPenaltiesError] = useState<string | null>(null);
@@ -61,19 +73,21 @@ export function ModerationSettingsPanel() {
     }
   }, []);
 
+  const loadWarnings = useCallback(async (expanded: boolean) => {
+    const page = await fetchMyNotifications({
+      pageIndex: 0,
+      pageSize: expanded ? WARNINGS_ALL_PAGE_SIZE : WARNINGS_PREVIEW,
+      type: 'ContentReportWarningIssued',
+    });
+    setWarningsTotal(page.total);
+    setWarnings(page.result.filter(item => isContentReportWarningIssued(item.type)));
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void fetchMyNotifications({
-      pageIndex: 0,
-      pageSize: 20,
-      type: 'ContentReportWarningIssued',
-    })
-      .then(page => {
-        if (cancelled) return;
-        setWarnings(page.result.filter(item => isContentReportWarningIssued(item.type)));
-      })
+    void loadWarnings(false)
       .catch(e => {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : 'Не удалось загрузить');
@@ -82,7 +96,7 @@ export function ModerationSettingsPanel() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [loadWarnings]);
 
   useEffect(() => {
     void loadPenalties();
@@ -95,6 +109,27 @@ export function ModerationSettingsPanel() {
     })),
     [warnings],
   );
+
+  const canShowAllWarnings = !warningsExpanded && warningsTotal > notices.length;
+
+  const handleShowAllWarnings = async () => {
+    if (expandingWarnings) return;
+    setExpandingWarnings(true);
+    setError(null);
+    try {
+      await loadWarnings(true);
+      setWarningsExpanded(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить');
+    } finally {
+      setExpandingWarnings(false);
+    }
+  };
+
+  const handleCollapseWarnings = () => {
+    setWarningsExpanded(false);
+    setWarnings(prev => prev.slice(0, WARNINGS_PREVIEW));
+  };
 
   const handleRevoke = async () => {
     if (!revokeId || revokeBusy) return;
@@ -177,11 +212,27 @@ export function ModerationSettingsPanel() {
 
       <section className={styles.section}>
         <div className={styles.sectionHead}>
-          <h3 className={styles.sectionTitle}>Недавние предупреждения</h3>
-          {!loading && notices.length > 0 && (
-            <Link className={styles.sectionLink} to={moderationListLink('/reports-against-me')}>
-              Все
-            </Link>
+          <h3 className={styles.sectionTitle}>
+            {warningsExpanded ? 'Предупреждения' : 'Недавние предупреждения'}
+          </h3>
+          {!loading && canShowAllWarnings && (
+            <button
+              type="button"
+              className={styles.sectionLink}
+              disabled={expandingWarnings}
+              onClick={() => void handleShowAllWarnings()}
+            >
+              {expandingWarnings ? '…' : 'Все'}
+            </button>
+          )}
+          {!loading && warningsExpanded && (
+            <button
+              type="button"
+              className={styles.sectionLink}
+              onClick={handleCollapseWarnings}
+            >
+              Свернуть
+            </button>
           )}
         </div>
 
@@ -193,32 +244,26 @@ export function ModerationSettingsPanel() {
           <div className={styles.state}>Предупреждений модераторов пока нет</div>
         ) : (
           <ul className={styles.list}>
-            {notices.map(({ notification, reportData }) => {
-              const reportId = reportData?.reportId;
-              const href = reportId
-                ? `/reports-against-me?report=${reportId}&from=settings-moderation`
-                : '/reports-against-me?from=settings-moderation';
-              return (
-                <li key={notification.id}>
-                  <Link className={styles.card} to={href}>
-                    <div className={styles.cardTop}>
-                      <span className={styles.cardTitle}>
-                        {notification.title
-                          || contentReportNotificationTypeLabel(notification.type)}
-                      </span>
-                      {!notification.readAt && <span className={styles.status}>Новое</span>}
-                    </div>
-                    <p className={styles.remark}>
-                      {notification.message || 'Предупреждение по вашей жалобе'}
-                    </p>
-                    <span className={styles.meta}>
-                      {reportData?.reasonName ? `${reportData.reasonName} · ` : ''}
-                      {formatDateTime(notification.createdAt)}
+            {notices.map(({ notification, reportData }) => (
+              <li key={notification.id}>
+                <Link className={styles.card} to={warningReportHref(reportData?.reportId)}>
+                  <div className={styles.cardTop}>
+                    <span className={styles.cardTitle}>
+                      {notification.title
+                        || contentReportNotificationTypeLabel(notification.type)}
                     </span>
-                  </Link>
-                </li>
-              );
-            })}
+                    {!notification.readAt && <span className={styles.status}>Новое</span>}
+                  </div>
+                  <p className={styles.remark}>
+                    {notification.message || 'Предупреждение модерации'}
+                  </p>
+                  <span className={styles.meta}>
+                    {reportData?.reasonName ? `${reportData.reasonName} · ` : ''}
+                    {formatDateTime(notification.createdAt)}
+                  </span>
+                </Link>
+              </li>
+            ))}
           </ul>
         )}
       </section>
