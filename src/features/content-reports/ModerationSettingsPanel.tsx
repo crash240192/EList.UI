@@ -32,7 +32,7 @@ function penaltyUntil(penalty: IModerationPenalty): string {
   return `до ${formatDateTime(penalty.endsAt)}`;
 }
 
-function moderationSettingsListLink(path: '/reports-against-me' | '/my-reports'): string {
+function moderationListLink(path: '/reports-against-me' | '/my-reports'): string {
   return `${path}?from=settings-moderation`;
 }
 
@@ -115,16 +115,32 @@ export function ModerationSettingsPanel() {
   return (
     <div className={styles.panel}>
       <div className={styles.intro}>
-        <h2 className={styles.title}>Замечания модерации</h2>
+        <h2 className={styles.title}>Модерация</h2>
         <p className={styles.hint}>
-          Здесь показываем предупреждения модераторов из общего инбокса
-          и действующие ограничения аккаунта.
-          Полная история входящих жалоб и решений доступна по ссылке ниже.
+          Новые предупреждения приходят в уведомления (колокольчик в шапке).
+          Здесь — ограничения аккаунта, недавние предупреждения и переходы к спискам жалоб.
         </p>
       </div>
 
+      <div className={styles.hub}>
+        <Link className={styles.hubCard} to={moderationListLink('/reports-against-me')}>
+          <span className={styles.hubTitle}>Жалобы на меня</span>
+          <span className={styles.hubText}>
+            Входящие замечания и решения по вашему контенту
+          </span>
+        </Link>
+        <Link className={styles.hubCard} to={moderationListLink('/my-reports')}>
+          <span className={styles.hubTitle}>Мои жалобы</span>
+          <span className={styles.hubText}>
+            Исходящие жалобы и статус их рассмотрения
+          </span>
+        </Link>
+      </div>
+
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Ограничения</h3>
+        <div className={styles.sectionHead}>
+          <h3 className={styles.sectionTitle}>Ограничения</h3>
+        </div>
         {penaltiesLoading ? (
           <div className={styles.state}>Загрузка…</div>
         ) : penaltiesError ? (
@@ -160,7 +176,15 @@ export function ModerationSettingsPanel() {
       </section>
 
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Предупреждения</h3>
+        <div className={styles.sectionHead}>
+          <h3 className={styles.sectionTitle}>Недавние предупреждения</h3>
+          {!loading && notices.length > 0 && (
+            <Link className={styles.sectionLink} to={moderationListLink('/reports-against-me')}>
+              Все
+            </Link>
+          )}
+        </div>
+
         {loading ? (
           <div className={styles.state}>Загрузка…</div>
         ) : error ? (
@@ -198,15 +222,6 @@ export function ModerationSettingsPanel() {
           </ul>
         )}
       </section>
-
-      <div className={styles.links}>
-        <Link className={styles.link} to={moderationSettingsListLink('/reports-against-me')}>
-          Все входящие жалобы
-        </Link>
-        <Link className={styles.link} to={moderationSettingsListLink('/my-reports')}>
-          Мои исходящие жалобы
-        </Link>
-      </div>
 
       {revokeId && (
         <ConfirmDialog

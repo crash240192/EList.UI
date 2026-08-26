@@ -18,7 +18,7 @@ import {
 import { apiIsoToLocalParts } from '@/shared/lib/datetime';
 import { usePageTitle } from '@/shared/hooks';
 import { ReportTargetPreview } from '@/features/content-reports';
-import styles from './MyReportsPage.module.css';
+import styles from '@/features/content-reports/reportInbox.module.css';
 
 const PAGE_SIZE = 20;
 
@@ -45,7 +45,7 @@ export default function MyReportsPage() {
   usePageTitle('Мои жалобы');
   const [searchParams, setSearchParams] = useSearchParams();
   const initialReportId = searchParams.get('report');
-  const fromSettingsModeration = searchParams.get('from') === 'settings-moderation';
+  const fromSettings = searchParams.get('from') === 'settings-moderation';
 
   const [reports, setReports] = useState<IContentReport[]>([]);
   const [total, setTotal] = useState(0);
@@ -67,7 +67,7 @@ export default function MyReportsPage() {
       const page = await fetchMyContentReports(index, PAGE_SIZE);
       setTotal(page.total);
       setPageIndex(index);
-      setReports(prev => append ? [...prev, ...page.result] : page.result);
+      setReports(prev => (append ? [...prev, ...page.result] : page.result));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось загрузить жалобы');
     } finally {
@@ -129,18 +129,39 @@ export default function MyReportsPage() {
 
   const closeDetail = () => setSelectedId(null);
 
+  const againstMeHref = fromSettings
+    ? '/reports-against-me?from=settings-moderation'
+    : '/reports-against-me';
+
   return (
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.cardHeader}>
-          <h1 className={styles.cardTitle}>Мои жалобы</h1>
+          <div className={styles.headerMain}>
+            <div className={styles.titleRow}>
+              <h1 className={styles.cardTitle}>Мои жалобы</h1>
+              {!loading && !selectedId && total > 0 && (
+                <span className={styles.count}>{total}</span>
+              )}
+            </div>
+            <p className={styles.subtitle}>
+              Исходящие жалобы на чужой контент и статус их рассмотрения.
+            </p>
+          </div>
+          {!selectedId && (
+            <Link className={styles.headerLink} to={againstMeHref}>
+              Жалобы на меня
+            </Link>
+          )}
         </div>
+
         <div className={styles.content}>
-          {fromSettingsModeration && (
+          {fromSettings && !selectedId && (
             <Link className={styles.backBtn} to="/settings?tab=moderation">
               ← В модерацию
             </Link>
           )}
+
           {selectedId ? (
             <>
               <button type="button" className={styles.backBtn} onClick={closeDetail}>
@@ -151,25 +172,30 @@ export default function MyReportsPage() {
               ) : detailError && !detail ? (
                 <div className={styles.error}>{detailError}</div>
               ) : detail ? (
-                <>
-                  <div className={styles.section}>
-                    <span className={styles.sectionTitle}>Статус</span>
-                    <span className={`${styles.statusChip} ${statusChipClass(detail.status)}`}>
-                      {statusLabel(detail.status)}
-                    </span>
-                    <p className={styles.meta}>{formatDateTime(detail.createdAt)}</p>
-                  </div>
-                  <div className={styles.section}>
-                    <span className={styles.sectionTitle}>Причина</span>
-                    <p className={styles.sectionText}>{detail.reason?.name || '—'}</p>
-                    {detail.reason?.description && (
-                      <p className={styles.meta}>{detail.reason.description}</p>
-                    )}
-                  </div>
-                  <div className={styles.section}>
-                    <span className={styles.sectionTitle}>
+                <div className={styles.detail}>
+                  <div className={styles.statusBanner}>
+                    <div className={styles.statusBannerMain}>
+                      <span className={`${styles.statusChip} ${statusChipClass(detail.status)}`}>
+                        {statusLabel(detail.status)}
+                      </span>
+                      <span className={styles.itemMeta}>{formatDateTime(detail.createdAt)}</span>
+                    </div>
+                    <span className={styles.itemType}>
                       {REPORT_TARGET_TYPE_LABELS[detail.targetType] || detail.targetType}
                     </span>
+                  </div>
+
+                  <div>
+                    <h2 className={styles.detailTitle}>{detail.reason?.name || 'Жалоба'}</h2>
+                    {detail.reason?.description && (
+                      <p className={styles.detailLead}>{detail.reason.description}</p>
+                    )}
+                  </div>
+
+                  <hr className={styles.divider} />
+
+                  <div className={styles.block}>
+                    <span className={styles.blockLabel}>Объект</span>
                     <ReportTargetPreview report={detail} />
                     {detail.eventId && detail.targetType !== ReportTargetType.Event && (
                       <Link className={styles.eventLink} to={`/event/${detail.eventId}`}>
@@ -177,38 +203,46 @@ export default function MyReportsPage() {
                       </Link>
                     )}
                   </div>
+
                   {detail.comment && (
-                    <div className={styles.section}>
-                      <span className={styles.sectionTitle}>Ваш комментарий</span>
-                      <p className={styles.sectionText}>{detail.comment}</p>
+                    <div className={styles.block}>
+                      <span className={styles.blockLabel}>Ваш комментарий</span>
+                      <p className={styles.blockText}>{detail.comment}</p>
                     </div>
                   )}
+
                   {(detail.resolutionAction || detail.resolutionComment) && (
-                    <div className={styles.section}>
-                      <span className={styles.sectionTitle}>Решение</span>
+                    <div className={styles.block}>
+                      <span className={styles.blockLabel}>Решение</span>
                       {detail.resolutionAction && (
-                        <p className={styles.sectionText}>
+                        <p className={styles.blockText}>
                           {REPORT_RESOLUTION_ACTION_LABELS[detail.resolutionAction]
                             ?? detail.resolutionAction}
                         </p>
                       )}
                       {detail.resolutionComment && (
-                        <p className={styles.meta}>{detail.resolutionComment}</p>
+                        <p className={styles.itemMeta}>{detail.resolutionComment}</p>
+                      )}
+                      {detail.resolvedAt && (
+                        <p className={styles.itemMeta}>{formatDateTime(detail.resolvedAt)}</p>
                       )}
                     </div>
                   )}
+
                   {actions.length > 0 && (
-                    <div className={styles.section}>
-                      <span className={styles.sectionTitle}>История</span>
-                      {actions.map(a => (
-                        <p key={a.id} className={styles.meta}>
-                          {formatDateTime(a.createdAt)} · {a.action}
-                          {a.details ? ` — ${a.details}` : ''}
-                        </p>
-                      ))}
+                    <div className={styles.block}>
+                      <span className={styles.blockLabel}>История</span>
+                      <ul className={styles.historyList}>
+                        {actions.map(a => (
+                          <li key={a.id} className={styles.historyItem}>
+                            {formatDateTime(a.createdAt)} · {a.action}
+                            {a.details ? ` — ${a.details}` : ''}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
-                </>
+                </div>
               ) : null}
             </>
           ) : loading ? (
@@ -216,33 +250,43 @@ export default function MyReportsPage() {
           ) : error ? (
             <div className={styles.error}>{error}</div>
           ) : reports.length === 0 ? (
-            <div className={styles.empty}>Вы ещё не отправляли жалоб</div>
+            <div className={styles.emptyState}>
+              <p className={styles.emptyTitle}>Жалоб пока нет</p>
+              <p className={styles.emptySub}>
+                Когда вы пожалуетесь на мероприятие, сообщение или профиль, статус появится здесь.
+              </p>
+            </div>
           ) : (
             <>
-              {reports.map(report => (
-                <button
-                  key={report.id}
-                  type="button"
-                  className={styles.cardItem}
-                  onClick={() => openDetail(report.id)}
-                >
-                  <div className={styles.cardTop}>
-                    <span className={styles.reasonName}>
-                      {report.reason?.name || 'Жалоба'}
+              <div className={styles.list}>
+                {reports.map(report => (
+                  <button
+                    key={report.id}
+                    type="button"
+                    className={styles.item}
+                    onClick={() => openDetail(report.id)}
+                  >
+                    <div className={styles.itemTop}>
+                      <div className={styles.itemTitleBlock}>
+                        <span className={styles.itemType}>
+                          {REPORT_TARGET_TYPE_LABELS[report.targetType] || report.targetType}
+                        </span>
+                        <span className={styles.itemTitle}>
+                          {report.reason?.name || 'Жалоба'}
+                        </span>
+                      </div>
+                      <span className={`${styles.statusChip} ${statusChipClass(report.status)}`}>
+                        {statusLabel(report.status)}
+                      </span>
+                    </div>
+                    <ReportTargetPreview report={report} compact />
+                    <span className={styles.itemMeta}>
+                      {report.eventName ? `${report.eventName} · ` : ''}
+                      {formatDateTime(report.createdAt)}
                     </span>
-                    <span className={`${styles.statusChip} ${statusChipClass(report.status)}`}>
-                      {statusLabel(report.status)}
-                    </span>
-                  </div>
-                  <ReportTargetPreview report={report} compact />
-                  <span className={styles.meta}>
-                    {REPORT_TARGET_TYPE_LABELS[report.targetType] || report.targetType}
-                    {report.eventName ? ` · ${report.eventName}` : ''}
-                    {' · '}
-                    {formatDateTime(report.createdAt)}
-                  </span>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
               {hasMore && (
                 <button
                   type="button"
