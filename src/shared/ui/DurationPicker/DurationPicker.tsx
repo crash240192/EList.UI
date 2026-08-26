@@ -14,12 +14,24 @@ import styles from './DurationPicker.module.css';
 const HOURS_LIST   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
 const MINUTES_LIST = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
 
+/** Округление минут к шагу 5 с переносом в часы (59 → +1ч 00, не 60). */
+function normalizeDuration(hours: number, minutes: number): { h: number; m: number } {
+  let h = Math.max(0, Math.trunc(hours));
+  let m = Math.max(0, Math.round(minutes / 5) * 5);
+  if (m >= 60) {
+    h += Math.floor(m / 60);
+    m %= 60;
+  }
+  return { h, m };
+}
+
 function toDigits(hours: number, minutes: number): string {
   // 0:0 — «не задано», показываем пустую маску __:__
   if (hours === 0 && minutes === 0) return '';
+  const { h, m } = normalizeDuration(hours, minutes);
   return hmToTimeDigits(
-    String(hours).padStart(2, '0'),
-    String(Math.round(minutes / 5) * 5).padStart(2, '0'),
+    String(h).padStart(2, '0'),
+    String(m).padStart(2, '0'),
   );
 }
 
@@ -81,17 +93,19 @@ interface DurationPickerProps {
 export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes, className, hasError }: DurationPickerProps) {
   const [open, setOpen] = useState(false);
   const [timeDigits, setTimeDigits] = useState(() => toDigits(hours, minutes));
-  const [draftH, setDraftH] = useState(hours);
-  const [draftM, setDraftM] = useState(Math.round(minutes / 5) * 5);
+  const initial = normalizeDuration(hours, minutes);
+  const [draftH, setDraftH] = useState(Math.min(23, initial.h));
+  const [draftM, setDraftM] = useState(initial.m);
 
   useEffect(() => {
     setTimeDigits(toDigits(hours, minutes));
   }, [hours, minutes]);
 
   const applyHM = useCallback((h: number, m: number) => {
-    onChangeHours(h);
-    onChangeMinutes(m);
-    setTimeDigits(toDigits(h, m));
+    const next = normalizeDuration(h, m);
+    onChangeHours(next.h);
+    onChangeMinutes(next.m);
+    setTimeDigits(toDigits(next.h, next.m));
   }, [onChangeHours, onChangeMinutes]);
 
   const commitDigits = useCallback((digits: string): boolean => {
@@ -126,8 +140,9 @@ export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes,
   };
 
   const handleOpen = () => {
-    setDraftH(hours);
-    setDraftM(Math.round(minutes / 5) * 5);
+    const next = normalizeDuration(hours, minutes);
+    setDraftH(Math.min(23, next.h));
+    setDraftM(next.m);
     setOpen(true);
   };
 
@@ -161,7 +176,7 @@ export function DurationPicker({ hours, minutes, onChangeHours, onChangeMinutes,
           )}
         </span>
         <button type="button" tabIndex={-1} className={fieldStyles.calendarBtn} aria-label="Открыть выбор длительности"
-          onClick={() => setOpen(v => !v)}>
+          onClick={() => { if (open) setOpen(false); else handleOpen(); }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={fieldStyles.icon}>
             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
           </svg>

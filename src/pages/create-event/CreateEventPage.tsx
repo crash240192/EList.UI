@@ -524,8 +524,11 @@ export default function CreateEventPage() {
         === new Date(String(ev.endTime)).toDateString();
       if (sameDay && diff >= 0) {
         setEndMode('duration');
-        setDurationH(String(Math.floor(diff / 3600000)));
-        setDurationM(String(Math.max(0, Math.round((diff % 3600000) / 60000))));
+        let dh = Math.floor(diff / 3600000);
+        let dm = Math.max(0, Math.round((diff % 3600000) / 60000));
+        if (dm >= 60) { dh += 1; dm = 0; }
+        setDurationH(String(dh));
+        setDurationM(String(dm));
       } else {
         setEndMode('multiday');
       }
@@ -655,8 +658,11 @@ export default function CreateEventPage() {
         const sameDay = new Date(ev.startTime).toDateString() === new Date(ev.endTime).toDateString();
         if (sameDay) {
           setEndMode('duration');
-          setDurationH(String(Math.floor(diff / 3600000)));
-          setDurationM(String(Math.round((diff % 3600000) / 60000)));
+          let dh = Math.floor(diff / 3600000);
+          let dm = Math.round((diff % 3600000) / 60000);
+          if (dm >= 60) { dh += 1; dm = 0; }
+          setDurationH(String(dh));
+          setDurationM(String(dm));
         } else { setEndMode('multiday'); }
       }
 
@@ -867,12 +873,22 @@ export default function CreateEventPage() {
     ? addDaysLocalDateString(tariffValidator.createDateMaxPeriod)
     : null;
 
+  const startDateParsed = (form.startDate && form.startTime)
+    ? new Date(`${form.startDate}T${form.startTime}`)
+    : null;
+  const startDateIsInvalid = Boolean(
+    form.startDate && form.startTime && startDateParsed && isNaN(startDateParsed.getTime()),
+  );
+  const todayIso = todayLocalDateString();
+
   const startDateTimeFieldError = ((): string | undefined => {
     if (!hasErr('startDate') && !hasErr('startTime')) return undefined;
     if (!form.startDate || !form.startTime) return 'Укажите дату и время';
+    if (startDateIsInvalid) return 'Некорректная дата или время начала';
     if (maxStartDate && form.startDate > maxStartDate) {
       return `Дата начала не может быть позднее ${formatLocalDateLongRu(maxStartDate)}`;
     }
+    if (!isEditing && form.startDate < todayIso) return 'Некорректная дата начала';
     return 'Дата и время начала не могут быть в прошлом';
   })();
 
@@ -884,9 +900,11 @@ export default function CreateEventPage() {
 
   const startDateToastMessage = ((): string => {
     if (!form.startDate || !form.startTime) return 'Укажите дату и время начала';
+    if (startDateIsInvalid) return 'Некорректная дата или время начала';
     if (maxStartDate && form.startDate > maxStartDate) {
       return `Дата начала не может быть позднее ${formatLocalDateLongRu(maxStartDate)}`;
     }
+    if (!isEditing && form.startDate < todayIso) return 'Некорректная дата начала';
     return 'Дата и время начала не могут быть в прошлом';
   })();
 
@@ -991,9 +1009,13 @@ export default function CreateEventPage() {
     if (!form.address.trim() || lat === null || lng === null) errs.add('location');
     if (!form.startDate)   errs.add('startDate');
     if (!form.startTime)   errs.add('startTime');
-    if (!isEditing && form.startDate && form.startTime) {
+    if (form.startDate && form.startTime) {
       const start = new Date(`${form.startDate}T${form.startTime}`);
-      if (!isNaN(start.getTime()) && start.getTime() < Date.now()) errs.add('startDate');
+      if (isNaN(start.getTime())) {
+        errs.add('startDate');
+      } else if (!isEditing && start.getTime() < Date.now()) {
+        errs.add('startDate');
+      }
     }
     if (form.startDate && maxStartDate && form.startDate > maxStartDate) {
       errs.add('startDate');
@@ -1649,11 +1671,18 @@ export default function CreateEventPage() {
                   withTime
                   value={form.startDate && form.startTime ? `${form.startDate}T${form.startTime}` : form.startDate}
                   onChange={iso => {
-                    const d = new Date(iso);
+                    if (!iso) {
+                      setForm(f => ({ ...f, startDate: '', startTime: '' }));
+                      return;
+                    }
+                    // Берём компоненты из ISO-строки, а не из Date — иначе год вроде 0101
+                    // парсится непредсказуемо и форма снова выглядит «пустой».
+                    const date = iso.slice(0, 10);
+                    const time = iso.includes('T') ? iso.slice(11, 16) : '';
                     setForm(f => ({
                       ...f,
-                      startDate: iso.slice(0, 10),
-                      startTime: `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+                      startDate: date,
+                      startTime: time || f.startTime,
                     }));
                     setFieldErrors(p => { const n = new Set(p); n.delete('startDate'); n.delete('startTime'); return n; });
                   }}
@@ -1691,11 +1720,16 @@ export default function CreateEventPage() {
                     withTime
                     value={form.endDate && form.endTime ? `${form.endDate}T${form.endTime}` : form.endDate}
                     onChange={iso => {
-                      const d = new Date(iso);
+                      if (!iso) {
+                        setForm(f => ({ ...f, endDate: '', endTime: '' }));
+                        return;
+                      }
+                      const date = iso.slice(0, 10);
+                      const time = iso.includes('T') ? iso.slice(11, 16) : '';
                       setForm(f => ({
                         ...f,
-                        endDate: iso.slice(0, 10),
-                        endTime: `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+                        endDate: date,
+                        endTime: time || f.endTime,
                       }));
                       setFieldErrors(p => { const n = new Set(p); n.delete('endDate'); n.delete('endTime'); return n; });
                     }}
@@ -2309,14 +2343,15 @@ function LockedInput({ locked, hint, suffix, hasError, ...props }: {
 } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
-        <input
-          className={`${styles.input} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''}`}
-          disabled={locked} {...props}
-          style={suffix ? { flex: 1 } : undefined}
-          onFocus={e => (e.target as HTMLInputElement).select()} />
+      <div className={styles.lockedFieldRow}>
+        <div className={`${styles.inputShell} ${locked ? styles.inputShellLocked : ''}`}>
+          <input
+            className={`${styles.input} ${styles.inputInShell} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''}`}
+            disabled={locked} {...props}
+            onFocus={e => (e.target as HTMLInputElement).select()} />
+          {locked && <span className={styles.lockBadge}>тариф</span>}
+        </div>
         {suffix && <span className={styles.inputSuffix}>{suffix}</span>}
-        {locked && <span className={styles.lockBadge}>тариф</span>}
       </div>
       {hint && <div className={`${styles.fieldHint} ${hasError ? styles.fieldHintErr : locked ? styles.fieldHintWarn : ''}`}>{hint}</div>}
     </div>
@@ -2332,9 +2367,9 @@ function LockedSelect({ locked, hint, hasError, value, onChange, options, placeh
 }) {
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
+      <div className={`${styles.inputShell} ${locked ? styles.inputShellLocked : ''}`}>
         <select
-          className={`${styles.input} ${styles.select} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''} ${!value ? styles.selectPlaceholder : ''}`}
+          className={`${styles.input} ${styles.inputInShell} ${styles.select} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''} ${!value ? styles.selectPlaceholder : ''}`}
           disabled={locked}
           value={value}
           onChange={e => onChange(e.target.value)}

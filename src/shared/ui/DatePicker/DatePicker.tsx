@@ -228,8 +228,14 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const swipeStartX = useRef<number | null>(null);
 
   const syncTimeFromHM = useCallback((h: string, m: string) => {
-    setTimeH(h);
-    setTimeM(String(Math.round(parseInt(m, 10) / 5) * 5).padStart(2, '0'));
+    let hours = parseInt(h, 10) || 0;
+    let mins = Math.round((parseInt(m, 10) || 0) / 5) * 5;
+    if (mins >= 60) {
+      hours = (hours + Math.floor(mins / 60)) % 24;
+      mins %= 60;
+    }
+    setTimeH(String(hours).padStart(2, '0'));
+    setTimeM(String(mins).padStart(2, '0'));
   }, []);
 
   useEffect(() => {
@@ -321,11 +327,10 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     }
     const iso = digitsToIso(digits, withTime);
     if (!iso) return false;
-    if (!isInRange(iso, withTime, min, max) || !satisfiesMinTime(iso, withTime, min, minTime)) {
-      return false;
-    }
+    // Пробрасываем распознанную дату даже вне min/max — родитель покажет
+    // корректную ошибку («некорректная / в прошлом / позднее лимита»), а не «укажите дату».
     onChange(iso);
-    return true;
+    return isInRange(iso, withTime, min, max) && satisfiesMinTime(iso, withTime, min, minTime);
   }, [withTime, onChange, min, max, minTime]);
 
   const handleDigitsChange = (digits: string) => {
