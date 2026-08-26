@@ -53,7 +53,7 @@ export default function HomePage() {
       return '';
     }
   });
-  const [mapTruncationOpen, setMapTruncationOpen] = useState(false);
+  const [mapTruncationDismissed, setMapTruncationDismissed] = useState(false);
 
   const navigate = useNavigate();
   const listElRef = useRef<HTMLDivElement>(null);
@@ -82,8 +82,6 @@ export default function HomePage() {
     window.addEventListener('elist:homeCityChanged', handler);
     return () => window.removeEventListener('elist:homeCityChanged', handler);
   }, [setMapCenter]);
-
-  const prevMapLoadingRef = useRef(false);
 
   // Слушаем событие сброса города из FilterBar
   useEffect(() => {
@@ -161,16 +159,16 @@ export default function HomePage() {
     };
   }, [viewMode, paramsKey]);
 
+  const mapIsTruncated =
+    viewMode === 'map' && mapShortTotal > EVENTS_MAP_SHORT_PAGE_SIZE;
+
   useEffect(() => {
-    if (viewMode !== 'map') {
-      setMapTruncationOpen(false);
-      prevMapLoadingRef.current = mapShortLoading;
-      return;
-    }
-    const finished = prevMapLoadingRef.current && !mapShortLoading;
-    prevMapLoadingRef.current = mapShortLoading;
-    if (finished && mapShortTotal > EVENTS_MAP_SHORT_PAGE_SIZE) setMapTruncationOpen(true);
-  }, [viewMode, mapShortLoading, mapShortTotal]);
+    // После ухода с карты снова покажем баннер один раз, если срез всё ещё есть.
+    // Pan/zoom не сбрасывают закрытие — иначе снова всплывало бы на каждое движение.
+    if (viewMode !== 'map') setMapTruncationDismissed(false);
+  }, [viewMode]);
+
+  const showMapTruncationBanner = mapIsTruncated && !mapTruncationDismissed;
 
   const handleListEventClick = useCallback((event: IEvent) => {
     navigate(`/event/${event.id}`);
@@ -277,6 +275,22 @@ export default function HomePage() {
               {mapShortError && (
                 <div className={styles.mapErrorBanner}>{mapShortError}</div>
               )}
+              {showMapTruncationBanner && (
+                <div className={styles.mapTruncBanner} role="status">
+                  <p className={styles.mapTruncBannerText}>
+                    На карте {EVENTS_MAP_SHORT_PAGE_SIZE} из {mapShortTotal}.
+                    Сузьте область или фильтры, чтобы увидеть все точки.
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.mapTruncBannerClose}
+                    aria-label="Скрыть"
+                    onClick={() => setMapTruncationDismissed(true)}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
               <EventMap
                 events={mapShortItems}
                 onMarkerClick={handleMapMarkerClick}
@@ -343,27 +357,6 @@ export default function HomePage() {
         open={mapBirthDialogOpen}
         onClose={handleMapBirthDecline}
       />
-
-      {mapTruncationOpen && (
-        <>
-          <button
-            type="button"
-            className={styles.mapTruncBackdrop}
-            aria-label="Закрыть"
-            onClick={() => setMapTruncationOpen(false)}
-          />
-          <div className={styles.mapTruncDialog} role="dialog" aria-modal>
-            <p className={styles.mapTruncText}>
-              По текущим условиям найдено событий: <strong>{mapShortTotal}</strong>.
-              На карте отображаются не более {EVENTS_MAP_SHORT_PAGE_SIZE} — сузьте область карты или фильтры,
-              чтобы увидеть все точки.
-            </p>
-            <button type="button" className={styles.mapTruncBtn} onClick={() => setMapTruncationOpen(false)}>
-              Понятно
-            </button>
-          </div>
-        </>
-      )}
 
       {showCityConfirm && (
         <CityConfirmDialog
