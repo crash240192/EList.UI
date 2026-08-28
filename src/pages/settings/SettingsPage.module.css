@@ -462,11 +462,23 @@
 
   .snav {
     flex-direction: row;
+    flex-wrap: nowrap;
     overflow-x: auto;
     border-right: none;
     border-bottom: 1px solid var(--border);
     padding: 10px 12px;
     gap: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .snav::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Секции — только группировка на десктопе; на мобиле — одна горизонтальная лента */
+  .snav > div {
+    display: contents;
   }
 
   .snavSection {
@@ -476,6 +488,7 @@
   .snavItem {
     white-space: nowrap;
     flex-shrink: 0;
+    width: auto;
   }
 
   .scontent {
