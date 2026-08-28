@@ -107,10 +107,10 @@
 }
 
 .orgCardHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: start;
 }
 
 .orgBadges {
@@ -119,17 +119,17 @@
   gap: 6px;
   justify-content: flex-end;
   align-items: center;
-  flex-shrink: 0;
-  max-width: min(100%, 220px);
+  justify-self: end;
+  align-self: start;
 }
 
 .orgName {
   font-size: var(--font-sm);
   font-weight: 600;
   color: var(--text-primary);
-  flex: 1;
   min-width: 0;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .orgMeta {
