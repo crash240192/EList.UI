@@ -11,6 +11,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { IEvent, IEventsSearchParams } from '@/entities/event';
 import { fetchEvents } from '@/entities/event';
+import { eventOwnerSearchParams } from './eventOwnerSearchParams';
 
 export type OwnerFilter = 'all' | 'mine' | 'others';
 
@@ -34,10 +35,13 @@ function ownerParams(
   accountId: string
 ): Pick<IEventsSearchParams, 'organizatorId' | 'participantId'> {
   switch (filter) {
-    case 'mine':   return { organizatorId: accountId };
-    case 'others': return { participantId: accountId };
+    case 'mine':
+      return eventOwnerSearchParams('organizer', accountId);
+    case 'others':
+      return eventOwnerSearchParams('participant', accountId);
     case 'all':
-    default:       return { organizatorId: accountId, participantId: accountId };
+    default:
+      return eventOwnerSearchParams('all', accountId);
   }
 }
 
