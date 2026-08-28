@@ -27,7 +27,7 @@ import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
-import { isAccessDeniedError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
+import { isAccessDeniedError, isApiError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
@@ -474,8 +474,13 @@ export default function EventPage() {
           setParticipants(prev => [...prev, { accountId, login: accountId.slice(0, 8), firstName: null, lastName: null }]);
         }
       }
+    } catch (e: unknown) {
+      if (isApiError(e)) {
+        const msg = e.serverMessage ?? e.message;
+        if (msg) toast(msg, 'error');
+      }
     } finally { setActionLoading(false); }
-  }, [id, accountId, isParticipating]);
+  }, [id, accountId, isParticipating, toast]);
 
   const handleCancelEvent = useCallback(async () => {
     if (!id) return;
