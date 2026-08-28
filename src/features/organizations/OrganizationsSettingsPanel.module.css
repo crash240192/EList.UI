@@ -462,7 +462,14 @@
   gap: 4px;
   padding: 10px 14px 12px;
   border-top: 1px solid var(--border);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.subTabs::-webkit-scrollbar {
+  display: none;
 }
 
 .subTab {
@@ -475,6 +482,8 @@
   color: var(--text-secondary);
   cursor: pointer;
   font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .subTab:hover {

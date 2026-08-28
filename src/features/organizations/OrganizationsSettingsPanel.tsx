@@ -464,7 +464,7 @@ function OrganizationDetailView({
   const [myAccountId, setMyAccountId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [section, setSection] = useState<'profile' | 'members' | 'sales'>('profile');
+  const [section, setSection] = useState<'profile' | 'members' | 'legal' | 'requisites' | 'sales'>('profile');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -544,6 +544,8 @@ function OrganizationDetailView({
             [
               { id: 'profile' as const, label: 'Профиль' },
               { id: 'members' as const, label: 'Команда' },
+              { id: 'legal' as const, label: 'Юридические данные' },
+              { id: 'requisites' as const, label: 'Реквизиты' },
               { id: 'sales' as const, label: 'Продажа билетов' },
             ]
           ).map(t => (
@@ -589,8 +591,9 @@ function OrganizationDetailView({
           onChanged={reload}
         />
       )}
-      {section === 'sales' && (
-        <OrganizationSalesSection
+      {(section === 'legal' || section === 'requisites' || section === 'sales') && (
+        <OrganizationBillingSection
+          view={section}
           organizationId={organizationId}
           org={org}
           isOwner={isOwner}
@@ -1418,13 +1421,15 @@ function OrganizationMembersSection({
   );
 }
 
-function OrganizationSalesSection({
+function OrganizationBillingSection({
+  view,
   organizationId,
   org,
   isOwner,
   canEdit,
   onChanged,
 }: {
+  view: 'legal' | 'requisites' | 'sales';
   organizationId: string;
   org: OrganizationResponse;
   isOwner: boolean;
@@ -1520,7 +1525,7 @@ function OrganizationSalesSection({
   const checklist = [
     { ok: ticketingAgreed, label: 'Соглашение на продажу билетов принято' },
     { ok: legalFilled, label: 'Юридические данные заполнены' },
-    { ok: payoutFilled, label: 'Реквизиты для выплат заполнены' },
+    { ok: payoutFilled, label: 'Реквизиты заполнены' },
     { ok: verified, label: 'Верификация пройдена' },
     { ok: onboardingActive, label: 'Онбординг выплат активен' },
   ];
@@ -1560,10 +1565,6 @@ function OrganizationSalesSection({
 
   const saveLegal = async () => {
     if (!isOwner) return;
-    if (!ticketingAgreed) {
-      setMsg({ text: 'Сначала примите соглашение на продажу билетов', ok: false });
-      return;
-    }
     if (isSelfEmployed) {
       setMsg({
         text: 'Платный тир доступен только для ИП и юридических лиц',
@@ -1597,10 +1598,6 @@ function OrganizationSalesSection({
 
   const requestSaveLegal = () => {
     if (!isOwner) return;
-    if (!ticketingAgreed) {
-      setMsg({ text: 'Сначала примите соглашение на продажу билетов', ok: false });
-      return;
-    }
     if (isSelfEmployed) {
       setMsg({
         text: 'Платный тир доступен только для ИП и юридических лиц',
@@ -1617,10 +1614,6 @@ function OrganizationSalesSection({
 
   const savePayout = async () => {
     if (!isOwner) return;
-    if (!ticketingAgreed) {
-      setMsg({ text: 'Сначала примите соглашение на продажу билетов', ok: false });
-      return;
-    }
     setBusy(true);
     setMsg(null);
     try {
@@ -1685,210 +1678,279 @@ function OrganizationSalesSection({
 
   return (
     <>
-      <div className={styles.scard}>
-        <div className={styles.scardHead}>
-          <div className={styles.scardTitle}>Соглашение на продажу билетов</div>
-          <div className={styles.scardDesc}>
-            Согласие принимается от имени организации и требуется для подключения продаж
-          </div>
-        </div>
-        {ticketingAgreed ? (
-          <div className={styles.formBody}>
-            <div className={styles.bannerOk} style={{ margin: 0 }}>Соглашение принято</div>
-          </div>
-        ) : (
-          <>
-            <div className={styles.formBody}>
-              <div className={styles.agreeRow}>
-                <input
-                  id="ticketing-agree"
-                  type="checkbox"
-                  checked={ticketingAccepted}
-                  disabled={!isOwner}
-                  onChange={e => setTicketingAccepted(e.target.checked)}
-                />
-                <label htmlFor="ticketing-agree" className={styles.agreeLabel}>
-                  Принимаю{' '}
-                  <button
-                    type="button"
-                    className={styles.linkBtn}
-                    onClick={() => setTicketingDocOpen(true)}
-                    disabled={!ticketingDoc}
-                  >
-                    соглашение на продажу билетов
-                  </button>
-                  {!ticketingDoc && (
-                    <span className={styles.agreeHint}> (документ пока недоступен на сервере)</span>
-                  )}
-                </label>
+      {view === 'sales' && (
+        <>
+          <div className={styles.scard}>
+            <div className={styles.scardHead}>
+              <div className={styles.scardTitle}>Соглашение на продажу билетов</div>
+              <div className={styles.scardDesc}>
+                Согласие принимается от имени организации и требуется для подключения продаж
               </div>
+            </div>
+            {ticketingAgreed ? (
+              <div className={styles.formBody}>
+                <div className={styles.bannerOk} style={{ margin: 0 }}>Соглашение принято</div>
+              </div>
+            ) : (
+              <>
+                <div className={styles.formBody}>
+                  <div className={styles.agreeRow}>
+                    <input
+                      id="ticketing-agree"
+                      type="checkbox"
+                      checked={ticketingAccepted}
+                      disabled={!isOwner}
+                      onChange={e => setTicketingAccepted(e.target.checked)}
+                    />
+                    <label htmlFor="ticketing-agree" className={styles.agreeLabel}>
+                      Принимаю{' '}
+                      <button
+                        type="button"
+                        className={styles.linkBtn}
+                        onClick={() => setTicketingDocOpen(true)}
+                        disabled={!ticketingDoc}
+                      >
+                        соглашение на продажу билетов
+                      </button>
+                      {!ticketingDoc && (
+                        <span className={styles.agreeHint}> (документ пока недоступен на сервере)</span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+                {isOwner && (
+                  <div className={styles.scardFooter}>
+                    <div className={styles.footerSpacer} />
+                    <Button
+                      loading={busy}
+                      disabled={!ticketingAccepted}
+                      onClick={() => { void acceptTicketingAgreement(); }}
+                    >
+                      Принять соглашение
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className={styles.scard}>
+            <div className={styles.scardHead}>
+              <div className={styles.scardTitle}>Подключение продаж</div>
+              <div className={styles.scardDesc}>
+                Юридические данные и реквизиты можно заполнить заранее на отдельных вкладках.
+                Включение продаж — после соглашения, верификации и онбординга (см. вкладку «Реквизиты»).
+              </div>
+            </div>
+            {rejected && (
+              <div className={styles.bannerWarn}>
+                Верификация отклонена. Исправьте данные на вкладках «Юридические данные» и «Реквизиты».
+              </div>
+            )}
+            {pending && (
+              <div className={styles.bannerWarn}>Заявка на проверке. Обычно это занимает некоторое время.</div>
+            )}
+            <div className={styles.scardFooter}>
+              <div className={styles.footerSpacer} />
+              {isOwner && !org.canSellTickets && (
+                <Button
+                  loading={busy}
+                  disabled={!verified || !ticketingAgreed}
+                  title={
+                    !ticketingAgreed
+                      ? 'Нужно принять соглашение на продажу билетов'
+                      : !verified
+                        ? 'Нужна успешная верификация'
+                        : undefined
+                  }
+                  onClick={() => { void toggleTickets(true); }}
+                >
+                  Включить продажу билетов
+                </Button>
+              )}
+              {isOwner && org.canSellTickets && (
+                <Button
+                  variant="secondary"
+                  loading={busy}
+                  onClick={() => { void toggleTickets(false); }}
+                >
+                  Отключить продажу билетов
+                </Button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {view === 'requisites' && (
+        <>
+          <div className={styles.scard}>
+            <div className={styles.scardHead}>
+              <div className={styles.scardTitle}>Готовность к продажам</div>
+              <div className={styles.scardDesc}>
+                Чеклист шагов перед подключением продажи билетов
+              </div>
+            </div>
+            <ul className={styles.checkList}>
+              {checklist.map(item => (
+                <li key={item.label} className={item.ok ? styles.checkOk : styles.checkNo}>
+                  <span className={styles.checkMark} aria-hidden>{item.ok ? '✓' : '·'}</span>
+                  {item.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className={styles.scard}>
+            <div className={styles.scardHead}>
+              <div className={styles.scardTitle}>Реквизиты</div>
+              <div className={styles.scardDesc}>
+                Банковские реквизиты для выплат · онбординг: {formatOnboardingStatus(onboardingStatus as never)}
+              </div>
+            </div>
+            <div className={styles.formBody}>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Расчётный счёт *</span>
+                <input className={styles.input} value={bankAccount} disabled={!isOwner} onChange={e => setBankAccount(e.target.value)} />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>БИК *</span>
+                <input className={styles.input} value={bik} disabled={!isOwner} onChange={e => setBik(e.target.value)} />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Банк *</span>
+                <input className={styles.input} value={bankName} disabled={!isOwner} onChange={e => setBankName(e.target.value)} />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Налоговый режим</span>
+                <input className={styles.input} value={taxRegime} disabled={!isOwner} onChange={e => setTaxRegime(e.target.value)} />
+              </label>
             </div>
             {isOwner && (
               <div className={styles.scardFooter}>
                 <div className={styles.footerSpacer} />
                 <Button
                   loading={busy}
-                  disabled={!ticketingAccepted}
-                  onClick={() => { void acceptTicketingAgreement(); }}
+                  onClick={() => { void savePayout(); }}
                 >
-                  Принять соглашение
+                  Сохранить реквизиты
                 </Button>
               </div>
             )}
-          </>
-        )}
-        {ticketingDocOpen && (
-          <AgreementDocumentModal
-            doc={ticketingDoc}
-            onClose={() => setTicketingDocOpen(false)}
-          />
-        )}
-      </div>
+          </div>
 
-      <div className={styles.scard}>
-        <div className={styles.scardHead}>
-          <div className={styles.scardTitle}>Готовность к продажам</div>
-          <div className={styles.scardDesc}>
-            Бесплатные анонсы доступны всегда. Продажа билетов — после верификации и онбординга выплат.
-          </div>
-        </div>
-        <ul className={styles.checkList}>
-          {checklist.map(item => (
-            <li key={item.label} className={item.ok ? styles.checkOk : styles.checkNo}>
-              <span className={styles.checkMark} aria-hidden>{item.ok ? '✓' : '·'}</span>
-              {item.label}
-            </li>
-          ))}
-        </ul>
-        {rejected && (
-          <div className={styles.bannerWarn}>
-            Верификация отклонена. Исправьте данные и отправьте заявку снова.
-            Организация не блокируется — бесплатные анонсы работают.
-          </div>
-        )}
-        {pending && (
-          <div className={styles.bannerWarn}>Заявка на проверке. Обычно это занимает некоторое время.</div>
-        )}
-        <div className={styles.scardFooter}>
-          <div className={styles.footerSpacer} />
-          {isOwner && !org.canSellTickets && (
-            <Button
-              loading={busy}
-              disabled={!verified || !ticketingAgreed}
-              title={
-                !ticketingAgreed
-                  ? 'Нужно принять соглашение на продажу билетов'
-                  : !verified
-                    ? 'Нужна успешная верификация'
-                    : undefined
-              }
-              onClick={() => { void toggleTickets(true); }}
-            >
-              Включить продажу билетов
-            </Button>
-          )}
-          {isOwner && org.canSellTickets && (
-            <Button
-              variant="secondary"
-              loading={busy}
-              onClick={() => { void toggleTickets(false); }}
-            >
-              Отключить продажу билетов
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className={styles.scard}>
-        <div className={styles.scardHead}>
-          <div className={styles.scardTitle}>Юридические данные</div>
-          <div className={styles.scardDesc}>
-            Можно заполнить вручную или найти организацию в реестре по ИНН
-          </div>
-        </div>
-        <div className={styles.formBody}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Правовая форма</span>
-            <Select
-              value={legalForm}
-              disabled={!isOwner}
-              onChange={v => setLegalForm(v as OrganizationLegalFormValue)}
-              options={[
-                { value: OrganizationLegalForm.Ip, label: formatLegalForm(OrganizationLegalForm.Ip) },
-                { value: OrganizationLegalForm.LegalEntity, label: formatLegalForm(OrganizationLegalForm.LegalEntity) },
-                { value: OrganizationLegalForm.SelfEmployed, label: formatLegalForm(OrganizationLegalForm.SelfEmployed) },
-              ]}
-            />
-          </label>
-          {isSelfEmployed && (
-            <div className={styles.bannerWarn}>
-              Платный тир (продажа билетов) доступен только для ИП и юридических лиц.
-            </div>
-          )}
-          <div className={styles.field}>
-            <span className={styles.fieldLabel}>ИНН *</span>
-            <div className={styles.innRow}>
-              <input
-                className={styles.input}
-                value={inn}
-                inputMode="numeric"
-                disabled={!isOwner}
-                onChange={e => setInn(e.target.value.replace(/\D/g, '').slice(0, 12))}
-              />
-              {isOwner && (
+          {isOwner && (
+            <div className={styles.scard}>
+              <div className={styles.scardHead}>
+                <div className={styles.scardTitle}>Верификация</div>
+                <div className={styles.scardDesc}>
+                  Отправка на проверку требует заполненные юр. данные и реквизиты
+                </div>
+              </div>
+              <div className={styles.scardFooter}>
+                <div className={styles.footerSpacer} />
                 <Button
-                  variant="secondary"
-                  disabled={!ticketingAgreed}
+                  loading={busy}
+                  disabled={!ticketingAgreed || !legalFilled || !payoutFilled || pending}
                   title={!ticketingAgreed ? 'Сначала примите соглашение на продажу билетов' : undefined}
-                  onClick={() => setInnLookupOpen(true)}
+                  onClick={() => { void submitVerification(); }}
                 >
-                  Найти по ИНН
+                  {pending ? 'На проверке' : 'Отправить на проверку'}
                 </Button>
-              )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {view === 'legal' && (
+        <div className={styles.scard}>
+          <div className={styles.scardHead}>
+            <div className={styles.scardTitle}>Юридические данные</div>
+            <div className={styles.scardDesc}>
+              Можно заполнить заранее, без подключения продажи билетов — вручную или по ИНН из реестра
             </div>
           </div>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>ОГРН / ОГРНИП</span>
-            <input className={styles.input} value={ogrn} disabled={!isOwner} onChange={e => setOgrn(e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>КПП</span>
-            <input className={styles.input} value={kpp} disabled={!isOwner} onChange={e => setKpp(e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Юр. адрес *</span>
-            <input className={styles.input} value={legalAddress} disabled={!isOwner} onChange={e => setLegalAddress(e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>ФИО руководителя *</span>
-            <input className={styles.input} value={headName} disabled={!isOwner} onChange={e => setHeadName(e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Действует на основании</span>
-            <input className={styles.input} value={headBasis} disabled={!isOwner} onChange={e => setHeadBasis(e.target.value)} placeholder="Устава / доверенности" />
-          </label>
-        </div>
-        {isOwner && (
-          <div className={styles.scardFooter}>
-            <div className={styles.footerSpacer} />
-            <Button
-              loading={busy}
-              disabled={!ticketingAgreed}
-              title={!ticketingAgreed ? 'Сначала примите соглашение на продажу билетов' : undefined}
-              onClick={requestSaveLegal}
-            >
-              Сохранить юр. данные
-            </Button>
-          </div>
-        )}
-        {!isOwner && canEdit && (
           <div className={styles.formBody}>
-            <p className={styles.scardDesc}>Редактирование доступно только владельцу</p>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Правовая форма</span>
+              <Select
+                value={legalForm}
+                disabled={!isOwner}
+                onChange={v => setLegalForm(v as OrganizationLegalFormValue)}
+                options={[
+                  { value: OrganizationLegalForm.Ip, label: formatLegalForm(OrganizationLegalForm.Ip) },
+                  { value: OrganizationLegalForm.LegalEntity, label: formatLegalForm(OrganizationLegalForm.LegalEntity) },
+                  { value: OrganizationLegalForm.SelfEmployed, label: formatLegalForm(OrganizationLegalForm.SelfEmployed) },
+                ]}
+              />
+            </label>
+            {isSelfEmployed && (
+              <div className={styles.bannerWarn}>
+                Платный тир (продажа билетов) доступен только для ИП и юридических лиц.
+              </div>
+            )}
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>ИНН *</span>
+              <div className={styles.innRow}>
+                <input
+                  className={styles.input}
+                  value={inn}
+                  inputMode="numeric"
+                  disabled={!isOwner}
+                  onChange={e => setInn(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                />
+                {isOwner && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setInnLookupOpen(true)}
+                  >
+                    Найти по ИНН
+                  </Button>
+                )}
+              </div>
+            </div>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>ОГРН / ОГРНИП</span>
+              <input className={styles.input} value={ogrn} disabled={!isOwner} onChange={e => setOgrn(e.target.value)} />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>КПП</span>
+              <input className={styles.input} value={kpp} disabled={!isOwner} onChange={e => setKpp(e.target.value)} />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Юр. адрес *</span>
+              <input className={styles.input} value={legalAddress} disabled={!isOwner} onChange={e => setLegalAddress(e.target.value)} />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>ФИО руководителя *</span>
+              <input className={styles.input} value={headName} disabled={!isOwner} onChange={e => setHeadName(e.target.value)} />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Действует на основании</span>
+              <input className={styles.input} value={headBasis} disabled={!isOwner} onChange={e => setHeadBasis(e.target.value)} placeholder="Устава / доверенности" />
+            </label>
           </div>
-        )}
-      </div>
+          {isOwner && (
+            <div className={styles.scardFooter}>
+              <div className={styles.footerSpacer} />
+              <Button
+                loading={busy}
+                onClick={requestSaveLegal}
+              >
+                Сохранить юр. данные
+              </Button>
+            </div>
+          )}
+          {!isOwner && canEdit && (
+            <div className={styles.formBody}>
+              <p className={styles.scardDesc}>Редактирование доступно только владельцу</p>
+            </div>
+          )}
+        </div>
+      )}
 
-      {innLookupOpen && (
+      {view === 'legal' && innLookupOpen && (
         <OrgInnLookupModal
           initialInn={inn}
           onClose={() => setInnLookupOpen(false)}
@@ -1896,7 +1958,7 @@ function OrganizationSalesSection({
         />
       )}
 
-      {confirmLegalSaveOpen && (
+      {view === 'legal' && confirmLegalSaveOpen && (
         <ConfirmDialog
           title="Проверьте данные"
           message="Вы изменили поля после автозаполнения из реестра. Подтвердите, что проверили корректность юридических данных перед сохранением."
@@ -1909,66 +1971,11 @@ function OrganizationSalesSection({
         />
       )}
 
-      <div className={styles.scard}>
-        <div className={styles.scardHead}>
-          <div className={styles.scardTitle}>Выплаты</div>
-          <div className={styles.scardDesc}>
-            Онбординг: {formatOnboardingStatus(onboardingStatus as never)}
-          </div>
-        </div>
-        <div className={styles.formBody}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Расчётный счёт *</span>
-            <input className={styles.input} value={bankAccount} disabled={!isOwner} onChange={e => setBankAccount(e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>БИК *</span>
-            <input className={styles.input} value={bik} disabled={!isOwner} onChange={e => setBik(e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Банк *</span>
-            <input className={styles.input} value={bankName} disabled={!isOwner} onChange={e => setBankName(e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Налоговый режим</span>
-            <input className={styles.input} value={taxRegime} disabled={!isOwner} onChange={e => setTaxRegime(e.target.value)} />
-          </label>
-        </div>
-        {isOwner && (
-          <div className={styles.scardFooter}>
-            <div className={styles.footerSpacer} />
-            <Button
-              loading={busy}
-              disabled={!ticketingAgreed}
-              title={!ticketingAgreed ? 'Сначала примите соглашение на продажу билетов' : undefined}
-              onClick={() => { void savePayout(); }}
-            >
-              Сохранить реквизиты
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {isOwner && (
-        <div className={styles.scard}>
-          <div className={styles.scardHead}>
-            <div className={styles.scardTitle}>Верификация</div>
-            <div className={styles.scardDesc}>
-              Отправка на проверку требует заполненные юр. данные и реквизиты выплат
-            </div>
-          </div>
-          <div className={styles.scardFooter}>
-            <div className={styles.footerSpacer} />
-            <Button
-              loading={busy}
-              disabled={!ticketingAgreed || !legalFilled || !payoutFilled || pending}
-              title={!ticketingAgreed ? 'Сначала примите соглашение на продажу билетов' : undefined}
-              onClick={() => { void submitVerification(); }}
-            >
-              {pending ? 'На проверке' : 'Отправить на проверку'}
-            </Button>
-          </div>
-        </div>
+      {view === 'sales' && ticketingDocOpen && (
+        <AgreementDocumentModal
+          doc={ticketingDoc}
+          onClose={() => setTicketingDocOpen(false)}
+        />
       )}
 
       {msg && <div className={msg.ok ? styles.bannerOk : styles.bannerErr}>{msg.text}</div>}
