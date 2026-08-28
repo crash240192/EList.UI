@@ -256,22 +256,24 @@ export function OrganizationsSettingsPanel({
               <li key={org.id}>
                 <button
                   type="button"
-                  className={styles.orgRow}
+                  className={styles.orgCard}
                   onClick={() => setView({ kind: 'detail', id: org.id })}
                 >
-                  <div className={styles.orgRowMain}>
+                  <div className={styles.orgCardHead}>
                     <span className={styles.orgName}>{org.name}</span>
-                    {shouldShowVerificationBadge(org) && (
-                      <span className={`${styles.badge} ${statusClass(org.verificationStatus)}`}>
-                        {formatVerificationStatus(org.verificationStatus)}
-                      </span>
-                    )}
-                    {!org.active && (
-                      <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
-                    )}
-                    {org.canSellTickets && (
-                      <span className={`${styles.badge} ${styles.badgeOk}`}>Билеты</span>
-                    )}
+                    <div className={styles.orgBadges}>
+                      {shouldShowVerificationBadge(org) && (
+                        <span className={`${styles.badge} ${statusClass(org.verificationStatus)}`}>
+                          {formatVerificationStatus(org.verificationStatus)}
+                        </span>
+                      )}
+                      {!org.active && (
+                        <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
+                      )}
+                      {org.canSellTickets && (
+                        <span className={`${styles.badge} ${styles.badgeOk}`}>Билеты</span>
+                      )}
+                    </div>
                   </div>
                   <span className={styles.orgMeta}>
                     {org.address || 'Адрес не указан'}
