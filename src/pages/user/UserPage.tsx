@@ -8,7 +8,7 @@ import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
 import { useEvents } from '@/features/event-list/useEvents';
-import { usePageTitle } from '@/shared/hooks';
+import { useInfiniteScroll, usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import {
   fetchSubscriptionsCount,
@@ -187,6 +187,9 @@ function UserEventsPanel({
   events,
   total,
   isLoading,
+  isLoadingMore,
+  hasMore,
+  onLoadMore,
   scope,
   phase,
   onPhaseChange,
@@ -195,12 +198,28 @@ function UserEventsPanel({
   events: IEvent[];
   total: number;
   isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  onLoadMore: () => void;
   scope: UserEventsScope;
   phase: UserEventsPhase;
   onPhaseChange: (phase: UserEventsPhase) => void;
   onOpen: (eventId: string) => void;
 }) {
   const filtered = useMemo(() => splitEventsByPhase(events, phase), [events, phase]);
+
+  const sentinelRef = useInfiniteScroll(onLoadMore, {
+    enabled: !isLoading && !isLoadingMore && hasMore,
+  });
+
+  // Первая страница может целиком попасть в другую фазу — подгружаем дальше,
+  // пока не появятся карточки или не кончатся данные.
+  useEffect(() => {
+    if (isLoading || isLoadingMore || !hasMore) return;
+    if (filtered.length > 0) return;
+    if (events.length === 0) return;
+    onLoadMore();
+  }, [isLoading, isLoadingMore, hasMore, filtered.length, events.length, onLoadMore]);
 
   return (
     <div className={styles.tabContent}>
@@ -223,7 +242,7 @@ function UserEventsPanel({
         </div>
       )}
 
-      {!isLoading && filtered.length === 0 && (
+      {!isLoading && filtered.length === 0 && !hasMore && (
         <p className={styles.placeholder}>
           {scope === 'all'
             ? (phase === 'upcoming' ? 'Нет предстоящих мероприятий' : 'Нет прошедших мероприятий')
@@ -231,6 +250,10 @@ function UserEventsPanel({
               ? (phase === 'upcoming' ? 'Нет предстоящих организованных мероприятий' : 'Нет прошедших организованных мероприятий')
               : (phase === 'upcoming' ? 'Нет предстоящих мероприятий с участием' : 'Нет прошедших мероприятий с участием')}
         </p>
+      )}
+
+      {!isLoading && filtered.length === 0 && hasMore && (
+        <p className={styles.placeholder}>Загрузка…</p>
       )}
 
       {!isLoading && filtered.length > 0 && (
@@ -246,7 +269,13 @@ function UserEventsPanel({
         </EventList>
       )}
 
-      {!isLoading && total > events.length && filtered.length > 0 && (
+      {hasMore && (
+        <div ref={sentinelRef} className={styles.sentinel}>
+          {isLoadingMore && <span className={styles.loadingMore}>Загрузка…</span>}
+        </div>
+      )}
+
+      {!isLoading && !hasMore && total > events.length && filtered.length > 0 && (
         <p className={styles.moreHint}>Показано {events.length} из {total}</p>
       )}
     </div>
@@ -416,17 +445,44 @@ export default function UserPage() {
     [createdEvents.events, participatingEvents.events],
   );
   const allEventsTotal = useMemo(
-    () => countUniqueUserEvents(createdEvents.events, participatingEvents.events),
-    [createdEvents.events, participatingEvents.events],
+    () => Math.max(
+      countUniqueUserEvents(createdEvents.events, participatingEvents.events),
+      createdEvents.total + participatingEvents.total,
+    ),
+    [createdEvents.events, participatingEvents.events, createdEvents.total, participatingEvents.total],
   );
 
+  const loadAllMore = useCallback(() => {
+    if (createdEvents.hasMore) createdEvents.loadMore();
+    if (participatingEvents.hasMore) participatingEvents.loadMore();
+  }, [
+    createdEvents.hasMore,
+    createdEvents.loadMore,
+    participatingEvents.hasMore,
+    participatingEvents.loadMore,
+  ]);
+
   const activeEvents = mainTab === 'all'
-    ? { events: allEvents, total: allEventsTotal, isLoading: createdEvents.isLoading || participatingEvents.isLoading }
+    ? {
+        events: allEvents,
+        total: allEventsTotal,
+        isLoading: createdEvents.isLoading || participatingEvents.isLoading,
+        isLoadingMore: createdEvents.isLoadingMore || participatingEvents.isLoadingMore,
+        hasMore: createdEvents.hasMore || participatingEvents.hasMore,
+        loadMore: loadAllMore,
+      }
     : mainTab === 'created'
       ? createdEvents
       : mainTab === 'participating'
         ? participatingEvents
-        : { events: [], total: 0, isLoading: false };
+        : {
+            events: [] as IEvent[],
+            total: 0,
+            isLoading: false,
+            isLoadingMore: false,
+            hasMore: false,
+            loadMore: () => {},
+          };
 
   const tabCounts: Record<MainTab, number> = {
     all: allEventsTotal || allEvents.length,
@@ -758,6 +814,9 @@ export default function UserPage() {
                 events={activeEvents.events}
                 total={activeEvents.total}
                 isLoading={activeEvents.isLoading}
+                isLoadingMore={activeEvents.isLoadingMore}
+                hasMore={activeEvents.hasMore}
+                onLoadMore={activeEvents.loadMore}
                 scope={mainTab}
                 phase={eventsPhase}
                 onPhaseChange={setEventsPhase}
