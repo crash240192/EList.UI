@@ -278,7 +278,6 @@ function ProfileTab() {
       <div className={styles.scard}>
         <div className={styles.scardHead}>
           <div className={styles.scardTitle}>Фото профиля</div>
-          <div className={styles.scardDesc}>Видна всем пользователям</div>
         </div>
         <div className={styles.avatarSection}>
           <AvatarUpload
