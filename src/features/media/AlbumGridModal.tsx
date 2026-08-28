@@ -154,7 +154,6 @@ export function AlbumGridModal({
   const uploadingRef = useRef<UploadingItem[]>([]);
   const dirtyRef = useRef(false);
   const loadedForAlbumIdRef = useRef<string | null>(null);
-  const uploadChainRef = useRef(Promise.resolve());
 
   const revokeUploadingPreviews = useCallback((items: UploadingItem[]) => {
     items.forEach(item => URL.revokeObjectURL(item.previewUrl));
@@ -211,7 +210,6 @@ export function AlbumGridModal({
     setSelectMode(false);
     setSelectedIds(new Set());
     setDeleteConfirm(false);
-    uploadChainRef.current = Promise.resolve();
     revokeUploadingPreviews(uploadingRef.current);
     setUploadingItems([]);
     setUploadError(null);
@@ -244,27 +242,27 @@ export function AlbumGridModal({
       return;
     }
 
-    uploadChainRef.current = uploadChainRef.current.then(async () => {
-      setUploadError(null);
+    setUploadError(null);
 
-      const placeholders: Array<UploadingItem & { file: File }> = items.map(file => ({
-        localId: nextUploadId(),
-        previewUrl: URL.createObjectURL(file),
-        file,
-      }));
+    const placeholders: Array<UploadingItem & { file: File }> = items.map(file => ({
+      localId: nextUploadId(),
+      previewUrl: URL.createObjectURL(file),
+      file,
+    }));
 
-      setUploadingItems(prev => [
-        ...prev,
-        ...placeholders.map(({ localId, previewUrl }) => ({ localId, previewUrl })),
-      ]);
+    setUploadingItems(prev => [
+      ...prev,
+      ...placeholders.map(({ localId, previewUrl }) => ({ localId, previewUrl })),
+    ]);
 
-      for (const placeholder of placeholders) {
-        try {
-          const id = await uploadPhotoToAlbum(album.id, placeholder.file);
+    for (const placeholder of placeholders) {
+      void uploadPhotoToAlbum(album.id, placeholder.file)
+        .then(id => {
           clearUploadingPlaceholders([placeholder.localId]);
           setFiles(prev => appendUniqueFiles(prev, album.id, [id]));
           dirtyRef.current = true;
-        } catch (e) {
+        })
+        .catch(e => {
           const message = e instanceof Error ? e.message : 'Ошибка загрузки';
           setUploadError(message);
           setUploadingItems(prev => prev.map(item => (
@@ -272,9 +270,8 @@ export function AlbumGridModal({
               ? { ...item, error: message }
               : item
           )));
-        }
-      }
-    }).catch(() => {});
+        });
+    }
   }, [album, canManage, isParticipating, clearUploadingPlaceholders]);
 
   const exitSelectMode = useCallback(() => {

@@ -8,7 +8,7 @@ import {
   type IAlbum,
   type ICreateAlbumPayload,
 } from '@/entities/media/albumApi';
-import { uploadPhotosToAlbum } from '@/entities/media/albumFileApi';
+import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
 import { filterImageFiles } from '@/shared/lib/imageFile';
 import { AlbumPhotoUploadZone } from './AlbumPhotoUploadZone';
 import { AlbumPhotoPreviewGrid, type PhotoPreviewItem } from './AlbumPhotoPreviewGrid';
@@ -47,7 +47,7 @@ export function AlbumFormModal({
   const [readOnly,    setReadOnly]    = useState(album?.parameters?.participantsReadonly ?? false);
   const [isPrivate,   setIsPrivate]   = useState(album?.parameters?.private ?? false);
   const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
-  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadingPhotoIds, setUploadingPhotoIds] = useState<Set<string>>(() => new Set());
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
   const pendingRef = useRef<PendingPhoto[]>([]);
@@ -78,8 +78,10 @@ export function AlbumFormModal({
   const previewItems: PhotoPreviewItem[] = pendingPhotos.map(item => ({
     localId: item.localId,
     previewUrl: item.previewUrl,
-    uploading: uploadingPhotos,
+    uploading: uploadingPhotoIds.has(item.localId),
   }));
+
+  const uploadingPhotos = uploadingPhotoIds.size > 0;
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Укажите название альбома'); return; }
@@ -110,8 +112,18 @@ export function AlbumFormModal({
         };
         const newId = await createAlbum(payload);
         if (pendingPhotos.length > 0) {
-          setUploadingPhotos(true);
-          await uploadPhotosToAlbum(newId, pendingPhotos.map(p => p.file));
+          setUploadingPhotoIds(new Set(pendingPhotos.map(p => p.localId)));
+          await Promise.all(pendingPhotos.map(async photo => {
+            try {
+              await uploadPhotoToAlbum(newId, photo.file);
+            } finally {
+              setUploadingPhotoIds(prev => {
+                const next = new Set(prev);
+                next.delete(photo.localId);
+                return next;
+              });
+            }
+          }));
         }
         revokePendingPreviews(pendingPhotos);
         setPendingPhotos([]);
@@ -127,7 +139,7 @@ export function AlbumFormModal({
       setError(e instanceof Error ? e.message : 'Ошибка при сохранении альбома');
     } finally {
       setSaving(false);
-      setUploadingPhotos(false);
+      setUploadingPhotoIds(new Set());
     }
   };
 
