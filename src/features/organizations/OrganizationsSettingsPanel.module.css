@@ -107,10 +107,10 @@
 }
 
 .orgCardHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: start;
 }
 
 .orgBadges {
@@ -119,17 +119,17 @@
   gap: 6px;
   justify-content: flex-end;
   align-items: center;
-  flex-shrink: 0;
-  max-width: min(100%, 220px);
+  justify-self: end;
+  align-self: start;
 }
 
 .orgName {
   font-size: var(--font-sm);
   font-weight: 600;
   color: var(--text-primary);
-  flex: 1;
   min-width: 0;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .orgMeta {
@@ -462,7 +462,14 @@
   gap: 4px;
   padding: 10px 14px 12px;
   border-top: 1px solid var(--border);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.subTabs::-webkit-scrollbar {
+  display: none;
 }
 
 .subTab {
@@ -475,6 +482,8 @@
   color: var(--text-secondary);
   cursor: pointer;
   font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .subTab:hover {
