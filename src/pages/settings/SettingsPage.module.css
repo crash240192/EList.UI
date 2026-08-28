@@ -466,14 +466,11 @@
     overflow-x: auto;
     border-right: none;
     border-bottom: 1px solid var(--border);
-    padding: 10px 12px;
+    padding: 10px 12px 8px;
     gap: 6px;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .snav::-webkit-scrollbar {
-    display: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
 
   /* Секции — только группировка на десктопе; на мобиле — одна горизонтальная лента */
