@@ -79,45 +79,85 @@
   padding: 0;
 }
 
-.orgRow {
+.orgList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 16px;
+}
+
+.orgCard {
   width: 100%;
   text-align: left;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  padding: 14px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
   cursor: pointer;
   font-family: inherit;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  transition: background 0.12s;
+  gap: 6px;
+  transition: background 0.12s, border-color 0.12s;
 }
 
-.orgRow:hover {
-  background: var(--surface-2);
+.orgCard:hover {
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--accent) 12%);
+  border-color: color-mix(in srgb, var(--border) 55%, var(--accent) 45%);
 }
 
-.orgRow:last-child {
-  border-bottom: none;
+.orgCardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.orgRowMain {
+.orgBadges {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  flex-shrink: 0;
+  max-width: min(100%, 220px);
 }
 
 .orgName {
   font-size: var(--font-sm);
   font-weight: 600;
   color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
 }
 
 .orgMeta {
   font-size: var(--font-xs);
   color: var(--text-muted);
+  line-height: 1.45;
+}
+
+@media (max-width: 639px) {
+  .orgList {
+    padding: 10px 12px 14px;
+    gap: 8px;
+  }
+
+  .orgCard {
+    padding: 12px 14px;
+  }
+
+  .orgCardHead {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .orgBadges {
+    max-width: none;
+    justify-content: flex-end;
+  }
 }
 
 .badge {
