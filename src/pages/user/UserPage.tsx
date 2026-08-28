@@ -7,7 +7,7 @@ import { fetchOrganizerRating } from '@/entities/event';
 import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
-import { useEvents } from '@/features/event-list/useEvents';
+import { useUserProfileEvents } from '@/features/event-list/useUserProfileEvents';
 import { useInfiniteScroll, usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import {
@@ -44,13 +44,11 @@ import {
 } from '@/entities/organization';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
-  countUniqueUserEvents,
   formatContactHref,
   formatShortEventDate,
   getContactIconKind,
   getUpcomingPreview,
   isContactLink,
-  mergeUserEvents,
   splitEventsByPhase,
   type ContactIconKind,
   type UserEventsPhase,
@@ -330,14 +328,7 @@ export default function UserPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
 
-  const createdEvents = useEvents(
-    { organizatorId: profileAccountId },
-    !!profileAccountId,
-  );
-  const participatingEvents = useEvents(
-    { participantId: profileAccountId },
-    !!profileAccountId,
-  );
+  const { scopes: eventScopes } = useUserProfileEvents(profileAccountId || null);
 
   useEffect(() => {
     setLoading(true);
@@ -440,64 +431,32 @@ export default function UserPage() {
     }
   }, [profileAccountId, targetId]);
 
-  const allEvents = useMemo(
-    () => mergeUserEvents(createdEvents.events, participatingEvents.events),
-    [createdEvents.events, participatingEvents.events],
-  );
-  const allEventsTotal = useMemo(
-    () => Math.max(
-      countUniqueUserEvents(createdEvents.events, participatingEvents.events),
-      createdEvents.total + participatingEvents.total,
-    ),
-    [createdEvents.events, participatingEvents.events, createdEvents.total, participatingEvents.total],
-  );
-
-  const loadAllMore = useCallback(() => {
-    if (createdEvents.hasMore) createdEvents.loadMore();
-    if (participatingEvents.hasMore) participatingEvents.loadMore();
-  }, [
-    createdEvents.hasMore,
-    createdEvents.loadMore,
-    participatingEvents.hasMore,
-    participatingEvents.loadMore,
-  ]);
-
-  const activeEvents = mainTab === 'all'
-    ? {
-        events: allEvents,
-        total: allEventsTotal,
-        isLoading: createdEvents.isLoading || participatingEvents.isLoading,
-        isLoadingMore: createdEvents.isLoadingMore || participatingEvents.isLoadingMore,
-        hasMore: createdEvents.hasMore || participatingEvents.hasMore,
-        loadMore: loadAllMore,
-      }
-    : mainTab === 'created'
-      ? createdEvents
-      : mainTab === 'participating'
-        ? participatingEvents
-        : {
-            events: [] as IEvent[],
-            total: 0,
-            isLoading: false,
-            isLoadingMore: false,
-            hasMore: false,
-            loadMore: () => {},
-          };
+  const activeEvents =
+    mainTab === 'all' || mainTab === 'created' || mainTab === 'participating'
+      ? eventScopes[mainTab]
+      : {
+          events: [] as IEvent[],
+          total: 0,
+          isLoading: false,
+          isLoadingMore: false,
+          hasMore: false,
+          loadMore: () => {},
+        };
 
   const tabCounts: Record<MainTab, number> = {
-    all: allEventsTotal || allEvents.length,
-    created: createdEvents.total || createdEvents.events.length,
-    participating: participatingEvents.total || participatingEvents.events.length,
+    all: eventScopes.all.total || eventScopes.all.events.length,
+    created: eventScopes.created.total || eventScopes.created.events.length,
+    participating: eventScopes.participating.total || eventScopes.participating.events.length,
     albums: albumsCount,
   };
 
   const upcomingPreview = useMemo(() => {
-    const created = getUpcomingPreview(createdEvents.events, 'created', 2);
-    const participating = getUpcomingPreview(participatingEvents.events, 'participating', 2);
+    const created = getUpcomingPreview(eventScopes.created.events, 'created', 2);
+    const participating = getUpcomingPreview(eventScopes.participating.events, 'participating', 2);
     return [...created, ...participating]
       .sort((a, b) => new Date(a.event.startTime).getTime() - new Date(b.event.startTime).getTime())
       .slice(0, 3);
-  }, [createdEvents.events, participatingEvents.events]);
+  }, [eventScopes.created.events, eventScopes.participating.events]);
 
   const pageTitle = profile
     ? ([profile.person?.lastName, profile.person?.firstName].filter(Boolean).join(' ')
@@ -633,11 +592,11 @@ export default function UserPage() {
         <div className={styles.statsBar}>
           <div className={styles.statGroup}>
             <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{createdEvents.total || createdEvents.events.length}</span>
+              <span className={styles.statNum}>{eventScopes.created.total || eventScopes.created.events.length}</span>
               <span className={styles.statLabel}>организовал</span>
             </div>
             <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{participatingEvents.total || participatingEvents.events.length}</span>
+              <span className={styles.statNum}>{eventScopes.participating.total || eventScopes.participating.events.length}</span>
               <span className={styles.statLabel}>посетил</span>
             </div>
           </div>

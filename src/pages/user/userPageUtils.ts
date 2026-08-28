@@ -2,7 +2,7 @@ import type { IEvent, IEventType } from '@/entities/event';
 import { isEventFinished } from '@/features/event/RatingWidget';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 
-export type UserEventsScope = 'all' | 'created' | 'participating';
+export type { UserEventsScope } from '@/features/event-list/eventOwnerSearchParams';
 export type UserEventsPhase = 'upcoming' | 'past';
 
 export {
@@ -38,24 +38,6 @@ export function splitEventsByPhase(events: IEvent[], phase: UserEventsPhase): IE
     const bTime = new Date(b.startTime).getTime();
     return phase === 'upcoming' ? aTime - bTime : bTime - aTime;
   });
-}
-
-export function mergeUserEvents(created: IEvent[], participating: IEvent[]): IEvent[] {
-  const seen = new Set<string>();
-  const merged: IEvent[] = [];
-  for (const event of [...created, ...participating]) {
-    if (seen.has(event.id)) continue;
-    seen.add(event.id);
-    merged.push(event);
-  }
-  return merged;
-}
-
-export function countUniqueUserEvents(created: IEvent[], participating: IEvent[]): number {
-  const ids = new Set<string>();
-  created.forEach(e => ids.add(e.id));
-  participating.forEach(e => ids.add(e.id));
-  return ids.size;
 }
 
 export function getUpcomingPreview(
