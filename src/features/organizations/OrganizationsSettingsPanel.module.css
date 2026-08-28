@@ -460,16 +460,13 @@
 .subTabs {
   display: flex;
   gap: 4px;
-  padding: 10px 14px 12px;
+  padding: 10px 14px 8px;
   border-top: 1px solid var(--border);
   flex-wrap: nowrap;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.subTabs::-webkit-scrollbar {
-  display: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
 .subTab {

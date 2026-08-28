@@ -768,13 +768,8 @@
   }
 
   .profileHeader {
-    padding: 0 16px;
-    margin-top: -36px;
-  }
-
-  .avatar {
-    width: 72px;
-    height: 72px;
+    padding: 0 20px 12px;
+    margin-top: -44px;
   }
 
   .profileActions {

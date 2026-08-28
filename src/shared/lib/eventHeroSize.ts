@@ -43,20 +43,18 @@ export function calcEventPageExpandedHeroHeight(
     return EVENT_PAGE_HERO_COLLAPSED_HEIGHT;
   }
 
-  const maxExpanded =
-    width <= EVENT_PREVIEW_HERO_WIDTH
-      ? EVENT_PREVIEW_HERO_HEIGHT
-      : (width / EVENT_PREVIEW_HERO_WIDTH) * EVENT_PREVIEW_HERO_HEIGHT;
+  const proportionalHeight =
+    (width / EVENT_PREVIEW_HERO_WIDTH) * EVENT_PREVIEW_HERO_HEIGHT;
 
   const coverNaturalSize = options.coverNaturalSize;
   if (coverNaturalSize && coverNaturalSize.width > 0) {
     const coverFitHeight = calcCoverFitHeight(width, coverNaturalSize);
-    if (coverFitHeight < maxExpanded) {
+    if (coverFitHeight < proportionalHeight) {
       return coverFitHeight;
     }
   }
 
-  return maxExpanded;
+  return proportionalHeight;
 }
 
 export function calcEventPageHeroHeight(expandedHeight: number, scrollCollapse: number): number {
