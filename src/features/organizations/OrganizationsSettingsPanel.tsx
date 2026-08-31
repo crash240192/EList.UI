@@ -1424,7 +1424,6 @@ function OrganizationMembersSection({
 interface ReadinessChecklistItem {
   label: string;
   ok: boolean;
-  statusLabel: string;
 }
 
 function OrganizationSalesReadinessCard({ items }: { items: ReadinessChecklistItem[] }) {
@@ -1432,27 +1431,18 @@ function OrganizationSalesReadinessCard({ items }: { items: ReadinessChecklistIt
     <div className={styles.scard}>
       <div className={styles.scardHead}>
         <div className={styles.scardTitle}>Готовность к продаже билетов</div>
+        <div className={styles.scardDesc}>
+          Чеклист шагов перед подключением продажи билетов
+        </div>
       </div>
-      <div className={styles.formBody}>
-        <ul className={styles.orgDocsList}>
-          {items.map(item => (
-            <li key={item.label}>
-              <div className={`${styles.orgDocRow} ${styles.orgDocRowStatic}`}>
-                <div className={styles.orgDocMain}>
-                  <span className={styles.orgDocName}>{item.label}</span>
-                  <span
-                    className={`${styles.orgDocStatus} ${
-                      item.ok ? styles.orgDocStatusOk : styles.orgDocStatusNo
-                    }`}
-                  >
-                    {item.statusLabel}
-                  </span>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <ul className={styles.checkList}>
+        {items.map(item => (
+          <li key={item.label} className={item.ok ? styles.checkOk : styles.checkNo}>
+            <span className={styles.checkMark} aria-hidden>{item.ok ? '✓' : '·'}</span>
+            {item.label}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -1562,48 +1552,19 @@ function OrganizationBillingSection({
     verified && onboardingActive && ticketingAgreed && legalFilled && payoutFilled;
 
   const checklist: ReadinessChecklistItem[] = [
-    {
-      ok: ticketingAgreed,
-      label: 'Соглашение на продажу билетов принято',
-      statusLabel: ticketingAgreed ? 'Принято' : 'Не принято',
-    },
-    {
-      ok: legalFilled,
-      label: 'Юридические данные заполнены',
-      statusLabel: legalFilled ? 'Готово' : 'Не готово',
-    },
-    {
-      ok: payoutFilled,
-      label: 'Реквизиты заполнены',
-      statusLabel: payoutFilled ? 'Готово' : 'Не готово',
-    },
-    {
-      ok: verified,
-      label: 'Верификация пройдена',
-      statusLabel: verified ? 'Пройдена' : pending ? 'На проверке' : 'Не пройдена',
-    },
+    { ok: ticketingAgreed, label: 'Соглашение на продажу билетов принято' },
+    { ok: legalFilled, label: 'Юридические данные заполнены' },
+    { ok: payoutFilled, label: 'Реквизиты заполнены' },
+    { ok: verified, label: 'Верификация пройдена' },
     {
       ok: onboardingActive,
-      label: 'Онбординг выплат активен',
-      statusLabel: onboardingActive ? 'Активен' : 'Не активен',
+      label: `Подключение выплат (${formatOnboardingStatus(onboardingStatus as never)})`,
     },
     org.canSellTickets
-      ? {
-          ok: true,
-          label: 'Продажа билетов',
-          statusLabel: 'Включена',
-        }
+      ? { ok: true, label: 'Продажа билетов включена' }
       : salesReady
-        ? {
-            ok: true,
-            label: 'Продажа билетов',
-            statusLabel: 'Отключена',
-          }
-        : {
-            ok: false,
-            label: 'Продажа билетов',
-            statusLabel: 'Не подключена',
-          },
+        ? { ok: true, label: 'Продажа билетов отключена' }
+        : { ok: false, label: 'Продажа билетов не подключена' },
   ];
 
   const acceptTicketingAgreement = async () => {
@@ -1816,7 +1777,7 @@ function OrganizationBillingSection({
             <div className={styles.scardHead}>
               <div className={styles.scardTitle}>Подключение продаж</div>
               <div className={styles.scardDesc}>
-                Включение продаж — после соглашения, верификации и онбординга (см. чеклист выше).
+                Включение продаж — после соглашения, верификации и подключения выплат (см. чеклист выше).
               </div>
             </div>
             {rejected && (
@@ -1864,7 +1825,7 @@ function OrganizationBillingSection({
           <div className={styles.scardHead}>
             <div className={styles.scardTitle}>Реквизиты</div>
             <div className={styles.scardDesc}>
-              Банковские реквизиты для выплат · онбординг: {formatOnboardingStatus(onboardingStatus as never)}
+              Банковские реквизиты для выплат · подключение к платёжному провайдеру: {formatOnboardingStatus(onboardingStatus as never)}
             </div>
           </div>
           <div className={styles.formBody}>

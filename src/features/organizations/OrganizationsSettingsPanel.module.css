@@ -351,10 +351,6 @@
   cursor: not-allowed;
 }
 
-.orgDocRowStatic {
-  cursor: default;
-}
-
 .orgDocMain {
   display: flex;
   align-items: flex-start;
