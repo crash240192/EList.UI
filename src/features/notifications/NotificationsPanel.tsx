@@ -109,9 +109,12 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     }
   }, [markRead, navigate, onClose]);
 
-  const closeNotification = useCallback((n: INotification) => {
+  const closeNotification = useCallback((e: React.MouseEvent, n: INotification) => {
+    e.stopPropagation();
     void markRead(n.id);
   }, [markRead]);
+
+  const visibleItems = items.filter(i => !i.readAt);
 
   const handleTestSend = async () => {
     if (!accountId || !testMsg.trim()) return;
@@ -167,14 +170,14 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       </div>
 
       <ul className={styles.list}>
-        {historyLoading && items.length === 0 ? (
+        {historyLoading && visibleItems.length === 0 ? (
           <li className={styles.empty}>Загрузка…</li>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <li className={styles.empty}>
             Пока нет уведомлений. Новые появятся здесь по WebSocket.
           </li>
         ) : (
-          items.map(n => {
+          visibleItems.map(n => {
             const hasTitle = !!n.title;
             const messageText = n.message || notificationTypeLabel(n.type);
             const eventStart = formatEventStart(n.eventShort?.startTime);
@@ -253,7 +256,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                 <button
                   type="button"
                   className={styles.itemDismiss}
-                  onClick={() => closeNotification(n)}
+                  onClick={e => closeNotification(e, n)}
                   aria-label="Скрыть уведомление"
                   title="Отметить прочитанным"
                 >
@@ -285,7 +288,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         </div>
       )}
 
-      {items.some(i => !i.readAt) && (
+      {visibleItems.length > 0 && (
         <button type="button" className={styles.clearBtn} onClick={() => { void clearAll(); }}>
           Прочитать все
         </button>
