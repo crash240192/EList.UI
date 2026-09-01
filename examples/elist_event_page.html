@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EList — Страница события (макет v2)</title>
+<link rel="stylesheet" href="elist_shared.css">
+<style>
+.page-scroll {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg);
+  padding: var(--page-pad-d);
+}
+
+.page-card {
+  max-width: var(--max-card);
+  margin: 0 auto;
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.12);
+}
+
+/* Hero */
+.hero {
+  position: relative;
+  height: 280px;
+  background: linear-gradient(135deg, #312e81 0%, #4f46e5 50%, #7c3aed 100%);
+  overflow: hidden;
+}
+.hero-img {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(255,255,255,0.08) 0%, transparent 50%),
+    linear-gradient(135deg, #312e81, #7c3aed);
+}
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.05) 20%, rgba(0,0,0,0.65) 100%);
+}
+.hero-top {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.hero-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(8px);
+  border: 0.5px solid rgba(255,255,255,0.25);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hero-btn:hover { background: rgba(255,255,255,0.3); }
+.hero-top-right { display: flex; gap: 8px; }
+.hero-bottom {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 4;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.tag-free {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 500;
+  backdrop-filter: blur(6px);
+  background: rgba(16,185,129,0.65);
+  color: #fff;
+  border: 0.5px solid rgba(16,185,129,0.4);
+}
+
+/* Action row — desktop */
+.action-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--bd);
+}
+.action-title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  color: var(--t1);
+}
+.action-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--warn);
+  font-weight: 500;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.action-btns {
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+  align-items: center;
+}
+.btn-invite {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--sur2);
+  border: 1px solid var(--bd);
+  color: var(--t1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-join {
+  height: 36px;
+  padding: 0 20px;
+  border-radius: 9px;
+  background: var(--ac);
+  color: #fff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-join:hover { background: var(--ac-hover); }
+
+/* Grid */
+.main-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  align-items: start;
+}
+.left-panel {
+  border-right: 1px solid var(--bd);
+  padding: 16px 14px 24px;
+}
+.right-panel {
+  padding: 18px 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Price block */
+.price-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--sur2);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  margin: 10px 0;
+}
+.price-val { font-size: 17px; font-weight: 600; color: var(--ok); }
+
+/* Participants */
+.participants-block {
+  background: var(--sur2);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  margin: 10px 0;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.participants-block:hover { border-color: var(--ac); }
+.participants-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.fill-track {
+  height: 4px;
+  background: var(--bd);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.fill-inner {
+  height: 100%;
+  width: 76%;
+  background: linear-gradient(90deg, var(--ac), #8b5cf6);
+  border-radius: 2px;
+}
+.avatar-row { display: flex; }
+.av-chip {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--sur2);
+  margin-left: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+}
+.av-chip:first-child { margin-left: 0; }
+
+/* Description */
+.desc {
+  font-size: 13px;
+  color: var(--t2);
+  line-height: 1.7;
+}
+.desc-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  color: var(--ac);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+/* Map block */
+.map-block {
+  position: relative;
+  border-radius: var(--r);
+  overflow: hidden;
+  border: 1px solid var(--bd);
+  height: 200px;
+  background: linear-gradient(160deg, #1a1f35, #13141a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t3);
+  font-size: 12px;
+}
+.map-expand {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  font-size: 11px;
+  color: var(--t2);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Discussion stub */
+.discussion {
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 14px;
+}
+.discussion-msg {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bd);
+}
+.discussion-msg:last-child { border-bottom: none; }
+.msg-av {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0891b2, #06b6d4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+}
+.msg-body { flex: 1; min-width: 0; }
+.msg-author { font-size: 12px; font-weight: 600; color: var(--t1); }
+.msg-text { font-size: 12px; color: var(--t2); margin-top: 3px; line-height: 1.5; }
+.msg-time { font-size: 10px; color: var(--t3); margin-top: 4px; }
+
+/* Sticky bar mobile */
+.sticky-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+.sticky-bar .btn-join { flex: 1; height: 44px; font-size: 14px; }
+.sticky-share {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-sm);
+  background: var(--sur2);
+  border: 1px solid var(--bd);
+  color: var(--t2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Mobile */
+@media (max-width: 639px) {
+  .page-scroll { padding: 0; padding-bottom: 70px; }
+  .page-card { border-radius: 0; border-left: none; border-right: none; }
+  .hero { height: 240px; }
+  .main-grid { grid-template-columns: 1fr; }
+  .left-panel { border-right: none; border-bottom: 1px solid var(--bd); }
+  .action-row { flex-wrap: wrap; }
+  .action-title { font-size: 16px; width: 100%; }
+  .action-btns { width: 100%; }
+  .action-btns .btn-join { display: none; }
+  .sticky-bar { display: flex; }
+  .map-block { height: 160px; }
+}
+
+body.frame-mobile .app { max-width: 390px; margin: 0 auto; border-left: 1px solid var(--bd); border-right: 1px solid var(--bd); }
+body.frame-mobile .sticky-bar { display: flex; max-width: 390px; left: 50%; transform: translateX(-50%); }
+body.frame-mobile .page-scroll { padding-bottom: 70px; }
+body.frame-mobile .action-btns .btn-join { display: none; }
+</style>
+</head>
+<body>
+
+<div class="mockup-ribbon">Макет v2 — Событие</div>
+
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-left">
+      <button class="menu-btn" onclick="history.back()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="logo-btn" style="font-size:13px;color:var(--t2);font-family:var(--font-body);font-weight:500" onclick="location.href='elist_home.html'">← Назад к поиску</button>
+    </div>
+    <div class="app-header-right">
+      <button class="icon-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>
+      </button>
+      <button class="avatar-btn">АК</button>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <aside class="app-sidebar">
+      <a class="nav-item" href="elist_home.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></a>
+      <a class="nav-item" href="elist_my_events.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></a>
+    </aside>
+
+    <main class="app-main">
+      <div class="page-scroll">
+        <div class="page-card">
+          <!-- Hero -->
+          <div class="hero">
+            <div class="hero-img"></div>
+            <div class="hero-overlay"></div>
+            <div class="hero-top">
+              <button class="hero-btn" onclick="history.back()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <div class="hero-top-right">
+                <button class="hero-btn" title="Поделиться">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>
+                </button>
+                <button class="hero-btn" title="Меню организатора">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="hero-bottom">
+              <span class="badge-overlay">Конференция</span>
+              <span class="tag-free">Бесплатно</span>
+              <span class="badge-overlay" style="background:rgba(239,68,68,0.6)">18+</span>
+            </div>
+          </div>
+
+          <!-- Title + actions -->
+          <div class="action-row">
+            <div style="flex:1;min-width:0">
+              <h1 class="action-title">Дизайн-спринт 2025: UX для городских сервисов</h1>
+              <div class="action-rating">⭐ 4.8 · 38 участников</div>
+            </div>
+            <div class="action-btns">
+              <button class="btn-invite" title="Пригласить">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85"><circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 019.29-5"/><circle cx="19" cy="17" r="4"/><line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/></svg>
+              </button>
+              <button class="btn-join">Участвовать</button>
+            </div>
+          </div>
+
+          <!-- Grid -->
+          <div class="main-grid">
+            <div class="left-panel">
+              <div class="meta-row">
+                <div class="meta-ico">📅</div>
+                <div>
+                  <div class="meta-lbl">Дата</div>
+                  <div class="meta-val">Сб, 5 июля</div>
+                  <div class="meta-sub">10:00 — 18:00</div>
+                </div>
+              </div>
+              <div class="meta-row">
+                <div class="meta-ico">📍</div>
+                <div>
+                  <div class="meta-lbl">Место</div>
+                  <div class="meta-val">Artplay, Москва</div>
+                  <div class="meta-sub">Нижняя Сыромятническая ул., 10</div>
+                </div>
+              </div>
+
+              <div class="price-block">
+                <div class="price-val">Бесплатно</div>
+                <span class="chip chip-ok">Открытое</span>
+              </div>
+
+              <div class="participants-block">
+                <div class="participants-head">
+                  <span>Участники (38)</span>
+                  <span style="font-size:11px;color:var(--t2)">38 / 50</span>
+                </div>
+                <div class="fill-track"><div class="fill-inner"></div></div>
+                <div class="avatar-row">
+                  <div class="av-chip" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">АК</div>
+                  <div class="av-chip" style="background:linear-gradient(135deg,#0891b2,#06b6d4)">ОК</div>
+                  <div class="av-chip" style="background:linear-gradient(135deg,#d97706,#f59e0b)">МС</div>
+                  <div class="av-chip" style="background:linear-gradient(135deg,#059669,#10b981)">ДВ</div>
+                  <div class="av-chip" style="background:var(--sur3);color:var(--t2);font-size:8px">+34</div>
+                </div>
+              </div>
+
+              <div style="margin-top:14px">
+                <div class="sec-label">Организаторы</div>
+                <div style="display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--sur2);border:1px solid var(--bd);border-radius:var(--r);margin-top:8px;cursor:pointer">
+                  <div class="av-chip" style="width:36px;height:36px;font-size:12px;margin:0;background:linear-gradient(135deg,#6366f1,#8b5cf6)">ОК</div>
+                  <div>
+                    <div style="font-size:12px;font-weight:500">Ольга Кравцова</div>
+                    <div style="font-size:10px;color:var(--t3)">Организатор</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="right-panel">
+              <div>
+                <div class="sec-label">О мероприятии</div>
+                <p class="desc">Двухдневный интенсив по проектированию пользовательского опыта для городских платформ. Участники разобьются на команды, пройдут воркшопы по дизайн-мышлению, создадут прототипы и представят их жюри.</p>
+                <button class="desc-toggle">Показать полностью ↓</button>
+              </div>
+
+              <div>
+                <div class="sec-label">Место проведения</div>
+                <div class="map-block">
+                  <button class="map-expand">⛶ Развернуть</button>
+                  <span>Яндекс.Карта · Artplay</span>
+                </div>
+              </div>
+
+              <div>
+                <div class="sec-label">Обсуждение</div>
+                <div class="discussion">
+                  <div class="discussion-msg">
+                    <div class="msg-av">ОК</div>
+                    <div class="msg-body">
+                      <div class="msg-author">Ольга Кравцова</div>
+                      <div class="msg-text">Добро пожаловать! Не забудьте ноутбук — будем работать в Figma.</div>
+                      <div class="msg-time">2 часа назад</div>
+                    </div>
+                  </div>
+                  <div class="discussion-msg">
+                    <div class="msg-av" style="background:linear-gradient(135deg,#d97706,#f59e0b)">МС</div>
+                    <div class="msg-body">
+                      <div class="msg-author">Марина С.</div>
+                      <div class="msg-text">Будет ли запись? Не смогу прийти в первый день.</div>
+                      <div class="msg-time">45 мин назад</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <a class="bnav-item" href="elist_home.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>Поиск</a>
+      <a class="bnav-item" href="elist_my_events.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Мои</a>
+      <div class="bnav-item create"><a href="elist_create_event.html" class="bnav-create-btn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></a></div>
+      <a class="bnav-item" href="elist_invitations.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 019.29-5"/><circle cx="19" cy="17" r="4"/></svg>Инвайты</a>
+      <button class="bnav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Профиль</button>
+    </div>
+  </nav>
+</div>
+
+<!-- Sticky CTA (mobile) -->
+<div class="sticky-bar visible with-bottom-nav">
+  <button class="btn-join">Участвовать</button>
+  <button class="sticky-share" title="Поделиться">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>
+  </button>
+</div>
+
+<div class="viewport-toggle">
+  <button class="active" onclick="setFrame('desktop',this)">Desktop</button>
+  <button onclick="setFrame('mobile',this)">Mobile</button>
+</div>
+
+<script>
+function setFrame(mode, btn) {
+  document.querySelectorAll('.viewport-toggle button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.body.classList.toggle('frame-mobile', mode === 'mobile');
+  const sticky = document.querySelector('.sticky-bar');
+  if (mode === 'mobile') sticky.classList.add('visible');
+  else sticky.classList.remove('visible');
+}
+</script>
+</body>
+</html>
