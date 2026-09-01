@@ -158,30 +158,39 @@ function satisfiesMinTime(iso: string, withTime: boolean, min?: string, minTime?
   return isTimeAtOrAfter(h, m, minH, minM);
 }
 
+function isDateOnlyBound(bound: string): boolean {
+  return !bound.includes('T');
+}
+
+/** Сравнение по календарному дню (без времени). */
+function compareCalendarDay(a: Date, b: Date): number {
+  const aDay = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime();
+  const bDay = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime();
+  return aDay - bDay;
+}
+
 function isInRange(iso: string, withTime: boolean, min?: string, max?: string): boolean {
   const d = parseValue(iso);
   if (!d) return false;
   if (min) {
     const minD = parseValue(min);
     if (minD) {
-      if (withTime) {
-        if (d < minD) return false;
-      } else {
-        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        const minDay = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate());
-        if (dDay < minDay) return false;
+      // date-only min при withTime: день доступен целиком; точное время — через minTime / satisfiesMinTime
+      if (!withTime || isDateOnlyBound(min)) {
+        if (compareCalendarDay(d, minD) < 0) return false;
+      } else if (d < minD) {
+        return false;
       }
     }
   }
   if (max) {
     const maxD = parseValue(max);
     if (maxD) {
-      if (withTime) {
-        if (d > maxD) return false;
-      } else {
-        const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        const maxDay = new Date(maxD.getFullYear(), maxD.getMonth(), maxD.getDate());
-        if (dDay > maxDay) return false;
+      // date-only max (напр. лимит тарифа): последний день включительно в любое время суток
+      if (!withTime || isDateOnlyBound(max)) {
+        if (compareCalendarDay(d, maxD) > 0) return false;
+      } else if (d > maxD) {
+        return false;
       }
     }
   }

@@ -5,6 +5,7 @@ import type { PagedList } from '@/shared/api/types';
 import type { EventListItemData } from '@/entities/event/lib/eventListItemUtils';
 import { normalizeEventListItem } from '@/entities/event/normalizeEventListItem';
 import { fetchEventParameters } from '@/entities/event/eventExtrasApi';
+import { fetchEvents } from '@/entities/event/api';
 
 export interface IAlbumParams {
   albumId?: string;
@@ -127,6 +128,69 @@ export async function getAlbumsByEvents(
   const enriched = await enrichAlbumGroupsWithParameters(groups);
   return {
     ...data,
+    result: enriched,
+  };
+}
+
+/**
+ * Альбомы мероприятий организации: обходим события org и подтягиваем альбомы.
+ * В swagger нет byEvents?organizationId — собираем группы на клиенте.
+ */
+export async function getAlbumsByOrganizationEvents(
+  organizationId: string,
+  pageIndex = 0,
+  pageSize = 10,
+): Promise<PagedList<IEventAlbumsGroup>> {
+  const EVENT_SCAN_SIZE = Math.max(pageSize * 3, 20);
+  const collected: IEventAlbumsGroup[] = [];
+  let eventPage = 0;
+  let eventsTotal = 0;
+  let scanned = 0;
+  const skip = pageIndex * pageSize;
+
+  while (collected.length < skip + pageSize) {
+    const eventsPage = await fetchEvents({
+      organizationId,
+      pageIndex: eventPage,
+      pageSize: EVENT_SCAN_SIZE,
+    });
+    eventsTotal = eventsPage.total;
+    const batch = eventsPage.result ?? [];
+    if (batch.length === 0) break;
+
+    const groups = await Promise.all(
+      batch.map(async (event) => {
+        const albums = await getEventAlbums(event.id).catch(() => [] as IAlbum[]);
+        if (!albums.length) return null;
+        return {
+          event: normalizeEventListItem(event),
+          albums,
+        } satisfies IEventAlbumsGroup;
+      }),
+    );
+
+    for (const g of groups) {
+      if (g) collected.push(g);
+    }
+
+    scanned += batch.length;
+    eventPage += 1;
+    if (scanned >= eventsTotal || batch.length < EVENT_SCAN_SIZE) break;
+  }
+
+  const pageGroups = collected.slice(skip, skip + pageSize);
+  const enriched = await enrichAlbumGroupsWithParameters(pageGroups);
+
+  // Пока не просканировали все события — total как нижняя граница + «есть ещё»
+  const exhausted = scanned >= eventsTotal;
+  const total = exhausted
+    ? collected.length
+    : Math.max(collected.length, skip + pageGroups.length + (pageGroups.length === pageSize ? 1 : 0));
+
+  return {
+    pageIndex,
+    pageSize,
+    total,
     result: enriched,
   };
 }
