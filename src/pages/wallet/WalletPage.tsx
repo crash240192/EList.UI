@@ -4,22 +4,28 @@ import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import { createWallet, getWalletByAccount, setWalletTariff, type IWallet } from '@/entities/user/walletApi';
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
+import {
+  fetchMyOrders,
+  formatMoney,
+  ORDER_STATUS_LABELS,
+  type IOrder,
+} from '@/entities/order';
+import { fetchEventById } from '@/entities/event';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { usePageTitle } from '@/shared/hooks';
 import { formatTariffAgeCapability } from '@/shared/lib/ageLimit';
 import styles from './WalletPage.module.css';
 
-const HISTORY_STUB: {
+type HistoryKind = 'in' | 'out' | 'tariff';
+
+interface HistoryRow {
   id: string;
-  kind: 'in' | 'out' | 'tariff';
+  kind: HistoryKind;
   name: string;
   meta: string;
   amount: string;
-}[] = [
-  { id: '1', kind: 'in', name: 'Пополнение кошелька', meta: '15 мая 2025 · Банковская карта', amount: '+ 2 000 ₽' },
-  { id: '2', kind: 'tariff', name: 'Тариф «Стандарт»', meta: '1 мая 2025 · Автопродление', amount: '− 490 ₽' },
-  { id: '3', kind: 'out', name: 'Startup Pitch Night', meta: '18 мар 2025 · Билет на мероприятие', amount: '− 1 000 ₽' },
-];
+  sortAt: number;
+}
 
 const HIST_ICO_CLASS = {
   in: styles.histIcoIn,
@@ -143,6 +149,72 @@ export default function WalletPage() {
   const [selectedTariffId, setSelectedTariffId] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const loadHistory = useCallback(async (currentTariff: ITariff | null, currentWallet: IWallet | null) => {
+    setHistoryLoading(true);
+    try {
+      const orders = await fetchMyOrders().catch(() => [] as IOrder[]);
+      const eventIds = [...new Set(orders.map(o => o.eventId).filter(Boolean))];
+      const nameById = new Map<string, string>();
+      await Promise.all(eventIds.map(async (eventId) => {
+        try {
+          const ev = await fetchEventById(eventId);
+          if (ev?.name) nameById.set(eventId, ev.name);
+        } catch { /* ignore */ }
+      }));
+
+      const rows: HistoryRow[] = orders.map((order) => {
+        const when = order.paidAt || order.createDate;
+        const sortAt = when ? new Date(when).getTime() : 0;
+        const dateLabel = when
+          ? new Date(when).toLocaleString('ru-RU', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          : '';
+        const status = ORDER_STATUS_LABELS[order.status] ?? order.status;
+        const qty = order.quantity > 1 ? ` · ${order.quantity} билета` : ' · Билет';
+        const isRefund = order.status === 'Refunded' || order.status === 'PartiallyRefunded';
+        const amountAbs = formatMoney(order.amountTotal, order.currency);
+        return {
+          id: order.id,
+          kind: isRefund ? 'in' : 'out',
+          name: nameById.get(order.eventId) || 'Билет на мероприятие',
+          meta: `${dateLabel}${qty} · ${status}`,
+          amount: isRefund ? `+ ${amountAbs}` : `− ${amountAbs}`,
+          sortAt,
+        };
+      });
+
+      if (currentWallet?.lastChargeDate && currentTariff) {
+        const sortAt = new Date(currentWallet.lastChargeDate).getTime();
+        rows.push({
+          id: `tariff-${currentWallet.id}`,
+          kind: 'tariff',
+          name: `Тариф «${currentTariff.name}»`,
+          meta: `${new Date(currentWallet.lastChargeDate).toLocaleString('ru-RU', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          })} · Списание тарифа`,
+          amount: currentTariff.cost > 0
+            ? `− ${formatMoney(currentTariff.cost)}`
+            : '0 ₽',
+          sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+        });
+      }
+
+      rows.sort((a, b) => b.sortAt - a.sortAt);
+      setHistory(rows);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -166,6 +238,10 @@ export default function WalletPage() {
       if (w?.tariffId) {
         const t = tariffs.find(x => x.id === w!.tariffId) ?? null;
         setTariff(t);
+        await loadHistory(t, w);
+      } else {
+        setTariff(null);
+        await loadHistory(null, w);
       }
 
       const validatorEntries = await Promise.all(
@@ -358,27 +434,31 @@ export default function WalletPage() {
                 <div className={styles.tariffHeader}>
                   <div>
                     <div className={styles.sectionTitle}>История операций</div>
-                    <div className={styles.sectionSubtitle}>Пополнения, списания и оплата тарифов</div>
-                  </div>
-                  <span className={styles.stubBadge}>заглушка</span>
-                </div>
-                <div className={styles.histList} aria-hidden>
-                  {HISTORY_STUB.map(row => (
-                    <div key={row.id} className={styles.histRow}>
-                      <div className={`${styles.histIco} ${HIST_ICO_CLASS[row.kind]}`} aria-hidden />
-                      <div className={styles.histInfo}>
-                        <div className={styles.histName}>{row.name}</div>
-                        <div className={styles.histMeta}>{row.meta}</div>
-                      </div>
-                      <div className={`${styles.histAmt} ${HIST_AMT_CLASS[row.kind]}`}>
-                        {row.amount}
-                      </div>
+                    <div className={styles.sectionSubtitle}>
+                      Покупки билетов и списания тарифа
                     </div>
-                  ))}
+                  </div>
                 </div>
-                <p className={styles.historyHint}>
-                  Реальная история транзакций появится после подключения платёжного API.
-                </p>
+                {historyLoading ? (
+                  <div className={styles.historyHint}>Загрузка истории…</div>
+                ) : history.length === 0 ? (
+                  <p className={styles.historyHint}>Операций пока нет</p>
+                ) : (
+                  <div className={styles.histList}>
+                    {history.map(row => (
+                      <div key={row.id} className={styles.histRow}>
+                        <div className={`${styles.histIco} ${HIST_ICO_CLASS[row.kind]}`} aria-hidden />
+                        <div className={styles.histInfo}>
+                          <div className={styles.histName}>{row.name}</div>
+                          <div className={styles.histMeta}>{row.meta}</div>
+                        </div>
+                        <div className={`${styles.histAmt} ${HIST_AMT_CLASS[row.kind]}`}>
+                          {row.amount}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}

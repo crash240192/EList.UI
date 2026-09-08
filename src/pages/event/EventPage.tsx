@@ -42,6 +42,7 @@ import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialo
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
+import { BuyTicketModal } from '@/features/tickets';
 import { ContentReportModal, EventModerationStrip, OrganizerReportsModal, useOrganizerReportsCount } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import heroStyles from '@/shared/styles/hero.module.css';
@@ -220,6 +221,7 @@ export default function EventPage() {
   const [coverNaturalSize, setCoverNaturalSize] = useState<CoverNaturalSize | null>(null);
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [buyTicketOpen, setBuyTicketOpen] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   usePageTitle(event?.name ?? null);
@@ -593,12 +595,22 @@ export default function EventPage() {
   const participantCap = maxPersons != null && maxPersons > 0 ? maxPersons : null;
   const isParticipantLimitFull =
     participantCap != null && participants.length >= participantCap && !isParticipating;
+  const remainingSeats = participantCap == null
+    ? null
+    : Math.max(0, participantCap - participants.length);
   const isEventActive = event.active;
+  const ticketBuyDisabled =
+    actionLoading
+    || !isEventActive
+    || isParticipantLimitFull
+    || (remainingSeats != null && remainingSeats <= 0);
   const eventFinished = isEventFinished(event.startTime, event.endTime);
   const allowUsersToInvite = event.parameters?.allowUsersToInvite;
   const canUsersInviteByEventPolicy = allowUsersToInvite === null || allowUsersToInvite === undefined || allowUsersToInvite === true;
   const canShowInviteButton = !eventFinished && !!event?.id
     && (isOrganizer || (isParticipating && canUsersInviteByEventPolicy));
+  /** При продаже билетов вход только через покупку, не через Participate */
+  const showFreeJoin = !ticketsEnabled;
   const joinDisabled =
     actionLoading ||
     (authenticated && isOrganizer) ||
@@ -888,24 +900,57 @@ export default function EventPage() {
                     Пригласить
                   </button>
                 )}
-                {ticketsEnabled && (
-                  <Button
-                    variant="secondary"
-                    className={styles.btnTicket}
-                    onClick={() => {
-                      if (!authenticated) {
-                        setAuthDialogOpen(true);
-                        return;
+                {ticketsEnabled && !eventFinished && !isOrganizer && !isParticipating && (
+                  <div className={styles.joinBtnWrap}>
+                    {limitNotice && isParticipantLimitFull && (
+                      <div className={styles.joinLimitNotice} role="status">
+                        Достигнут лимит участников ({participantCap})
+                      </div>
+                    )}
+                    <Button
+                      variant="primary"
+                      className={`${styles.btnTicket} ${joinShake ? styles.btnJoinShake : ''}`}
+                      disabled={ticketBuyDisabled && !isParticipantLimitFull}
+                      title={
+                        isParticipantLimitFull
+                          ? `Достигнут лимит участников (${participantCap})`
+                          : undefined
                       }
-                    }}
-                  >
-                    Купить билет
-                  </Button>
+                      onClick={() => {
+                        if (!authenticated) {
+                          setAuthDialogOpen(true);
+                          return;
+                        }
+                        if (isParticipantLimitFull || (remainingSeats != null && remainingSeats <= 0)) {
+                          triggerParticipantLimitFeedback();
+                          return;
+                        }
+                        setBuyTicketOpen(true);
+                      }}
+                    >
+                      Купить билет
+                    </Button>
+                  </div>
                 )}
-                {!eventFinished && !isOrganizer && isParticipating && (
+                {ticketsEnabled && !eventFinished && !isOrganizer && isParticipating && (
+                  <>
+                    <span className={styles.actionJoinSep} aria-hidden />
+                    <div className={styles.joinBtnWrap}>
+                      <Button
+                        variant="danger"
+                        loading={actionLoading}
+                        onClick={onJoinClick}
+                        disabled={actionLoading}
+                      >
+                        Покинуть
+                      </Button>
+                    </div>
+                  </>
+                )}
+                {showFreeJoin && !eventFinished && !isOrganizer && isParticipating && (
                   <span className={styles.actionJoinSep} aria-hidden />
                 )}
-                {!eventFinished && !isOrganizer && (
+                {showFreeJoin && !eventFinished && !isOrganizer && (
                   <div className={styles.joinBtnWrap}>
                     {limitNotice && isParticipantLimitFull && (
                       <div className={styles.joinLimitNotice} role="status">
@@ -1164,6 +1209,31 @@ export default function EventPage() {
           inviterOrganizationId={inviterOrganizationId}
           isPrivate={!!event.parameters?.private}
           onClose={() => setInviteModalOpen(false)}
+        />
+      )}
+      {buyTicketOpen && event?.id && (
+        <BuyTicketModal
+          open
+          eventId={event.id}
+          eventName={event.name}
+          unitPrice={cost}
+          remainingSeats={remainingSeats}
+          onClose={() => setBuyTicketOpen(false)}
+          onPurchased={async () => {
+            toast('Билет оформлен — вы идёте на мероприятие', 'success');
+            if (!id || !accountId) return;
+            try {
+              const list = await fetchEventParticipants(id);
+              setParticipants(list);
+            } catch {
+              if (!participants.some(p => p.accountId === accountId)) {
+                setParticipants(prev => [
+                  ...prev,
+                  { accountId, login: accountId.slice(0, 8), firstName: null, lastName: null },
+                ]);
+              }
+            }
+          }}
         />
       )}
       {addOrgModalOpen && accountId && id && (
