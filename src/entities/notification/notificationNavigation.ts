@@ -4,11 +4,11 @@ import type { INotification } from './types';
 import {
   getNotificationEventId,
   isEventPageNotificationType,
+  isInvitationStatusNotification,
   isNewInvitationNotification,
   NOTIFICATION_TYPE_NEW_INVITATION,
 } from './eventData';
 import {
-  contentReportNotificationTypeLabel,
   isContentReportNotificationType,
   NOTIFICATION_TYPE_CONTENT_REPORT_ACCOUNT_SUSPENDED,
   NOTIFICATION_TYPE_CONTENT_REPORT_AVATAR_RESET,
@@ -24,10 +24,17 @@ import {
   notificationTypeKey,
   parseContentReportNotificationData,
 } from './contentReportNotification';
+import {
+  isUserNotificationTypeName,
+  parseNotificationOrganizationId,
+  resolveUserNotificationTypeName,
+  userNotificationTypeLabel,
+} from './userNotificationTypes';
 
 export {
   NOTIFICATION_TYPE_NEW_INVITATION,
   isNewInvitationNotification,
+  isInvitationStatusNotification,
 };
 
 /** NewSubscription */
@@ -43,16 +50,12 @@ export const NOTIFICATION_TYPE_PARTICIPATED = 20;
 /** EventLeft */
 export const NOTIFICATION_TYPE_EVENT_LEFT = 21;
 
-const USER_PROFILE_TYPES = new Set([
-  NOTIFICATION_TYPE_NEW_SUBSCRIPTION,
-  NOTIFICATION_TYPE_UNSUBSCRIBED,
-  NOTIFICATION_TYPE_RELATED_PERSON_SUBSCRIBED,
-  NOTIFICATION_TYPE_RELATED_PERSON_UNSUBSCRIBED,
-]);
-
-const EVENT_PAGE_TYPES = new Set([
-  NOTIFICATION_TYPE_PARTICIPATED,
-  NOTIFICATION_TYPE_EVENT_LEFT,
+const USER_PROFILE_TYPE_NAMES = new Set([
+  'NewSubscription',
+  'Unsubscribed',
+  'RelatedPersonSubscribed',
+  'RelatedPersonUnsubscribed',
+  'RelatedPersonActivityDigest',
 ]);
 
 export type NotificationNavTarget =
@@ -64,40 +67,15 @@ export type NotificationNavTarget =
   | { kind: 'admin-moderation'; reportId?: string }
   | { kind: 'event-reports'; eventId: string }
   | { kind: 'organization'; organizationId: string }
-  | { kind: 'settings-moderation' };
+  | { kind: 'settings-organizations'; organizationId?: string }
+  | { kind: 'settings-moderation' }
+  | { kind: 'agreements-recheck' };
 
 export function notificationTypeLabel(type: INotification['type']): string {
+  const fromRegistry = userNotificationTypeLabel(type);
+  if (fromRegistry) return fromRegistry;
   if (type == null) return 'Уведомление';
-  if (isContentReportNotificationType(type)) {
-    return contentReportNotificationTypeLabel(type);
-  }
-  if (type === 'EventRestored') return 'Событие восстановлено';
-  switch (Number(type)) {
-    case 0: return 'Создано событие';
-    case 1: return 'Событие обновлено';
-    case 2: return 'Событие отменено';
-    case 3: return 'Событие завершено';
-    case 4: return 'Событие восстановлено';
-    case NOTIFICATION_TYPE_NEW_SUBSCRIPTION: return 'На вас подписались';
-    case NOTIFICATION_TYPE_UNSUBSCRIBED: return 'От вас отписались';
-    case NOTIFICATION_TYPE_RELATED_PERSON_SUBSCRIBED:
-      return 'Подписка у пользователя из ваших подписок';
-    case NOTIFICATION_TYPE_RELATED_PERSON_UNSUBSCRIBED:
-      return 'Отписка у пользователя из ваших подписок';
-    case NOTIFICATION_TYPE_PARTICIPATED: return 'Участие в мероприятии';
-    case NOTIFICATION_TYPE_EVENT_LEFT: return 'Выход из мероприятия';
-    case 31: return 'Новый ответ в обсуждении';
-    case 41: return 'Добавлен в чёрный список';
-    case 42: return 'Добавлен в белый список';
-    case 43: return 'Удалён из чёрного списка';
-    case 44: return 'Удалён из белого списка';
-    case 45: return 'Нет в белом списке';
-    case 60: return 'Новая оценка мероприятия';
-    case 61: return 'Оценка изменена';
-    case 62: return 'Оценка удалена';
-    case NOTIFICATION_TYPE_NEW_INVITATION: return 'Новое приглашение';
-    default: return String(type);
-  }
+  return String(type);
 }
 
 /** Куда переходить по клику на уведомление */
@@ -106,19 +84,47 @@ export function getNotificationNavigationTarget(
 ): NotificationNavTarget | null {
   const typeNum = Number(n.type);
   const typeKey = notificationTypeKey(n.type);
+  const typeName = resolveUserNotificationTypeName(n.type);
   const reportData = parseContentReportNotificationData(n.data);
   const reportId = reportData?.reportId ?? undefined;
+  const orgIdFromData =
+    parseNotificationOrganizationId(n.data)
+    ?? reportData?.organizationId
+    ?? null;
+
+  if (isUserNotificationTypeName(n.type, 'AgreementUpdateRequired')) {
+    return { kind: 'agreements-recheck' };
+  }
+
+  if (
+    isUserNotificationTypeName(
+      n.type,
+      'OrganizationMemberAdded',
+      'OrganizationMemberRemoved',
+      'OrganizationMemberDeactivated',
+      'OrganizationOwnershipTransferred',
+      'OrganizationVerificationApproved',
+      'OrganizationVerificationRejected',
+    )
+  ) {
+    if (orgIdFromData) {
+      return { kind: 'settings-organizations', organizationId: orgIdFromData };
+    }
+    return { kind: 'settings-organizations' };
+  }
 
   if (isContentReportNotificationType(n.type)) {
     if (
       typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_REVIEWED
       || typeKey === 'ContentReportReviewed'
+      || typeName === 'ContentReportReviewed'
     ) {
       return { kind: 'my-reports', reportId };
     }
     if (
       typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_NEW_ORG_QUEUE
       || typeKey === 'ContentReportNewInOrganizerQueue'
+      || typeName === 'ContentReportNewInOrganizerQueue'
     ) {
       const eventId = reportData?.eventId ?? n.eventId;
       if (eventId) return { kind: 'event-reports', eventId };
@@ -126,20 +132,23 @@ export function getNotificationNavigationTarget(
     if (
       typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_NEW_PLATFORM_QUEUE
       || typeKey === 'ContentReportNewInPlatformQueue'
+      || typeName === 'ContentReportNewInPlatformQueue'
     ) {
       return { kind: 'admin-moderation', reportId };
     }
     if (
       typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_PENALTY_ISSUED
       || typeKey === 'ContentReportPenaltyIssued'
+      || typeName === 'ContentReportPenaltyIssued'
     ) {
       return { kind: 'settings-moderation' };
     }
     if (
       typeNum === NOTIFICATION_TYPE_CONTENT_REPORT_ORG_SUSPENDED
       || typeKey === 'ContentReportOrganizationSuspended'
+      || typeName === 'ContentReportOrganizationSuspended'
     ) {
-      const orgId = reportData?.organizationId;
+      const orgId = reportData?.organizationId ?? orgIdFromData;
       if (orgId) return { kind: 'organization', organizationId: orgId };
     }
     if (
@@ -160,21 +169,37 @@ export function getNotificationNavigationTarget(
     }
   }
 
-  if (isNewInvitationNotification(n.type)) {
+  if (isInvitationStatusNotification(n.type)) {
     return { kind: 'invitations' };
   }
 
-  if (USER_PROFILE_TYPES.has(typeNum) && n.relatedAccountId) {
-    return { kind: 'user', accountId: n.relatedAccountId };
+  if (
+    (typeName && USER_PROFILE_TYPE_NAMES.has(typeName))
+    || typeNum === NOTIFICATION_TYPE_NEW_SUBSCRIPTION
+    || typeNum === NOTIFICATION_TYPE_UNSUBSCRIBED
+    || typeNum === NOTIFICATION_TYPE_RELATED_PERSON_SUBSCRIBED
+    || typeNum === NOTIFICATION_TYPE_RELATED_PERSON_UNSUBSCRIBED
+  ) {
+    if (n.relatedAccountId) {
+      return { kind: 'user', accountId: n.relatedAccountId };
+    }
   }
 
-  if (EVENT_PAGE_TYPES.has(typeNum) || isEventPageNotificationType(n.type)) {
+  if (
+    isEventPageNotificationType(n.type)
+    || typeNum === NOTIFICATION_TYPE_PARTICIPATED
+    || typeNum === NOTIFICATION_TYPE_EVENT_LEFT
+  ) {
     const eventId = getNotificationEventId(n);
     if (eventId) return { kind: 'event', eventId };
   }
 
   const eventId = getNotificationEventId(n);
   if (eventId) return { kind: 'event', eventId };
+
+  if (orgIdFromData) {
+    return { kind: 'organization', organizationId: orgIdFromData };
+  }
 
   if (n.relatedAccountId) {
     return { kind: 'user', accountId: n.relatedAccountId };

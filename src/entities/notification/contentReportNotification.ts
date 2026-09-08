@@ -136,6 +136,7 @@ export function isContentReportNotificationType(type: INotification['type']): bo
 }
 
 export function contentReportNotificationTypeLabel(type: INotification['type']): string {
+  // Подписи живут в userNotificationTypes; здесь — запасной fallback
   const key = notificationTypeKey(type);
   switch (key) {
     case '70':

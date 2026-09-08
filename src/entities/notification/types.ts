@@ -12,15 +12,15 @@ export interface INotification {
   message: string | null;
   createdAt: string;
   readAt: string | null;
-  /** Произвольный payload; для типов 0–3, 41–45 — краткая карточка мероприятия; для 60–62 — оценка */
+  /** Произвольный payload; для lifecycle/BW/org event — краткая карточка; для rating — оценка */
   data: unknown;
   /** Распознанный data для типов с карточкой мероприятия в payload */
   eventShort?: IEventSearchShortItem | null;
-  /** Распознанный data для NewEventRating / EventRatingChanged / EventRatingDeleted */
+  /** Распознанный data для NewEventRating / EventRatingChanged / EventRatingDeleted / EventRatingDigest */
   ratingData?: INotificationRatingData | null;
 }
 
-/** data для уведомлений об оценке мероприятия (типы 60–62) */
+/** data для уведомлений об оценке мероприятия (EventRating*) */
 export interface INotificationRatingData {
   id: string;
   accountId: string;

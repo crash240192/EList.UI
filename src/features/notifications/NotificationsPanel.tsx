@@ -103,8 +103,18 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       case 'organization':
         navigate(`/organization/${target.organizationId}`);
         break;
+      case 'settings-organizations':
+        navigate(
+          target.organizationId
+            ? `/settings?tab=organizations&org=${target.organizationId}`
+            : '/settings?tab=organizations',
+        );
+        break;
       case 'settings-moderation':
         navigate('/settings?tab=moderation');
+        break;
+      case 'agreements-recheck':
+        window.dispatchEvent(new Event('elist:recheck-agreements'));
         break;
     }
   }, [markRead, navigate, onClose]);
