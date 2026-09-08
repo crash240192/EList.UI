@@ -2,20 +2,16 @@
 
 import type { IEventSearchShortItem } from '@/entities/event/types';
 import type { INotificationRatingData } from './types';
+import {
+  isUserNotificationTypeName,
+  resolveUserNotificationTypeName,
+} from './userNotificationTypes';
 
 export const NOTIFICATION_TYPE_NEW_INVITATION = 51;
 
 /** EventCreated / Updated / Cancelled / Finished / Restored */
 export const EVENT_LIFECYCLE_TYPES = new Set([0, 1, 2, 3, 4]);
 export const NOTIFICATION_TYPE_EVENT_RESTORED = 4;
-
-const EVENT_LIFECYCLE_NAMES = new Set([
-  'EventCreated',
-  'EventUpdated',
-  'EventCancelled',
-  'EventFinished',
-  'EventRestored',
-]);
 
 /** AddedToBlackList … NotInWhiteList */
 export const BW_LIST_NOTIFICATION_TYPES = new Set([41, 42, 43, 44, 45]);
@@ -29,13 +25,59 @@ export const EVENT_SHORT_DATA_TYPES = new Set([
   ...BW_LIST_NOTIFICATION_TYPES,
 ]);
 
+const EVENT_SHORT_DATA_NAMES = new Set([
+  'EventCreated',
+  'EventUpdated',
+  'EventCancelled',
+  'EventFinished',
+  'EventRestored',
+  'AddedToBlackList',
+  'AddedToWhiteList',
+  'RemovedFromBlackList',
+  'RemovedFromWhiteList',
+  'NotInWhiteList',
+  'RemovedFromEvent',
+  'Participated',
+  'EventLeft',
+  'ParticipatedDigest',
+  'EventLeftDigest',
+  'EventOrganizatorAssigned',
+  'EventOrganizatorRemoved',
+]);
+
+const RATING_TYPE_NAMES = new Set([
+  'NewEventRating',
+  'EventRatingChanged',
+  'EventRatingDeleted',
+  'EventRatingDigest',
+]);
+
+const EVENT_PAGE_TYPE_NAMES = new Set([
+  ...EVENT_SHORT_DATA_NAMES,
+  ...RATING_TYPE_NAMES,
+  'MessageReplied',
+  'NewMessage',
+]);
+
 export function isNewInvitationNotification(type: string | number | null | undefined): boolean {
-  return Number(type) === NOTIFICATION_TYPE_NEW_INVITATION;
+  return isUserNotificationTypeName(type, 'NewInvitation')
+    || Number(type) === NOTIFICATION_TYPE_NEW_INVITATION;
+}
+
+export function isInvitationStatusNotification(type: string | number | null | undefined): boolean {
+  return isUserNotificationTypeName(
+    type,
+    'NewInvitation',
+    'InvitationAccepted',
+    'InvitationDeclined',
+    'InvitationCancelled',
+  );
 }
 
 export function isEventShortDataType(type: string | number | null | undefined): boolean {
   if (type == null || type === '') return false;
-  if (typeof type === 'string' && EVENT_LIFECYCLE_NAMES.has(type)) return true;
+  const name = resolveUserNotificationTypeName(type);
+  if (name && EVENT_SHORT_DATA_NAMES.has(name)) return true;
   const n = Number(type);
   return Number.isFinite(n) && EVENT_SHORT_DATA_TYPES.has(n);
 }
@@ -47,15 +89,18 @@ export function isEventNotificationType(type: string | number | null | undefined
 
 export function isRatingNotificationType(type: string | number | null | undefined): boolean {
   if (type == null || type === '') return false;
+  const name = resolveUserNotificationTypeName(type);
+  if (name && RATING_TYPE_NAMES.has(name)) return true;
   const n = Number(type);
   return Number.isFinite(n) && RATING_NOTIFICATION_TYPES.has(n);
 }
 
 export function isEventPageNotificationType(type: string | number | null | undefined): boolean {
   if (type == null || type === '') return false;
-  if (typeof type === 'string' && EVENT_LIFECYCLE_NAMES.has(type)) return true;
+  const name = resolveUserNotificationTypeName(type);
+  if (name && EVENT_PAGE_TYPE_NAMES.has(name)) return true;
   const n = Number(type);
-  return Number.isFinite(n) && (EVENT_SHORT_DATA_TYPES.has(n) || RATING_NOTIFICATION_TYPES.has(n));
+  return Number.isFinite(n) && (EVENT_SHORT_DATA_TYPES.has(n) || RATING_NOTIFICATION_TYPES.has(n) || n === 31);
 }
 
 /** data → IEventSearchShortItem (camelCase / PascalCase) */
@@ -90,7 +135,7 @@ export function parseEventNotificationData(raw: unknown): IEventSearchShortItem 
   };
 }
 
-/** data → INotificationRatingData (типы 60–62) */
+/** data → INotificationRatingData (типы 60–62 / EventRating*) */
 export function parseRatingNotificationData(raw: unknown): INotificationRatingData | null {
   if (!raw || typeof raw !== 'object') return null;
 

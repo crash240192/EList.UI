@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/app/store';
 import { parseWsNotificationMessage } from '@/entities/notification/parseNotification';
-import { isNewInvitationNotification } from '@/entities/notification/notificationNavigation';
+import { isInvitationStatusNotification } from '@/entities/notification/notificationNavigation';
 import {
   isWebSocketUnauthorizedClose,
   isWebSocketUnauthorizedMessage,
@@ -165,7 +165,7 @@ export function useNotificationsWebSocket(enabled: boolean): void {
         if (!n) return;
         pushNotification(n);
         playNotificationPop();
-        if (isNewInvitationNotification(n.type)) {
+        if (isInvitationStatusNotification(n.type)) {
           void useInvitationsStore.getState().refreshNotViewedCount();
         }
       };

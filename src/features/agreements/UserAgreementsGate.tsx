@@ -68,6 +68,12 @@ export function UserAgreementsGate({ children }: UserAgreementsGateProps) {
     void runCheck();
   }, [runCheck]);
 
+  useEffect(() => {
+    const onRecheck = () => { void runCheck(); };
+    window.addEventListener('elist:recheck-agreements', onRecheck);
+    return () => window.removeEventListener('elist:recheck-agreements', onRecheck);
+  }, [runCheck]);
+
   const current = queue[index] ?? null;
 
   const handleCancel = () => {
