@@ -20,10 +20,18 @@
 }
 
 .title {
-  margin: 0 0 18px;
+  margin: 0 0 10px;
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
+  text-align: center;
+}
+
+.hint {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
   text-align: center;
 }
 

@@ -6,7 +6,10 @@
 
 import { useCallback, useState } from 'react';
 import { useAuthStore } from '@/app/store';
-import { agreeAnonymousAge, getAnonymousAgeAgreement } from '@/entities/agreement';
+import {
+  checkAnonymousAgeAgreement,
+  confirmAnonymousAgeAgreement,
+} from '@/entities/agreement';
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { isApiError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 
@@ -40,12 +43,8 @@ export async function resolveEventAgeAccessError(
   const message = apiErrorMessage(err);
 
   if (!isAuthenticated) {
-    try {
-      const agreed = await getAnonymousAgeAgreement();
-      if (agreed) return { resolution: 'denied', message };
-    } catch {
-      // нет соглашения
-    }
+    const agreed = await checkAnonymousAgeAgreement();
+    if (agreed) return { resolution: 'denied', message };
     return { resolution: 'prompt-anonymous', message: null };
   }
 
@@ -78,7 +77,7 @@ export function useEventAgeAccessDialog(onGranted: () => void | Promise<void>) {
   const onAgeConfirm = useCallback(async () => {
     setBusy(true);
     try {
-      await agreeAnonymousAge();
+      await confirmAnonymousAgeAgreement();
       setAnonymousDialogOpen(false);
       await onGranted();
     } catch {

@@ -7,10 +7,11 @@ function normalizeEventCategory(raw: unknown): IEventType['eventCategory'] {
   return {
     id: String(c.id ?? c.Id ?? ''),
     name: String(c.name ?? c.Name ?? ''),
-    namePath: String(c.namePath ?? c.NamePath ?? ''),
+    namePath: String(c.namePath ?? c.NamePath ?? c.localizationPath ?? c.LocalizationPath ?? ''),
     ico: (c.ico ?? c.Ico ?? null) as string | null,
     description: (c.description ?? c.Description ?? null) as string | null,
     color: (c.color ?? c.Color ?? null) as string | null,
+    active: c.active !== false && c.Active !== false,
   };
 }
 
@@ -23,11 +24,12 @@ function normalizeEventType(raw: unknown): IEventType | null {
   return {
     id,
     name: String(t.name ?? t.Name ?? ''),
-    namePath: String(t.namePath ?? t.NamePath ?? ''),
+    namePath: String(t.namePath ?? t.NamePath ?? t.localizationPath ?? t.LocalizationPath ?? ''),
     description: (t.description ?? t.Description ?? null) as string | null,
     ico: (t.ico ?? t.Ico ?? null) as string | null,
     eventCategoryId: String(t.eventCategoryId ?? t.EventCategoryId ?? (cat as Record<string, unknown>)?.id ?? ''),
     eventCategory: normalizeEventCategory(cat),
+    active: t.active !== false && t.Active !== false,
   };
 }
 

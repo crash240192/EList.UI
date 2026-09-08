@@ -1,13 +1,14 @@
 // pages/settings/SettingsPage.tsx — макет examples/elist_settings_wallet.html
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchContactTypes } from '@/features/auth/registrationApi';
 import type { IContactType } from '@/features/auth/registrationApi';
 import {
   changePassword, updateLocation,
   savePersonInfo, getMyPersonInfo,
   createContact, updateContact, getMyContacts,
+  deleteMyAccount,
 } from '@/entities/user/settingsApi';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { POPULAR_CITIES, useGeoCity, type ICity } from '@/features/auth/useGeoCity';
@@ -19,9 +20,10 @@ import { Select } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { birthDateToApiIso, parseBirthDateFromApi, todayLocalDateString } from '@/shared/lib/datetime';
 import { useMyAvatar } from '@/features/auth/useAvatar';
-import { useFiltersStore } from '@/app/store';
+import { useAuthStore, useFiltersStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { Button } from '@/shared/ui/Button';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { usePageTitle } from '@/shared/hooks';
 import { OrganizationsSettingsPanel } from '@/features/organizations';
 import { ModerationSettingsPanel } from '@/features/content-reports';
@@ -205,6 +207,7 @@ export default function SettingsPage() {
           {tab === 'security' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <PasswordSection />
+              <DeleteAccountSection />
             </div>
           )}
           {tab === 'moderation' && (
@@ -712,3 +715,81 @@ function PasswordSection() {
     </div>
   );
 }
+
+function DeleteAccountSection() {
+  const navigate = useNavigate();
+  const logout = useAuthStore(s => s.logout);
+  const [stage, setStage] = useState<'idle' | 'confirm' | 'final'>('idle');
+  const [deleting, setDeleting] = useState(false);
+
+  const closeDialog = () => {
+    if (deleting) return;
+    setStage('idle');
+  };
+
+  const handleConfirm = async () => {
+    if (stage === 'confirm') {
+      setStage('final');
+      return;
+    }
+    if (stage !== 'final' || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteMyAccount();
+      logout();
+      navigate('/login', { replace: true });
+    } catch {
+      // toast из apiClient
+      setDeleting(false);
+      setStage('idle');
+    }
+  };
+
+  return (
+    <>
+      <div className={`${styles.scard} ${styles.dangerCard}`}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Удаление аккаунта</div>
+        </div>
+        <div className={styles.scardBody}>
+          <p className={styles.dangerText}>
+            Удаление необратимо: аккаунт будет деактивирован и анонимизирован.
+            Восстановить его будет невозможно.
+          </p>
+        </div>
+        <div className={styles.scardFooter}>
+          <span />
+          <Button
+            variant="danger"
+            onClick={() => setStage('confirm')}
+            disabled={deleting}
+          >
+            Удалить аккаунт
+          </Button>
+        </div>
+      </div>
+
+      {stage !== 'idle' && (
+        <ConfirmDialog
+          title={stage === 'confirm' ? 'Удалить аккаунт?' : 'Подтвердите удаление'}
+          message={
+            stage === 'confirm'
+              ? 'Аккаунт будет удалён безвозвратно. Восстановить его будет невозможно.'
+              : 'Это действие нельзя отменить. Вы действительно хотите удалить аккаунт?'
+          }
+          confirmLabel={
+            deleting
+              ? 'Удаление…'
+              : stage === 'confirm'
+                ? 'Удалить'
+                : 'Удалить безвозвратно'
+          }
+          cancelLabel="Отмена"
+          onConfirm={() => { void handleConfirm(); }}
+          onCancel={closeDialog}
+        />
+      )}
+    </>
+  );
+}
+

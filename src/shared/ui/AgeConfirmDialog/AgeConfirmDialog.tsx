@@ -24,6 +24,9 @@ export function AgeConfirmDialog({
       <div className={styles.backdrop} onClick={busy ? undefined : onDecline} aria-hidden />
       <div className={styles.modal} role="dialog" aria-modal aria-labelledby="age-confirm-title">
         <p id="age-confirm-title" className={styles.title}>Вам исполнилось 18 лет?</p>
+        <p className={styles.hint}>
+          Подтверждение действует 24 часа. После истечения срока его нужно будет повторить.
+        </p>
         <div className={styles.actions}>
           <button
             type="button"

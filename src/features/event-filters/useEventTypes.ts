@@ -1,6 +1,6 @@
 // features/event-filters/useEventTypes.ts
 // Загружает категории и типы мероприятий, группирует типы по категориям.
-// Результат кешируется в памяти на время сессии.
+// Справочники кешируются в entities/event/dictionariesCache (активные по умолчанию).
 
 import { useState, useEffect } from 'react';
 import { fetchEventCategories, fetchEventTypes } from '@/entities/event';
@@ -18,28 +18,30 @@ interface UseEventTypesResult {
   error: string | null;
 }
 
-// Простой in-memory кеш — не перезапрашиваем при каждом открытии пикера
-let cache: CategoryWithTypes[] | null = null;
-
 export function useEventTypes(): UseEventTypesResult {
-  const [groups, setGroups] = useState<CategoryWithTypes[]>(cache ?? []);
-  const [loading, setLoading] = useState(!cache);
-  const [error, setError]     = useState<string | null>(null);
+  const [groups, setGroups] = useState<CategoryWithTypes[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (cache) return; // уже загружено
+    let cancelled = false;
     setLoading(true);
     Promise.all([fetchEventCategories(), fetchEventTypes()])
       .then(([categories, types]) => {
+        if (cancelled) return;
         const result: CategoryWithTypes[] = sortByNameRu(categories).map(cat => ({
           category: cat,
           types: sortByNameRu(types.filter(t => t.eventCategoryId === cat.id)),
         })).filter(g => g.types.length > 0);
-        cache = result;
         setGroups(result);
       })
-      .catch(e => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
-      .finally(() => setLoading(false));
+      .catch(e => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   return { groups, loading, error };

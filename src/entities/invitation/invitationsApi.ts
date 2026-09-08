@@ -193,7 +193,7 @@ export async function enrichInvitationsWithEventTypes(invitations: IInvitation[]
   if (missing.length === 0) return invitations;
 
   const eventIds = [...new Set(missing.map(inv => inv.eventId))];
-  const allTypes = await fetchEventTypes().catch(() => []);
+  const allTypes = await fetchEventTypes(undefined, { includeInactive: true }).catch(() => []);
   const typeById = new Map(allTypes.map(t => [t.id, t]));
 
   const typesByEvent = new Map<string, IEventType[]>();

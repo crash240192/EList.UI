@@ -428,7 +428,10 @@ export default function CreateEventPage() {
   // Загрузка всех типов и категорий для чипов (цвета категорий)
   useEffect(() => {
     if (USE_MOCK) return;
-    Promise.all([fetchAllEventTypes(), fetchEventCategories()])
+    Promise.all([
+      fetchAllEventTypes(undefined, { includeInactive: true }),
+      fetchEventCategories({ includeInactive: true }),
+    ])
       .then(([types, categories]) => {
         const catMap = new Map(categories.map(c => [c.id, c]));
         const mapped = types.map(t => ({
