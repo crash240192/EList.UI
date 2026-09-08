@@ -1,6 +1,7 @@
 // entities/admin/adminApi.ts
 
 import { apiClient } from '@/shared/api/client';
+import { invalidateEventDictionariesCache } from '@/entities/event/dictionariesCache';
 
 // ---- Категории мероприятий ----
 
@@ -11,6 +12,7 @@ export interface IEventCategory {
   ico: string | null;
   description: string | null;
   color: string | null;
+  active?: boolean;
 }
 
 export interface IEventCategoryRequest {
@@ -21,20 +23,52 @@ export interface IEventCategoryRequest {
   color?: string | null;
 }
 
+function normalizeAdminCategory(raw: IEventCategory & Record<string, unknown>): IEventCategory {
+  return {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    localizationPath: String(raw.localizationPath ?? raw.namePath ?? ''),
+    ico: (raw.ico ?? null) as string | null,
+    description: (raw.description ?? null) as string | null,
+    color: (raw.color ?? null) as string | null,
+    active: raw.active !== false,
+  };
+}
+
+function normalizeAdminType(raw: IEventType & Record<string, unknown>): IEventType {
+  return {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    localizationPath: String(raw.localizationPath ?? raw.namePath ?? ''),
+    description: (raw.description ?? null) as string | null,
+    ico: (raw.ico ?? null) as string | null,
+    eventCategoryId: String(raw.eventCategoryId ?? ''),
+    eventCategory: raw.eventCategory
+      ? normalizeAdminCategory(raw.eventCategory as IEventCategory & Record<string, unknown>)
+      : raw.eventCategory,
+    active: raw.active !== false,
+  };
+}
+
 export const categoriesApi = {
   getAll: async (): Promise<IEventCategory[]> => {
-    const r = await apiClient.get<IEventCategory[]>('/api/events/eventCategories/getAll');
-    return r.result ?? [];
+    const r = await apiClient.get<(IEventCategory & Record<string, unknown>)[]>(
+      '/api/events/eventCategories/getAll',
+    );
+    return (r.result ?? []).map(normalizeAdminCategory);
   },
   create: async (payload: IEventCategoryRequest): Promise<string> => {
     const r = await apiClient.post<string>('/api/events/eventCategories/create', payload);
+    invalidateEventDictionariesCache();
     return r.result;
   },
   update: async (id: string, payload: IEventCategoryRequest): Promise<void> => {
     await apiClient.put(`/api/events/eventCategories/update/${id}`, payload);
+    invalidateEventDictionariesCache();
   },
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/events/eventCategories/delete/${id}`);
+    invalidateEventDictionariesCache();
   },
 };
 
@@ -48,6 +82,7 @@ export interface IEventType {
   ico: string | null;
   eventCategoryId: string;
   eventCategory?: IEventCategory | null;
+  active?: boolean;
 }
 
 export interface IEventTypeRequest {
@@ -60,18 +95,23 @@ export interface IEventTypeRequest {
 
 export const typesApi = {
   getAll: async (): Promise<IEventType[]> => {
-    const r = await apiClient.get<IEventType[]>('/api/events/eventTypes/getAll');
-    return r.result ?? [];
+    const r = await apiClient.get<(IEventType & Record<string, unknown>)[]>(
+      '/api/events/eventTypes/getAll',
+    );
+    return (r.result ?? []).map(normalizeAdminType);
   },
   create: async (payload: IEventTypeRequest): Promise<string> => {
     const r = await apiClient.post<string>('/api/events/eventTypes/create', payload);
+    invalidateEventDictionariesCache();
     return r.result;
   },
   update: async (id: string, payload: IEventTypeRequest): Promise<void> => {
     await apiClient.put(`/api/events/eventTypes/update/${id}`, payload);
+    invalidateEventDictionariesCache();
   },
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/events/eventTypes/delete/${id}`);
+    invalidateEventDictionariesCache();
   },
 };
 

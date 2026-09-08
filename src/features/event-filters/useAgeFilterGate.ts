@@ -3,7 +3,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthStore, useToastStore } from '@/app/store';
-import { agreeAnonymousAge, getAnonymousAgeAgreement } from '@/entities/agreement';
+import {
+  checkAnonymousAgeAgreement,
+  confirmAnonymousAgeAgreement,
+} from '@/entities/agreement';
 import type { IEventsSearchParams } from '@/entities/event';
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { getAge } from '@/shared/lib/datetime';
@@ -54,7 +57,6 @@ export function useAgeFilterGate(
   const [birthDialogOpen, setBirthDialogOpen] = useState(false);
 
   const pendingRef = useRef<PendingAgeFilter | null>(null);
-  const agreedRef = useRef<boolean | null>(null);
   const guardingRef = useRef(false);
 
   // Загрузка ДР авторизованного пользователя
@@ -98,14 +100,7 @@ export function useAgeFilterGate(
   ]);
 
   const checkAgreed = useCallback(async (): Promise<boolean> => {
-    if (agreedRef.current === true) return true;
-    try {
-      const ok = await getAnonymousAgeAgreement();
-      agreedRef.current = ok;
-      return ok;
-    } catch {
-      return false;
-    }
+    return checkAnonymousAgeAgreement();
   }, []);
 
   const openAgeDialog = useCallback((pending: PendingAgeFilter) => {
@@ -170,8 +165,7 @@ export function useAgeFilterGate(
   const onAgeConfirm = useCallback(async () => {
     setAgeDialogBusy(true);
     try {
-      await agreeAnonymousAge();
-      agreedRef.current = true;
+      await confirmAnonymousAgeAgreement();
       const pending = pendingRef.current;
       if (pending) {
         applyAgeFilters(setFilter, pending.ageLimit, pending.adultOnly);
@@ -205,7 +199,6 @@ export function useAgeFilterGate(
       || (filters.ageLimit != null && filters.ageLimit >= 18);
     if (!needsGate) return;
     if (ageDialogOpen || guardingRef.current) return;
-    if (agreedRef.current === true) return;
 
     let cancelled = false;
     guardingRef.current = true;

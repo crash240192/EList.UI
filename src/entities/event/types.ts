@@ -14,6 +14,8 @@ export interface IEventCategory {
   ico: string | null;   // base64 иконка
   description: string | null;
   color: string | null; // цвет категории, напр. "#6366f1"
+  /** false — не показывать в формах выбора */
+  active?: boolean;
 }
 
 export interface IEventType {
@@ -24,6 +26,8 @@ export interface IEventType {
   ico: string | null;   // base64 иконка
   eventCategoryId: string;
   eventCategory: IEventCategory | null;
+  /** false — не показывать в формах выбора */
+  active?: boolean;
 }
 
 // ---------- Параметры мероприятия ----------

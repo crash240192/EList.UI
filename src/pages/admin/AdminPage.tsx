@@ -279,6 +279,7 @@ function EventTypesTab() {
                 }}>
                   <span className={styles.itemName}>{cat.name}</span>
                   <span className={styles.itemSub}>{cat.localizationPath}</span>
+                  {cat.active === false && <span className={styles.tag}>выкл.</span>}
                 </div>
                 <div className={styles.itemActions}>
                   <EditIconBtn onClick={() => setEditingCat(cat)} />
@@ -313,6 +314,7 @@ function EventTypesTab() {
                         )}
                         <span className={styles.itemName}>{tp.name}</span>
                         <span className={styles.itemSub}>{tp.localizationPath}</span>
+                        {tp.active === false && <span className={styles.tag}>выкл.</span>}
                       </div>
                       <div className={styles.itemActions}>
                         <EditIconBtn onClick={() => {

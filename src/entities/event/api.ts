@@ -8,29 +8,12 @@ import { apiClient } from '@/shared/api/client';
 import type { CommandResult, PagedList } from '@/shared/api/types';
 import type {
   IEvent,
-  IEventCategory,
-  IEventType,
   IEventParameters,
   IEventsSearchParams,
   IEventSearchShortItem,
   ICreateEventRequest,
   IEventParametersRequest,
 } from './types';
-import { sortByNameRu } from './lib/sortByNameRu';
-
-// ---- Вспомогательная функция сборки query string ----
-
-function buildQuery(params: Record<string, unknown>): string {
-  const qs = Object.entries(params)
-    .filter(([, v]) => v !== undefined && v !== null && v !== '')
-    .flatMap(([k, v]) =>
-      Array.isArray(v)
-        ? v.map((item) => `${encodeURIComponent(k)}=${encodeURIComponent(String(item))}`)
-        : [`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`]
-    )
-    .join('&');
-  return qs ? `?${qs}` : '';
-}
 
 // ---- Поиск мероприятий (POST /api/events/search) ----
 
@@ -171,22 +154,14 @@ export async function updateEventParameters(
   await apiClient.put(`/api/events/parameters/update/${eventId}`, payload);
 }
 
-// ---- Категории мероприятий ----
+// ---- Категории / типы мероприятий (кеш + фильтр active) ----
 
-export async function fetchEventCategories(): Promise<IEventCategory[]> {
-  const data = await apiClient.get<IEventCategory[]>('/api/events/eventCategories/getAll');
-  return sortByNameRu(data.result ?? []);
-}
-
-// ---- Типы мероприятий ----
-
-export async function fetchEventTypes(
-  categoryId?: string
-): Promise<IEventType[]> {
-  const qs = buildQuery({ categoryId });
-  const data = await apiClient.get<IEventType[]>(`/api/events/eventTypes/getAll${qs}`);
-  return sortByNameRu(data.result ?? []);
-}
+export {
+  fetchEventCategories,
+  fetchEventTypes,
+  invalidateEventDictionariesCache,
+} from './dictionariesCache';
+export type { FetchDictionariesOptions } from './dictionariesCache';
 
 // ---- Мок-данные для разработки (используйте пока нет реального API) ----
 

@@ -30,8 +30,11 @@ export {
   updateEventParameters,
   fetchEventCategories,
   fetchEventTypes,
+  invalidateEventDictionariesCache,
   MOCK_EVENTS,
 } from './api';
+
+export type { FetchDictionariesOptions } from './api';
 
 export { EventCard } from './ui/EventCard';
 

@@ -290,6 +290,17 @@
   background: rgba(239, 68, 68, 0.1);
 }
 
+.dangerCard {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+.dangerText {
+  margin: 0;
+  font-size: var(--font-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
 /* ── City block ── */
 .cityBlock {
   display: flex;

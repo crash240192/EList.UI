@@ -13,6 +13,11 @@ export async function changePassword(payload: {
   await apiClient.post('/api/authorization/changePassword', payload);
 }
 
+/** DELETE /api/accounts/me — удаление (деактивация + анонимизация) текущего аккаунта */
+export async function deleteMyAccount(): Promise<void> {
+  await apiClient.delete('/api/accounts/me');
+}
+
 // ---- Местоположение ----
 
 export async function updateLocation(latitude: number, longitude: number): Promise<void> {
