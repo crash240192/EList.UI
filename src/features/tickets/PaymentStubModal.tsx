@@ -39,10 +39,8 @@ export function PaymentStubModal({
   const onPaidRef = useRef(onPaid);
   onPaidRef.current = onPaid;
 
-  const canDismiss = phase === 'success' || phase === 'error' || phase === 'countdown';
-
   useModalBackButton(() => {
-    if (canDismiss && phase !== 'completing') onClose();
+    if (phase !== 'completing') onClose();
   }, open);
 
   useEffect(() => {
