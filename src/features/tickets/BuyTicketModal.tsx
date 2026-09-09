@@ -165,13 +165,11 @@ export function BuyTicketModal({
           orderId={pendingPay.orderId}
           providerPaymentId={pendingPay.providerPaymentId}
           amountLabel={formatMoney(pendingPay.amountTotal, pendingPay.currency)}
-          onCancel={() => {
-            setPendingPay(null);
-            onClose();
-          }}
-          onSuccess={(order) => {
-            setPendingPay(null);
+          onPaid={(order) => {
             onPurchased(order);
+          }}
+          onClose={() => {
+            setPendingPay(null);
             onClose();
           }}
         />
