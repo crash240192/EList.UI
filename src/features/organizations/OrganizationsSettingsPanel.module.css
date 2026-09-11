@@ -612,6 +612,11 @@
   flex: 1;
 }
 
+.addManagerBtn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .checkList {
   padding: 14px 18px;
   display: flex;

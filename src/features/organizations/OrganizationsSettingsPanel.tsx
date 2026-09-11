@@ -72,6 +72,7 @@ import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { Select } from '@/shared/ui/Select/Select';
 import { OrgInnLookupModal } from './OrgInnLookupModal';
 import { OrgLogoUpload } from './OrgLogoUpload';
+import { AddOrgManagersFromSubscribersModal } from './AddOrgManagersFromSubscribersModal';
 import styles from './OrganizationsSettingsPanel.module.css';
 
 type View =
@@ -1239,22 +1240,60 @@ function OrganizationMembersSection({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [transferId, setTransferId] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const handleAdd = async () => {
-    const id = accountId.trim();
-    if (!id || !isOwner) return;
+  const uuidFilled = accountId.trim().length > 0;
+  const existingMemberIds = useMemo(
+    () => new Set(members.map(m => m.accountId)),
+    [members],
+  );
+
+  const addManagers = async (ids: string[]) => {
+    if (!isOwner || ids.length === 0) return;
     setBusy(true);
     setMsg(null);
-    try {
-      await addOrganizationManager(organizationId, { accountId: id });
-      setAccountId('');
-      setMsg({ text: 'Администратор добавлен', ok: true });
-      await onChanged();
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Не удалось добавить', ok: false });
-    } finally {
-      setBusy(false);
+    let added = 0;
+    let lastError: string | null = null;
+    for (const id of ids) {
+      if (existingMemberIds.has(id)) continue;
+      try {
+        await addOrganizationManager(organizationId, { accountId: id });
+        added += 1;
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : 'Не удалось добавить';
+      }
     }
+    try {
+      if (added > 0) await onChanged();
+    } catch {
+      // список мог не обновиться — сообщение всё равно покажем
+    }
+    if (added > 0 && !lastError) {
+      setAccountId('');
+      setMsg({
+        text: added === 1 ? 'Администратор добавлен' : `Добавлено администраторов: ${added}`,
+        ok: true,
+      });
+    } else if (added > 0 && lastError) {
+      setMsg({ text: `Добавлено ${added}. Остальные не удалось: ${lastError}`, ok: false });
+    } else {
+      setMsg({ text: lastError ?? 'Не удалось добавить', ok: false });
+    }
+    setBusy(false);
+  };
+
+  const handleAdd = async () => {
+    if (!isOwner) return;
+    if (!uuidFilled) {
+      setPickerOpen(true);
+      return;
+    }
+    await addManagers([accountId.trim()]);
+  };
+
+  const handlePickFromSubscribers = (ids: string[]) => {
+    setPickerOpen(false);
+    void addManagers(ids);
   };
 
   const handleRemove = async (memberAccountId: string) => {
@@ -1368,7 +1407,9 @@ function OrganizationMembersSection({
         <div className={styles.scard}>
           <div className={styles.scardHead}>
             <div className={styles.scardTitle}>Добавить администратора</div>
-            <div className={styles.scardDesc}>Укажите accountId пользователя</div>
+            <div className={styles.scardDesc}>
+              Введите UUID или выберите из подписчиков
+            </div>
           </div>
           <div className={styles.formBody}>
             <div className={styles.inlineForm}>
@@ -1379,15 +1420,24 @@ function OrganizationMembersSection({
                 placeholder="UUID аккаунта"
               />
               <Button
+                className={styles.addManagerBtn}
                 loading={busy}
-                disabled={!accountId.trim()}
                 onClick={() => { void handleAdd(); }}
               >
-                Добавить
+                {uuidFilled ? 'Добавить' : 'Добавить из подписок'}
               </Button>
             </div>
           </div>
         </div>
+      )}
+
+      {pickerOpen && (
+        <AddOrgManagersFromSubscribersModal
+          currentAccountId={myAccountId}
+          existingMemberIds={existingMemberIds}
+          onClose={() => setPickerOpen(false)}
+          onConfirm={handlePickFromSubscribers}
+        />
       )}
 
       {isOwner && (
