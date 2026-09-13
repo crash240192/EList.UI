@@ -98,10 +98,27 @@
   text-align: center;
 }
 
+.successMark {
+  width: 56px;
+  height: 56px;
+  margin: 4px auto 2px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--success, #22c55e);
+  background: color-mix(in srgb, var(--success, #22c55e) 16%, transparent);
+}
+
 .actions {
   display: flex;
   gap: 8px;
   margin-top: 6px;
+}
+
+.actions :global(button):last-child {
+  flex: 1.2;
 }
 
 .cancelBtn,
