@@ -36,7 +36,7 @@
 }
 
 .deniedHero {
-  height: 220px;
+  height: 300px;
   background: linear-gradient(135deg, var(--surface-2) 0%, color-mix(in srgb, var(--border) 40%, var(--surface-2)) 100%);
 }
 
@@ -62,7 +62,7 @@
 }
 
 /* Hero */
-.hero { position:relative; height:220px; overflow:hidden; }
+.hero { position:relative; height:300px; overflow:hidden; }
 .heroImg { width:100%; height:100%; object-fit:cover; display:block; }
 .heroOverlay {
   position:absolute; inset:0; z-index:1;
@@ -310,7 +310,7 @@
 .discussionStub { border:1px dashed var(--border); border-radius:10px; padding:20px; text-align:center; color:var(--text-muted); font-size:12px; line-height:1.6; }
 
 /* Skeleton / Error */
-.skeletonHero { height:220px; background:var(--surface-2); animation:shimmer 1.4s ease infinite; }
+.skeletonHero { height:300px; background:var(--surface-2); animation:shimmer 1.4s ease infinite; }
 .skeletonLine { border-radius:8px; background:var(--surface-2); animation:shimmer 1.4s ease infinite; }
 @keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:.45} }
 .errorState { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:12px; color:var(--text-secondary); }
