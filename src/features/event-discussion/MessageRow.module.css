@@ -125,6 +125,18 @@
   color: var(--text-muted);
 }
 
+.replyToChip {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+}
+
+.replyToName {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .text {
   margin: 0;
   font-size: 13px;

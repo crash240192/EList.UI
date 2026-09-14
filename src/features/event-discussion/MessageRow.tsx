@@ -20,6 +20,7 @@ import {
 } from './messageUtils';
 import { DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import { MessageReplies } from './MessageReplies';
+import type { DiscussionViewMode } from './discussionViewMode';
 import { useDiscussionRefresh } from './discussionRefreshContext';
 import styles from './MessageRow.module.css';
 
@@ -30,7 +31,12 @@ interface MessageRowProps {
   activeReplyId?: string | null;
   conversationId: string;
   currentAccountId: string | null;
-  onReply?: (message: IMessage) => void;
+  viewMode?: DiscussionViewMode;
+  /** Корень ветки; для корневых комментариев = message.id */
+  threadRootId?: string;
+  /** Подпись «в ответ …» в режиме ленты */
+  replyToAuthor?: string | null;
+  onReply?: (message: IMessage, threadRootId: string) => void;
   onDeleted?: (messageId: string) => void;
 }
 
@@ -92,6 +98,9 @@ export function MessageRow({
   activeReplyId = null,
   conversationId,
   currentAccountId,
+  viewMode = 'tree',
+  threadRootId,
+  replyToAuthor = null,
   onReply,
   onDeleted,
 }: MessageRowProps) {
@@ -119,6 +128,9 @@ export function MessageRow({
   const canDelete = isMine && !isHidden && canDeleteMessage(message, replyBump, replyTotal);
   const accountId = message.accountId ?? message.account?.id ?? '';
   const initials = messageInitials(message);
+  const rootId = threadRootId ?? message.id;
+  /** В ленте вложенные ответы уже собраны под корнем — не открываем новое дерево */
+  const canNestReplies = viewMode === 'tree' || message.id === rootId;
 
   useEffect(() => {
     setDisplayText(message.messageText);
@@ -298,6 +310,11 @@ export function MessageRow({
               </div>
             ) : (
               <>
+                {replyToAuthor && (
+                  <div className={styles.replyToChip}>
+                    в ответ <span className={styles.replyToName}>{replyToAuthor}</span>
+                  </div>
+                )}
                 <p className={`${styles.text} ${isLongText && !textExpanded ? styles.textClamped : ''}`}>
                   {displayText}
                 </p>
@@ -326,7 +343,7 @@ export function MessageRow({
             {!editing && !isHidden && (
               <footer className={styles.foot}>
                 {currentAccountId && onReply && (
-                  <button type="button" className={styles.actionBtn} onClick={() => onReply(message)}>
+                  <button type="button" className={styles.actionBtn} onClick={() => onReply?.(message, rootId)}>
                     <ReplyIcon />
                     Ответить
                   </button>
@@ -361,7 +378,7 @@ export function MessageRow({
                     {alreadyReported ? 'Жалоба уже отправлена' : 'Пожаловаться'}
                   </button>
                 )}
-                {hasReplies && expanded && (
+                {canNestReplies && hasReplies && expanded && (
                   <button
                     type="button"
                     className={`${styles.actionBtn} ${styles.actionBtnMuted}`}
@@ -398,7 +415,7 @@ export function MessageRow({
         />
       )}
 
-      {hasReplies && !expanded && (
+      {canNestReplies && hasReplies && !expanded && (
         <button
           type="button"
           className={styles.collapsedReplies}
@@ -414,7 +431,7 @@ export function MessageRow({
         </button>
       )}
 
-      {hasReplies && expanded && (
+      {canNestReplies && hasReplies && expanded && (
         <MessageReplies
           parent={message}
           depth={depth}
@@ -422,6 +439,8 @@ export function MessageRow({
           activeReplyId={activeReplyId}
           conversationId={conversationId}
           currentAccountId={currentAccountId}
+          viewMode={viewMode}
+          threadRootId={rootId}
           onReply={onReply}
           onDeleted={onDeleted}
           onTotalLoaded={setReplyTotal}

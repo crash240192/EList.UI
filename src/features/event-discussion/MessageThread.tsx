@@ -23,6 +23,13 @@ import { useDiscussionSlotRect } from './useDiscussionSlotRect';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
+import {
+  DISCUSSION_VIEW_MODE_LABELS,
+  DISCUSSION_VIEW_MODE_STORAGE_KEY,
+  isDiscussionViewMode,
+  type DiscussionViewMode,
+} from './discussionViewMode';
+import { useLocalStorage } from '@/shared/hooks';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import styles from './MessageThread.module.css';
 
@@ -46,6 +53,12 @@ function MessageThreadInner({
     useRootMessages(conversationId);
   const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
+  const [replyThreadRootId, setReplyThreadRootId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useLocalStorage<DiscussionViewMode>(
+    DISCUSSION_VIEW_MODE_STORAGE_KEY,
+    'tree',
+  );
+  const safeViewMode: DiscussionViewMode = isDiscussionViewMode(viewMode) ? viewMode : 'tree';
   const [replyScrollTailPx, setReplyScrollTailPx] = useState(0);
   const [replyHighlightHole, setReplyHighlightHole] = useState<HoleRect | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -70,15 +83,17 @@ function MessageThreadInner({
   const closeSheet = useCallback(() => {
     setSheetOpen(false);
     setReplyTarget(null);
+    setReplyThreadRootId(null);
     setReplyScrollTailPx(0);
     setReplyHighlightHole(null);
   }, []);
 
-  const handleReply = useCallback((message: IMessage) => {
+  const handleReply = useCallback((message: IMessage, threadRootId: string) => {
     if (!canComment) return;
     const reserve = getReplyComposerReservePx(getDefaultComposerHeightEstimate());
     setReplyScrollTailPx(computeReplyScrollTailPx(message.id, reserve));
     setReplyTarget(message);
+    setReplyThreadRootId(threadRootId || message.id);
     setSheetOpen(true);
   }, [canComment]);
 
@@ -183,6 +198,7 @@ function MessageThreadInner({
 
   const openSheetForNewComment = useCallback(() => {
     setReplyTarget(null);
+    setReplyThreadRootId(null);
     setReplyScrollTailPx(0);
     setSheetOpen(true);
   }, []);
@@ -198,6 +214,9 @@ function MessageThreadInner({
     });
     if (replyToId) {
       bump(replyToId);
+      if (safeViewMode === 'flat' && replyThreadRootId && replyThreadRootId !== replyToId) {
+        bump(replyThreadRootId);
+      }
     } else {
       refresh();
     }
@@ -238,6 +257,21 @@ function MessageThreadInner({
       {!loading && !error && messages.length === 0 && (
         <p className={styles.muted}>Пока нет комментариев. Будьте первым!</p>
       )}
+      {!loading && messages.length > 0 && (
+        <div className={styles.viewModeBar} role="group" aria-label="Вид комментариев">
+          {(['tree', 'flat'] as DiscussionViewMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              className={`${styles.viewModeBtn} ${safeViewMode === mode ? styles.viewModeBtnActive : ''}`}
+              aria-pressed={safeViewMode === mode}
+              onClick={() => setViewMode(mode)}
+            >
+              {DISCUSSION_VIEW_MODE_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+      )}
       {!loading && (
         <div className={styles.list}>
           {messages.map((msg) => (
@@ -249,6 +283,8 @@ function MessageThreadInner({
               activeReplyId={activeReplyId}
               conversationId={conversationId}
               currentAccountId={currentAccountId}
+              viewMode={safeViewMode}
+              threadRootId={msg.id}
               onReply={canComment ? handleReply : undefined}
               onDeleted={handleDeleted}
             />

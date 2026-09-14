@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { IMessage } from '@/entities/conversation';
 import { fetchMessageReplies } from '@/entities/conversation';
 import { MessageRow } from './MessageRow';
@@ -7,6 +7,12 @@ import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import { useDiscussionRefreshActions } from './discussionRefreshContext';
+import {
+  DISCUSSION_TREE_INDENT_CAP,
+  type DiscussionViewMode,
+} from './discussionViewMode';
+import { loadDescendantReplies } from './loadDescendantReplies';
+import { messageAuthorName } from './messageUtils';
 import styles from './MessageReplies.module.css';
 
 const PAGE_SIZE = 5;
@@ -18,7 +24,10 @@ interface MessageRepliesProps {
   activeReplyId?: string | null;
   conversationId: string;
   currentAccountId: string | null;
-  onReply?: (message: IMessage) => void;
+  viewMode: DiscussionViewMode;
+  /** Корень ветки (для ленты и чипа «в ответ») */
+  threadRootId: string;
+  onReply?: (message: IMessage, threadRootId: string) => void;
   onDeleted?: (messageId: string) => void;
   onTotalLoaded?: (total: number) => void;
 }
@@ -30,6 +39,8 @@ export function MessageReplies({
   activeReplyId = null,
   conversationId,
   currentAccountId,
+  viewMode,
+  threadRootId,
   onReply,
   onDeleted,
   onTotalLoaded,
@@ -43,7 +54,14 @@ export function MessageReplies({
   const [error, setError] = useState<string | null>(null);
   const pageRef = useRef(0);
 
-  const loadPage = useCallback(
+  const byId = useMemo(() => {
+    const map = new Map<string, IMessage>();
+    map.set(parent.id, parent);
+    for (const item of items) map.set(item.id, item);
+    return map;
+  }, [parent, items]);
+
+  const loadTreePage = useCallback(
     async (pageIndex: number, append: boolean) => {
       const paged = await fetchMessageReplies(parent.id, pageIndex, PAGE_SIZE);
       const nextItems = paged.result ?? [];
@@ -57,20 +75,30 @@ export function MessageReplies({
     [parent.id, onTotalLoaded],
   );
 
+  const loadFlat = useCallback(async () => {
+    const descendants = await loadDescendantReplies(parent.id);
+    setItems(descendants);
+    setTotal(descendants.length);
+    onTotalLoaded?.(descendants.length);
+    setHasMore(false);
+    setError(null);
+  }, [parent.id, onTotalLoaded]);
+
   useEffect(() => {
     pageRef.current = 0;
     setLoading(true);
-    void loadPage(0, false)
+    const request = viewMode === 'flat' ? loadFlat() : loadTreePage(0, false);
+    void request
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов'))
       .finally(() => setLoading(false));
-  }, [loadPage, parent.id, refreshKey]);
+  }, [loadFlat, loadTreePage, parent.id, refreshKey, viewMode]);
 
   const loadMore = () => {
-    if (loadingMore || !hasMore) return;
+    if (viewMode === 'flat' || loadingMore || !hasMore) return;
     const next = pageRef.current + 1;
     pageRef.current = next;
     setLoadingMore(true);
-    void loadPage(next, true).finally(() => setLoadingMore(false));
+    void loadTreePage(next, true).finally(() => setLoadingMore(false));
   };
 
   const handleDeleted = useCallback((messageId: string) => {
@@ -79,17 +107,18 @@ export function MessageReplies({
       setTotal((prevTotal) => {
         const nextTotal = Math.max(0, prevTotal - 1);
         onTotalLoaded?.(nextTotal);
-        setHasMore(next.length < nextTotal);
+        setHasMore(viewMode === 'tree' && next.length < nextTotal);
         if (nextTotal === 0) resetBump(parent.id);
         return nextTotal;
       });
       return next;
     });
     onDeleted?.(messageId);
-  }, [onDeleted, onTotalLoaded, parent.id, resetBump]);
+  }, [onDeleted, onTotalLoaded, parent.id, resetBump, viewMode]);
 
   const childDepth = depth + 1;
   const remaining = Math.max(0, total - items.length);
+  const nestIndent = viewMode === 'tree' && childDepth <= DISCUSSION_TREE_INDENT_CAP;
 
   const showRepliesSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
   const showMoreSpinner = useDelayedBusy(loadingMore, DISCUSSION_PRELOADER_DELAY_MS);
@@ -111,21 +140,35 @@ export function MessageReplies({
   }
 
   return (
-    <div className={styles.list}>
-      {items.map((msg) => (
-        <MessageRow
-          key={msg.id}
-          message={msg}
-          depth={childDepth}
-          highlighted={activeReplyId === msg.id}
-          activeReplyId={activeReplyId}
-          currentAccountId={currentAccountId}
-          conversationId={conversationId}
-          onReply={onReply}
-          onDeleted={handleDeleted}
-        />
-      ))}
-      {hasMore && (
+    <div className={nestIndent ? styles.list : styles.listFlush}>
+      {items.map((msg) => {
+        const parentMsg = msg.replyTo ? byId.get(msg.replyTo) : undefined;
+        const replyToAuthor =
+          viewMode === 'flat' &&
+          msg.replyTo &&
+          msg.replyTo !== threadRootId &&
+          parentMsg
+            ? messageAuthorName(parentMsg)
+            : null;
+
+        return (
+          <MessageRow
+            key={msg.id}
+            message={msg}
+            depth={childDepth}
+            highlighted={activeReplyId === msg.id}
+            activeReplyId={activeReplyId}
+            currentAccountId={currentAccountId}
+            conversationId={conversationId}
+            viewMode={viewMode}
+            threadRootId={threadRootId}
+            replyToAuthor={replyToAuthor}
+            onReply={onReply}
+            onDeleted={handleDeleted}
+          />
+        );
+      })}
+      {hasMore && viewMode === 'tree' && (
         <button
           type="button"
           className={`${styles.moreBtn} ${loadingMore && showMoreSpinner ? styles.moreBtnLoading : ''}`}
