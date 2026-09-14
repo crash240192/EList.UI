@@ -51,6 +51,8 @@ export const ApiErrorCode = {
   AccountWalletAlreadyExists: 10006,
 
   OrganizationNotFound: 11001,
+  OrganizationPaymentRequired: 11006,
+  OrganizationNotVerified: 11007,
 
   EventIsFull: 12001,
 
@@ -63,6 +65,10 @@ export const ApiErrorCode = {
   RatingItemNotFound: 15001,
 
   FileNotFound: 17003,
+
+  AgreementNotFound: 18001,
+  UserMustBeAuthorized: 18002,
+  AgreementDocumentNotFound: 18003,
 
   ContentReportReasonNotFound: 20001,
   ContentReportAlreadyExists: 20003,
@@ -81,4 +87,9 @@ export function isAccessDeniedApiCode(code: number): boolean {
 
 export function isEventAccessDeniedCode(code: number): boolean {
   return code === ApiErrorCode.EventAccessDenied;
+}
+
+/** Re-consent / отсутствие актуального Consent или Agreement */
+export function isAgreementNotFoundCode(code: number): boolean {
+  return code === ApiErrorCode.AgreementNotFound;
 }

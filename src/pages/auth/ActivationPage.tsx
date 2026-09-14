@@ -8,7 +8,7 @@ import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { setPersonInfo } from '@/features/auth/registrationApi';
 import { loadPendingPersonData, clearPendingPersonData } from '@/features/auth/pendingPersonData';
 import { takeActivationNotice } from '@/features/auth/activationNotice';
-import { useAuthStore } from '@/app/store';
+import { useAuthStore, useToastStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { OtpCodeInput } from '@/shared/ui/OtpCodeInput';
 import { usePageTitle } from '@/shared/hooks';
@@ -31,6 +31,7 @@ export default function ActivationPage() {
   usePageTitle('Активация аккаунта');
   const navigate = useNavigate();
   const { confirmActivation, logout } = useAuthStore();
+  const toast = useToastStore(s => s.add);
 
   const [code, setCode]         = useState('');
   const [loading, setLoading]   = useState(false);
@@ -81,7 +82,19 @@ export default function ActivationPage() {
       await activateAccount(code);
       confirmActivation();
       const pending = loadPendingPersonData();
-      if (pending) { await setPersonInfo(pending).catch(() => {}); clearPendingPersonData(); }
+      if (pending) {
+        try {
+          await setPersonInfo(pending);
+          clearPendingPersonData();
+        } catch (personErr) {
+          toast(
+            personErr instanceof Error
+              ? `Аккаунт активирован, но профиль не сохранён: ${personErr.message}`
+              : 'Аккаунт активирован, но профиль не сохранён. Заполните данные в настройках.',
+            'error',
+          );
+        }
+      }
       setSuccess(true);
       setTimeout(() => navigate('/', { replace: true }), 1200);
     } catch (err) {
