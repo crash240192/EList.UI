@@ -28,6 +28,7 @@ const MyTicketsPage   = lazyWithRetry(() => import('@/pages/my-tickets/MyTickets
 const PaymentsReturnPage = lazyWithRetry(() => import('@/pages/payments/PaymentsReturnPage'));
 const MyReportsPage   = lazyWithRetry(() => import('@/pages/my-reports/MyReportsPage'));
 const ReportsAgainstMePage = lazyWithRetry(() => import('@/pages/reports-against-me/ReportsAgainstMePage'));
+const CookiePolicyPage = lazyWithRetry(() => import('@/pages/legal/CookiePolicyPage'));
 const LoginPage       = lazyWithRetry(() => import('@/pages/auth/LoginPage'));
 const ActivationPage  = lazyWithRetry(() => import('@/pages/auth/ActivationPage'));
 const RegisterPage    = lazyWithRetry(() => import('@/pages/auth/RegisterPage'));
@@ -84,6 +85,7 @@ const router = createBrowserRouter([
       { path: 'payments/return',  element: <RequireAuth>{S(PaymentsReturnPage)}</RequireAuth> },
       { path: 'my-reports',       element: <RequireAuth>{S(MyReportsPage)}</RequireAuth> },
       { path: 'reports-against-me', element: <RequireAuth>{S(ReportsAgainstMePage)}</RequireAuth> },
+      { path: 'cookies',          element: S(CookiePolicyPage) },
       { path: '*',                element: S(NotFoundPage) },
     ],
   },
