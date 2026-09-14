@@ -29,6 +29,7 @@ import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isApiError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
@@ -47,6 +48,7 @@ import { ContentReportModal, EventModerationStrip, OrganizerReportsModal, useOrg
 import { ReportTargetType } from '@/entities/contentReport';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
+  calcEventPageCollapsedHeroHeight,
   calcEventPageExpandedHeroHeight,
   calcEventPageHeroHeight,
   EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
@@ -218,6 +220,7 @@ export default function EventPage() {
   const reportMenuRef = useRef<HTMLButtonElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedHeroHeight, setExpandedHeroHeight] = useState(EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
+  const [heroWidth, setHeroWidth] = useState(0);
   const [coverNaturalSize, setCoverNaturalSize] = useState<CoverNaturalSize | null>(null);
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
@@ -321,8 +324,10 @@ export default function EventPage() {
     if (!hero || !event) return;
 
     const syncWidth = () => {
+      const width = hero.offsetWidth;
+      setHeroWidth(width);
       setExpandedHeroHeight(
-        calcEventPageExpandedHeroHeight(hero.offsetWidth, {
+        calcEventPageExpandedHeroHeight(width, {
           hasCover: !!(event.coverImageId || event.coverUrl),
           coverNaturalSize,
         }),
@@ -634,9 +639,12 @@ export default function EventPage() {
     pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const coverFocusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const collapsedHeroHeight = calcEventPageCollapsedHeroHeight(heroWidth, hasCover);
   const heroHeight = calcEventPageHeroHeight(
     expandedHeroHeight,
     hasCover ? heroCollapse : 1,
+    collapsedHeroHeight,
   );
 
   // Участники: текущий пользователь — первым
@@ -668,6 +676,7 @@ export default function EventPage() {
               imageFit="cover"
               alt={event.name}
               className={styles.heroImg}
+              style={coverFocusStyle}
               onLoad={handleCoverLoad}
               fallback={
                 event.coverUrl ? (
@@ -675,6 +684,7 @@ export default function EventPage() {
                     src={event.coverUrl}
                     alt={event.name}
                     className={styles.heroImg}
+                    style={coverFocusStyle}
                     onLoad={handleCoverLoad}
                   />
                 ) : undefined
@@ -685,6 +695,7 @@ export default function EventPage() {
               src={event.coverUrl}
               alt={event.name}
               className={styles.heroImg}
+              style={coverFocusStyle}
               onLoad={handleCoverLoad}
             />
           ) : null}

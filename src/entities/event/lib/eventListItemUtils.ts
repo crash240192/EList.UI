@@ -11,6 +11,8 @@ export interface EventListItemData {
   address?: string | null;
   coverImageId?: string | null;
   coverUrl?: string | null;
+  coverFocusX?: number | null;
+  coverFocusY?: number | null;
   eventTypes?: IEventType[];
   eventType?: IEventType | null;
   parameters?: {

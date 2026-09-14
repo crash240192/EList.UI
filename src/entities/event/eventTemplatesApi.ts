@@ -27,6 +27,8 @@ export interface ICreateEventBodyEvent {
   active?: boolean;
   coverImageId?: string | null;
   coverUrl?: string | null;
+  coverFocusX?: number | null;
+  coverFocusY?: number | null;
 }
 
 /**

@@ -43,6 +43,15 @@ import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker'
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { saveCoverFocusToFile, loadCoverFocusFromFile } from '@/entities/event/coverFocusApi';
+import {
+  DEFAULT_COVER_FOCUS,
+  coverFocusEventPayload,
+  coverFocusFromEvent,
+  coverFocusImgStyle,
+  parseCoverFocusFromRecord,
+  type CoverFocus,
+} from '@/shared/lib/coverFocus';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { DurationPicker } from '@/shared/ui/DurationPicker/DurationPicker';
@@ -218,6 +227,7 @@ export default function CreateEventPage() {
   const [lng,          setLng]          = useState<number | null>(null);
   const [coverUrl,     setCoverUrl]     = useState<string | null>(null);
   const [coverImageId, setCoverImageId] = useState<string | null>(null);
+  const [coverFocus,   setCoverFocus]   = useState<CoverFocus>(DEFAULT_COVER_FOCUS);
 
   const userCoords = getStoredUserCoords() ?? { lat: 55.7558, lng: 37.6173 };
 
@@ -459,6 +469,7 @@ export default function CreateEventPage() {
     setLng(null);
     setCoverUrl(null);
     setCoverImageId(null);
+    setCoverFocus(DEFAULT_COVER_FOCUS);
     setSelectedCategories([]);
     setSelectedTypes([]);
     setPickerOpen(false);
@@ -520,6 +531,8 @@ export default function CreateEventPage() {
     if (typeof ev.longitude === 'number') setLng(ev.longitude);
     if (ev.coverUrl) setCoverUrl(String(ev.coverUrl));
     if (ev.coverImageId) setCoverImageId(String(ev.coverImageId));
+    const templateFocus = parseCoverFocusFromRecord(ev);
+    setCoverFocus(templateFocus ?? DEFAULT_COVER_FOCUS);
 
     if (ev.startTime && ev.endTime) {
       const diff = new Date(String(ev.endTime)).getTime() - new Date(String(ev.startTime)).getTime();
@@ -655,6 +668,16 @@ export default function CreateEventPage() {
       if (ev.longitude)     setLng(ev.longitude);
       if (ev.coverUrl)      setCoverUrl(ev.coverUrl);
       if (ev.coverImageId)  setCoverImageId(ev.coverImageId);
+      const fromEvent = coverFocusFromEvent(ev);
+      if (fromEvent) {
+        setCoverFocus(fromEvent);
+      } else if (ev.coverImageId) {
+        void loadCoverFocusFromFile(ev.coverImageId).then(f => {
+          if (f) setCoverFocus(f);
+        });
+      } else {
+        setCoverFocus(DEFAULT_COVER_FOCUS);
+      }
 
       if (ev.startTime && ev.endTime) {
         const diff = new Date(ev.endTime).getTime() - new Date(ev.startTime).getTime();
@@ -1135,8 +1158,11 @@ export default function CreateEventPage() {
           address: form.address, startTime, endTime, active: true,
           ...(lat !== null && lng !== null ? { latitude: lat, longitude: lng } : {}),
           ...(coverUrl ? { coverUrl } : {}),
-          ...(coverImageId ? { coverImageId } : {}),
+          ...(coverImageId ? { coverImageId, ...coverFocusEventPayload(coverFocus) } : {}),
         });
+        if (coverImageId) {
+          try { await saveCoverFocusToFile(coverImageId, coverFocus); } catch { /* optional persistence channel */ }
+        }
         const editCost = parseFloat(form.cost) || 0;
         await assignEventParameters(id!, {
           cost:               editCost,
@@ -1160,6 +1186,9 @@ export default function CreateEventPage() {
 
         const createResult = await apiClient.post<string>('/api/events/create', createPayload);
         const newEventId = createResult?.result ?? createResult as unknown as string;
+        if (coverImageId) {
+          try { await saveCoverFocusToFile(coverImageId, coverFocus); } catch { /* optional persistence channel */ }
+        }
         try {
           await createConversation({ name: 'обсуждения', eventId: newEventId });
         } catch {
@@ -1205,7 +1234,7 @@ export default function CreateEventPage() {
         ...(endTime ? { endTime } : {}),
         active: true,
         ...(coverUrl ? { coverUrl } : {}),
-        ...(coverImageId ? { coverImageId } : {}),
+        ...(coverImageId ? { coverImageId, ...coverFocusEventPayload(coverFocus) } : {}),
       },
       eventParameters: {
         cost: createCost,
@@ -1582,10 +1611,12 @@ export default function CreateEventPage() {
           <CoverUpload
             currentUrl={coverUrl}
             currentFileId={coverImageId}
+            focus={coverFocus}
             onUploaded={(url, fileId) => {
               setCoverUrl(url);
               setCoverImageId(fileId);
             }}
+            onFocusChange={setCoverFocus}
           />
         </Section>
 
@@ -1941,13 +1972,13 @@ export default function CreateEventPage() {
             style={!coverUrl && !coverImageId ? { background: previewCoverBg } : undefined}
           >
             {coverUrl ? (
-              <img src={coverUrl} alt="Обложка" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <img src={coverUrl} alt="Обложка" style={{ width: '100%', height: '100%', ...coverFocusImgStyle(coverFocus), display: 'block' }} />
             ) : coverImageId ? (
               <AuthImage
                 fileId={coverImageId}
                 alt="Обложка"
                 imageFit="cover"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                style={{ width: '100%', height: '100%', ...coverFocusImgStyle(coverFocus), display: 'block' }}
               />
             ) : (
               <span className={styles.previewCoverEmpty}>нет обложки</span>

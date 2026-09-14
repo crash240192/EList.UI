@@ -98,3 +98,5 @@ export type {
   IUpdateEventTemplateRequest,
   IEventTemplateSearchRequest,
 } from './eventTemplatesApi';
+
+export { saveCoverFocusToFile, loadCoverFocusFromFile } from './coverFocusApi';
