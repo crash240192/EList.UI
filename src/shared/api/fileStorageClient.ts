@@ -12,12 +12,18 @@ export interface IUploadResult {
   url: string;
 }
 
+export interface IFileMetadata {
+  key: string;
+  value: string;
+}
+
 export interface IFileInfo {
   id:          string;
   mimeType:    string;
   title:       string | null;
   description: string | null;
   url:         string;
+  metadata?:   IFileMetadata[] | null;
 }
 
 function handleFileStorageUnauthorized(status: number): void {
@@ -91,7 +97,23 @@ export async function getFileInfo(fileId: string): Promise<IFileInfo | null> {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data.result ?? null;
+    const raw = (data.result ?? data) as Record<string, unknown> | null;
+    if (!raw) return null;
+    const metaRaw = raw.metadata ?? raw.Metadata;
+    const metadata = Array.isArray(metaRaw)
+      ? metaRaw.map((item: Record<string, unknown>) => ({
+          key: String(item.key ?? item.Key ?? ''),
+          value: String(item.value ?? item.Value ?? ''),
+        }))
+      : null;
+    return {
+      id: String(raw.id ?? raw.Id ?? ''),
+      mimeType: String(raw.mimeType ?? raw.MimeType ?? ''),
+      title: (raw.title ?? raw.Title ?? null) as string | null,
+      description: (raw.description ?? raw.Description ?? raw.context ?? raw.Context ?? null) as string | null,
+      url: String(raw.url ?? raw.Url ?? ''),
+      metadata,
+    };
   } catch { return null; }
 }
 

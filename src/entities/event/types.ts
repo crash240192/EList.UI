@@ -73,6 +73,10 @@ export interface IEvent {
   /** URL обложки (из MediaAlbum) */
   coverUrl?:      string | null;
   coverImageId?:  string | null;
+  /** Фокус обложки по горизонтали, 0…100 */
+  coverFocusX?:   number | null;
+  /** Фокус обложки по вертикали, 0…100 */
+  coverFocusY?:   number | null;
   /** Кол-во участников */
   participantsCount?: number;
   /** Текущий пользователь участвует */

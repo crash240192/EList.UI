@@ -5,6 +5,7 @@ import type { IEvent } from '../types';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
 import styles from './EventCard.module.css';
@@ -54,14 +55,16 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
   const { event } = useEventCard();
   const gradient = fallbackGradient ?? getEventCoverBackground(event);
   const hasCover = !!(event.coverImageId || event.coverUrl);
+  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
 
   return (
     <div className={styles.cover} style={{ background: hasCover ? '#111' : gradient }}>
       {event.coverImageId ? (
         <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg}
-          fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} /> : undefined} />
+          style={focusStyle}
+          fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} /> : undefined} />
       ) : event.coverUrl ? (
-        <img src={event.coverUrl} alt={event.name} className={styles.coverImg} loading="lazy" />
+        <img src={event.coverUrl} alt={event.name} className={styles.coverImg} loading="lazy" style={focusStyle} />
       ) : null}
 
       <div className={styles.coverOverlay} />

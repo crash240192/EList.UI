@@ -10,6 +10,7 @@ import {
   type EventListItemData,
 } from '@/entities/event/lib/eventListItemUtils';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
+import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import styles from './EventListItem.module.css';
 
 export type EventListUrgencyKind = 'hot' | 'soon' | 'ok';
@@ -86,6 +87,7 @@ export function EventListItem({
       : styles.urgOk;
 
   const showParticipants = params.participantsCount != null;
+  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
 
   return (
     <div
@@ -109,14 +111,15 @@ export function EventListItem({
               fileId={event.coverImageId}
               alt=""
               className={styles.coverImg}
+              style={focusStyle}
               fallback={
                 event.coverUrl
-                  ? <img src={event.coverUrl} alt="" className={styles.coverImg} />
+                  ? <img src={event.coverUrl} alt="" className={styles.coverImg} style={focusStyle} />
                   : <div className={styles.coverPlaceholder} />
               }
             />
           ) : event.coverUrl ? (
-            <img src={event.coverUrl} alt="" className={styles.coverImg} />
+            <img src={event.coverUrl} alt="" className={styles.coverImg} style={focusStyle} />
           ) : (
             <div className={styles.coverPlaceholder} />
           )}

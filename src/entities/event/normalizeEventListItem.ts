@@ -1,5 +1,6 @@
 import type { IEventType } from './types';
 import type { EventListItemData } from './lib/eventListItemUtils';
+import { parseCoverFocusFromRecord } from '@/shared/lib/coverFocus';
 
 function normalizeEventCategory(raw: unknown): IEventType['eventCategory'] {
   if (!raw || typeof raw !== 'object') return null;
@@ -62,6 +63,8 @@ export function normalizeEventListItem(raw: unknown): EventListItemData {
     address: (e.address ?? e.Address ?? null) as string | null,
     coverImageId: (e.coverImageId ?? e.CoverImageId ?? null) as string | null,
     coverUrl: (e.coverUrl ?? e.CoverUrl ?? null) as string | null,
+    coverFocusX: parseCoverFocusFromRecord(e)?.x ?? null,
+    coverFocusY: parseCoverFocusFromRecord(e)?.y ?? null,
     eventTypes: types.length > 0 ? types : single ? [single] : [],
     eventType: single,
     parameters: params

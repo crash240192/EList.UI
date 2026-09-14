@@ -29,6 +29,7 @@ import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isApiError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
@@ -634,6 +635,7 @@ export default function EventPage() {
     pageRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const coverFocusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
   const heroHeight = calcEventPageHeroHeight(
     expandedHeroHeight,
     hasCover ? heroCollapse : 1,
@@ -668,6 +670,7 @@ export default function EventPage() {
               imageFit="cover"
               alt={event.name}
               className={styles.heroImg}
+              style={coverFocusStyle}
               onLoad={handleCoverLoad}
               fallback={
                 event.coverUrl ? (
@@ -675,6 +678,7 @@ export default function EventPage() {
                     src={event.coverUrl}
                     alt={event.name}
                     className={styles.heroImg}
+                    style={coverFocusStyle}
                     onLoad={handleCoverLoad}
                   />
                 ) : undefined
@@ -685,6 +689,7 @@ export default function EventPage() {
               src={event.coverUrl}
               alt={event.name}
               className={styles.heroImg}
+              style={coverFocusStyle}
               onLoad={handleCoverLoad}
             />
           ) : null}
