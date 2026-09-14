@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import styles from './ConfirmDialog.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
@@ -10,6 +11,7 @@ interface ConfirmDialogProps {
   hideCancel?: boolean;
   variant?: 'danger' | 'accent';
   zIndex?: number;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -22,6 +24,7 @@ export function ConfirmDialog({
   hideCancel = false,
   variant = 'danger',
   zIndex = 600,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -49,6 +52,7 @@ export function ConfirmDialog({
           {title}
         </p>
         {message && <p className={styles.message}>{message}</p>}
+        {children}
         <div className={styles.actions}>
           {!hideCancel && (
             <button type="button" className={styles.cancelBtn} onClick={onCancel}>

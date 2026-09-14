@@ -5,8 +5,11 @@ import type {
   ICompletePaymentRequest,
   ICreateOrderRequest,
   ICreateOrderResponse,
+  ICreateRefundRequest,
   IOrder,
   ITicket,
+  ITicketCheckInRequest,
+  ITransferTicketRequest,
   OrderStatus,
   TicketStatus,
 } from './types';
@@ -141,4 +144,36 @@ export async function fetchTicketByCode(code: string): Promise<ITicket | null> {
   } catch {
     return null;
   }
+}
+
+/** POST /api/orders/tickets/transfer */
+export async function transferTicket(payload: ITransferTicketRequest): Promise<ITicket> {
+  const r = await apiClient.post<Record<string, unknown>>(
+    '/api/orders/tickets/transfer',
+    payload,
+  );
+  return normalizeTicket((r.result ?? {}) as Record<string, unknown>);
+}
+
+/** POST /api/orders/refunds */
+export async function createRefund(payload: ICreateRefundRequest): Promise<void> {
+  await apiClient.post('/api/orders/refunds', payload);
+}
+
+/** POST /api/orders/tickets/validate — проверка кода без погашения */
+export async function validateTicket(payload: ITicketCheckInRequest): Promise<ITicket> {
+  const r = await apiClient.post<Record<string, unknown>>(
+    '/api/orders/tickets/validate',
+    payload,
+  );
+  return normalizeTicket((r.result ?? {}) as Record<string, unknown>);
+}
+
+/** POST /api/orders/tickets/check-in — погасить билет на входе */
+export async function checkInTicket(payload: ITicketCheckInRequest): Promise<ITicket> {
+  const r = await apiClient.post<Record<string, unknown>>(
+    '/api/orders/tickets/check-in',
+    payload,
+  );
+  return normalizeTicket((r.result ?? {}) as Record<string, unknown>);
 }

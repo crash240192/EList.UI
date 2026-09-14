@@ -54,3 +54,20 @@ export interface ICompletePaymentRequest {
   orderId?: string;
   providerPaymentId?: string;
 }
+
+export interface ITransferTicketRequest {
+  ticketId?: string;
+  code?: string;
+  newHolderAccountId: string;
+}
+
+export interface ICreateRefundRequest {
+  orderId: string;
+  ticketIds?: string[];
+  reason?: string;
+}
+
+export interface ITicketCheckInRequest {
+  eventId: string;
+  code: string;
+}

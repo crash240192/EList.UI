@@ -69,12 +69,37 @@ export function BuyTicketModal({
         onClose();
         return;
       }
-      setPendingPay({
+
+      const pending = {
         orderId: result.order.id,
         providerPaymentId: result.providerPaymentId,
         amountTotal: result.order.amountTotal || total,
         currency: result.order.currency || 'RUB',
-      });
+      };
+
+      // Сохраняем для /payments/return (реальный провайдер / stub returnUrl).
+      try {
+        sessionStorage.setItem('elist_pending_payment', JSON.stringify(pending));
+      } catch { /* ignore */ }
+
+      const confirmationUrl = result.confirmationUrl?.trim() || null;
+      if (confirmationUrl) {
+        let useInAppStub = false;
+        try {
+          const url = new URL(confirmationUrl, window.location.origin);
+          useInAppStub = url.searchParams.get('stub') === '1'
+            || url.pathname.includes('/payments/return');
+        } catch {
+          useInAppStub = false;
+        }
+        if (!useInAppStub) {
+          window.location.assign(confirmationUrl);
+          return;
+        }
+      }
+
+      // Stub / локальный return: виджет-заглушка с completePayment.
+      setPendingPay(pending);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось создать заказ');
     } finally {

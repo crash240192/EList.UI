@@ -1873,6 +1873,11 @@ export default function CreateEventPage() {
                   }
                 />
               )}
+              {(parseFloat(form.cost) || 0) > 0 && !form.ticketsEnabled && (
+                <p className={styles.fieldHint}>
+                  Без продажи билетов стоимость показывается как «на месте» — запись свободная, оплата у организатора.
+                </p>
+              )}
             </div>
 
             {/* Список участников: чёрный (по умолчанию) или белый (для приватных) */}
@@ -1993,7 +1998,12 @@ export default function CreateEventPage() {
             <div className={styles.previewPriceRow}>
               {parseFloat(form.cost) === 0
                 ? <div className={styles.previewFree}>Бесплатно</div>
-                : <div className={styles.previewCost}>{parseFloat(form.cost).toLocaleString('ru-RU')} ₽</div>}
+                : (
+                  <div className={styles.previewCost}>
+                    {parseFloat(form.cost).toLocaleString('ru-RU')} ₽
+                    {!form.ticketsEnabled ? ' · на месте' : ''}
+                  </div>
+                )}
             </div>
           </div>
         </div>

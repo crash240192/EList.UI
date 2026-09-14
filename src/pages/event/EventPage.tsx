@@ -42,7 +42,7 @@ import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialo
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
-import { BuyTicketModal } from '@/features/tickets';
+import { BuyTicketModal, TicketCheckInPanel } from '@/features/tickets';
 import { ContentReportModal, EventModerationStrip, OrganizerReportsModal, useOrganizerReportsCount } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import heroStyles from '@/shared/styles/hero.module.css';
@@ -825,8 +825,12 @@ export default function EventPage() {
               <div className={styles.heroTagsRight}>
                 {cost === 0 ? (
                   <span className={styles.tagFree}>Бесплатно</span>
-                ) : (
+                ) : ticketsEnabled ? (
                   <span className={styles.tagPaid}>{cost.toLocaleString('ru-RU')} ₽</span>
+                ) : (
+                  <span className={styles.tagPaid} title="Оплата на месте у организатора">
+                    {cost.toLocaleString('ru-RU')} ₽ · на месте
+                  </span>
                 )}
                 <span className={styles.tagAge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
                 {event.parameters?.private && (
@@ -928,7 +932,7 @@ export default function EventPage() {
                         setBuyTicketOpen(true);
                       }}
                     >
-                      Купить билет
+                      {cost <= 0 ? 'Получить билет' : 'Купить билет'}
                     </Button>
                   </div>
                 )}
@@ -1075,6 +1079,10 @@ export default function EventPage() {
                   </button>
                 )}
               </AccessDeniedGate>
+            )}
+
+            {isOrganizer && ticketsEnabled && id && (
+              <TicketCheckInPanel eventId={id} />
             )}
 
             <EventAlbums

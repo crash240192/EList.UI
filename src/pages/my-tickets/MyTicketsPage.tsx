@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  createRefund,
   fetchMyTickets,
+  transferTicket,
   TICKET_STATUS_LABELS,
   type ITicket,
   type TicketStatus,
@@ -26,6 +28,8 @@ const STATUS_CLASS: Partial<Record<TicketStatus, string>> = {
   Void: styles.statusVoid,
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export default function MyTicketsPage() {
   usePageTitle('Мои билеты');
   const navigate = useNavigate();
@@ -38,6 +42,8 @@ export default function MyTicketsPage() {
     ticket: TicketRow;
     action: 'refund' | 'gift';
   } | null>(null);
+  const [giftAccountId, setGiftAccountId] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,6 +83,46 @@ export default function MyTicketsPage() {
     }),
     [tickets],
   );
+
+  const closeAction = () => {
+    if (busy) return;
+    setActionTicket(null);
+    setGiftAccountId('');
+  };
+
+  const confirmAction = async () => {
+    if (!actionTicket || busy) return;
+    const { ticket, action } = actionTicket;
+    setBusy(true);
+    try {
+      if (action === 'refund') {
+        await createRefund({
+          orderId: ticket.orderId,
+          ticketIds: [ticket.id],
+          reason: 'Возврат пользователем из «Мои билеты»',
+        });
+        toast('Запрос на возврат отправлен', 'success');
+      } else {
+        const holderId = giftAccountId.trim();
+        if (!UUID_RE.test(holderId)) {
+          toast('Укажите UUID аккаунта получателя', 'error');
+          return;
+        }
+        await transferTicket({
+          ticketId: ticket.id,
+          newHolderAccountId: holderId,
+        });
+        toast('Билет передан', 'success');
+      }
+      setActionTicket(null);
+      setGiftAccountId('');
+      await load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось выполнить действие', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className={styles.page}>
@@ -134,16 +180,19 @@ export default function MyTicketsPage() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        disabled={!canAct}
+                        disabled={!canAct || busy}
                         title={canAct ? undefined : 'Доступно только для активных билетов'}
-                        onClick={() => setActionTicket({ ticket, action: 'gift' })}
+                        onClick={() => {
+                          setGiftAccountId('');
+                          setActionTicket({ ticket, action: 'gift' });
+                        }}
                       >
                         Подарить
                       </Button>
                       <Button
                         size="sm"
                         variant="danger"
-                        disabled={!canAct}
+                        disabled={!canAct || busy}
                         title={canAct ? undefined : 'Доступно только для активных билетов'}
                         onClick={() => setActionTicket({ ticket, action: 'refund' })}
                       >
@@ -167,23 +216,28 @@ export default function MyTicketsPage() {
           }
           message={
             actionTicket.action === 'refund'
-              ? 'Возврат билетов скоро будет доступен. API возврата пока не подключено.'
-              : 'Передача билета другому пользователю скоро будет доступна.'
+              ? 'Будет создан возврат для этого билета. Статус обновится после подтверждения оплаты (stub/webhook).'
+              : 'Укажите UUID аккаунта получателя. Владелец билета сменится, покупатель заказа останется прежним.'
           }
-          confirmLabel="Понятно"
-          hideCancel
-          variant="accent"
-          onConfirm={() => {
-            toast(
-              actionTicket.action === 'refund'
-                ? 'Возврат билетов появится позже'
-                : 'Передача билетов появится позже',
-              'info',
-            );
-            setActionTicket(null);
-          }}
-          onCancel={() => setActionTicket(null)}
-        />
+          confirmLabel={busy ? '…' : actionTicket.action === 'refund' ? 'Вернуть' : 'Передать'}
+          cancelLabel="Отмена"
+          variant={actionTicket.action === 'refund' ? 'danger' : 'accent'}
+          onConfirm={() => { void confirmAction(); }}
+          onCancel={closeAction}
+        >
+          {actionTicket.action === 'gift' && (
+            <label className={styles.giftField}>
+              <span>UUID получателя</span>
+              <input
+                value={giftAccountId}
+                onChange={e => setGiftAccountId(e.target.value)}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                disabled={busy}
+                autoComplete="off"
+              />
+            </label>
+          )}
+        </ConfirmDialog>
       )}
     </div>
   );

@@ -8,6 +8,9 @@ export type {
   ICreateOrderRequest,
   ICreateOrderResponse,
   ICompletePaymentRequest,
+  ITransferTicketRequest,
+  ICreateRefundRequest,
+  ITicketCheckInRequest,
 } from './types';
 
 export {
@@ -17,6 +20,10 @@ export {
   fetchOrderById,
   fetchMyTickets,
   fetchTicketByCode,
+  transferTicket,
+  createRefund,
+  validateTicket,
+  checkInTicket,
 } from './api';
 
 export {
