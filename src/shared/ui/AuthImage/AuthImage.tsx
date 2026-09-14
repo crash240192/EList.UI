@@ -226,8 +226,14 @@ function AuthImageProgressiveFull({
 
   const layerFitStyle: React.CSSProperties =
     imageFit === 'cover'
-      ? { objectFit: 'cover', width: '100%', height: '100%', maxHeight: 'none' }
-      : { objectFit: 'contain' };
+      ? {
+          objectFit: 'cover',
+          objectPosition: style?.objectPosition,
+          width: '100%',
+          height: '100%',
+          maxHeight: 'none',
+        }
+      : { objectFit: 'contain', objectPosition: style?.objectPosition };
 
   const needsPreloader = loading && !fullUrl && !(error && previewUrl);
   const showPreloader = useDelayedVisible(needsPreloader, preloaderDelayMs);

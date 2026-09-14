@@ -4,6 +4,8 @@
 // Базовый путь: /api/events  (из swagger)
 // ============================================================
 
+import { parseCoverFocusFromRecord } from '@/shared/lib/coverFocus';
+import { loadCoverFocusFromFile } from './coverFocusApi';
 import { apiClient } from '@/shared/api/client';
 import type { CommandResult, PagedList } from '@/shared/api/types';
 import type {
@@ -36,6 +38,10 @@ export async function fetchEvents(
       ...ev,
       eventTypes: ev.Types ?? ev.types ?? ev.eventTypes ?? [],
       eventType:  ev.eventType ?? (ev.Types ?? ev.types ?? ev.eventTypes)?.[0] ?? null,
+      coverImageId: ev.coverImageId ?? ev.CoverImageId ?? null,
+      coverUrl: ev.coverUrl ?? ev.CoverUrl ?? null,
+      coverFocusX: parseCoverFocusFromRecord(ev)?.x ?? null,
+      coverFocusY: parseCoverFocusFromRecord(ev)?.y ?? null,
     }));
   }
   return paged;
@@ -80,12 +86,23 @@ export async function fetchEventById(id: string): Promise<IEvent> {
   const data = await apiClient.get<IEvent>(`/api/events/get/${id}`);
   const ev: any = data.result;
   const cancelSourceRaw = ev.cancelSource ?? ev.CancelSource ?? null;
+  const coverImageId = ev.coverImageId ?? ev.CoverImageId ?? null;
+  let focus = parseCoverFocusFromRecord(ev);
+  if (!focus && coverImageId) {
+    try {
+      focus = await loadCoverFocusFromFile(String(coverImageId));
+    } catch {
+      focus = null;
+    }
+  }
   return {
     ...ev,
     eventTypes: ev.Types ?? ev.types ?? ev.eventTypes ?? [],
     eventType:  ev.eventType ?? (ev.Types ?? ev.types ?? ev.eventTypes)?.[0] ?? null,
-    coverImageId: ev.coverImageId ?? ev.CoverImageId ?? null,
+    coverImageId,
     coverUrl: ev.coverUrl ?? ev.CoverUrl ?? null,
+    coverFocusX: focus?.x ?? null,
+    coverFocusY: focus?.y ?? null,
     cancelledAt: ev.cancelledAt ?? ev.CancelledAt ?? null,
     cancelledByAccountId: ev.cancelledByAccountId ?? ev.CancelledByAccountId ?? null,
     cancelSource: typeof cancelSourceRaw === 'string' && cancelSourceRaw

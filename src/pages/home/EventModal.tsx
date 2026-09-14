@@ -7,6 +7,7 @@ import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
+import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
 import styles from './EventModal.module.css';
@@ -30,6 +31,7 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
   const maxPersons = event.parameters?.maxPersonsCount;
   const gender     = event.parameters?.allowedGender;
   const hasCover   = !!(event.coverImageId || event.coverUrl);
+  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
 
   const hasLimits = isPrivate || maxPersons || gender;
 
@@ -43,9 +45,10 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
           style={{ background: hasCover ? '#111' : getEventCoverBackground(event) }}>
           {event.coverImageId ? (
             <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg}
-              fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} /> : undefined} />
+              style={focusStyle}
+              fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} /> : undefined} />
           ) : event.coverUrl ? (
-            <img src={event.coverUrl} alt={event.name} className={styles.coverImg} />
+            <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} />
           ) : null}
           <div className={styles.coverGrad} />
 
