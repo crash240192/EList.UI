@@ -134,7 +134,7 @@ npm run lint     # ESLint
 ## 6. Статус реализации
 
 > Продуктовое описание и актуальный чеклист живут в backend-репо:  
-> `elist.api` → [`docs/SERVICE.md`](https://github.com/crash240192/elist.api/blob/develop/docs/SERVICE.md), [`docs/production-readiness-checklist.md`](https://github.com/crash240192/elist.api/blob/develop/docs/production-readiness-checklist.md).  
+> `EList.API` → [`docs/SERVICE.md`](https://github.com/crash240192/EList.API/blob/cursor/service-docs-checklist-b9b4/docs/SERVICE.md) (после мержа — ветка `develop`), [`docs/production-readiness-checklist.md`](https://github.com/crash240192/EList.API/blob/cursor/service-docs-checklist-b9b4/docs/production-readiness-checklist.md).  
 > **Этот PLAN.md не обновляется автоматически при коммитах.**
 
 ### ✅ Реализовано (UI)
