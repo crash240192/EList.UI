@@ -8,7 +8,7 @@ import {
 } from '@/shared/auth/unauthorized';
 import { cookies } from '@/shared/lib/cookies';
 import type { CommandResult } from './types';
-import { isAccessDeniedApiCode } from './errorCodes';
+import { isAccessDeniedApiCode, isAgreementNotFoundCode } from './errorCodes';
 
 export const COOKIE_CLIENT_HASH = 'elist_client_hash';
 export const COOKIE_AUTH_TOKEN  = 'elist_auth_token';
@@ -19,7 +19,8 @@ export class ApiError extends Error {
   constructor(
     public readonly code: number,
     message: string,
-    public readonly serverMessage: string | null = null
+    public readonly serverMessage: string | null = null,
+    public readonly missingDocuments: string[] | null = null,
   ) { super(message); this.name = 'ApiError'; }
 }
 
@@ -77,7 +78,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
       if (shouldForceLogoutForApi(path, hadAuthToken)) notifyUnauthorized();
       throw new ApiError(401, 'Необходима авторизация');
     }
-    if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+    if (!response.ok) {
+      // ReConsentMiddleware отвечает 403 + JSON { errorCode, missingDocuments }.
+      try {
+        const errBody = await response.json() as {
+          errorCode?: number;
+          message?: string | null;
+          missingDocuments?: string[];
+        };
+        const code = errBody.errorCode ?? response.status;
+        const msg = errBody.message || `HTTP ${response.status}: ${response.statusText}`;
+        if (isAgreementNotFoundCode(code)) {
+          window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
+            detail: { missingDocuments: errBody.missingDocuments ?? [] },
+          }));
+        }
+        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null);
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+        throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
     const data: CommandResult<T> = await response.json();
     if (!data.success) {
       const code = data.errorCode ?? 0;
@@ -86,8 +107,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
         notifyUnauthorized();
       }
       // Ошибки доступа показываем в UI блока/страницы, без тоста
-      if (data.message && !isAccessDeniedApiCode(code)) onApiError?.(data.message);
-      throw new ApiError(code, msg, data.message);
+      if (data.message && !isAccessDeniedApiCode(code) && !isAgreementNotFoundCode(code)) {
+        onApiError?.(data.message);
+      }
+      if (isAgreementNotFoundCode(code)) {
+        window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
+          detail: { missingDocuments: (data as { missingDocuments?: string[] }).missingDocuments ?? [] },
+        }));
+      }
+      throw new ApiError(
+        code,
+        msg,
+        data.message,
+        (data as { missingDocuments?: string[] }).missingDocuments ?? null,
+      );
     }
     return data;
   });
@@ -114,7 +147,27 @@ async function requestWithClientJwtOnly<T>(
       if (shouldForceLogoutForApi(path, hadAuthToken)) notifyUnauthorized();
       throw new ApiError(401, 'Необходима авторизация');
     }
-    if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+    if (!response.ok) {
+      // ReConsentMiddleware отвечает 403 + JSON { errorCode, missingDocuments }.
+      try {
+        const errBody = await response.json() as {
+          errorCode?: number;
+          message?: string | null;
+          missingDocuments?: string[];
+        };
+        const code = errBody.errorCode ?? response.status;
+        const msg = errBody.message || `HTTP ${response.status}: ${response.statusText}`;
+        if (isAgreementNotFoundCode(code)) {
+          window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
+            detail: { missingDocuments: errBody.missingDocuments ?? [] },
+          }));
+        }
+        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null);
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+        throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
     const data: CommandResult<T> = await response.json();
     if (!data.success) {
       const code = data.errorCode ?? 0;
@@ -122,8 +175,20 @@ async function requestWithClientJwtOnly<T>(
       if (shouldForceLogoutForApi(path, hadAuthToken) && isUnauthorizedApiErrorCode(code)) {
         notifyUnauthorized();
       }
-      if (data.message && !isAccessDeniedApiCode(code)) onApiError?.(data.message);
-      throw new ApiError(code, msg, data.message);
+      if (data.message && !isAccessDeniedApiCode(code) && !isAgreementNotFoundCode(code)) {
+        onApiError?.(data.message);
+      }
+      if (isAgreementNotFoundCode(code)) {
+        window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
+          detail: { missingDocuments: (data as { missingDocuments?: string[] }).missingDocuments ?? [] },
+        }));
+      }
+      throw new ApiError(
+        code,
+        msg,
+        data.message,
+        (data as { missingDocuments?: string[] }).missingDocuments ?? null,
+      );
     }
     return data;
   });

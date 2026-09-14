@@ -2,7 +2,7 @@
 // Двухшаговая регистрация:
 //   Шаг 1 — логин, пароль, контакт, город + согласия (Consent / Agreement)
 //   Шаг 2 — ФИО, пол, дата рождения (обязательна, возраст ≥ 14)
-//   Финал — createAccount → login → agree ×2 → setPersonInfo → /activate или /
+//   Финал — createAccount(acceptConsent/Agreement) → login → agree fallback → setPersonInfo → /activate или /
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +14,7 @@ import {
 } from '@/features/auth/registrationApi';
 import { login } from '@/features/auth/api';
 import { storeActivationNotice } from '@/features/auth/activationNotice';
-import { useAuthStore } from '@/app/store';
+import { useAuthStore, useToastStore } from '@/app/store';
 import { useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
@@ -91,6 +91,7 @@ export default function RegisterPage() {
   usePageTitle('Регистрация');
   const navigate    = useNavigate();
   const { setAuth } = useAuthStore();
+  const toast = useToastStore(s => s.add);
 
   const [step, setStep]         = useState<1 | 2>(1);
   const [loading, setLoading]   = useState(false);
@@ -246,6 +247,9 @@ export default function RegisterPage() {
         showContact:               true,
         latitude:  finalCoords?.lat ?? undefined,
         longitude: finalCoords?.lng ?? undefined,
+        // Backend сохраняет Consent/Agreement в той же TX create — флаги обязательны.
+        acceptConsent:             true,
+        acceptAgreement:           true,
       });
 
       const authResult = await login(savedCreds.login
@@ -253,8 +257,9 @@ export default function RegisterPage() {
         : { login: form1.login.trim(), password: form1.password });
       setAuth(authResult.token, authResult.activationRequired);
 
-      await agreeDocument(DocumentType.Consent);
-      await agreeDocument(DocumentType.Agreement);
+      // Согласия уже пишутся в create; повторный agree — мягкий fallback (не валим регистрацию).
+      await agreeDocument(DocumentType.Consent).catch(() => undefined);
+      await agreeDocument(DocumentType.Agreement).catch(() => undefined);
 
       const personPayload = {
         firstName:  form2.firstName.trim()  || undefined,
@@ -281,7 +286,17 @@ export default function RegisterPage() {
       }
 
       if (hasPersonData) {
-        await setPersonInfo(personPayload).catch(() => { /* не критично */ });
+        try {
+          await setPersonInfo(personPayload);
+        } catch (personErr) {
+          // Аккаунт уже создан — не откатываем регистрацию, но не скрываем сбой профиля.
+          toast(
+            personErr instanceof Error
+              ? `Аккаунт создан, но профиль не сохранён: ${personErr.message}`
+              : 'Аккаунт создан, но профиль не сохранён. Заполните данные в настройках.',
+            'error',
+          );
+        }
       }
 
       navigate('/', { replace: true });

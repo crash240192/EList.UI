@@ -10,6 +10,8 @@ export interface CommandResult<T = void> {
   message: string | null;
   stackTrace: string | null;
   result: T;
+  /** Заполняется ReConsentMiddleware при 403 AgreementNotFound */
+  missingDocuments?: string[];
 }
 
 /** Пагинированный список */

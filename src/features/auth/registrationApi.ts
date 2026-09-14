@@ -24,6 +24,10 @@ export interface ICreateAccountRequest {
   showContact: boolean;
   latitude?: number;
   longitude?: number;
+  /** Обязательно: согласие на обработку ПДн (Consent). Policy галочкой не передаём. */
+  acceptConsent: boolean;
+  /** Обязательно: согласие с пользовательским соглашением (Agreement). */
+  acceptAgreement: boolean;
 }
 
 export interface IPersonRequest {
