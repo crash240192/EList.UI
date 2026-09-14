@@ -48,6 +48,7 @@ import { ContentReportModal, EventModerationStrip, OrganizerReportsModal, useOrg
 import { ReportTargetType } from '@/entities/contentReport';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
+  calcEventPageCollapsedHeroHeight,
   calcEventPageExpandedHeroHeight,
   calcEventPageHeroHeight,
   EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
@@ -219,6 +220,7 @@ export default function EventPage() {
   const reportMenuRef = useRef<HTMLButtonElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedHeroHeight, setExpandedHeroHeight] = useState(EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
+  const [heroWidth, setHeroWidth] = useState(0);
   const [coverNaturalSize, setCoverNaturalSize] = useState<CoverNaturalSize | null>(null);
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
@@ -322,8 +324,10 @@ export default function EventPage() {
     if (!hero || !event) return;
 
     const syncWidth = () => {
+      const width = hero.offsetWidth;
+      setHeroWidth(width);
       setExpandedHeroHeight(
-        calcEventPageExpandedHeroHeight(hero.offsetWidth, {
+        calcEventPageExpandedHeroHeight(width, {
           hasCover: !!(event.coverImageId || event.coverUrl),
           coverNaturalSize,
         }),
@@ -636,9 +640,11 @@ export default function EventPage() {
   };
 
   const coverFocusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const collapsedHeroHeight = calcEventPageCollapsedHeroHeight(heroWidth, hasCover);
   const heroHeight = calcEventPageHeroHeight(
     expandedHeroHeight,
     hasCover ? heroCollapse : 1,
+    collapsedHeroHeight,
   );
 
   // Участники: текущий пользователь — первым

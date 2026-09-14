@@ -68,7 +68,8 @@ export function parseCoverFocusFromContext(context: string | null | undefined): 
 
 export function serializeCoverFocusContext(focus: CoverFocus): string {
   const f = normalizeCoverFocus(focus);
-  return `${CONTEXT_PREFIX}${JSON.stringify({ coverFocusX: f.x, coverFocusY: f.y })}`;
+  // Filestorage attachContext requires a pure JSON object (JObject.Parse).
+  return JSON.stringify({ coverFocusX: f.x, coverFocusY: f.y });
 }
 
 export function coverFocusEventPayload(focus: CoverFocus): Record<string, number> {
