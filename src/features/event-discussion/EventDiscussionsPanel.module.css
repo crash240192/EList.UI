@@ -159,6 +159,22 @@
   min-height: 120px;
 }
 
+@media (max-width: 639px) {
+  .panel {
+    gap: 10px;
+  }
+
+  .tabsRow {
+    gap: 6px;
+    padding-bottom: 6px;
+  }
+
+  .tab {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+}
+
 .empty {
   margin: 0;
   font-size: 14px;

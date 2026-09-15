@@ -1,9 +1,9 @@
 .thread {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   position: relative;
-  padding-bottom: 8px;
+  padding-bottom: 6px;
 }
 
 .replyScrollTail {
@@ -19,13 +19,13 @@
   position: sticky;
   bottom: 0;
   z-index: 15;
-  padding-top: 10px;
+  padding-top: 6px;
   background: linear-gradient(to bottom, transparent 0%, var(--surface) 28%);
 }
 
 .fab {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: none;
   background: var(--accent);
@@ -34,7 +34,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
   transition: transform 0.15s, filter 0.15s;
 }
 
@@ -46,7 +46,7 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .skeletonStatus {
@@ -77,12 +77,12 @@
 
 .moreBtn {
   align-self: center;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface-2, var(--bg-secondary));
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -96,9 +96,29 @@
 }
 
 .moreBtnLoading {
-  min-width: 160px;
-  min-height: 38px;
+  min-width: 140px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+@media (max-width: 639px) {
+  .thread {
+    gap: 8px;
+    padding-bottom: 4px;
+  }
+
+  .composerDock {
+    padding-top: 4px;
+  }
+
+  .fab {
+    width: 40px;
+    height: 40px;
+  }
+
+  .list {
+    gap: 3px;
+  }
 }

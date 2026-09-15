@@ -18,8 +18,8 @@ export function scrollDiscussionMessageIntoView(
   return true;
 }
 
-const DEFAULT_COMPOSER_HEIGHT = 220;
-const MOBILE_COMPOSER_HEIGHT_ESTIMATE = 168;
+const DEFAULT_COMPOSER_HEIGHT = 180;
+const MOBILE_COMPOSER_HEIGHT_ESTIMATE = 140;
 const REPLY_GAP_PX = 16;
 const NARROW_REPLY_MEDIA = '(max-width: 639px)';
 
