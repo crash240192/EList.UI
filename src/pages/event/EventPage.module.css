@@ -550,9 +550,7 @@
     color-mix(in srgb, var(--accent) 20%, var(--border) 80%)
   );
 }
-.descToggleBody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-.descToggleTitle { font-size:12px; font-weight:600; color:var(--accent); }
-.descToggleHint { font-size:11px; color:var(--text-muted); }
+.descToggleTitle { flex:1; min-width:0; font-size:12px; font-weight:600; color:var(--accent); }
 .descToggle svg { flex-shrink:0; color:var(--accent); }
 
 /* Details cards */

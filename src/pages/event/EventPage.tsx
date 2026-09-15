@@ -1037,13 +1037,8 @@ export default function EventPage() {
                 aria-expanded={descExpanded}
               >
                 <span className={styles.descToggleLine} aria-hidden />
-                <span className={styles.descToggleBody}>
-                  <span className={styles.descToggleTitle}>
-                    {descExpanded ? 'Свернуть' : 'Показать полностью'}
-                  </span>
-                  <span className={styles.descToggleHint}>
-                    {descExpanded ? 'Скрыть описание' : 'Развернуть описание'}
-                  </span>
+                <span className={styles.descToggleTitle}>
+                  {descExpanded ? 'Свернуть' : 'Показать полностью'}
                 </span>
                 {descExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
               </button>
