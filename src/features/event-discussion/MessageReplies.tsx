@@ -8,6 +8,7 @@ import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import { useDiscussionRefreshActions } from './discussionRefreshContext';
 import {
+  DISCUSSION_REPLY_PREVIEW_COUNT,
   DISCUSSION_TREE_INDENT_CAP,
   type DiscussionViewMode,
 } from './discussionViewMode';
@@ -52,6 +53,8 @@ export function MessageReplies({
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Под корнем сначала показываем превью, остальное — по кнопке */
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const pageRef = useRef(0);
 
   const byId = useMemo(() => {
@@ -86,6 +89,7 @@ export function MessageReplies({
 
   useEffect(() => {
     pageRef.current = 0;
+    setPreviewExpanded(false);
     setLoading(true);
     const request = viewMode === 'flat' ? loadFlat() : loadTreePage(0, false);
     void request
@@ -117,8 +121,18 @@ export function MessageReplies({
   }, [onDeleted, onTotalLoaded, parent.id, resetBump, viewMode]);
 
   const childDepth = depth + 1;
+  /** Лента всегда с отступом (как YouTube); в дереве — с потолком глубины */
+  const nestIndent = viewMode === 'flat' || childDepth <= DISCUSSION_TREE_INDENT_CAP;
+  const usePreview = depth === 0;
+  const visibleItems =
+    usePreview && !previewExpanded
+      ? items.slice(0, DISCUSSION_REPLY_PREVIEW_COUNT)
+      : items;
+  const hiddenTotal =
+    usePreview && !previewExpanded
+      ? Math.max(0, total - DISCUSSION_REPLY_PREVIEW_COUNT)
+      : 0;
   const remaining = Math.max(0, total - items.length);
-  const nestIndent = viewMode === 'tree' && childDepth <= DISCUSSION_TREE_INDENT_CAP;
 
   const showRepliesSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
   const showMoreSpinner = useDelayedBusy(loadingMore, DISCUSSION_PRELOADER_DELAY_MS);
@@ -141,7 +155,7 @@ export function MessageReplies({
 
   return (
     <div className={nestIndent ? styles.list : styles.listFlush}>
-      {items.map((msg) => {
+      {visibleItems.map((msg) => {
         const parentMsg = msg.replyTo ? byId.get(msg.replyTo) : undefined;
         const replyToAuthor =
           viewMode === 'flat' &&
@@ -168,7 +182,16 @@ export function MessageReplies({
           />
         );
       })}
-      {hasMore && viewMode === 'tree' && (
+      {hiddenTotal > 0 && (
+        <button
+          type="button"
+          className={styles.moreBtn}
+          onClick={() => setPreviewExpanded(true)}
+        >
+          {`Ещё ответы (${hiddenTotal})`}
+        </button>
+      )}
+      {(previewExpanded || !usePreview) && hasMore && viewMode === 'tree' && (
         <button
           type="button"
           className={`${styles.moreBtn} ${loadingMore && showMoreSpinner ? styles.moreBtnLoading : ''}`}

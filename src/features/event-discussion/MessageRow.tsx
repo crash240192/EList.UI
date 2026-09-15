@@ -105,7 +105,8 @@ export function MessageRow({
   onDeleted,
 }: MessageRowProps) {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(message.replied);
+  /** Корень: сразу превью ответов; вложенные ветки — свёрнуты */
+  const [expanded, setExpanded] = useState(() => depth === 0 && Boolean(message.replied));
   const [textExpanded, setTextExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.messageText);
