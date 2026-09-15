@@ -276,7 +276,7 @@ function MessageThreadInner({
     setSheetOpen(true);
   }, []);
 
-  const handleSubmit = async (text: string) => {
+  const handleSubmit = async ({ text, fileIds }: { text: string; fileIds: string[] }) => {
     if (!currentAccountId) return;
     const replyToId = replyTarget?.id ?? null;
     await createMessage({
@@ -284,6 +284,7 @@ function MessageThreadInner({
       messageText: text,
       accountId: currentAccountId,
       replyTo: replyToId,
+      fileIds: fileIds.length ? fileIds : undefined,
     });
     if (replyToId) {
       bump(replyToId);

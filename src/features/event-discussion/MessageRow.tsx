@@ -12,6 +12,8 @@ import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
 import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { ImageLightbox } from '@/shared/ui/ImageLightbox';
 import { ContentReportModal } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import {
@@ -176,8 +178,10 @@ export function MessageRow({
     () => message.currentUserVote ?? null,
   );
   const [voting, setVoting] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   const replyBump = useDiscussionRefresh(message.id);
+  const fileIds = message.fileIds ?? [];
   const prevReplyBump = useRef(replyBump);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
   const isHidden = Boolean(message.hidden);
@@ -258,7 +262,7 @@ export function MessageRow({
   const saveEdit = async () => {
     const trimmed = editText.trim();
     const lengthErr = textLengthError(trimmed.length, DISCUSSION_MESSAGE_MAX_LENGTH);
-    if (!trimmed || !currentAccountId || savingEdit) return;
+    if ((!trimmed && fileIds.length === 0) || !currentAccountId || savingEdit) return;
     if (lengthErr) {
       setEditError(lengthErr);
       return;
@@ -276,6 +280,7 @@ export function MessageRow({
         messageText: trimmed,
         accountId: currentAccountId,
         replyTo: message.replyTo ?? null,
+        fileIds,
       });
       setDisplayText(trimmed);
       setEditing(false);
@@ -420,7 +425,11 @@ export function MessageRow({
                     <button
                     type="button"
                     className={styles.saveBtn}
-                    disabled={savingEdit || !editText.trim() || editText.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH}
+                    disabled={
+                      savingEdit
+                      || (!editText.trim() && fileIds.length === 0)
+                      || editText.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH
+                    }
                     onClick={() => void saveEdit()}
                   >
                     {savingEdit ? 'Сохранение…' : 'Сохранить'}
@@ -435,9 +444,11 @@ export function MessageRow({
                     в ответ <span className={styles.replyToName}>{replyToAuthor}</span>
                   </div>
                 )}
-                <p className={`${styles.text} ${isLongText && !textExpanded ? styles.textClamped : ''}`}>
-                  {displayText}
-                </p>
+                {displayText.trim() && (
+                  <p className={`${styles.text} ${isLongText && !textExpanded ? styles.textClamped : ''}`}>
+                    {displayText}
+                  </p>
+                )}
                 {isLongText && (
                   <button
                     type="button"
@@ -456,6 +467,22 @@ export function MessageRow({
                     </span>
                     {textExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
                   </button>
+                )}
+                {fileIds.length > 0 && (
+                  <div className={styles.gallery} role="list">
+                    {fileIds.map((fileId, index) => (
+                      <button
+                        key={fileId}
+                        type="button"
+                        className={styles.galleryItem}
+                        role="listitem"
+                        aria-label={`Фото ${index + 1}`}
+                        onClick={() => setLightboxIdx(index)}
+                      >
+                        <AuthImage fileId={fileId} alt="" className={styles.galleryImg} />
+                      </button>
+                    ))}
+                  </div>
                 )}
               </>
             )}
@@ -594,6 +621,15 @@ export function MessageRow({
           onReply={onReply}
           onDeleted={onDeleted}
           onTotalLoaded={setReplyTotal}
+        />
+      )}
+
+      {lightboxIdx != null && fileIds.length > 0 && (
+        <ImageLightbox
+          fileIds={fileIds}
+          startIndex={lightboxIdx}
+          alt="Фото из комментария"
+          onClose={() => setLightboxIdx(null)}
         />
       )}
     </div>

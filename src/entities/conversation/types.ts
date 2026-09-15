@@ -38,6 +38,8 @@ export interface IMessage {
   dislikesCount?: number;
   /** 'like' | 'dislike' | null */
   currentUserVote?: MessageVoteValue | null;
+  /** Вложения (file id из filestorage), до 10 */
+  fileIds?: string[];
 }
 
 export type MessageVoteValue = 'like' | 'dislike';
@@ -64,6 +66,8 @@ export interface IMessageRequest {
   accountId?: string | null;
   organizationId?: string | null;
   replyTo?: string | null;
+  /** Вложения (file id). Текст может быть пустым, если есть файлы. */
+  fileIds?: string[];
 }
 
 /** Узел пути root → target для deep-link из уведомлений */

@@ -10,6 +10,7 @@ import {
   deleteAlbum,
   type IAlbum,
 } from '@/entities/media/albumApi';
+import { canManageAlbum } from '@/entities/media/albumPermissions';
 import { AlbumFormModal } from '@/features/media/AlbumFormModal';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
@@ -306,7 +307,7 @@ export function EventAlbums({
         <AlbumCard
           key={a.id}
           album={a}
-          canManage={canManage}
+          canManage={canManageAlbum(a, { isOrganizer: canManage })}
           coverVersion={coverVersionByAlbumId[a.id] ?? 0}
           onOpen={() => openAlbum(a)}
           onEdit={() => setFormAlbum(a)}
@@ -324,7 +325,7 @@ export function EventAlbums({
       <AlbumGridModal
         open={gridAlbum !== null}
         album={gridAlbum}
-        canManage={canManage}
+        canManage={gridAlbum ? canManageAlbum(gridAlbum, { isOrganizer: canManage }) : false}
         isParticipating={isParticipating}
         onClose={handleCloseGrid}
         onChanged={bumpAlbumCover}
@@ -427,7 +428,7 @@ export function EventAlbums({
               <AlbumCard
                 key={a.id}
                 album={a}
-                canManage={canManage}
+                canManage={canManageAlbum(a, { isOrganizer: canManage })}
                 hideMeta
                 coverVersion={coverVersionByAlbumId[a.id] ?? 0}
                 onOpen={() => openAlbum(a)}
