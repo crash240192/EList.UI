@@ -44,7 +44,14 @@ import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
 import { BuyTicketModal, TicketCheckInPanel } from '@/features/tickets';
-import { ContentReportModal, EventModerationStrip, OrganizerReportsModal, useOrganizerReportsCount } from '@/features/content-reports';
+import {
+  ContentReportModal,
+  EventModerationDetailsModal,
+  EventModerationStrip,
+  OrganizerReportsModal,
+  useEventTargetModerationStats,
+  useOrganizerReportsCount,
+} from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
@@ -204,6 +211,7 @@ export default function EventPage() {
   const [coverReported, setCoverReported] = useState(false);
   const [reportedOrganizatorIds, setReportedOrganizatorIds] = useState<Set<string>>(() => new Set());
   const [organizerReportsOpen, setOrganizerReportsOpen] = useState(false);
+  const [moderationDetailsOpen, setModerationDetailsOpen] = useState(false);
   const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
   const [bwListOpen,      setBwListOpen]      = useState(false);
   const [mapModalOpen,    setMapModalOpen]    = useState(false);
@@ -237,11 +245,22 @@ export default function EventPage() {
     refetch: refetchOrganizers,
   } = useEventOrganizers(id, accountId);
 
+  const canSeeEventModeration = Boolean((isOrganizer || hasPlatformAccess) && id);
   const {
     count: organizerReportsCount,
     refresh: refreshOrganizerReportsCount,
     setCount: setOrganizerReportsCount,
   } = useOrganizerReportsCount(id, Boolean(isOrganizer && id));
+  const {
+    stats: eventModerationStats,
+    refresh: refreshEventModerationStats,
+    hasSignal: hasEventModerationSignal,
+    openCount: eventModerationOpenCount,
+  } = useEventTargetModerationStats(id, canSeeEventModeration);
+  const showReportsHeroChip = canSeeEventModeration && (
+    hasEventModerationSignal || organizerReportsCount > 0
+  );
+  const reportsHeroCount = Math.max(eventModerationOpenCount, organizerReportsCount);
 
   useEffect(() => {
     if (searchParams.get('organizerReports') !== '1') return;
@@ -857,6 +876,35 @@ export default function EventPage() {
                     {event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено'}
                   </span>
                 )}
+                {showReportsHeroChip && (
+                  <button
+                    type="button"
+                    className={styles.tagReports}
+                    onClick={() => {
+                      if (eventModerationStats) {
+                        setModerationDetailsOpen(true);
+                        return;
+                      }
+                      if (isOrganizer) setOrganizerReportsOpen(true);
+                    }}
+                    aria-label={
+                      reportsHeroCount > 0
+                        ? `Жалобы: ${reportsHeroCount}`
+                        : 'Жалобы и ограничения'
+                    }
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                      <line x1="4" y1="22" x2="4" y2="15" />
+                    </svg>
+                    Жалобы
+                    {reportsHeroCount > 0 && (
+                      <span className={styles.tagReportsCount}>
+                        {reportsHeroCount > 99 ? '99+' : reportsHeroCount}
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -993,7 +1041,7 @@ export default function EventPage() {
           </div>
         </div>
 
-        {(isOrganizer || hasPlatformAccess) && id && (
+        {canSeeEventModeration && id && (
           <EventModerationStrip
             eventId={id}
             isCancelled={!event.active}
@@ -1004,7 +1052,6 @@ export default function EventPage() {
               && !event.active
               && event.cancelSource === 'moderation'
             }
-            canRevokePenalties={hasPlatformAccess}
             onRestored={() => {
               setEvent(ev => ev
                 ? {
@@ -1016,6 +1063,7 @@ export default function EventPage() {
                   cancelledByAccountId: null,
                 }
                 : ev);
+              void refreshEventModerationStats();
             }}
           />
         )}
@@ -1200,6 +1248,16 @@ export default function EventPage() {
               setReportedOrganizatorIds(prev => new Set(prev).add(reportTarget.id));
             }
           }}
+        />
+      )}
+      {moderationDetailsOpen && eventModerationStats && (
+        <EventModerationDetailsModal
+          stats={eventModerationStats}
+          canRevokePenalties={hasPlatformAccess}
+          canOpenReportsList={isOrganizer}
+          onOpenReportsList={() => setOrganizerReportsOpen(true)}
+          onClose={() => setModerationDetailsOpen(false)}
+          onChanged={() => void refreshEventModerationStats()}
         />
       )}
       {organizerReportsOpen && event?.id && (
