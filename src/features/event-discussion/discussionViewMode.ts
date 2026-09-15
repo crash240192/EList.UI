@@ -10,9 +10,12 @@ export const DISCUSSION_TREE_INDENT_CAP = 4;
 /**
  * Сколько прямых ответов родителя показывать сразу;
  * остальные — кнопкой «Ещё ответы к этому комментарию».
- * (И для дерева на каждом уровне, и для превью ленты под корнем.)
+ * В дереве — на каждом уровне; в ленте — под корнем.
  */
 export const DISCUSSION_REPLY_PREVIEW_COUNT = 1;
+
+/** @deprecated alias — то же, что DISCUSSION_REPLY_PREVIEW_COUNT */
+export const DISCUSSION_FLAT_REPLY_PREVIEW_COUNT = DISCUSSION_REPLY_PREVIEW_COUNT;
 
 /** Размер страницы догрузки прямых детей в дереве */
 export const DISCUSSION_TREE_SIBLING_PAGE_SIZE = 5;

@@ -22,6 +22,17 @@
   min-width: 0;
 }
 
+.tabsTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-left: 10px;
+  margin-left: 2px;
+  border-left: 1px solid var(--border);
+  align-self: center;
+}
+
 .tabs {
   display: flex;
   flex-wrap: nowrap;
