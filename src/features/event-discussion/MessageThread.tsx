@@ -24,7 +24,6 @@ import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import {
-  DISCUSSION_VIEW_MODE_LABELS,
   DISCUSSION_VIEW_MODE_STORAGE_KEY,
   isDiscussionViewMode,
   type DiscussionViewMode,
@@ -258,18 +257,37 @@ function MessageThreadInner({
         <p className={styles.muted}>Пока нет комментариев. Будьте первым!</p>
       )}
       {!loading && messages.length > 0 && (
-        <div className={styles.viewModeBar} role="group" aria-label="Вид комментариев">
-          {(['tree', 'flat'] as DiscussionViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={`${styles.viewModeBtn} ${safeViewMode === mode ? styles.viewModeBtnActive : ''}`}
-              aria-pressed={safeViewMode === mode}
-              onClick={() => setViewMode(mode)}
-            >
-              {DISCUSSION_VIEW_MODE_LABELS[mode]}
-            </button>
-          ))}
+        <div className={styles.viewModeToggle} role="group" aria-label="Вид комментариев">
+          <button
+            type="button"
+            className={`${styles.viewModeIconBtn} ${safeViewMode === 'tree' ? styles.viewModeIconBtnActive : ''}`}
+            aria-pressed={safeViewMode === 'tree'}
+            aria-label="Дерево"
+            title="Дерево"
+            onClick={() => setViewMode('tree')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M6 4v7a3 3 0 0 0 3 3h3" />
+              <path d="M6 11a3 3 0 0 0 3 3h3" />
+              <circle cx="6" cy="4" r="2" fill="currentColor" stroke="none" />
+              <circle cx="15" cy="11" r="2" fill="currentColor" stroke="none" />
+              <circle cx="15" cy="17" r="2" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className={`${styles.viewModeIconBtn} ${safeViewMode === 'flat' ? styles.viewModeIconBtnActive : ''}`}
+            aria-pressed={safeViewMode === 'flat'}
+            aria-label="Лента"
+            title="Лента"
+            onClick={() => setViewMode('flat')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="8" y1="18" x2="20" y2="18" />
+            </svg>
+          </button>
         </div>
       )}
       {!loading && (
