@@ -1,7 +1,7 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cardReplyTarget {
@@ -20,7 +20,7 @@
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   transition: border-color 0.15s;
 }
 
@@ -54,7 +54,7 @@
 .cardInner {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 6px;
 }
 
 .avatar {
@@ -76,15 +76,15 @@
 }
 
 .avatarFallback {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   flex-shrink: 0;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: #fff;
 }
@@ -94,13 +94,13 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .head {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -179,10 +179,10 @@
 .textToggle {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  margin-top: 2px;
-  padding: 8px 0 8px 0;
+  margin-top: 1px;
+  padding: 4px 0;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -235,25 +235,30 @@
 .foot {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding-top: 4px;
+  gap: 4px;
+  padding-top: 2px;
 }
 
 .actionBtn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 10px;
+  gap: 3px;
+  height: 22px;
+  padding: 0 7px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   cursor: pointer;
   font-family: inherit;
   transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
+}
+
+.actionBtn svg {
+  width: 10px;
+  height: 10px;
 }
 
 .actionBtn:hover {
@@ -374,13 +379,13 @@
 }
 
 .moreBtn {
-  width: calc(100% - 10px);
-  height: 32px;
-  border-radius: 8px;
-  margin: 4px 0 0 10px;
+  width: calc(100% - 8px);
+  height: 28px;
+  border-radius: 6px;
+  margin: 2px 0 0 8px;
   background: none;
   border: 1px solid var(--border);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s;
@@ -395,4 +400,43 @@
 .moreBtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+@media (max-width: 639px) {
+  .card {
+    padding: 5px 6px;
+    border-radius: 6px;
+  }
+
+  .cardInner {
+    gap: 5px;
+  }
+
+  .author,
+  .authorBtn {
+    font-size: 12px;
+  }
+
+  .text,
+  .hiddenStub {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .foot {
+    gap: 3px;
+  }
+
+  .actionBtn {
+    height: 20px;
+    padding: 0 6px;
+    gap: 2px;
+    font-size: 10px;
+  }
+
+  .moreBtn {
+    height: 26px;
+    margin-left: 6px;
+    width: calc(100% - 6px);
+  }
 }

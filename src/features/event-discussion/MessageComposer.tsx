@@ -70,7 +70,7 @@ export function MessageComposer({
       <textarea
         ref={inputRef}
         className={styles.input}
-        rows={3}
+        rows={2}
         value={text}
         disabled={disabled || sending}
         placeholder={placeholder}

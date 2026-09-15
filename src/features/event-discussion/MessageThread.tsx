@@ -311,9 +311,9 @@ function MessageThreadInner({
         position: 'fixed',
         left:
           slot.width > 0
-            ? Math.min(slot.left + slot.width - 52 - 8, window.innerWidth - 60)
-            : window.innerWidth - 60,
-        bottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
+            ? Math.min(slot.left + slot.width - 44 - 6, window.innerWidth - 52)
+            : window.innerWidth - 52,
+        bottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
         zIndex: 499,
       }
     : undefined;

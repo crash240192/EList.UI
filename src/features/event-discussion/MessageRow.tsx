@@ -296,7 +296,7 @@ export function MessageRow({
                 accountId={accountId}
                 avatarId={message.account?.avatarId ?? null}
                 initials={initials}
-                size={36}
+                size={28}
                 className={styles.avatar}
               />
             </button>
