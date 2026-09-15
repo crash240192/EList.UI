@@ -10,13 +10,12 @@ import { useDiscussionRefreshActions } from './discussionRefreshContext';
 import {
   DISCUSSION_REPLY_PREVIEW_COUNT,
   DISCUSSION_TREE_INDENT_CAP,
+  DISCUSSION_TREE_SIBLING_PAGE_SIZE,
   type DiscussionViewMode,
 } from './discussionViewMode';
 import { loadDescendantReplies } from './loadDescendantReplies';
 import { messageAuthorName } from './messageUtils';
 import styles from './MessageReplies.module.css';
-
-const PAGE_SIZE = 5;
 
 interface MessageRepliesProps {
   parent: IMessage;
@@ -53,7 +52,7 @@ export function MessageReplies({
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Под корнем сначала показываем превью, остальное — по кнопке */
+  /** Превью прямых детей; остальные — вручную */
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const pageRef = useRef(0);
 
@@ -66,13 +65,13 @@ export function MessageReplies({
 
   const loadTreePage = useCallback(
     async (pageIndex: number, append: boolean) => {
-      const paged = await fetchMessageReplies(parent.id, pageIndex, PAGE_SIZE);
+      const paged = await fetchMessageReplies(parent.id, pageIndex, DISCUSSION_TREE_SIBLING_PAGE_SIZE);
       const nextItems = paged.result ?? [];
       const nextTotal = paged.total ?? 0;
       setItems((prev) => (append ? [...prev, ...nextItems] : nextItems));
       setTotal(nextTotal);
       onTotalLoaded?.(nextTotal);
-      setHasMore((pageIndex + 1) * PAGE_SIZE < nextTotal);
+      setHasMore((pageIndex + 1) * DISCUSSION_TREE_SIBLING_PAGE_SIZE < nextTotal);
       setError(null);
     },
     [parent.id, onTotalLoaded],
@@ -121,18 +120,37 @@ export function MessageReplies({
   }, [onDeleted, onTotalLoaded, parent.id, resetBump, viewMode]);
 
   const childDepth = depth + 1;
-  /** Лента всегда с отступом (как YouTube); в дереве — с потолком глубины */
+  /** Лента всегда с отступом; в дереве — с потолком глубины */
   const nestIndent = viewMode === 'flat' || childDepth <= DISCUSSION_TREE_INDENT_CAP;
-  const usePreview = depth === 0;
+  /**
+   * Превью одного прямого ребёнка:
+   * - дерево — на каждом уровне (веер вручную);
+   * - лента — только под корнем.
+   */
+  const useSiblingPreview = viewMode === 'tree' || depth === 0;
   const visibleItems =
-    usePreview && !previewExpanded
+    useSiblingPreview && !previewExpanded
       ? items.slice(0, DISCUSSION_REPLY_PREVIEW_COUNT)
       : items;
-  const hiddenTotal =
-    usePreview && !previewExpanded
+  const hiddenSiblingTotal =
+    useSiblingPreview && !previewExpanded
       ? Math.max(0, total - DISCUSSION_REPLY_PREVIEW_COUNT)
       : 0;
-  const remaining = Math.max(0, total - items.length);
+  const remainingUnloaded = Math.max(0, total - items.length);
+  const showPageMore =
+    viewMode === 'tree'
+    && hasMore
+    && (!useSiblingPreview || previewExpanded);
+
+  /**
+   * Автоцепочка: у родителя ровно один прямой ответ с продолжением —
+   * сразу раскрываем его (до развилки / конца).
+   */
+  const autoExpandChain =
+    viewMode === 'tree'
+    && total === 1
+    && items.length === 1
+    && Boolean(items[0]?.replied);
 
   const showRepliesSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
   const showMoreSpinner = useDelayedBusy(loadingMore, DISCUSSION_PRELOADER_DELAY_MS);
@@ -158,10 +176,10 @@ export function MessageReplies({
       {visibleItems.map((msg) => {
         const parentMsg = msg.replyTo ? byId.get(msg.replyTo) : undefined;
         const replyToAuthor =
-          viewMode === 'flat' &&
-          msg.replyTo &&
-          msg.replyTo !== threadRootId &&
-          parentMsg
+          viewMode === 'flat'
+          && msg.replyTo
+          && msg.replyTo !== threadRootId
+          && parentMsg
             ? messageAuthorName(parentMsg)
             : null;
 
@@ -177,21 +195,22 @@ export function MessageReplies({
             viewMode={viewMode}
             threadRootId={threadRootId}
             replyToAuthor={replyToAuthor}
+            autoExpandChain={autoExpandChain && msg.id === items[0]?.id}
             onReply={onReply}
             onDeleted={handleDeleted}
           />
         );
       })}
-      {hiddenTotal > 0 && (
+      {hiddenSiblingTotal > 0 && (
         <button
           type="button"
           className={styles.moreBtn}
           onClick={() => setPreviewExpanded(true)}
         >
-          {`Ещё ответы (${hiddenTotal})`}
+          {`Ещё ответы к этому комментарию (${hiddenSiblingTotal})`}
         </button>
       )}
-      {(previewExpanded || !usePreview) && hasMore && viewMode === 'tree' && (
+      {showPageMore && (
         <button
           type="button"
           className={`${styles.moreBtn} ${loadingMore && showMoreSpinner ? styles.moreBtnLoading : ''}`}
@@ -203,7 +222,7 @@ export function MessageReplies({
           {loadingMore && showMoreSpinner ? (
             <AppPreloader size="sm" layout="inline" role="none" />
           ) : (
-            `Загрузить ещё (${remaining})`
+            `Ещё ответы к этому комментарию (${remainingUnloaded})`
           )}
         </button>
       )}

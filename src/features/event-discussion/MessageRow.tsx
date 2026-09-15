@@ -36,6 +36,11 @@ interface MessageRowProps {
   threadRootId?: string;
   /** Подпись «в ответ …» в режиме ленты */
   replyToAuthor?: string | null;
+  /**
+   * Дерево: родитель имеет ровно одного ребёнка с продолжением —
+   * раскрываем цепочку сразу (до развилки).
+   */
+  autoExpandChain?: boolean;
   onReply?: (message: IMessage, threadRootId: string) => void;
   onDeleted?: (messageId: string) => void;
 }
@@ -101,12 +106,21 @@ export function MessageRow({
   viewMode = 'tree',
   threadRootId,
   replyToAuthor = null,
+  autoExpandChain = false,
   onReply,
   onDeleted,
 }: MessageRowProps) {
   const navigate = useNavigate();
-  /** Корень: сразу превью ответов; вложенные ветки — свёрнуты */
-  const [expanded, setExpanded] = useState(() => depth === 0 && Boolean(message.replied));
+  /**
+   * Корень ветки: сразу превью прямых ответов.
+   * Автоцепочка: единственный ребёнок с продолжением — раскрыт.
+   * Иначе вложенное свёрнуто до клика.
+   */
+  const [expanded, setExpanded] = useState(() => {
+    if (!message.replied) return false;
+    if (autoExpandChain) return true;
+    return depth === 0;
+  });
   const [textExpanded, setTextExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.messageText);
@@ -144,6 +158,10 @@ export function MessageRow({
     if (replyBump > prevReplyBump.current) setExpanded(true);
     prevReplyBump.current = replyBump;
   }, [replyBump]);
+
+  useEffect(() => {
+    if (autoExpandChain && message.replied) setExpanded(true);
+  }, [autoExpandChain, message.replied, message.id]);
 
   useEffect(() => {
     if (!hasReplies || expanded) return;
@@ -419,16 +437,11 @@ export function MessageRow({
       {canNestReplies && hasReplies && !expanded && (
         <button
           type="button"
-          className={styles.collapsedReplies}
+          className={styles.moreBtn}
           onClick={() => setExpanded(true)}
           aria-expanded={false}
         >
-          <span className={styles.collapsedRepliesLine} aria-hidden />
-          <span className={styles.collapsedRepliesBody}>
-            <span className={styles.collapsedRepliesCount}>{collapsedRepliesLabel}</span>
-            <span className={styles.collapsedRepliesHint}>Показать цепочку</span>
-          </span>
-          <ChevronDownIcon />
+          {collapsedRepliesLabel}
         </button>
       )}
 
