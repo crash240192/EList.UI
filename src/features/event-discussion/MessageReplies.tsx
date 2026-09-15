@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { IMessage } from '@/entities/conversation';
+import type { IMessage, IMessagePathNode } from '@/entities/conversation';
 import { fetchMessageReplies } from '@/entities/conversation';
 import { MessageRow } from './MessageRow';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
@@ -28,6 +28,10 @@ interface MessageRepliesProps {
   viewMode: DiscussionViewMode;
   /** Корень ветки (для ленты и чипа «в ответ») */
   threadRootId: string;
+  /** Путь от прямого ребёнка к цели deep-link */
+  focusPathTail?: IMessagePathNode[];
+  focusTargetId?: string | null;
+  onFocusHandled?: () => void;
   onReply?: (message: IMessage, threadRootId: string) => void;
   onDeleted?: (messageId: string) => void;
   onTotalLoaded?: (total: number) => void;
@@ -42,20 +46,27 @@ export function MessageReplies({
   currentAccountId,
   viewMode,
   threadRootId,
+  focusPathTail,
+  focusTargetId = null,
+  onFocusHandled,
   onReply,
   onDeleted,
   onTotalLoaded,
 }: MessageRepliesProps) {
   const { resetBump } = useDiscussionRefreshActions();
+  const focusChild = focusPathTail?.[0];
+  const focusInitialPage = focusChild?.pageIndex ?? 0;
   const [items, setItems] = useState<IMessage[]>([]);
   const [total, setTotal] = useState(0);
-  const [pageIndex, setPageIndex] = useState(0);
+  const [pageIndex, setPageIndex] = useState(focusInitialPage);
   const [loading, setLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** В ленте под корнем — превью первой порции */
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const requestGen = useRef(0);
+  const focusInitialPageRef = useRef(focusInitialPage);
+  focusInitialPageRef.current = focusInitialPage;
 
   const byId = useMemo(() => {
     const map = new Map<string, IMessage>();
@@ -137,14 +148,15 @@ export function MessageReplies({
   useEffect(() => {
     requestGen.current += 1;
     const generation = requestGen.current;
-    setPreviewExpanded(false);
-    setPageIndex(0);
+    setPreviewExpanded(Boolean(focusChild));
+    const startPage = Math.max(0, focusInitialPageRef.current);
+    setPageIndex(startPage);
     if (viewMode === 'flat') {
       void loadFlat(generation);
     } else {
-      void loadTreePage(0, generation, true);
+      void loadTreePage(startPage, generation, true);
     }
-  }, [loadFlat, loadTreePage, parent.id, refreshKey, viewMode]);
+  }, [loadFlat, loadTreePage, parent.id, refreshKey, viewMode, focusChild?.messageId]);
 
   const goToPage = useCallback((nextPage: number) => {
     if (viewMode === 'flat' || loading || pageLoading) return;
@@ -219,13 +231,16 @@ export function MessageReplies({
           && parentMsg
             ? messageAuthorName(parentMsg)
             : null;
+        const onFocusPath = Boolean(focusChild && focusChild.messageId === msg.id);
+        const childTail = onFocusPath ? focusPathTail?.slice(1) : undefined;
 
         return (
           <MessageRow
             key={msg.id}
             message={msg}
             depth={childDepth}
-            highlighted={activeReplyId === msg.id}
+            highlighted={activeReplyId === msg.id || focusTargetId === msg.id}
+            focusTarget={focusTargetId === msg.id}
             activeReplyId={activeReplyId}
             currentAccountId={currentAccountId}
             conversationId={conversationId}
@@ -233,6 +248,9 @@ export function MessageReplies({
             threadRootId={threadRootId}
             replyToAuthor={replyToAuthor}
             autoExpandChain={autoExpandChain && msg.id === items[0]?.id}
+            focusPathTail={childTail}
+            focusTargetId={focusTargetId}
+            onFocusHandled={onFocusHandled}
             onReply={onReply}
             onDeleted={handleDeleted}
           />

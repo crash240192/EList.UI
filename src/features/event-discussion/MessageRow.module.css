@@ -37,6 +37,20 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
+.cardFocusTarget {
+  animation: discussionFocusPulse 1.8s ease-out;
+}
+
+@keyframes discussionFocusPulse {
+  0% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
+    border-color: var(--accent);
+  }
+  100% {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+}
+
 .cardInner {
   display: flex;
   align-items: flex-start;

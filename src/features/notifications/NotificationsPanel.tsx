@@ -74,9 +74,14 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       case 'invitations':
         navigate('/invitations');
         break;
-      case 'event':
-        navigate(`/event/${target.eventId}`);
+      case 'event': {
+        const q = new URLSearchParams();
+        if (target.conversationId) q.set('conversation', target.conversationId);
+        if (target.messageId) q.set('message', target.messageId);
+        const qs = q.toString();
+        navigate(`/event/${target.eventId}${qs ? `?${qs}` : ''}`);
         break;
+      }
       case 'user':
         navigate(`/user/${target.accountId}`);
         break;

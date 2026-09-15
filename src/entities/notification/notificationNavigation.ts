@@ -60,7 +60,7 @@ const USER_PROFILE_TYPE_NAMES = new Set([
 
 export type NotificationNavTarget =
   | { kind: 'invitations' }
-  | { kind: 'event'; eventId: string }
+  | { kind: 'event'; eventId: string; conversationId?: string; messageId?: string }
   | { kind: 'user'; accountId: string }
   | { kind: 'my-reports'; reportId?: string }
   | { kind: 'reports-against-me'; reportId?: string }
@@ -70,6 +70,22 @@ export type NotificationNavTarget =
   | { kind: 'settings-organizations'; organizationId?: string }
   | { kind: 'settings-moderation' }
   | { kind: 'agreements-recheck' };
+
+/** Message из payload уведомления MessageReplied (ответ) */
+export function parseNotificationMessageRef(
+  data: unknown,
+): { id: string; conversationId?: string } | null {
+  if (!data || typeof data !== 'object') return null;
+  const o = data as Record<string, unknown>;
+  const id = String(o.id ?? o.Id ?? '').trim();
+  if (!id) return null;
+  const conversationRaw = o.conversationId ?? o.ConversationId;
+  const conversationId =
+    conversationRaw == null || conversationRaw === ''
+      ? undefined
+      : String(conversationRaw);
+  return { id, conversationId };
+}
 
 export function notificationTypeLabel(type: INotification['type']): string {
   const fromRegistry = userNotificationTypeLabel(type);
@@ -183,6 +199,24 @@ export function getNotificationNavigationTarget(
     if (n.relatedAccountId) {
       return { kind: 'user', accountId: n.relatedAccountId };
     }
+  }
+
+  if (
+    isUserNotificationTypeName(n.type, 'MessageReplied')
+    || typeNum === 31
+    || typeKey === 'MessageReplied'
+  ) {
+    const eventId = getNotificationEventId(n);
+    const msg = parseNotificationMessageRef(n.data);
+    if (eventId && msg?.id) {
+      return {
+        kind: 'event',
+        eventId,
+        conversationId: msg.conversationId,
+        messageId: msg.id,
+      };
+    }
+    if (eventId) return { kind: 'event', eventId };
   }
 
   if (

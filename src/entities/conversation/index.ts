@@ -4,6 +4,8 @@ export type {
   IConversationPersonInfo,
   IConversationRequest,
   IMessage,
+  IMessageLocation,
+  IMessagePathNode,
   IMessageRequest,
 } from './types';
 
@@ -16,6 +18,7 @@ export {
   fetchConversationMessages,
   fetchConversationRootMessages,
   fetchMessageReplies,
+  fetchMessageLocation,
   createMessage,
   updateMessage,
   deleteMessage,

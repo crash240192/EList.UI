@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { IMessage } from '@/entities/conversation';
+import type { IMessage, IMessagePathNode } from '@/entities/conversation';
 import { updateMessage, deleteMessage, fetchMessageReplies } from '@/entities/conversation';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
@@ -17,6 +17,7 @@ import {
   isLongMessageText,
   canDeleteMessage,
   messageHasReplies,
+  scrollDiscussionMessageIntoView,
 } from './messageUtils';
 import { DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import { MessageReplies } from './MessageReplies';
@@ -28,6 +29,8 @@ interface MessageRowProps {
   message: IMessage;
   depth: number;
   highlighted?: boolean;
+  /** Подсветка deep-link (уведомление) */
+  focusTarget?: boolean;
   activeReplyId?: string | null;
   conversationId: string;
   currentAccountId: string | null;
@@ -41,6 +44,10 @@ interface MessageRowProps {
    * раскрываем цепочку сразу (до развилки).
    */
   autoExpandChain?: boolean;
+  /** Оставшийся путь focus ниже этого узла (дети → … → цель) */
+  focusPathTail?: IMessagePathNode[];
+  focusTargetId?: string | null;
+  onFocusHandled?: () => void;
   onReply?: (message: IMessage, threadRootId: string) => void;
   onDeleted?: (messageId: string) => void;
 }
@@ -100,6 +107,7 @@ export function MessageRow({
   message,
   depth,
   highlighted = false,
+  focusTarget = false,
   activeReplyId = null,
   conversationId,
   currentAccountId,
@@ -107,6 +115,9 @@ export function MessageRow({
   threadRootId,
   replyToAuthor = null,
   autoExpandChain = false,
+  focusPathTail,
+  focusTargetId = null,
+  onFocusHandled,
   onReply,
   onDeleted,
 }: MessageRowProps) {
@@ -114,9 +125,11 @@ export function MessageRow({
   /**
    * Корень ветки: сразу превью прямых ответов.
    * Автоцепочка: единственный ребёнок с продолжением — раскрыт.
+   * Deep-link: раскрываем предков цели.
    * Иначе вложенное свёрнуто до клика.
    */
   const [expanded, setExpanded] = useState(() => {
+    if (focusPathTail && focusPathTail.length > 0) return true;
     if (!message.replied) return false;
     if (autoExpandChain) return true;
     return depth === 0;
@@ -146,6 +159,22 @@ export function MessageRow({
   const rootId = threadRootId ?? message.id;
   /** В ленте вложенные ответы уже собраны под корнем — не открываем новое дерево */
   const canNestReplies = viewMode === 'tree' || message.id === rootId;
+
+  useEffect(() => {
+    if (focusPathTail && focusPathTail.length > 0) setExpanded(true);
+  }, [focusPathTail]);
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    const delays = [60, 200, 480].map((ms) =>
+      window.setTimeout(() => {
+        if (scrollDiscussionMessageIntoView(message.id)) {
+          onFocusHandled?.();
+        }
+      }, ms),
+    );
+    return () => delays.forEach((id) => window.clearTimeout(id));
+  }, [focusTarget, message.id, onFocusHandled]);
 
   useEffect(() => {
     setDisplayText(message.messageText);
@@ -237,6 +266,8 @@ export function MessageRow({
     }
   };
 
+  const expandForFocus = Boolean(focusPathTail && focusPathTail.length > 0);
+  const showNestedReplies = canNestReplies && (hasReplies || expandForFocus);
   const collapsedRepliesLabel = replyTotal != null && replyTotal > 0
     ? formatReplyCount(replyTotal)
     : 'Есть ответы';
@@ -251,7 +282,7 @@ export function MessageRow({
     <div className={styles.wrap}>
       <article
         id={discussionMessageDomId(message.id)}
-        className={`${styles.card} ${isMine ? styles.cardMine : ''} ${highlighted ? styles.cardHighlight : ''} ${highlighted ? styles.cardReplyTarget : ''}`}
+        className={`${styles.card} ${isMine ? styles.cardMine : ''} ${highlighted ? styles.cardHighlight : ''} ${highlighted ? styles.cardReplyTarget : ''} ${focusTarget ? styles.cardFocusTarget : ''}`}
       >
         <div className={styles.cardInner}>
           {accountId ? (
@@ -397,7 +428,7 @@ export function MessageRow({
                     {alreadyReported ? 'Жалоба уже отправлена' : 'Пожаловаться'}
                   </button>
                 )}
-                {canNestReplies && hasReplies && expanded && (
+                {showNestedReplies && expanded && (
                   <button
                     type="button"
                     className={`${styles.actionBtn} ${styles.actionBtnMuted}`}
@@ -434,7 +465,7 @@ export function MessageRow({
         />
       )}
 
-      {canNestReplies && hasReplies && !expanded && (
+      {showNestedReplies && !expanded && (
         <button
           type="button"
           className={styles.moreBtn}
@@ -445,7 +476,7 @@ export function MessageRow({
         </button>
       )}
 
-      {canNestReplies && hasReplies && expanded && (
+      {showNestedReplies && expanded && (
         <MessageReplies
           parent={message}
           depth={depth}
@@ -455,6 +486,9 @@ export function MessageRow({
           currentAccountId={currentAccountId}
           viewMode={viewMode}
           threadRootId={rootId}
+          focusPathTail={focusPathTail}
+          focusTargetId={focusTargetId}
+          onFocusHandled={onFocusHandled}
           onReply={onReply}
           onDeleted={onDeleted}
           onTotalLoaded={setReplyTotal}

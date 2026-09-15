@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { IConversation } from '@/entities/conversation';
 import { fetchEventConversations } from '@/entities/conversation';
 import { MessageThread } from './MessageThread';
@@ -29,6 +30,10 @@ export function EventDiscussionsPanel({
   currentAccountId,
   canManage = false,
 }: EventDiscussionsPanelProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusConversationId = searchParams.get('conversation');
+  const focusMessageId = searchParams.get('message');
+
   const [conversations, setConversations] = useState<IConversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,9 +48,27 @@ export function EventDiscussionsPanel({
     'tree',
   );
   const safeViewMode: DiscussionViewMode = isDiscussionViewMode(viewMode) ? viewMode : 'tree';
+  /** Пока идёт deep-link — держим дерево, чтобы не сбросить раскладку после очистки query */
+  const [focusTreeLock, setFocusTreeLock] = useState(false);
+  useEffect(() => {
+    if (focusMessageId) setFocusTreeLock(true);
+  }, [focusMessageId]);
+  const threadViewMode: DiscussionViewMode = focusTreeLock ? 'tree' : safeViewMode;
+  const handleViewModeChange = useCallback((next: DiscussionViewMode) => {
+    setFocusTreeLock(false);
+    setViewMode(next);
+  }, [setViewMode]);
   const layoutBoundsRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
+
+  const clearFocusParams = useCallback(() => {
+    if (!searchParams.get('message') && !searchParams.get('conversation')) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('message');
+    next.delete('conversation');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const updateTabFades = useCallback(() => {
     const el = tabsRef.current;
@@ -68,6 +91,9 @@ export function EventDiscussionsPanel({
       const list = await fetchEventConversations(eventId);
       setConversations(list);
       setActiveId((prev) => {
+        if (focusConversationId && list.some((c) => c.id === focusConversationId)) {
+          return focusConversationId;
+        }
         if (prev && list.some((c) => c.id === prev)) return prev;
         return list[0]?.id ?? null;
       });
@@ -83,11 +109,18 @@ export function EventDiscussionsPanel({
     } finally {
       setLoading(false);
     }
-  }, [eventId]);
+  }, [eventId, focusConversationId]);
 
   useEffect(() => {
     void loadConversations();
   }, [loadConversations]);
+
+  useEffect(() => {
+    if (!focusConversationId || conversations.length === 0) return;
+    if (conversations.some((c) => c.id === focusConversationId)) {
+      setActiveId(focusConversationId);
+    }
+  }, [focusConversationId, conversations]);
 
   useEffect(() => {
     const el = tabsRef.current;
@@ -153,6 +186,10 @@ export function EventDiscussionsPanel({
   }
 
   const active = conversations.find((c) => c.id === activeId) ?? conversations[0] ?? null;
+  const threadFocusMessageId =
+    active && focusMessageId && (!focusConversationId || focusConversationId === active.id)
+      ? focusMessageId
+      : null;
 
   return (
     <div className={styles.panel}>
@@ -191,7 +228,7 @@ export function EventDiscussionsPanel({
           {fadeRight && <div className={`${styles.tabsFade} ${styles.tabsFadeRight}`} aria-hidden />}
         </div>
         <div className={styles.tabsTools}>
-          <DiscussionViewModeToggle value={safeViewMode} onChange={setViewMode} />
+          <DiscussionViewModeToggle value={threadViewMode} onChange={handleViewModeChange} />
           {canManage && conversations.length > 0 && (
             <button
               type="button"
@@ -212,12 +249,14 @@ export function EventDiscussionsPanel({
       {active ? (
         <div ref={layoutBoundsRef} className={styles.body} role="tabpanel">
           <MessageThread
-            key={`${active.id}:${safeViewMode}`}
+            key={`${active.id}:${threadViewMode}`}
             conversationId={active.id}
             currentAccountId={currentAccountId}
             layoutBoundsRef={layoutBoundsRef}
             canComment={!active.participantsReadonly || canManage}
-            viewMode={safeViewMode}
+            viewMode={threadViewMode}
+            focusMessageId={threadFocusMessageId}
+            onFocusHandled={clearFocusParams}
           />
         </div>
       ) : (

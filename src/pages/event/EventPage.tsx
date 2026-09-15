@@ -271,6 +271,17 @@ export default function EventPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, isOrganizer, id]);
 
+  useEffect(() => {
+    if (!searchParams.get('message')) return;
+    const t = window.setTimeout(() => {
+      document.getElementById('event-discussions')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [searchParams, id]);
+
   const { orgOrganizers, personOrganizers } = useMemo(() => {
     const orgs: IEventOrganizator[] = [];
     const people: IEventOrganizator[] = [];
@@ -1207,7 +1218,7 @@ export default function EventPage() {
 
           </div>
 
-          <div className={styles.discussionsSection}>
+          <div id="event-discussions" className={styles.discussionsSection}>
             {id && (
               <EventDiscussionsPanel
                 eventId={id}

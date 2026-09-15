@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import type { IMessage } from '@/entities/conversation';
-import { createMessage } from '@/entities/conversation';
+import type { IMessage, IMessageLocation, IMessagePathNode } from '@/entities/conversation';
+import { createMessage, fetchMessageLocation } from '@/entities/conversation';
 import { useRootMessages } from './useRootMessages';
 import { MessageRow } from './MessageRow';
 import { MessageComposer } from './MessageComposer';
@@ -11,6 +11,7 @@ import {
   messageAuthorName,
   computeReplyScrollTailPx,
   scrollMessageIntoViewForReply,
+  scrollDiscussionMessageIntoView,
   discussionMessageDomId,
   findScrollParent,
   getReplyComposerReservePx,
@@ -22,7 +23,11 @@ import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discus
 import { useDiscussionSlotRect } from './useDiscussionSlotRect';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
-import type { DiscussionViewMode } from './discussionViewMode';
+import {
+  DISCUSSION_ROOT_PAGE_SIZE,
+  DISCUSSION_TREE_SIBLING_PAGE_SIZE,
+  type DiscussionViewMode,
+} from './discussionViewMode';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import { DiscussionPager } from './DiscussionPager';
 import styles from './MessageThread.module.css';
@@ -36,6 +41,10 @@ interface MessageThreadProps {
   canComment?: boolean;
   /** Дерево или лента — управляется панелью обсуждений */
   viewMode?: DiscussionViewMode;
+  /** Deep-link: прокрутить к сообщению после загрузки нужных страниц */
+  focusMessageId?: string | null;
+  /** После успешной прокрутки к комментарию */
+  onFocusHandled?: () => void;
 }
 
 function MessageThreadInner({
@@ -44,10 +53,57 @@ function MessageThreadInner({
   layoutBoundsRef,
   canComment = true,
   viewMode = 'tree',
+  focusMessageId = null,
+  onFocusHandled,
 }: MessageThreadProps) {
   const location = useLocation();
+  const [focusLocation, setFocusLocation] = useState<IMessageLocation | null>(null);
+  /** null пока ждём location; иначе стартовая страница корней */
+  const [bootstrapPage, setBootstrapPage] = useState<number | null>(
+    focusMessageId ? null : 0,
+  );
+  const focusHandledRef = useRef(false);
+
+  useEffect(() => {
+    focusHandledRef.current = false;
+
+    if (!focusMessageId) {
+      setFocusLocation(null);
+      setBootstrapPage((prev) => (prev === null ? 0 : prev));
+      return;
+    }
+
+    let cancelled = false;
+    setFocusLocation(null);
+    setBootstrapPage(null);
+    void (async () => {
+      try {
+        const loc = await fetchMessageLocation(focusMessageId, {
+          rootPageSize: DISCUSSION_ROOT_PAGE_SIZE,
+          siblingPageSize: DISCUSSION_TREE_SIBLING_PAGE_SIZE,
+        });
+        if (cancelled) return;
+        if (!loc || loc.conversationId !== conversationId) {
+          setBootstrapPage((prev) => (prev === null ? 0 : prev));
+          return;
+        }
+        setFocusLocation(loc);
+        setBootstrapPage(loc.rootPageIndex);
+      } catch {
+        if (!cancelled) setBootstrapPage((prev) => (prev === null ? 0 : prev));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusMessageId, conversationId]);
+
+  const rootsConversationId = bootstrapPage !== null ? conversationId : null;
   const { messages, loading, pageLoading, pageIndex, totalPages, total, error, goToPage, refresh, removeMessage } =
-    useRootMessages(conversationId);
+    useRootMessages(rootsConversationId, {
+      initialPageIndex: bootstrapPage ?? 0,
+    });
   const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
   const [replyThreadRootId, setReplyThreadRootId] = useState<string | null>(null);
@@ -60,6 +116,30 @@ function MessageThreadInner({
   const sheetRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const boundsRef = layoutBoundsRef ?? threadRef;
+
+  const focusTargetId = focusLocation?.messageId ?? null;
+  const focusPath: IMessagePathNode[] = focusLocation?.path ?? [];
+
+  const markFocusHandled = useCallback(() => {
+    if (focusHandledRef.current) return;
+    focusHandledRef.current = true;
+    onFocusHandled?.();
+  }, [onFocusHandled]);
+
+  /** Корень на экране — прокручиваем сразу; вложенные — после раскрытия веток */
+  useEffect(() => {
+    if (!focusTargetId || loading || focusPath.length !== 1) return;
+    if (!messages.some((m) => m.id === focusTargetId)) return;
+
+    const delays = [40, 160, 400].map((ms) =>
+      window.setTimeout(() => {
+        if (scrollDiscussionMessageIntoView(focusTargetId)) {
+          markFocusHandled();
+        }
+      }, ms),
+    );
+    return () => delays.forEach((id) => window.clearTimeout(id));
+  }, [focusTargetId, focusPath.length, loading, messages, markFocusHandled]);
 
   useEffect(() => {
     const node = anchorRef.current;
@@ -251,21 +331,28 @@ function MessageThreadInner({
       )}
       {!loading && (
         <div className={styles.list}>
-          {messages.map((msg) => (
-            <MessageRow
-              key={msg.id}
-              message={msg}
-              depth={0}
-              highlighted={activeReplyId === msg.id}
-              activeReplyId={activeReplyId}
-              conversationId={conversationId}
-              currentAccountId={currentAccountId}
-              viewMode={safeViewMode}
-              threadRootId={msg.id}
-              onReply={canComment ? handleReply : undefined}
-              onDeleted={handleDeleted}
-            />
-          ))}
+          {messages.map((msg) => {
+            const onFocusPath = focusPath.length > 0 && focusPath[0]?.messageId === msg.id;
+            return (
+              <MessageRow
+                key={msg.id}
+                message={msg}
+                depth={0}
+                highlighted={activeReplyId === msg.id || focusTargetId === msg.id}
+                focusTarget={focusTargetId === msg.id}
+                activeReplyId={activeReplyId}
+                conversationId={conversationId}
+                currentAccountId={currentAccountId}
+                viewMode={safeViewMode}
+                threadRootId={msg.id}
+                focusPathTail={onFocusPath ? focusPath.slice(1) : undefined}
+                focusTargetId={focusTargetId}
+                onFocusHandled={markFocusHandled}
+                onReply={canComment ? handleReply : undefined}
+                onDeleted={handleDeleted}
+              />
+            );
+          })}
         </div>
       )}
       {!loading && !error && (

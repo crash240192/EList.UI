@@ -4,6 +4,20 @@ import { LONG_MESSAGE_CHAR_THRESHOLD, LONG_MESSAGE_LINE_CLAMP } from './discussi
 
 export const discussionMessageDomId = (messageId: string) => `discussion-msg-${messageId}`;
 
+/** Прокрутка к комментарию (deep-link из уведомления) */
+export function scrollDiscussionMessageIntoView(
+  messageId: string,
+  options?: { behavior?: ScrollBehavior; block?: ScrollLogicalPosition },
+): boolean {
+  const el = document.getElementById(discussionMessageDomId(messageId));
+  if (!el) return false;
+  el.scrollIntoView({
+    behavior: options?.behavior ?? 'smooth',
+    block: options?.block ?? 'center',
+  });
+  return true;
+}
+
 const DEFAULT_COMPOSER_HEIGHT = 220;
 const MOBILE_COMPOSER_HEIGHT_ESTIMATE = 168;
 const REPLY_GAP_PX = 16;

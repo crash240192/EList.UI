@@ -2,7 +2,14 @@ import { apiClient } from '@/shared/api/client';
 import { textLengthError } from '@/shared/lib/clampText';
 import { DISCUSSION_MESSAGE_MAX_LENGTH } from '@/shared/lib/textLimits';
 import type { PagedList } from '@/shared/api/types';
-import type { IConversation, IConversationRequest, IMessage, IMessageRequest } from './types';
+import type {
+  IConversation,
+  IConversationRequest,
+  IMessage,
+  IMessageLocation,
+  IMessagePathNode,
+  IMessageRequest,
+} from './types';
 
 const PAGE_SIZE_DEFAULT = 20;
 
@@ -130,6 +137,66 @@ export async function fetchMessageReplies(
   );
   const page = normalizePagedList(data.result, pageIndex, pageSize);
   return { ...page, result: page.result.map(normalizeMessage) };
+}
+
+function normalizePathNode(raw: unknown): IMessagePathNode | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const messageId = String(r.messageId ?? r.MessageId ?? '');
+  if (!messageId) return null;
+  const parentRaw = r.parentId ?? r.ParentId;
+  return {
+    messageId,
+    parentId: parentRaw == null || parentRaw === '' ? null : String(parentRaw),
+    pageIndex: Number(r.pageIndex ?? r.PageIndex ?? 0) || 0,
+  };
+}
+
+function normalizeMessageLocation(raw: unknown): IMessageLocation | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const messageId = String(r.messageId ?? r.MessageId ?? '');
+  const conversationId = String(r.conversationId ?? r.ConversationId ?? '');
+  if (!messageId || !conversationId) return null;
+
+  const pathRaw = (r.path ?? r.Path ?? []) as unknown[];
+  const path = pathRaw
+    .map(normalizePathNode)
+    .filter((n): n is IMessagePathNode => n != null);
+
+  const ancestorsRaw = (r.ancestorIds ?? r.AncestorIds ?? []) as unknown[];
+  const ancestorIds = ancestorsRaw.map((id) => String(id)).filter(Boolean);
+
+  const eventRaw = r.eventId ?? r.EventId;
+  const parentRaw = r.parentId ?? r.ParentId;
+  const rootId = String(r.rootId ?? r.RootId ?? path[0]?.messageId ?? messageId);
+
+  return {
+    messageId,
+    conversationId,
+    eventId: eventRaw == null || eventRaw === '' ? null : String(eventRaw),
+    rootId,
+    parentId: parentRaw == null || parentRaw === '' ? null : String(parentRaw),
+    path,
+    ancestorIds,
+    rootPageIndex: Number(r.rootPageIndex ?? r.RootPageIndex ?? path[0]?.pageIndex ?? 0) || 0,
+    siblingPageIndex: Number(r.siblingPageIndex ?? r.SiblingPageIndex ?? 0) || 0,
+  };
+}
+
+/** Путь и индексы страниц для прокрутки к комментарию (уведомления / deep-link) */
+export async function fetchMessageLocation(
+  messageId: string,
+  options?: { rootPageSize?: number; siblingPageSize?: number },
+): Promise<IMessageLocation | null> {
+  const qs = new URLSearchParams();
+  if (options?.rootPageSize != null) qs.set('rootPageSize', String(options.rootPageSize));
+  if (options?.siblingPageSize != null) qs.set('siblingPageSize', String(options.siblingPageSize));
+  const q = qs.toString();
+  const data = await apiClient.get<unknown>(
+    `/api/conversations/messages/${messageId}/location${q ? `?${q}` : ''}`,
+  );
+  return normalizeMessageLocation(data.result);
 }
 
 export async function createMessage(request: IMessageRequest): Promise<string> {

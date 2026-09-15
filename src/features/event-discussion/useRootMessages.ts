@@ -6,7 +6,13 @@ import {
   discussionTotalPages,
 } from './discussionViewMode';
 
-export function useRootMessages(conversationId: string | null) {
+export function useRootMessages(
+  conversationId: string | null,
+  options?: { initialPageIndex?: number },
+) {
+  const initialPageIndex = options?.initialPageIndex ?? 0;
+  const initialPageRef = useRef(initialPageIndex);
+  initialPageRef.current = initialPageIndex;
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
@@ -75,8 +81,9 @@ export function useRootMessages(conversationId: string | null) {
       return;
     }
 
-    setPageIndex(0);
-    void loadPage(0, generation, true);
+    const startPage = Math.max(0, initialPageRef.current);
+    setPageIndex(startPage);
+    void loadPage(startPage, generation, true);
   }, [conversationId, loadPage]);
 
   const goToPage = useCallback((nextPage: number) => {

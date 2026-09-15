@@ -52,3 +52,24 @@ export interface IMessageRequest {
   organizationId?: string | null;
   replyTo?: string | null;
 }
+
+/** Узел пути root → target для deep-link из уведомлений */
+export interface IMessagePathNode {
+  messageId: string;
+  parentId: string | null;
+  /** Страница среди сиблингов под parentId (для корня — среди корней) */
+  pageIndex: number;
+}
+
+/** Позиция сообщения в дереве обсуждения */
+export interface IMessageLocation {
+  messageId: string;
+  conversationId: string;
+  eventId: string | null;
+  rootId: string;
+  parentId: string | null;
+  path: IMessagePathNode[];
+  ancestorIds: string[];
+  rootPageIndex: number;
+  siblingPageIndex: number;
+}
