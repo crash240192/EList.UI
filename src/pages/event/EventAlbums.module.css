@@ -28,6 +28,7 @@ button.count {
   margin: 0;
   line-height: inherit;
   cursor: pointer;
+  border-radius: 20px;
 }
 .countChevron {
   display: block;
