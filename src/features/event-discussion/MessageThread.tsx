@@ -20,7 +20,6 @@ import {
 import type { HoleRect } from './discussionDimClipPath';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import { useDiscussionSlotRect } from './useDiscussionSlotRect';
-import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import type { DiscussionViewMode } from './discussionViewMode';
