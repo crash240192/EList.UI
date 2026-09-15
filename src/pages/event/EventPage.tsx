@@ -1050,59 +1050,8 @@ export default function EventPage() {
             )}
           </div>
 
-          {/* Сайдбар: участники → альбомы → организаторы */}
+          {/* Сайдбар: организаторы → альбомы → участники */}
           <div className={styles.sidePanel}>
-
-            {showParticipantsBlock && (
-              <AccessDeniedGate denied={participantsDenied} variant="section">
-                {participantsDenied ? (
-                  <SectionDeniedPlaceholder lines={3} />
-                ) : (
-                  <button
-                    type="button"
-                    className={`${styles.participantsBlock} ${sortedParticipants.length === 0 ? styles.participantsBlockEmpty : ''}`}
-                    onClick={() => setParticipantsModalOpen(true)}
-                    aria-label={`Участники: ${sortedParticipants.length}`}
-                  >
-                    <div className={styles.participantsBlockHead}>
-                      <span className={styles.participantsBlockTitle}>
-                        Участники ({sortedParticipants.length})
-                      </span>
-                      {maxPersons != null && (
-                        <span className={styles.participantsBlockCap}>
-                          {participants.length} / {maxPersons}
-                        </span>
-                      )}
-                    </div>
-
-                    {maxPersons != null && (
-                      <div className={styles.participantsFillTrack}>
-                        <div
-                          className={styles.fillInner}
-                          style={{ width: `${Math.min(fillPct ?? 0, 100)}%` }}
-                        />
-                      </div>
-                    )}
-
-                    {sortedParticipants.length > 0 && (
-                      <ParticipantsChipPreview participants={participantChips} />
-                    )}
-                  </button>
-                )}
-              </AccessDeniedGate>
-            )}
-
-            {isOrganizer && ticketsEnabled && id && (
-              <TicketCheckInPanel eventId={id} />
-            )}
-
-            <EventAlbums
-              eventId={id!}
-              compact
-              canManage={isOrganizer}
-              isParticipating={isParticipating}
-              accountId={accountId}
-            />
 
             {(orgOrganizers.length > 0 || personOrganizers.length > 0 || organizersDenied) && (
               <AccessDeniedGate denied={organizersDenied} variant="section">
@@ -1158,6 +1107,57 @@ export default function EventPage() {
                       />
                     ))}
                   </div>
+                )}
+              </AccessDeniedGate>
+            )}
+
+            {isOrganizer && ticketsEnabled && id && (
+              <TicketCheckInPanel eventId={id} />
+            )}
+
+            <EventAlbums
+              eventId={id!}
+              compact
+              canManage={isOrganizer}
+              isParticipating={isParticipating}
+              accountId={accountId}
+            />
+
+            {showParticipantsBlock && (
+              <AccessDeniedGate denied={participantsDenied} variant="section">
+                {participantsDenied ? (
+                  <SectionDeniedPlaceholder lines={3} />
+                ) : (
+                  <button
+                    type="button"
+                    className={`${styles.participantsBlock} ${sortedParticipants.length === 0 ? styles.participantsBlockEmpty : ''}`}
+                    onClick={() => setParticipantsModalOpen(true)}
+                    aria-label={`Участники: ${sortedParticipants.length}`}
+                  >
+                    <div className={styles.participantsBlockHead}>
+                      <span className={styles.participantsBlockTitle}>
+                        Участники ({sortedParticipants.length})
+                      </span>
+                      {maxPersons != null && (
+                        <span className={styles.participantsBlockCap}>
+                          {participants.length} / {maxPersons}
+                        </span>
+                      )}
+                    </div>
+
+                    {maxPersons != null && (
+                      <div className={styles.participantsFillTrack}>
+                        <div
+                          className={styles.fillInner}
+                          style={{ width: `${Math.min(fillPct ?? 0, 100)}%` }}
+                        />
+                      </div>
+                    )}
+
+                    {sortedParticipants.length > 0 && (
+                      <ParticipantsChipPreview participants={participantChips} />
+                    )}
+                  </button>
                 )}
               </AccessDeniedGate>
             )}
