@@ -14,6 +14,7 @@ export {
   fetchConversation,
   fetchEventConversations,
   fetchConversationMessages,
+  fetchConversationRootMessages,
   fetchMessageReplies,
   createMessage,
   updateMessage,

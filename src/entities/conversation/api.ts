@@ -105,6 +105,20 @@ export async function fetchConversationMessages(
   return { ...page, result: page.result.map(normalizeMessage) };
 }
 
+/** Корневые комментарии диалога (ReplyTo IS NULL) */
+export async function fetchConversationRootMessages(
+  conversationId: string,
+  pageIndex = 0,
+  pageSize = PAGE_SIZE_DEFAULT,
+): Promise<PagedList<IMessage>> {
+  const qs = `pageIndex=${pageIndex}&pageSize=${pageSize}`;
+  const data = await apiClient.get<PagedList<IMessage>>(
+    `/api/conversations/messages/roots/byConversationId/${conversationId}?${qs}`,
+  );
+  const page = normalizePagedList(data.result, pageIndex, pageSize);
+  return { ...page, result: page.result.map(normalizeMessage) };
+}
+
 export async function fetchMessageReplies(
   messageId: string,
   pageIndex = 0,

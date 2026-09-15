@@ -2,15 +2,16 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { IMessage } from '@/entities/conversation';
 import { fetchMessageReplies } from '@/entities/conversation';
 import { MessageRow } from './MessageRow';
-import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
+import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
+import { DiscussionPager } from './DiscussionPager';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
-import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import { useDiscussionRefreshActions } from './discussionRefreshContext';
 import {
   DISCUSSION_REPLY_PREVIEW_COUNT,
   DISCUSSION_TREE_INDENT_CAP,
   DISCUSSION_TREE_SIBLING_PAGE_SIZE,
+  discussionTotalPages,
   type DiscussionViewMode,
 } from './discussionViewMode';
 import { loadDescendantReplies } from './loadDescendantReplies';
@@ -48,13 +49,13 @@ export function MessageReplies({
   const { resetBump } = useDiscussionRefreshActions();
   const [items, setItems] = useState<IMessage[]>([]);
   const [total, setTotal] = useState(0);
+  const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Превью прямых детей; остальные — вручную */
+  /** В ленте под корнем — превью первой порции */
   const [previewExpanded, setPreviewExpanded] = useState(false);
-  const pageRef = useRef(0);
+  const requestGen = useRef(0);
 
   const byId = useMemo(() => {
     const map = new Map<string, IMessage>();
@@ -63,46 +64,93 @@ export function MessageReplies({
     return map;
   }, [parent, items]);
 
+  const totalPages = discussionTotalPages(total, DISCUSSION_TREE_SIBLING_PAGE_SIZE);
+
   const loadTreePage = useCallback(
-    async (pageIndex: number, append: boolean) => {
-      const paged = await fetchMessageReplies(parent.id, pageIndex, DISCUSSION_TREE_SIBLING_PAGE_SIZE);
-      const nextItems = paged.result ?? [];
-      const nextTotal = paged.total ?? 0;
-      setItems((prev) => (append ? [...prev, ...nextItems] : nextItems));
-      setTotal(nextTotal);
-      onTotalLoaded?.(nextTotal);
-      setHasMore((pageIndex + 1) * DISCUSSION_TREE_SIBLING_PAGE_SIZE < nextTotal);
-      setError(null);
+    async (nextPage: number, generation: number, initial: boolean) => {
+      if (initial) setLoading(true);
+      else setPageLoading(true);
+      try {
+        const paged = await fetchMessageReplies(
+          parent.id,
+          nextPage,
+          DISCUSSION_TREE_SIBLING_PAGE_SIZE,
+        );
+        if (generation !== requestGen.current) return;
+
+        const nextItems = paged.result ?? [];
+        const nextTotal = paged.total ?? 0;
+        const maxPage = Math.max(0, discussionTotalPages(nextTotal, DISCUSSION_TREE_SIBLING_PAGE_SIZE) - 1);
+        const safePage = Math.min(nextPage, maxPage);
+
+        if (safePage !== nextPage && nextTotal > 0) {
+          const last = await fetchMessageReplies(
+            parent.id,
+            safePage,
+            DISCUSSION_TREE_SIBLING_PAGE_SIZE,
+          );
+          if (generation !== requestGen.current) return;
+          setItems(last.result ?? []);
+          setTotal(last.total ?? 0);
+          onTotalLoaded?.(last.total ?? 0);
+          setPageIndex(safePage);
+        } else {
+          setItems(nextItems);
+          setTotal(nextTotal);
+          onTotalLoaded?.(nextTotal);
+          setPageIndex(safePage);
+        }
+        setError(null);
+      } catch (e) {
+        if (generation !== requestGen.current) return;
+        setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов');
+        if (initial) setItems([]);
+      } finally {
+        if (generation === requestGen.current) {
+          setLoading(false);
+          setPageLoading(false);
+        }
+      }
     },
     [parent.id, onTotalLoaded],
   );
 
-  const loadFlat = useCallback(async () => {
-    const descendants = await loadDescendantReplies(parent.id);
-    setItems(descendants);
-    setTotal(descendants.length);
-    onTotalLoaded?.(descendants.length);
-    setHasMore(false);
-    setError(null);
+  const loadFlat = useCallback(async (generation: number) => {
+    setLoading(true);
+    try {
+      const descendants = await loadDescendantReplies(parent.id);
+      if (generation !== requestGen.current) return;
+      setItems(descendants);
+      setTotal(descendants.length);
+      onTotalLoaded?.(descendants.length);
+      setPageIndex(0);
+      setError(null);
+    } catch (e) {
+      if (generation !== requestGen.current) return;
+      setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов');
+      setItems([]);
+    } finally {
+      if (generation === requestGen.current) setLoading(false);
+    }
   }, [parent.id, onTotalLoaded]);
 
   useEffect(() => {
-    pageRef.current = 0;
+    requestGen.current += 1;
+    const generation = requestGen.current;
     setPreviewExpanded(false);
-    setLoading(true);
-    const request = viewMode === 'flat' ? loadFlat() : loadTreePage(0, false);
-    void request
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов'))
-      .finally(() => setLoading(false));
+    setPageIndex(0);
+    if (viewMode === 'flat') {
+      void loadFlat(generation);
+    } else {
+      void loadTreePage(0, generation, true);
+    }
   }, [loadFlat, loadTreePage, parent.id, refreshKey, viewMode]);
 
-  const loadMore = () => {
-    if (viewMode === 'flat' || loadingMore || !hasMore) return;
-    const next = pageRef.current + 1;
-    pageRef.current = next;
-    setLoadingMore(true);
-    void loadTreePage(next, true).finally(() => setLoadingMore(false));
-  };
+  const goToPage = useCallback((nextPage: number) => {
+    if (viewMode === 'flat' || loading || pageLoading) return;
+    const generation = requestGen.current;
+    void loadTreePage(nextPage, generation, false);
+  }, [loadTreePage, loading, pageLoading, viewMode]);
 
   const handleDeleted = useCallback((messageId: string) => {
     setItems((prev) => {
@@ -110,37 +158,27 @@ export function MessageReplies({
       setTotal((prevTotal) => {
         const nextTotal = Math.max(0, prevTotal - 1);
         onTotalLoaded?.(nextTotal);
-        setHasMore(viewMode === 'tree' && next.length < nextTotal);
         if (nextTotal === 0) resetBump(parent.id);
         return nextTotal;
       });
       return next;
     });
     onDeleted?.(messageId);
-  }, [onDeleted, onTotalLoaded, parent.id, resetBump, viewMode]);
+  }, [onDeleted, onTotalLoaded, parent.id, resetBump]);
 
   const childDepth = depth + 1;
-  /** Лента всегда с отступом; в дереве — с потолком глубины */
   const nestIndent = viewMode === 'flat' || childDepth <= DISCUSSION_TREE_INDENT_CAP;
-  /**
-   * Превью одного прямого ребёнка:
-   * - дерево — на каждом уровне (веер вручную);
-   * - лента — только под корнем.
-   */
-  const useSiblingPreview = viewMode === 'tree' || depth === 0;
+
+  /** Превью только в ленте под корнем */
+  const useFlatPreview = viewMode === 'flat' && depth === 0;
   const visibleItems =
-    useSiblingPreview && !previewExpanded
+    useFlatPreview && !previewExpanded
       ? items.slice(0, DISCUSSION_REPLY_PREVIEW_COUNT)
       : items;
-  const hiddenSiblingTotal =
-    useSiblingPreview && !previewExpanded
+  const hiddenFlatTotal =
+    useFlatPreview && !previewExpanded
       ? Math.max(0, total - DISCUSSION_REPLY_PREVIEW_COUNT)
       : 0;
-  const remainingUnloaded = Math.max(0, total - items.length);
-  const showPageMore =
-    viewMode === 'tree'
-    && hasMore
-    && (!useSiblingPreview || previewExpanded);
 
   /**
    * Автоцепочка: у родителя ровно один прямой ответ с продолжением —
@@ -153,7 +191,6 @@ export function MessageReplies({
     && Boolean(items[0]?.replied);
 
   const showRepliesSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
-  const showMoreSpinner = useDelayedBusy(loadingMore, DISCUSSION_PRELOADER_DELAY_MS);
 
   if (loading) {
     return (
@@ -201,30 +238,24 @@ export function MessageReplies({
           />
         );
       })}
-      {hiddenSiblingTotal > 0 && (
+      {hiddenFlatTotal > 0 && (
         <button
           type="button"
           className={styles.moreBtn}
           onClick={() => setPreviewExpanded(true)}
         >
-          {`Ещё ответы к этому комментарию (${hiddenSiblingTotal})`}
+          {`Ещё ответы (${hiddenFlatTotal})`}
         </button>
       )}
-      {showPageMore && (
-        <button
-          type="button"
-          className={`${styles.moreBtn} ${loadingMore && showMoreSpinner ? styles.moreBtnLoading : ''}`}
-          disabled={loadingMore}
-          onClick={loadMore}
-          aria-busy={loadingMore}
-          aria-label={loadingMore ? 'Загрузка' : undefined}
-        >
-          {loadingMore && showMoreSpinner ? (
-            <AppPreloader size="sm" layout="inline" role="none" />
-          ) : (
-            `Ещё ответы к этому комментарию (${remainingUnloaded})`
-          )}
-        </button>
+      {viewMode === 'tree' && (
+        <DiscussionPager
+          pageIndex={pageIndex}
+          totalPages={totalPages}
+          totalItems={total}
+          disabled={pageLoading}
+          label="Ответы"
+          onPageChange={goToPage}
+        />
       )}
     </div>
   );

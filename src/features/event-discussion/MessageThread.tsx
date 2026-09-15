@@ -25,6 +25,7 @@ import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import type { DiscussionViewMode } from './discussionViewMode';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
+import { DiscussionPager } from './DiscussionPager';
 import styles from './MessageThread.module.css';
 
 interface MessageThreadProps {
@@ -46,7 +47,7 @@ function MessageThreadInner({
   viewMode = 'tree',
 }: MessageThreadProps) {
   const location = useLocation();
-  const { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh, removeMessage } =
+  const { messages, loading, pageLoading, pageIndex, totalPages, total, error, goToPage, refresh, removeMessage } =
     useRootMessages(conversationId);
   const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
@@ -225,7 +226,6 @@ function MessageThreadInner({
   const slot = useDiscussionSlotRect(boundsRef, trackSlot);
 
   const showThreadSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
-  const showMoreSpinner = useDelayedBusy(loadingMore, DISCUSSION_PRELOADER_DELAY_MS);
 
   const fabStyle: CSSProperties | undefined = showFab
     ? {
@@ -269,21 +269,15 @@ function MessageThreadInner({
           ))}
         </div>
       )}
-      {hasMore && !loading && !error && (
-        <button
-          type="button"
-          className={`${styles.moreBtn} ${loadingMore && showMoreSpinner ? styles.moreBtnLoading : ''}`}
-          disabled={loadingMore}
-          onClick={loadMore}
-          aria-busy={loadingMore}
-          aria-label={loadingMore ? 'Загрузка' : undefined}
-        >
-          {loadingMore && showMoreSpinner ? (
-            <AppPreloader size="sm" layout="inline" role="none" />
-          ) : (
-            `Загрузить ещё (${remainingMore})`
-          )}
-        </button>
+      {!loading && !error && (
+        <DiscussionPager
+          pageIndex={pageIndex}
+          totalPages={totalPages}
+          totalItems={total}
+          disabled={pageLoading}
+          label="Комментарии"
+          onPageChange={goToPage}
+        />
       )}
 
       {sheetOpen && replyTarget && replyScrollTailPx > 0 && (
