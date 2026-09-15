@@ -4,6 +4,13 @@ import { fetchEventConversations } from '@/entities/conversation';
 import { MessageThread } from './MessageThread';
 import { DiscussionFormModal } from './DiscussionFormModal';
 import { DiscussionsManageModal } from './DiscussionsManageModal';
+import { DiscussionViewModeToggle } from './DiscussionViewModeToggle';
+import {
+  DISCUSSION_VIEW_MODE_STORAGE_KEY,
+  isDiscussionViewMode,
+  type DiscussionViewMode,
+} from './discussionViewMode';
+import { useLocalStorage } from '@/shared/hooks';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { EventDiscussionsPanelSkeleton } from './EventDiscussionsPanelSkeleton';
@@ -31,6 +38,11 @@ export function EventDiscussionsPanel({
   const [manageOpen, setManageOpen] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [fadeRight, setFadeRight] = useState(false);
+  const [viewMode, setViewMode] = useLocalStorage<DiscussionViewMode>(
+    DISCUSSION_VIEW_MODE_STORAGE_KEY,
+    'tree',
+  );
+  const safeViewMode: DiscussionViewMode = isDiscussionViewMode(viewMode) ? viewMode : 'tree';
   const layoutBoundsRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
@@ -178,30 +190,34 @@ export function EventDiscussionsPanel({
           {fadeLeft && <div className={`${styles.tabsFade} ${styles.tabsFadeLeft}`} aria-hidden />}
           {fadeRight && <div className={`${styles.tabsFade} ${styles.tabsFadeRight}`} aria-hidden />}
         </div>
-        {canManage && conversations.length > 0 && (
-          <button
-            type="button"
-            className={styles.editTabsBtn}
-            onClick={() => setManageOpen(true)}
-            aria-label="Редактировать обсуждения"
-            title="Редактировать обсуждения"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
-        )}
+        <div className={styles.tabsTools}>
+          <DiscussionViewModeToggle value={safeViewMode} onChange={setViewMode} />
+          {canManage && conversations.length > 0 && (
+            <button
+              type="button"
+              className={styles.editTabsBtn}
+              onClick={() => setManageOpen(true)}
+              aria-label="Редактировать обсуждения"
+              title="Редактировать обсуждения"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {active ? (
         <div ref={layoutBoundsRef} className={styles.body} role="tabpanel">
           <MessageThread
-            key={active.id}
+            key={`${active.id}:${safeViewMode}`}
             conversationId={active.id}
             currentAccountId={currentAccountId}
             layoutBoundsRef={layoutBoundsRef}
             canComment={!active.participantsReadonly || canManage}
+            viewMode={safeViewMode}
           />
         </div>
       ) : (

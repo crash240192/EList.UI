@@ -8,7 +8,7 @@ import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import { useDiscussionRefreshActions } from './discussionRefreshContext';
 import {
-  DISCUSSION_REPLY_PREVIEW_COUNT,
+  DISCUSSION_FLAT_REPLY_PREVIEW_COUNT,
   DISCUSSION_TREE_INDENT_CAP,
   type DiscussionViewMode,
 } from './discussionViewMode';
@@ -53,7 +53,7 @@ export function MessageReplies({
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Под корнем сначала показываем превью, остальное — по кнопке */
+  /** В ленте под корнем — превью; в дереве сразу вся загруженная страница */
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const pageRef = useRef(0);
 
@@ -121,18 +121,19 @@ export function MessageReplies({
   }, [onDeleted, onTotalLoaded, parent.id, resetBump, viewMode]);
 
   const childDepth = depth + 1;
-  /** Лента всегда с отступом (как YouTube); в дереве — с потолком глубины */
+  /** Лента всегда с отступом; в дереве — с потолком глубины */
   const nestIndent = viewMode === 'flat' || childDepth <= DISCUSSION_TREE_INDENT_CAP;
-  const usePreview = depth === 0;
+  const useFlatPreview = viewMode === 'flat' && depth === 0;
   const visibleItems =
-    usePreview && !previewExpanded
-      ? items.slice(0, DISCUSSION_REPLY_PREVIEW_COUNT)
+    useFlatPreview && !previewExpanded
+      ? items.slice(0, DISCUSSION_FLAT_REPLY_PREVIEW_COUNT)
       : items;
   const hiddenTotal =
-    usePreview && !previewExpanded
-      ? Math.max(0, total - DISCUSSION_REPLY_PREVIEW_COUNT)
+    useFlatPreview && !previewExpanded
+      ? Math.max(0, total - DISCUSSION_FLAT_REPLY_PREVIEW_COUNT)
       : 0;
   const remaining = Math.max(0, total - items.length);
+  const showPageMore = viewMode === 'tree' && hasMore && (!useFlatPreview || previewExpanded);
 
   const showRepliesSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
   const showMoreSpinner = useDelayedBusy(loadingMore, DISCUSSION_PRELOADER_DELAY_MS);
@@ -191,7 +192,7 @@ export function MessageReplies({
           {`Ещё ответы (${hiddenTotal})`}
         </button>
       )}
-      {(previewExpanded || !usePreview) && hasMore && viewMode === 'tree' && (
+      {showPageMore && (
         <button
           type="button"
           className={`${styles.moreBtn} ${loadingMore && showMoreSpinner ? styles.moreBtnLoading : ''}`}
@@ -203,7 +204,7 @@ export function MessageReplies({
           {loadingMore && showMoreSpinner ? (
             <AppPreloader size="sm" layout="inline" role="none" />
           ) : (
-            `Загрузить ещё (${remaining})`
+            `Ещё ответы (${remaining})`
           )}
         </button>
       )}

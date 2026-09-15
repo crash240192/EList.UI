@@ -12,7 +12,6 @@ import {
   messageAuthorName,
   messageInitials,
   formatMessageDate,
-  formatReplyCount,
   discussionMessageDomId,
   isLongMessageText,
   canDeleteMessage,
@@ -20,7 +19,10 @@ import {
 } from './messageUtils';
 import { DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import { MessageReplies } from './MessageReplies';
-import type { DiscussionViewMode } from './discussionViewMode';
+import {
+  DISCUSSION_TREE_AUTO_EXPAND_DEPTH,
+  type DiscussionViewMode,
+} from './discussionViewMode';
 import { useDiscussionRefresh } from './discussionRefreshContext';
 import styles from './MessageRow.module.css';
 
@@ -105,8 +107,15 @@ export function MessageRow({
   onDeleted,
 }: MessageRowProps) {
   const navigate = useNavigate();
-  /** Корень: сразу превью ответов; вложенные ветки — свёрнуты */
-  const [expanded, setExpanded] = useState(() => depth === 0 && Boolean(message.replied));
+  /**
+   * Дерево: раскрываем ветку сразу (как на Пикабу), чтобы не кликать каждый уровень.
+   * Лента: под корнем сразу превью ответов; вложенные в ленте не нестятся.
+   */
+  const [expanded, setExpanded] = useState(() => {
+    if (!message.replied) return false;
+    if (viewMode === 'flat') return depth === 0;
+    return depth < DISCUSSION_TREE_AUTO_EXPAND_DEPTH;
+  });
   const [textExpanded, setTextExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.messageText);
@@ -220,8 +229,8 @@ export function MessageRow({
   };
 
   const collapsedRepliesLabel = replyTotal != null && replyTotal > 0
-    ? formatReplyCount(replyTotal)
-    : 'Есть ответы';
+    ? `Ещё ответы (${replyTotal})`
+    : 'Ещё ответы';
   const isLongText = isLongMessageText(displayText);
 
   const openAuthorProfile = () => {
@@ -419,16 +428,11 @@ export function MessageRow({
       {canNestReplies && hasReplies && !expanded && (
         <button
           type="button"
-          className={styles.collapsedReplies}
+          className={styles.moreBtn}
           onClick={() => setExpanded(true)}
           aria-expanded={false}
         >
-          <span className={styles.collapsedRepliesLine} aria-hidden />
-          <span className={styles.collapsedRepliesBody}>
-            <span className={styles.collapsedRepliesCount}>{collapsedRepliesLabel}</span>
-            <span className={styles.collapsedRepliesHint}>Показать цепочку</span>
-          </span>
-          <ChevronDownIcon />
+          {collapsedRepliesLabel}
         </button>
       )}
 

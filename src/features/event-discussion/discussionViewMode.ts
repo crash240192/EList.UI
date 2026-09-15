@@ -7,8 +7,17 @@ export const DISCUSSION_VIEW_MODE_STORAGE_KEY = 'elist.discussion.viewMode';
 /** После этой глубины в дереве отступы больше не накапливаются */
 export const DISCUSSION_TREE_INDENT_CAP = 4;
 
-/** Сколько ответов показывать сразу под корневым комментарием */
-export const DISCUSSION_REPLY_PREVIEW_COUNT = 1;
+/**
+ * В ленте под корнем сразу показываем столько ответов;
+ * остальные — за кнопкой «Ещё ответы».
+ */
+export const DISCUSSION_FLAT_REPLY_PREVIEW_COUNT = 1;
+
+/**
+ * В дереве автоматически раскрываем вложенные ветки до этой глубины
+ * (цепочка диалога без клика на каждый уровень, как на Пикабу).
+ */
+export const DISCUSSION_TREE_AUTO_EXPAND_DEPTH = 12;
 
 export const DISCUSSION_VIEW_MODE_LABELS: Record<DiscussionViewMode, string> = {
   tree: 'Дерево',

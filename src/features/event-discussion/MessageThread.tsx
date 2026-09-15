@@ -23,12 +23,7 @@ import { useDiscussionSlotRect } from './useDiscussionSlotRect';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
-import {
-  DISCUSSION_VIEW_MODE_STORAGE_KEY,
-  isDiscussionViewMode,
-  type DiscussionViewMode,
-} from './discussionViewMode';
-import { useLocalStorage } from '@/shared/hooks';
+import type { DiscussionViewMode } from './discussionViewMode';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import styles from './MessageThread.module.css';
 
@@ -39,6 +34,8 @@ interface MessageThreadProps {
   layoutBoundsRef?: RefObject<HTMLElement | null>;
   /** Можно ли писать комментарии (false — только чтение) */
   canComment?: boolean;
+  /** Дерево или лента — управляется панелью обсуждений */
+  viewMode?: DiscussionViewMode;
 }
 
 function MessageThreadInner({
@@ -46,6 +43,7 @@ function MessageThreadInner({
   currentAccountId,
   layoutBoundsRef,
   canComment = true,
+  viewMode = 'tree',
 }: MessageThreadProps) {
   const location = useLocation();
   const { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh, removeMessage } =
@@ -53,11 +51,7 @@ function MessageThreadInner({
   const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
   const [replyThreadRootId, setReplyThreadRootId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useLocalStorage<DiscussionViewMode>(
-    DISCUSSION_VIEW_MODE_STORAGE_KEY,
-    'tree',
-  );
-  const safeViewMode: DiscussionViewMode = isDiscussionViewMode(viewMode) ? viewMode : 'tree';
+  const safeViewMode: DiscussionViewMode = viewMode === 'flat' ? 'flat' : 'tree';
   const [replyScrollTailPx, setReplyScrollTailPx] = useState(0);
   const [replyHighlightHole, setReplyHighlightHole] = useState<HoleRect | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -255,40 +249,6 @@ function MessageThreadInner({
       {!loading && error && <p className={styles.error}>{error}</p>}
       {!loading && !error && messages.length === 0 && (
         <p className={styles.muted}>Пока нет комментариев. Будьте первым!</p>
-      )}
-      {!loading && messages.length > 0 && (
-        <div className={styles.viewModeToggle} role="group" aria-label="Вид комментариев">
-          <button
-            type="button"
-            className={`${styles.viewModeIconBtn} ${safeViewMode === 'tree' ? styles.viewModeIconBtnActive : ''}`}
-            aria-pressed={safeViewMode === 'tree'}
-            aria-label="Дерево"
-            title="Дерево"
-            onClick={() => setViewMode('tree')}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M6 4v7a3 3 0 0 0 3 3h3" />
-              <path d="M6 11a3 3 0 0 0 3 3h3" />
-              <circle cx="6" cy="4" r="2" fill="currentColor" stroke="none" />
-              <circle cx="15" cy="11" r="2" fill="currentColor" stroke="none" />
-              <circle cx="15" cy="17" r="2" fill="currentColor" stroke="none" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className={`${styles.viewModeIconBtn} ${safeViewMode === 'flat' ? styles.viewModeIconBtnActive : ''}`}
-            aria-pressed={safeViewMode === 'flat'}
-            aria-label="Лента"
-            title="Лента"
-            onClick={() => setViewMode('flat')}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <line x1="4" y1="6" x2="20" y2="6" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="8" y1="18" x2="20" y2="18" />
-            </svg>
-          </button>
-        </div>
       )}
       {!loading && (
         <div className={styles.list}>
