@@ -34,6 +34,19 @@ export interface IMessage {
   hidden?: boolean;
   account?: IConversationAccount | null;
   personInfo?: IConversationPersonInfo | null;
+  likesCount?: number;
+  dislikesCount?: number;
+  /** 'like' | 'dislike' | null */
+  currentUserVote?: MessageVoteValue | null;
+}
+
+export type MessageVoteValue = 'like' | 'dislike';
+
+export interface IMessageVoteResult {
+  messageId: string;
+  likesCount: number;
+  dislikesCount: number;
+  currentUserVote: MessageVoteValue | null;
 }
 
 export interface IConversationRequest {

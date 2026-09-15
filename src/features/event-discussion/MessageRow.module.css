@@ -288,6 +288,26 @@
   color: var(--text-secondary);
 }
 
+.actionBtnActive {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.actionBtnActive:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.voteReadonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 0 2px;
+}
+
 .actionBtnDanger {
   color: color-mix(in srgb, #ef4444 75%, var(--text-secondary));
 }

@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { IMessage, IMessagePathNode } from '@/entities/conversation';
-import { updateMessage, deleteMessage, fetchMessageReplies } from '@/entities/conversation';
+import type { IMessage, IMessagePathNode, MessageVoteValue } from '@/entities/conversation';
+import {
+  updateMessage,
+  deleteMessage,
+  fetchMessageReplies,
+  likeMessage,
+  dislikeMessage,
+} from '@/entities/conversation';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
@@ -87,6 +93,24 @@ function FlagIcon() {
   );
 }
 
+function LikeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+      <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+    </svg>
+  );
+}
+
+function DislikeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+      <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+    </svg>
+  );
+}
+
 function ChevronUpIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
@@ -146,6 +170,12 @@ export function MessageRow({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [alreadyReported, setAlreadyReported] = useState(false);
+  const [likesCount, setLikesCount] = useState(() => message.likesCount ?? 0);
+  const [dislikesCount, setDislikesCount] = useState(() => message.dislikesCount ?? 0);
+  const [userVote, setUserVote] = useState<MessageVoteValue | null>(
+    () => message.currentUserVote ?? null,
+  );
+  const [voting, setVoting] = useState(false);
 
   const replyBump = useDiscussionRefresh(message.id);
   const prevReplyBump = useRef(replyBump);
@@ -175,6 +205,12 @@ export function MessageRow({
     );
     return () => delays.forEach((id) => window.clearTimeout(id));
   }, [focusTarget, message.id, onFocusHandled]);
+
+  useEffect(() => {
+    setLikesCount(message.likesCount ?? 0);
+    setDislikesCount(message.dislikesCount ?? 0);
+    setUserVote(message.currentUserVote ?? null);
+  }, [message.id, message.likesCount, message.dislikesCount, message.currentUserVote]);
 
   useEffect(() => {
     setDisplayText(message.messageText);
@@ -276,6 +312,40 @@ export function MessageRow({
   const openAuthorProfile = () => {
     if (!accountId) return;
     navigate(isMine ? '/user/me' : `/user/${accountId}`);
+  };
+
+  const applyVoteResult = (result: {
+    likesCount: number;
+    dislikesCount: number;
+    currentUserVote: MessageVoteValue | null;
+  }) => {
+    setLikesCount(result.likesCount);
+    setDislikesCount(result.dislikesCount);
+    setUserVote(result.currentUserVote);
+  };
+
+  const handleLike = async () => {
+    if (!currentAccountId || voting || isHidden) return;
+    setVoting(true);
+    try {
+      applyVoteResult(await likeMessage(message.id));
+    } catch {
+      /* toast via apiClient */
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const handleDislike = async () => {
+    if (!currentAccountId || voting || isHidden) return;
+    setVoting(true);
+    try {
+      applyVoteResult(await dislikeMessage(message.id));
+    } catch {
+      /* toast via apiClient */
+    } finally {
+      setVoting(false);
+    }
   };
 
   return (
@@ -392,6 +462,38 @@ export function MessageRow({
 
             {!editing && !isHidden && (
               <footer className={styles.foot}>
+                {currentAccountId && (
+                  <>
+                    <button
+                      type="button"
+                      className={`${styles.actionBtn} ${userVote === 'like' ? styles.actionBtnActive : ''}`}
+                      disabled={voting}
+                      aria-pressed={userVote === 'like'}
+                      aria-label="Нравится"
+                      onClick={() => void handleLike()}
+                    >
+                      <LikeIcon />
+                      {likesCount > 0 ? likesCount : null}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.actionBtn} ${userVote === 'dislike' ? styles.actionBtnActive : ''}`}
+                      disabled={voting}
+                      aria-pressed={userVote === 'dislike'}
+                      aria-label="Не нравится"
+                      onClick={() => void handleDislike()}
+                    >
+                      <DislikeIcon />
+                      {dislikesCount > 0 ? dislikesCount : null}
+                    </button>
+                  </>
+                )}
+                {!currentAccountId && (likesCount > 0 || dislikesCount > 0) && (
+                  <span className={styles.voteReadonly} aria-label="Оценки комментария">
+                    {likesCount > 0 && <span>▲ {likesCount}</span>}
+                    {dislikesCount > 0 && <span>▼ {dislikesCount}</span>}
+                  </span>
+                )}
                 {currentAccountId && onReply && (
                   <button type="button" className={styles.actionBtn} onClick={() => onReply?.(message, rootId)}>
                     <ReplyIcon />

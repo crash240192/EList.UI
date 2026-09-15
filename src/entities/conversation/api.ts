@@ -9,6 +9,8 @@ import type {
   IMessageLocation,
   IMessagePathNode,
   IMessageRequest,
+  IMessageVoteResult,
+  MessageVoteValue,
 } from './types';
 
 const PAGE_SIZE_DEFAULT = 20;
@@ -90,12 +92,42 @@ export async function fetchEventConversations(eventId: string): Promise<IConvers
   );
 }
 
+function normalizeMessageVote(raw: unknown): MessageVoteValue | null {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'number') {
+    if (raw === 0) return 'like';
+    if (raw === 1) return 'dislike';
+    return null;
+  }
+  const s = String(raw).toLowerCase();
+  if (s === 'like' || s === '0') return 'like';
+  if (s === 'dislike' || s === '1') return 'dislike';
+  return null;
+}
+
 function normalizeMessage(raw: unknown): IMessage {
   const r = (raw ?? {}) as Record<string, unknown>;
   const msg = (raw ?? {}) as IMessage;
   return {
     ...msg,
+    id: String(r.id ?? r.Id ?? msg.id ?? ''),
+    conversationId: String(r.conversationId ?? r.ConversationId ?? msg.conversationId ?? ''),
+    messageText: String(r.messageText ?? r.MessageText ?? msg.messageText ?? ''),
+    replied: Boolean(r.replied ?? r.Replied ?? msg.replied),
     hidden: Boolean(r.hidden ?? r.Hidden ?? msg.hidden),
+    likesCount: Number(r.likesCount ?? r.LikesCount ?? msg.likesCount ?? 0) || 0,
+    dislikesCount: Number(r.dislikesCount ?? r.DislikesCount ?? msg.dislikesCount ?? 0) || 0,
+    currentUserVote: normalizeMessageVote(r.currentUserVote ?? r.CurrentUserVote ?? msg.currentUserVote),
+  };
+}
+
+function normalizeMessageVoteResult(raw: unknown): IMessageVoteResult {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    messageId: String(r.messageId ?? r.MessageId ?? ''),
+    likesCount: Number(r.likesCount ?? r.LikesCount ?? 0) || 0,
+    dislikesCount: Number(r.dislikesCount ?? r.DislikesCount ?? 0) || 0,
+    currentUserVote: normalizeMessageVote(r.currentUserVote ?? r.CurrentUserVote),
   };
 }
 
@@ -214,4 +246,19 @@ export async function updateMessage(request: IMessageRequest): Promise<void> {
 
 export async function deleteMessage(messageId: string): Promise<void> {
   await apiClient.delete(`/api/conversations/messages/${messageId}`);
+}
+
+export async function likeMessage(messageId: string): Promise<IMessageVoteResult> {
+  const data = await apiClient.post<unknown>(`/api/conversations/messages/${messageId}/like`);
+  return normalizeMessageVoteResult(data.result);
+}
+
+export async function dislikeMessage(messageId: string): Promise<IMessageVoteResult> {
+  const data = await apiClient.post<unknown>(`/api/conversations/messages/${messageId}/dislike`);
+  return normalizeMessageVoteResult(data.result);
+}
+
+export async function removeMessageVote(messageId: string): Promise<IMessageVoteResult> {
+  const data = await apiClient.delete<unknown>(`/api/conversations/messages/${messageId}/vote`);
+  return normalizeMessageVoteResult(data.result);
 }

@@ -71,13 +71,13 @@ export type NotificationNavTarget =
   | { kind: 'settings-moderation' }
   | { kind: 'agreements-recheck' };
 
-/** Message из payload уведомления MessageReplied (ответ) */
+/** Message / digest payload с ссылкой на комментарий */
 export function parseNotificationMessageRef(
   data: unknown,
 ): { id: string; conversationId?: string } | null {
   if (!data || typeof data !== 'object') return null;
   const o = data as Record<string, unknown>;
-  const id = String(o.id ?? o.Id ?? '').trim();
+  const id = String(o.id ?? o.Id ?? o.messageId ?? o.MessageId ?? '').trim();
   if (!id) return null;
   const conversationRaw = o.conversationId ?? o.ConversationId;
   const conversationId =
@@ -202,9 +202,13 @@ export function getNotificationNavigationTarget(
   }
 
   if (
-    isUserNotificationTypeName(n.type, 'MessageReplied')
+    isUserNotificationTypeName(n.type, 'MessageReplied', 'CommentLiked', 'CommentLikedDigest')
     || typeNum === 31
+    || typeNum === 33
+    || typeNum === 34
     || typeKey === 'MessageReplied'
+    || typeKey === 'CommentLiked'
+    || typeKey === 'CommentLikedDigest'
   ) {
     const eventId = getNotificationEventId(n);
     const msg = parseNotificationMessageRef(n.data);

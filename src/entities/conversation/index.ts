@@ -7,6 +7,8 @@ export type {
   IMessageLocation,
   IMessagePathNode,
   IMessageRequest,
+  IMessageVoteResult,
+  MessageVoteValue,
 } from './types';
 
 export {
@@ -22,4 +24,7 @@ export {
   createMessage,
   updateMessage,
   deleteMessage,
+  likeMessage,
+  dislikeMessage,
+  removeMessageVote,
 } from './api';
