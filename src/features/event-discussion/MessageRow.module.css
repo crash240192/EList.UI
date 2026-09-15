@@ -285,62 +285,6 @@
   color: #ef4444;
 }
 
-.collapsedReplies {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin: 2px 0 0 10px;
-  padding: 8px 12px 8px 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-  border-radius: 0 10px 10px 0;
-  transition: background 0.12s;
-}
-
-.collapsedReplies:hover {
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface-2) 95%);
-}
-
-.collapsedRepliesLine {
-  width: 2px;
-  align-self: stretch;
-  flex-shrink: 0;
-  border-radius: 2px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 55%, var(--border) 45%),
-    color-mix(in srgb, var(--accent) 20%, var(--border) 80%)
-  );
-}
-
-.collapsedRepliesBody {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.collapsedRepliesCount {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.collapsedRepliesHint {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.collapsedReplies svg {
-  flex-shrink: 0;
-  color: var(--accent);
-}
-
 .linkBtn {
   border: none;
   background: transparent;
@@ -412,5 +356,29 @@
 
 .saveBtn:disabled {
   opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.moreBtn {
+  width: calc(100% - 10px);
+  height: 32px;
+  border-radius: 8px;
+  margin: 4px 0 0 10px;
+  background: none;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  font-family: inherit;
+}
+
+.moreBtn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--accent);
+}
+
+.moreBtn:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
