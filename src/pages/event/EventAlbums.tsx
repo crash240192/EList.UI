@@ -91,12 +91,13 @@ interface AlbumCardProps {
   album: IAlbum;
   canManage: boolean;
   coverVersion?: number;
+  hideMeta?: boolean;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-function AlbumCard({ album, canManage, coverVersion = 0, onOpen, onEdit, onDelete }: AlbumCardProps) {
+function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpen, onEdit, onDelete }: AlbumCardProps) {
   const [cover, setCover] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -119,7 +120,7 @@ function AlbumCard({ album, canManage, coverVersion = 0, onOpen, onEdit, onDelet
   }, [menuOpen]);
 
   return (
-    <div className={styles.albumCard}>
+    <div className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : ''}`}>
       <div className={styles.albumCardBody} onClick={onOpen} role="button" tabIndex={0}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}>
         <div className={styles.albumCover}>
@@ -140,10 +141,12 @@ function AlbumCard({ album, canManage, coverVersion = 0, onOpen, onEdit, onDelet
             </div>
           )}
         </div>
-        <div className={styles.albumMeta}>
-          <div className={styles.albumName}>{album.name}</div>
-          {album.description && <div className={styles.albumDesc}>{album.description}</div>}
-        </div>
+        {!hideMeta && (
+          <div className={styles.albumMeta}>
+            <div className={styles.albumName}>{album.name}</div>
+            {album.description && <div className={styles.albumDesc}>{album.description}</div>}
+          </div>
+        )}
       </div>
 
       {canManage && (
@@ -218,6 +221,7 @@ export function EventAlbums({
   const [checkingPhotos, setCheckingPhotos] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [coverVersionByAlbumId, setCoverVersionByAlbumId] = useState<Record<string, number>>({});
+  const [albumsExpanded, setAlbumsExpanded] = useState(false);
 
   const bumpAlbumCover = useCallback((albumId: string) => {
     setCoverVersionByAlbumId(prev => ({
@@ -389,13 +393,53 @@ export function EventAlbums({
   if (!albums.length && !canManage) return null;
 
   if (compact) {
+    const hasAlbums = albums.length > 0;
     return (
       <div className={styles.albumsSection}>
         <div className={styles.header}>
           <div className={styles.title}>Фотоальбомы</div>
-          {albums.length > 0 && <span className={styles.count}>{albums.length}</span>}
+          {hasAlbums && (
+            <button
+              type="button"
+              className={styles.count}
+              aria-expanded={albumsExpanded}
+              onClick={() => setAlbumsExpanded(v => !v)}
+            >
+              {albums.length}
+              <svg
+                className={`${styles.countChevron} ${albumsExpanded ? styles.countChevronOpen : ''}`}
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                aria-hidden
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          )}
         </div>
-        {renderGrid(albums.slice(0, canManage ? albums.length : 4), true)}
+        {hasAlbums && !albumsExpanded && (
+          <div className={styles.gridCollapsed}>
+            {albums.slice(0, 4).map(a => (
+              <AlbumCard
+                key={a.id}
+                album={a}
+                canManage={canManage}
+                hideMeta
+                coverVersion={coverVersionByAlbumId[a.id] ?? 0}
+                onOpen={() => openAlbum(a)}
+                onEdit={() => setFormAlbum(a)}
+                onDelete={() => setDeleteTarget(a)}
+              />
+            ))}
+          </div>
+        )}
+        {(albumsExpanded || (!hasAlbums && canManage)) && (
+          renderGrid(albums.slice(0, canManage ? albums.length : 4), true)
+        )}
         {modals}
       </div>
     );
