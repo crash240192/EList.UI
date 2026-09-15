@@ -3,7 +3,7 @@ import type { IMessage, IMessagePathNode } from '@/entities/conversation';
 import { fetchMessageReplies } from '@/entities/conversation';
 import { MessageRow } from './MessageRow';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
-import { DiscussionPager } from './DiscussionPager';
+import { DiscussionLoadMore } from './DiscussionLoadMore';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { useDiscussionRefreshActions } from './discussionRefreshContext';
@@ -11,12 +11,23 @@ import {
   DISCUSSION_REPLY_PREVIEW_COUNT,
   DISCUSSION_TREE_INDENT_CAP,
   DISCUSSION_TREE_SIBLING_PAGE_SIZE,
-  discussionTotalPages,
   type DiscussionViewMode,
 } from './discussionViewMode';
 import { loadDescendantReplies } from './loadDescendantReplies';
 import { messageAuthorName } from './messageUtils';
 import styles from './MessageReplies.module.css';
+
+function mergeById(existing: IMessage[], incoming: IMessage[]): IMessage[] {
+  if (incoming.length === 0) return existing;
+  const seen = new Set(existing.map((m) => m.id));
+  const next = [...existing];
+  for (const item of incoming) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    next.push(item);
+  }
+  return next;
+}
 
 interface MessageRepliesProps {
   parent: IMessage;
@@ -55,18 +66,18 @@ export function MessageReplies({
 }: MessageRepliesProps) {
   const { resetBump } = useDiscussionRefreshActions();
   const focusChild = focusPathTail?.[0];
-  const focusInitialPage = focusChild?.pageIndex ?? 0;
+  const focusThroughPage = focusChild?.pageIndex ?? 0;
   const [items, setItems] = useState<IMessage[]>([]);
   const [total, setTotal] = useState(0);
-  const [pageIndex, setPageIndex] = useState(focusInitialPage);
+  const [loadedThroughPage, setLoadedThroughPage] = useState(-1);
   const [loading, setLoading] = useState(true);
-  const [pageLoading, setPageLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** В ленте под корнем — превью первой порции */
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const requestGen = useRef(0);
-  const focusInitialPageRef = useRef(focusInitialPage);
-  focusInitialPageRef.current = focusInitialPage;
+  const focusThroughPageRef = useRef(focusThroughPage);
+  focusThroughPageRef.current = focusThroughPage;
 
   const byId = useMemo(() => {
     const map = new Map<string, IMessage>();
@@ -75,51 +86,58 @@ export function MessageReplies({
     return map;
   }, [parent, items]);
 
-  const totalPages = discussionTotalPages(total, DISCUSSION_TREE_SIBLING_PAGE_SIZE);
+  const remaining = Math.max(0, total - items.length);
 
-  const loadTreePage = useCallback(
-    async (nextPage: number, generation: number, initial: boolean) => {
-      if (initial) setLoading(true);
-      else setPageLoading(true);
+  const fetchTreeRange = useCallback(
+    async (
+      fromPage: number,
+      toPage: number,
+      generation: number,
+      mode: 'replace' | 'append',
+    ) => {
+      if (toPage < fromPage) return;
+      if (mode === 'replace') setLoading(true);
+      else setLoadingMore(true);
+
       try {
-        const paged = await fetchMessageReplies(
-          parent.id,
-          nextPage,
-          DISCUSSION_TREE_SIBLING_PAGE_SIZE,
-        );
-        if (generation !== requestGen.current) return;
+        const localAcc: IMessage[] = [];
+        let nextTotal = 0;
 
-        const nextItems = paged.result ?? [];
-        const nextTotal = paged.total ?? 0;
-        const maxPage = Math.max(0, discussionTotalPages(nextTotal, DISCUSSION_TREE_SIBLING_PAGE_SIZE) - 1);
-        const safePage = Math.min(nextPage, maxPage);
-
-        if (safePage !== nextPage && nextTotal > 0) {
-          const last = await fetchMessageReplies(
+        for (let page = fromPage; page <= toPage; page += 1) {
+          const paged = await fetchMessageReplies(
             parent.id,
-            safePage,
+            page,
             DISCUSSION_TREE_SIBLING_PAGE_SIZE,
           );
           if (generation !== requestGen.current) return;
-          setItems(last.result ?? []);
-          setTotal(last.total ?? 0);
-          onTotalLoaded?.(last.total ?? 0);
-          setPageIndex(safePage);
-        } else {
-          setItems(nextItems);
-          setTotal(nextTotal);
-          onTotalLoaded?.(nextTotal);
-          setPageIndex(safePage);
+          nextTotal = paged.total ?? 0;
+          localAcc.push(...(paged.result ?? []));
+          if ((paged.result?.length ?? 0) === 0) break;
         }
+
+        if (generation !== requestGen.current) return;
+
+        if (mode === 'replace') {
+          setItems(mergeById([], localAcc));
+        } else {
+          setItems((prev) => mergeById(prev, localAcc));
+        }
+        setTotal(nextTotal);
+        onTotalLoaded?.(nextTotal);
+        setLoadedThroughPage(toPage);
         setError(null);
       } catch (e) {
         if (generation !== requestGen.current) return;
         setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов');
-        if (initial) setItems([]);
+        if (mode === 'replace') {
+          setItems([]);
+          setLoadedThroughPage(-1);
+          setTotal(0);
+        }
       } finally {
         if (generation === requestGen.current) {
           setLoading(false);
-          setPageLoading(false);
+          setLoadingMore(false);
         }
       }
     },
@@ -134,12 +152,13 @@ export function MessageReplies({
       setItems(descendants);
       setTotal(descendants.length);
       onTotalLoaded?.(descendants.length);
-      setPageIndex(0);
+      setLoadedThroughPage(0);
       setError(null);
     } catch (e) {
       if (generation !== requestGen.current) return;
       setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов');
       setItems([]);
+      setLoadedThroughPage(-1);
     } finally {
       if (generation === requestGen.current) setLoading(false);
     }
@@ -149,20 +168,40 @@ export function MessageReplies({
     requestGen.current += 1;
     const generation = requestGen.current;
     setPreviewExpanded(Boolean(focusChild));
-    const startPage = Math.max(0, focusInitialPageRef.current);
-    setPageIndex(startPage);
+    setLoadedThroughPage(-1);
     if (viewMode === 'flat') {
       void loadFlat(generation);
     } else {
-      void loadTreePage(startPage, generation, true);
+      const through = Math.max(0, focusThroughPageRef.current);
+      void fetchTreeRange(0, through, generation, 'replace');
     }
-  }, [loadFlat, loadTreePage, parent.id, refreshKey, viewMode, focusChild?.messageId]);
+  }, [loadFlat, fetchTreeRange, parent.id, refreshKey, viewMode, focusChild?.messageId]);
 
-  const goToPage = useCallback((nextPage: number) => {
-    if (viewMode === 'flat' || loading || pageLoading) return;
+  // Deep-link: дотянуть сиблингов до страницы цели
+  useEffect(() => {
+    if (viewMode !== 'tree') return;
+    if (loading || loadingMore) return;
+    if (loadedThroughPage < 0) return;
+    if (focusThroughPage <= loadedThroughPage) return;
+
     const generation = requestGen.current;
-    void loadTreePage(nextPage, generation, false);
-  }, [loadTreePage, loading, pageLoading, viewMode]);
+    void fetchTreeRange(loadedThroughPage + 1, focusThroughPage, generation, 'append');
+  }, [
+    viewMode,
+    loading,
+    loadingMore,
+    loadedThroughPage,
+    focusThroughPage,
+    fetchTreeRange,
+  ]);
+
+  const loadMore = useCallback(() => {
+    if (viewMode === 'flat' || loading || loadingMore || remaining <= 0) return;
+    const nextPage = loadedThroughPage + 1;
+    if (nextPage < 0) return;
+    const generation = requestGen.current;
+    void fetchTreeRange(nextPage, nextPage, generation, 'append');
+  }, [viewMode, loading, loadingMore, remaining, loadedThroughPage, fetchTreeRange]);
 
   const handleDeleted = useCallback((messageId: string) => {
     setItems((prev) => {
@@ -266,13 +305,11 @@ export function MessageReplies({
         </button>
       )}
       {viewMode === 'tree' && (
-        <DiscussionPager
-          pageIndex={pageIndex}
-          totalPages={totalPages}
-          totalItems={total}
-          disabled={pageLoading}
-          label="Ответы"
-          onPageChange={goToPage}
+        <DiscussionLoadMore
+          remaining={remaining}
+          loading={loadingMore}
+          label="Ещё ответы"
+          onLoadMore={loadMore}
         />
       )}
     </div>

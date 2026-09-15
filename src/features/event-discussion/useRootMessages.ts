@@ -1,73 +1,101 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { IMessage } from '@/entities/conversation';
 import { fetchConversationRootMessages } from '@/entities/conversation';
-import {
-  DISCUSSION_ROOT_PAGE_SIZE,
-  discussionTotalPages,
-} from './discussionViewMode';
+import { DISCUSSION_ROOT_PAGE_SIZE } from './discussionViewMode';
+
+function mergeById(existing: IMessage[], incoming: IMessage[]): IMessage[] {
+  if (incoming.length === 0) return existing;
+  const seen = new Set(existing.map((m) => m.id));
+  const next = [...existing];
+  for (const item of incoming) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    next.push(item);
+  }
+  return next;
+}
 
 export function useRootMessages(
   conversationId: string | null,
-  options?: { initialPageIndex?: number },
+  options?: {
+    /**
+     * Deep-link: сразу подтянуть страницы API 0…N, чтобы целевой корень
+     * оказался в непрерывной ленте (без прыжка на «страницу N»).
+     */
+    loadThroughPage?: number;
+  },
 ) {
-  const initialPageIndex = options?.initialPageIndex ?? 0;
-  const initialPageRef = useRef(initialPageIndex);
-  initialPageRef.current = initialPageIndex;
+  const loadThroughPage = Math.max(0, options?.loadThroughPage ?? 0);
+  const loadThroughPageRef = useRef(loadThroughPage);
+  loadThroughPageRef.current = loadThroughPage;
+
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(false);
-  const [pageIndex, setPageIndex] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadedThroughPage, setLoadedThroughPage] = useState(-1);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const generationRef = useRef(0);
 
-  const totalPages = discussionTotalPages(total, DISCUSSION_ROOT_PAGE_SIZE);
+  const hasMore = messages.length < total;
 
-  const loadPage = useCallback(async (nextPage: number, generation: number, replaceLoading: boolean) => {
-    if (!conversationId) return;
-    if (replaceLoading) setLoading(true);
-    else setPageLoading(true);
+  const fetchPageRange = useCallback(
+    async (
+      fromPage: number,
+      toPage: number,
+      generation: number,
+      mode: 'replace' | 'append',
+    ) => {
+      if (!conversationId || toPage < fromPage) return;
 
-    try {
-      const paged = await fetchConversationRootMessages(
-        conversationId,
-        nextPage,
-        DISCUSSION_ROOT_PAGE_SIZE,
-      );
-      if (generation !== generationRef.current) return;
+      if (mode === 'replace') setLoading(true);
+      else setLoadingMore(true);
 
-      const nextTotal = paged.total ?? 0;
-      const maxPage = Math.max(0, discussionTotalPages(nextTotal, DISCUSSION_ROOT_PAGE_SIZE) - 1);
-      const safePage = Math.min(nextPage, maxPage);
+      try {
+        const localAcc: IMessage[] = [];
+        let nextTotal = 0;
 
-      // Если запросили страницу за пределами — подтянем последнюю
-      if (safePage !== nextPage && nextTotal > 0) {
-        const last = await fetchConversationRootMessages(
-          conversationId,
-          safePage,
-          DISCUSSION_ROOT_PAGE_SIZE,
-        );
+        for (let page = fromPage; page <= toPage; page += 1) {
+          const paged = await fetchConversationRootMessages(
+            conversationId,
+            page,
+            DISCUSSION_ROOT_PAGE_SIZE,
+          );
+          if (generation !== generationRef.current) return;
+
+          nextTotal = paged.total ?? 0;
+          localAcc.push(...(paged.result ?? []));
+
+          if ((paged.result?.length ?? 0) === 0) break;
+        }
+
         if (generation !== generationRef.current) return;
-        setMessages(last.result ?? []);
-        setTotal(last.total ?? 0);
-        setPageIndex(safePage);
-      } else {
-        setMessages(paged.result ?? []);
+
+        if (mode === 'replace') {
+          setMessages(mergeById([], localAcc));
+        } else {
+          setMessages((prev) => mergeById(prev, localAcc));
+        }
         setTotal(nextTotal);
-        setPageIndex(safePage);
+        setLoadedThroughPage(toPage);
+        setError(null);
+      } catch (e) {
+        if (generation !== generationRef.current) return;
+        setError(e instanceof Error ? e.message : 'Не удалось загрузить сообщения');
+        if (mode === 'replace') {
+          setMessages([]);
+          setLoadedThroughPage(-1);
+          setTotal(0);
+        }
+      } finally {
+        if (generation === generationRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-      setError(null);
-    } catch (e) {
-      if (generation !== generationRef.current) return;
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить сообщения');
-      if (replaceLoading) setMessages([]);
-    } finally {
-      if (generation === generationRef.current) {
-        setLoading(false);
-        setPageLoading(false);
-      }
-    }
-  }, [conversationId]);
+    },
+    [conversationId],
+  );
 
   useEffect(() => {
     generationRef.current += 1;
@@ -76,28 +104,56 @@ export function useRootMessages(
     if (!conversationId) {
       setMessages([]);
       setTotal(0);
-      setPageIndex(0);
+      setLoadedThroughPage(-1);
       setError(null);
+      setLoading(false);
+      setLoadingMore(false);
       return;
     }
 
-    const startPage = Math.max(0, initialPageRef.current);
-    setPageIndex(startPage);
-    void loadPage(startPage, generation, true);
-  }, [conversationId, loadPage]);
+    const through = loadThroughPageRef.current;
+    void fetchPageRange(0, through, generation, 'replace');
+  }, [conversationId, fetchPageRange]);
 
-  const goToPage = useCallback((nextPage: number) => {
-    if (!conversationId || loading || pageLoading) return;
+  // Deep-link: если целевая страница глубже уже загруженной — дотянуть хвост
+  useEffect(() => {
+    if (!conversationId || loading || loadingMore) return;
+    if (loadedThroughPage < 0) return;
+    if (loadThroughPage <= loadedThroughPage) return;
+
     const generation = generationRef.current;
-    void loadPage(nextPage, generation, false);
-  }, [conversationId, loadPage, loading, pageLoading]);
+    void fetchPageRange(loadedThroughPage + 1, loadThroughPage, generation, 'append');
+  }, [
+    conversationId,
+    loadThroughPage,
+    loadedThroughPage,
+    loading,
+    loadingMore,
+    fetchPageRange,
+  ]);
+
+  const loadMore = useCallback(() => {
+    if (!conversationId || loading || loadingMore || !hasMore) return;
+    const nextPage = loadedThroughPage + 1;
+    if (nextPage < 0) return;
+    const generation = generationRef.current;
+    void fetchPageRange(nextPage, nextPage, generation, 'append');
+  }, [
+    conversationId,
+    loading,
+    loadingMore,
+    hasMore,
+    loadedThroughPage,
+    fetchPageRange,
+  ]);
 
   const refresh = useCallback(() => {
     if (!conversationId) return;
     generationRef.current += 1;
     const generation = generationRef.current;
-    void loadPage(pageIndex, generation, true);
-  }, [conversationId, loadPage, pageIndex]);
+    const through = Math.max(0, loadedThroughPage, loadThroughPageRef.current);
+    void fetchPageRange(0, through, generation, 'replace');
+  }, [conversationId, loadedThroughPage, fetchPageRange]);
 
   const removeMessage = useCallback((messageId: string) => {
     setMessages((prev) => {
@@ -110,12 +166,12 @@ export function useRootMessages(
   return {
     messages,
     loading,
-    pageLoading,
-    pageIndex,
-    totalPages,
+    loadingMore,
+    hasMore,
+    remaining: Math.max(0, total - messages.length),
     total,
     error,
-    goToPage,
+    loadMore,
     refresh,
     removeMessage,
   };

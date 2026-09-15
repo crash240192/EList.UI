@@ -29,7 +29,7 @@ import {
   type DiscussionViewMode,
 } from './discussionViewMode';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
-import { DiscussionPager } from './DiscussionPager';
+import { DiscussionLoadMore } from './DiscussionLoadMore';
 import styles from './MessageThread.module.css';
 
 interface MessageThreadProps {
@@ -100,9 +100,9 @@ function MessageThreadInner({
   }, [focusMessageId, conversationId]);
 
   const rootsConversationId = bootstrapPage !== null ? conversationId : null;
-  const { messages, loading, pageLoading, pageIndex, totalPages, total, error, goToPage, refresh, removeMessage } =
+  const { messages, loading, loadingMore, remaining, error, loadMore, refresh, removeMessage } =
     useRootMessages(rootsConversationId, {
-      initialPageIndex: bootstrapPage ?? 0,
+      loadThroughPage: bootstrapPage ?? 0,
     });
   const { bump } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
@@ -356,13 +356,11 @@ function MessageThreadInner({
         </div>
       )}
       {!loading && !error && (
-        <DiscussionPager
-          pageIndex={pageIndex}
-          totalPages={totalPages}
-          totalItems={total}
-          disabled={pageLoading}
-          label="Комментарии"
-          onPageChange={goToPage}
+        <DiscussionLoadMore
+          remaining={remaining}
+          loading={loadingMore}
+          label="Ещё комментарии"
+          onLoadMore={loadMore}
         />
       )}
 
