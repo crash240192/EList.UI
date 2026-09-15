@@ -30,8 +30,3 @@ export const DISCUSSION_VIEW_MODE_LABELS: Record<DiscussionViewMode, string> = {
 export function isDiscussionViewMode(value: unknown): value is DiscussionViewMode {
   return value === 'tree' || value === 'flat';
 }
-
-export function discussionTotalPages(total: number, pageSize: number): number {
-  if (pageSize <= 0 || total <= 0) return 1;
-  return Math.max(1, Math.ceil(total / pageSize));
-}
