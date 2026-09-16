@@ -72,6 +72,46 @@
   opacity: 0.85;
 }
 
+@media (max-width: 639px) {
+  .wrap {
+    min-height: 88px;
+    border-radius: 12px;
+    flex-direction: row;
+  }
+
+  .inner {
+    min-height: 0;
+  }
+
+  .placeholder {
+    flex-direction: row;
+    min-height: 88px;
+  }
+
+  .placeholderCover {
+    width: 108px;
+    flex: 0 0 108px;
+    height: auto;
+    align-self: stretch;
+    border-bottom: none;
+    border-right: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
+  }
+
+  .placeholderBody {
+    padding: 8px 10px;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .placeholderText {
+    font-size: 12px;
+  }
+
+  .placeholderLine {
+    height: 10px;
+  }
+}
+
 /* Боковая панель */
 .sidebarWrap {
   position: relative;

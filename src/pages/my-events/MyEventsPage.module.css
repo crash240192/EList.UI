@@ -149,6 +149,22 @@
   gap: 14px;
 }
 
+@media (max-width: 639px) {
+  .list {
+    padding: 10px 12px 28px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .skeleton {
+    height: 88px;
+    border-radius: 12px;
+  }
+}
+
 /* ---- Card wrap: единый контейнер для всех карточек ---- */
 .cardWrap {
   position: relative;
