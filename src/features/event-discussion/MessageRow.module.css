@@ -500,6 +500,49 @@
   background: var(--surface-3, var(--bg-secondary));
 }
 
+.editShotUploading {
+  pointer-events: none;
+}
+
+.editShotImgDim {
+  filter: brightness(0.72);
+}
+
+.editShotOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.editShotError {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  background: rgba(239, 68, 68, 0.22);
+  color: #dc2626;
+  cursor: pointer;
+}
+
+.editShotSpinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: editShotSpin 0.8s linear infinite;
+}
+
+@keyframes editShotSpin {
+  to { transform: rotate(360deg); }
+}
+
 .editShotRemove {
   position: absolute;
   top: 2px;

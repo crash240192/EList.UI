@@ -182,12 +182,20 @@ export function MessageRow({
   const [voting, setVoting] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [editFileIds, setEditFileIds] = useState<string[]>(() => message.fileIds ?? []);
-  const [uploadingEdit, setUploadingEdit] = useState(false);
+  const [editUploads, setEditUploads] = useState<Array<{
+    localId: string;
+    previewUrl: string;
+    error?: string;
+  }>>([]);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const editUploadsRef = useRef(editUploads);
+  editUploadsRef.current = editUploads;
 
   const replyBump = useDiscussionRefresh(message.id);
   const fileIds = message.fileIds ?? [];
   const [displayFileIds, setDisplayFileIds] = useState(fileIds);
+  const uploadingEdit = editUploads.some(u => !u.error);
+  const editSlotCount = editFileIds.length + editUploads.length;
   const prevReplyBump = useRef(replyBump);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
   const isHidden = Boolean(message.hidden);
@@ -227,10 +235,17 @@ export function MessageRow({
     setEditText(clampText(message.messageText, DISCUSSION_MESSAGE_MAX_LENGTH));
     setDisplayFileIds(message.fileIds ?? []);
     setEditFileIds(message.fileIds ?? []);
+    setEditUploads(prev => {
+      prev.forEach(u => URL.revokeObjectURL(u.previewUrl));
+      return [];
+    });
     setTextExpanded(false);
     setEditError(null);
   }, [message.id, message.messageText, message.fileIds?.join(',')]);
 
+  useEffect(() => () => {
+    editUploadsRef.current.forEach(u => URL.revokeObjectURL(u.previewUrl));
+  }, []);
   useEffect(() => {
     if (replyBump > prevReplyBump.current) setExpanded(true);
     prevReplyBump.current = replyBump;
@@ -258,6 +273,10 @@ export function MessageRow({
   const startEdit = () => {
     setEditText(displayText);
     setEditFileIds(displayFileIds);
+    setEditUploads(prev => {
+      prev.forEach(u => URL.revokeObjectURL(u.previewUrl));
+      return [];
+    });
     setEditError(null);
     setEditing(true);
   };
@@ -265,6 +284,10 @@ export function MessageRow({
   const cancelEdit = () => {
     setEditText(displayText);
     setEditFileIds(displayFileIds);
+    setEditUploads(prev => {
+      prev.forEach(u => URL.revokeObjectURL(u.previewUrl));
+      return [];
+    });
     setEditError(null);
     setEditing(false);
   };
@@ -273,9 +296,17 @@ export function MessageRow({
     setEditFileIds(prev => prev.filter(id => id !== fileId));
   };
 
-  const handleEditFiles = async (list: FileList | null) => {
-    if (!list?.length || uploadingEdit || savingEdit) return;
-    const remaining = DISCUSSION_MESSAGE_MAX_FILES - editFileIds.length;
+  const removeEditUpload = (localId: string) => {
+    setEditUploads(prev => {
+      const target = prev.find(u => u.localId === localId);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter(u => u.localId !== localId);
+    });
+  };
+
+  const handleEditFiles = (list: FileList | null) => {
+    if (!list?.length || savingEdit) return;
+    const remaining = DISCUSSION_MESSAGE_MAX_FILES - editSlotCount;
     if (remaining <= 0) {
       setEditError(`Не больше ${DISCUSSION_MESSAGE_MAX_FILES} фото`);
       return;
@@ -285,23 +316,39 @@ export function MessageRow({
       setEditError('Можно прикладывать только изображения');
       return;
     }
-    setUploadingEdit(true);
     setEditError(null);
-    try {
-      const uploaded: string[] = [];
-      for (const file of images) {
-        const result = await uploadFile(file);
-        uploaded.push(result.id);
-      }
-      if (uploaded.length) {
-        setEditFileIds(prev => [...prev, ...uploaded].slice(0, DISCUSSION_MESSAGE_MAX_FILES));
-      }
-    } catch (e) {
-      setEditError(e instanceof Error ? e.message : 'Не удалось загрузить фото');
-    } finally {
-      setUploadingEdit(false);
-      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    const placeholders = images.map(file => ({
+      localId: `edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      previewUrl: URL.createObjectURL(file),
+      file,
+    }));
+    setEditUploads(prev => [
+      ...prev,
+      ...placeholders.map(({ localId, previewUrl }) => ({ localId, previewUrl })),
+    ]);
+
+    for (const placeholder of placeholders) {
+      void uploadFile(placeholder.file)
+        .then(result => {
+          setEditUploads(prev => {
+            const target = prev.find(u => u.localId === placeholder.localId);
+            if (target) URL.revokeObjectURL(target.previewUrl);
+            return prev.filter(u => u.localId !== placeholder.localId);
+          });
+          setEditFileIds(prev => [...prev, result.id].slice(0, DISCUSSION_MESSAGE_MAX_FILES));
+        })
+        .catch(e => {
+          const message = e instanceof Error ? e.message : 'Не удалось загрузить фото';
+          setEditError(message);
+          setEditUploads(prev => prev.map(u => (
+            u.localId === placeholder.localId && !u.error
+              ? { ...u, error: message }
+              : u
+          )));
+        });
     }
+
+    if (editFileInputRef.current) editFileInputRef.current.value = '';
   };
 
   const saveEdit = async () => {
@@ -333,6 +380,10 @@ export function MessageRow({
       });
       setDisplayText(trimmed);
       setDisplayFileIds(editFileIds);
+      setEditUploads(prev => {
+        prev.forEach(u => URL.revokeObjectURL(u.previewUrl));
+        return [];
+      });
       setEditing(false);
     } catch (e) {
       setEditError(e instanceof Error ? e.message : 'Не удалось сохранить');
@@ -465,7 +516,7 @@ export function MessageRow({
                     }
                   }}
                 />
-                {editFileIds.length > 0 && (
+                {(editFileIds.length > 0 || editUploads.length > 0) && (
                   <div className={styles.gallery}>
                     {editFileIds.map(fileId => (
                       <div key={fileId} className={styles.editShot}>
@@ -481,6 +532,38 @@ export function MessageRow({
                         </button>
                       </div>
                     ))}
+                    {editUploads.map(item => (
+                      <div
+                        key={item.localId}
+                        className={`${styles.editShot} ${!item.error ? styles.editShotUploading : ''}`}
+                        aria-busy={!item.error}
+                        aria-label={item.error ? 'Ошибка загрузки' : 'Загрузка фото'}
+                      >
+                        <img
+                          src={item.previewUrl}
+                          alt=""
+                          className={`${styles.galleryImg} ${styles.editShotImgDim}`}
+                        />
+                        {item.error ? (
+                          <button
+                            type="button"
+                            className={styles.editShotError}
+                            title={item.error}
+                            onClick={() => removeEditUpload(item.localId)}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <div className={styles.editShotOverlay}>
+                            <div className={styles.editShotSpinner} aria-hidden />
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
                 <div className={styles.editAttachRow}>
@@ -490,18 +573,20 @@ export function MessageRow({
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     multiple
                     className={styles.fileInputHidden}
-                    disabled={savingEdit || uploadingEdit || editFileIds.length >= DISCUSSION_MESSAGE_MAX_FILES}
-                    onChange={(e) => void handleEditFiles(e.target.files)}
+                    disabled={savingEdit || editSlotCount >= DISCUSSION_MESSAGE_MAX_FILES}
+                    onChange={(e) => handleEditFiles(e.target.files)}
                   />
                   <button
                     type="button"
                     className={styles.actionBtn}
-                    disabled={savingEdit || uploadingEdit || editFileIds.length >= DISCUSSION_MESSAGE_MAX_FILES}
+                    disabled={savingEdit || editSlotCount >= DISCUSSION_MESSAGE_MAX_FILES}
                     onClick={() => editFileInputRef.current?.click()}
                   >
-                    {uploadingEdit ? 'Загрузка…' : 'Фото'}
+                    {uploadingEdit
+                      ? `Загрузка… (${editUploads.filter(u => !u.error).length})`
+                      : 'Фото'}
                   </button>
-                  {editFileIds.length > 0 && (
+                  {(editFileIds.length > 0 || editUploads.length > 0) && (
                     <span className={styles.editAttachCount}>
                       {editFileIds.length}/{DISCUSSION_MESSAGE_MAX_FILES}
                     </span>
