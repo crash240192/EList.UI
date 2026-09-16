@@ -5,10 +5,12 @@ import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'rea
 import { useNavigate } from 'react-router-dom';
 import type { IEvent, IEventsSearchParams } from '@/entities/event';
 import { EventCard, fetchEventById, EVENTS_MAP_SHORT_PAGE_SIZE } from '@/entities/event';
+import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
 import { useEvents } from '@/features/event-list/useEvents';
 import { useEventsMapShort } from '@/features/event-list/useEventsMapShort';
 import { useFiltersStore, useToastStore } from '@/app/store';
-import { useInfiniteScroll, useDebounce, usePageTitle } from '@/shared/hooks';
+import { useInfiniteScroll, useDebounce, usePageTitle, useMediaQuery } from '@/shared/hooks';
+import { media } from '@/shared/lib/breakpoints';
 import { EventModal } from './EventModal';
 import { FilterBar } from '@/features/event-filters/FilterBar';
 import { useHomeFilterUrlSync } from '@/features/event-filters/filterUrlSync';
@@ -45,6 +47,7 @@ function readStoredListUi(): StoredListUi | null {
 
 export default function HomePage() {
   usePageTitle('Поиск событий');
+  const isMobileList = useMediaQuery(media.mobile);
   const [selectedEvent, setSelectedEvent] = useState<IEvent | null>(null);
   const [searchName, setSearchName] = useState(() => {
     try {
@@ -319,19 +322,36 @@ export default function HomePage() {
                 <p style={{ fontSize: 12 }}>Попробуйте сдвинуть карту, сменить масштаб, выбрать другой город или убрать часть фильтров</p>
               </div>
             ) : (
-              <div className={styles.grid}>
-                {events.map((event, idx) => (
-                  <Fragment key={event.id}>
-                    <EventCard.Preset
-                      event={event}
-                      onClick={e => handleListEventClick(e)}
-                    />
-                    {shouldInsertAdAfterIndex(idx) && (
-                      <AdSlot key={`ad-${event.id}`} />
-                    )}
-                  </Fragment>
-                ))}
-              </div>
+              isMobileList ? (
+                <EventList>
+                  {events.map((event, idx) => (
+                    <Fragment key={event.id}>
+                      <EventListItem
+                        event={event}
+                        bleedCover
+                        onClick={() => handleListEventClick(event)}
+                      />
+                      {shouldInsertAdAfterIndex(idx) && (
+                        <AdSlot key={`ad-${event.id}`} />
+                      )}
+                    </Fragment>
+                  ))}
+                </EventList>
+              ) : (
+                <div className={styles.grid}>
+                  {events.map((event, idx) => (
+                    <Fragment key={event.id}>
+                      <EventCard.Preset
+                        event={event}
+                        onClick={e => handleListEventClick(e)}
+                      />
+                      {shouldInsertAdAfterIndex(idx) && (
+                        <AdSlot key={`ad-${event.id}`} />
+                      )}
+                    </Fragment>
+                  ))}
+                </div>
+              )
             )}
 
             {hasMore && (

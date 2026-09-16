@@ -30,6 +30,10 @@ import {
 } from './discussionViewMode';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import { DiscussionLoadMore } from './DiscussionLoadMore';
+import {
+  clearDiscussionChromeClearance,
+  setDiscussionChromeClearance,
+} from './discussionChromeClearance';
 import styles from './MessageThread.module.css';
 
 interface MessageThreadProps {
@@ -113,6 +117,7 @@ function MessageThreadInner({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dockVisible, setDockVisible] = useState(true);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const boundsRef = layoutBoundsRef ?? threadRef;
@@ -305,6 +310,45 @@ function MessageThreadInner({
   const trackSlot = sheetOpen || showFab;
   const slot = useDiscussionSlotRect(boundsRef, trackSlot);
 
+  /** Keep event-page scroll-top above FAB / sticky composer on mobile */
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const update = () => {
+      if (sheetOpen) {
+        setDiscussionChromeClearance(0);
+        return;
+      }
+      if (showDock && dockRef.current) {
+        const h = dockRef.current.getBoundingClientRect().height;
+        setDiscussionChromeClearance(h + 10);
+        return;
+      }
+      if (showFab) {
+        const fabSize = window.matchMedia('(max-width: 639px)').matches ? 40 : 44;
+        setDiscussionChromeClearance(fabSize + 14);
+        return;
+      }
+      setDiscussionChromeClearance(0);
+    };
+
+    update();
+
+    const dockEl = dockRef.current;
+    if (!showDock || !dockEl || typeof ResizeObserver === 'undefined') {
+      return () => clearDiscussionChromeClearance();
+    }
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(dockEl);
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+      clearDiscussionChromeClearance();
+    };
+  }, [showDock, showFab, sheetOpen]);
+
   const showThreadSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
 
   const fabStyle: CSSProperties | undefined = showFab
@@ -371,7 +415,7 @@ function MessageThreadInner({
 
       <div ref={anchorRef} className={styles.composerAnchor}>
         {showDock && (
-          <div className={styles.composerDock}>
+          <div ref={dockRef} className={styles.composerDock}>
             <MessageComposer
               replyingTo={replyTarget ? messageAuthorName(replyTarget) : null}
               onCancelReply={() => setReplyTarget(null)}

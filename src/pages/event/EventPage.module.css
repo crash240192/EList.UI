@@ -728,9 +728,12 @@
   .scrollTopBtn {
     left: auto;
     right: 16px;
-    bottom: 16px;
+    /* Lift above discussion FAB / sticky composer when present */
+    bottom: calc(
+      16px + env(safe-area-inset-bottom, 0px) + var(--discussion-chrome-clearance, 0px)
+    );
     padding: 9px 12px;
-    /* Below sticky discussion composer / attach controls */
-    z-index: 110;
+    /* Above sticky composer dock (130), below composer sheet (500+) */
+    z-index: 140;
   }
 }

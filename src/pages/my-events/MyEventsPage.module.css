@@ -149,19 +149,20 @@
   gap: 14px;
 }
 
+.eventListSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 @media (max-width: 639px) {
   .list {
     padding: 10px 12px 28px;
   }
 
-  .grid {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
   .skeleton {
-    height: 76px;
-    border-radius: 12px;
+    height: 120px;
+    border-radius: 14px;
   }
 }
 
@@ -187,6 +188,17 @@
   background: var(--accent);
   border-radius: 20px; padding: 2px 8px;
   pointer-events: none;
+}
+
+.organizerTagInline {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 20px;
+  padding: 2px 8px;
 }
 
 /* ---- States ---- */
