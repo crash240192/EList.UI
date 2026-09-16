@@ -490,8 +490,55 @@
   display: block;
 }
 
+.editShot {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-3, var(--bg-secondary));
+}
+
+.editShotRemove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.editAttachRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.editAttachCount {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.fileInputHidden {
+  display: none;
+}
+
 @media (max-width: 639px) {
   .galleryItem {
+    width: 64px;
+    height: 64px;
+  }
+
+  .editShot {
     width: 64px;
     height: 64px;
   }
