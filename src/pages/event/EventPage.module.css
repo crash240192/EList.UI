@@ -726,14 +726,11 @@
 
 @media (max-width: 639px) {
   .scrollTopBtn {
-    left: 16px;
+    left: auto;
+    right: 16px;
     bottom: 16px;
     padding: 9px 12px;
-  }
-}
-
-@media (max-width: 639px) {
-  .scrollTopBtn {
-    left: 16px;
+    /* Below sticky discussion composer / attach controls */
+    z-index: 110;
   }
 }

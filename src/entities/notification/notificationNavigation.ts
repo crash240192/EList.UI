@@ -75,16 +75,21 @@ export type NotificationNavTarget =
 export function parseNotificationMessageRef(
   data: unknown,
 ): { id: string; conversationId?: string } | null {
-  if (!data || typeof data !== 'object') return null;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
   const o = data as Record<string, unknown>;
-  const id = String(o.id ?? o.Id ?? o.messageId ?? o.MessageId ?? '').trim();
+  const id = unwrapScalar(o.id ?? o.Id ?? o.messageId ?? o.MessageId);
   if (!id) return null;
-  const conversationRaw = o.conversationId ?? o.ConversationId;
-  const conversationId =
-    conversationRaw == null || conversationRaw === ''
-      ? undefined
-      : String(conversationRaw);
+  const conversationId = unwrapScalar(o.conversationId ?? o.ConversationId) || undefined;
   return { id, conversationId };
+}
+
+/** STJ historically serialized Newtonsoft JValues as []; treat those as missing. */
+function unwrapScalar(raw: unknown): string {
+  if (raw == null) return '';
+  if (Array.isArray(raw)) return '';
+  if (typeof raw === 'object') return '';
+  const s = String(raw).trim();
+  return s === '' || s === '[]' ? '' : s;
 }
 
 export function notificationTypeLabel(type: INotification['type']): string {
