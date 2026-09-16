@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
 import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
 import { uploadFile } from '@/shared/api/fileStorageClient';
@@ -9,10 +9,12 @@ import {
 } from './discussionUiConstants';
 import styles from './MessageComposer.module.css';
 
-interface PendingShot {
+interface ShotItem {
   localId: string;
-  fileId: string;
   previewUrl: string;
+  fileId?: string;
+  uploading?: boolean;
+  error?: string;
 }
 
 export interface MessageComposerSubmitPayload {
@@ -46,14 +48,17 @@ export function MessageComposer({
   onSubmit,
 }: MessageComposerProps) {
   const [text, setText] = useState('');
-  const [shots, setShots] = useState<PendingShot[]>([]);
+  const [shots, setShots] = useState<ShotItem[]>([]);
   const [sending, setSending] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const shotsRef = useRef(shots);
   shotsRef.current = shots;
+
+  const readyShots = shots.filter(s => s.fileId && !s.error && !s.uploading);
+  const uploadingCount = shots.filter(s => s.uploading).length;
+  const uploading = uploadingCount > 0;
 
   const handleTextChange = (raw: string) => {
     setText(clampText(raw, DISCUSSION_MESSAGE_MAX_LENGTH));
@@ -68,18 +73,30 @@ export function MessageComposer({
     }
   }, [autoFocus, replyingTo]);
 
-  useEffect(() => () => {
-    shotsRef.current.forEach(s => URL.revokeObjectURL(s.previewUrl));
+  const revokeShots = useCallback((items: ShotItem[]) => {
+    items.forEach(s => URL.revokeObjectURL(s.previewUrl));
   }, []);
+
+  useEffect(() => () => {
+    revokeShots(shotsRef.current);
+  }, [revokeShots]);
 
   const clearShots = () => {
     setShots(prev => {
-      prev.forEach(s => URL.revokeObjectURL(s.previewUrl));
+      revokeShots(prev);
       return [];
     });
   };
 
-  const handleFiles = async (list: FileList | null) => {
+  const removeShot = (localId: string) => {
+    setShots(prev => {
+      const target = prev.find(s => s.localId === localId);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter(s => s.localId !== localId);
+    });
+  };
+
+  const handleFiles = (list: FileList | null) => {
     if (!list?.length || disabled || sending) return;
     const remaining = DISCUSSION_MESSAGE_MAX_FILES - shots.length;
     if (remaining <= 0) {
@@ -93,37 +110,45 @@ export function MessageComposer({
       return;
     }
 
-    setUploading(true);
     setAttachError(null);
-    try {
-      const uploaded: PendingShot[] = [];
-      for (const file of images) {
-        const previewUrl = URL.createObjectURL(file);
-        const result = await uploadFile(file);
-        uploaded.push({ localId: nextLocalId(), fileId: result.id, previewUrl });
-      }
-      if (uploaded.length) {
-        setShots(prev => [...prev, ...uploaded].slice(0, DISCUSSION_MESSAGE_MAX_FILES));
-      }
-    } catch (e) {
-      setAttachError(e instanceof Error ? e.message : 'Не удалось загрузить фото');
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
+    const placeholders: Array<ShotItem & { file: File }> = images.map(file => ({
+      localId: nextLocalId(),
+      previewUrl: URL.createObjectURL(file),
+      uploading: true,
+      file,
+    }));
 
-  const removeShot = (localId: string) => {
-    setShots(prev => {
-      const target = prev.find(s => s.localId === localId);
-      if (target) URL.revokeObjectURL(target.previewUrl);
-      return prev.filter(s => s.localId !== localId);
-    });
+    setShots(prev => [
+      ...prev,
+      ...placeholders.map(({ localId, previewUrl, uploading }) => ({ localId, previewUrl, uploading })),
+    ].slice(0, DISCUSSION_MESSAGE_MAX_FILES));
+
+    for (const placeholder of placeholders) {
+      void uploadFile(placeholder.file)
+        .then(result => {
+          setShots(prev => prev.map(item => (
+            item.localId === placeholder.localId
+              ? { ...item, fileId: result.id, uploading: false }
+              : item
+          )));
+        })
+        .catch(e => {
+          const message = e instanceof Error ? e.message : 'Не удалось загрузить фото';
+          setAttachError(message);
+          setShots(prev => prev.map(item => (
+            item.localId === placeholder.localId && !item.error
+              ? { ...item, uploading: false, error: message }
+              : item
+          )));
+        });
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSubmit = async () => {
     const trimmed = text.trim();
-    const fileIds = shots.map(s => s.fileId);
+    const fileIds = readyShots.map(s => s.fileId!);
     const error = textLengthError(trimmed.length, DISCUSSION_MESSAGE_MAX_LENGTH);
     if ((!trimmed && fileIds.length === 0) || sending || uploading || disabled || error) return;
     setSending(true);
@@ -141,7 +166,7 @@ export function MessageComposer({
     !disabled
     && !sending
     && !uploading
-    && (text.trim().length > 0 || shots.length > 0)
+    && (text.trim().length > 0 || readyShots.length > 0)
     && text.trim().length <= DISCUSSION_MESSAGE_MAX_LENGTH;
 
   return (
@@ -175,17 +200,40 @@ export function MessageComposer({
       {shots.length > 0 && (
         <div className={styles.shots}>
           {shots.map(shot => (
-            <div key={shot.localId} className={styles.shot}>
-              <img src={shot.previewUrl} alt="" className={styles.shotImg} />
-              <button
-                type="button"
-                className={styles.shotRemove}
-                aria-label="Убрать фото"
-                disabled={sending}
-                onClick={() => removeShot(shot.localId)}
-              >
-                ×
-              </button>
+            <div
+              key={shot.localId}
+              className={`${styles.shot} ${shot.uploading ? styles.shotUploading : ''}`}
+              aria-busy={shot.uploading}
+              aria-label={shot.error ? 'Ошибка загрузки' : shot.uploading ? 'Загрузка фото' : 'Фото'}
+            >
+              <img
+                src={shot.previewUrl}
+                alt=""
+                className={`${styles.shotImg} ${shot.uploading || shot.error ? styles.shotImgDim : ''}`}
+              />
+              {shot.error ? (
+                <div className={styles.shotError} title={shot.error}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
+              ) : shot.uploading ? (
+                <div className={styles.shotOverlay}>
+                  <div className={styles.shotSpinner} aria-hidden />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.shotRemove}
+                  aria-label="Убрать фото"
+                  disabled={sending}
+                  onClick={() => removeShot(shot.localId)}
+                >
+                  ×
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -199,21 +247,21 @@ export function MessageComposer({
             accept="image/jpeg,image/png,image/webp,image/gif"
             multiple
             className={styles.fileInput}
-            disabled={disabled || sending || uploading || shots.length >= DISCUSSION_MESSAGE_MAX_FILES}
-            onChange={(e) => void handleFiles(e.target.files)}
+            disabled={disabled || sending || shots.length >= DISCUSSION_MESSAGE_MAX_FILES}
+            onChange={(e) => handleFiles(e.target.files)}
           />
           <button
             type="button"
             className={styles.attachBtn}
-            disabled={disabled || sending || uploading || shots.length >= DISCUSSION_MESSAGE_MAX_FILES}
+            disabled={disabled || sending || shots.length >= DISCUSSION_MESSAGE_MAX_FILES}
             onClick={() => fileInputRef.current?.click()}
             aria-label="Прикрепить фото"
           >
-            {uploading ? 'Загрузка…' : 'Фото'}
+            {uploading ? `Загрузка… (${uploadingCount})` : 'Фото'}
           </button>
           {shots.length > 0 && (
             <span className={styles.attachCount}>
-              {shots.length}/{DISCUSSION_MESSAGE_MAX_FILES}
+              {readyShots.length}/{DISCUSSION_MESSAGE_MAX_FILES}
             </span>
           )}
           <span className={styles.hint}>Ctrl+Enter — отправить</span>
