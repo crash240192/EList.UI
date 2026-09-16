@@ -12,6 +12,8 @@ export interface IAlbumParams {
   headAlbum?: boolean;
   participantsReadonly?: boolean;
   private?: boolean;
+  /** 1 = DiscussionPhotos и т.п.; null/undefined — обычный альбом */
+  systemKind?: number | null;
 }
 
 export interface IAlbum {
@@ -23,6 +25,10 @@ export interface IAlbum {
   organizationId?: string;
   wallpaperId?: string;
   parameters?: IAlbumParams;
+}
+
+export function isSystemAlbum(album: IAlbum | null | undefined): boolean {
+  return album?.parameters?.systemKind != null;
 }
 
 export interface ICreateAlbumPayload {
@@ -61,10 +67,45 @@ export async function deleteAlbum(albumId: string): Promise<void> {
   await apiClient.delete(`/api/media/albums/${albumId}`);
 }
 
+function normalizeAlbumParams(raw: unknown): IAlbumParams | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const systemRaw = r.systemKind ?? r.SystemKind;
+  return {
+    albumId: r.albumId != null || r.AlbumId != null ? String(r.albumId ?? r.AlbumId) : undefined,
+    headAlbum: Boolean(r.headAlbum ?? r.HeadAlbum),
+    participantsReadonly: Boolean(r.participantsReadonly ?? r.ParticipantsReadonly),
+    private: Boolean(r.private ?? r.Private),
+    systemKind: systemRaw == null || systemRaw === '' ? null : Number(systemRaw),
+  };
+}
+
+function normalizeAlbum(raw: unknown): IAlbum {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const params = normalizeAlbumParams(r.parameters ?? r.Parameters);
+  return {
+    id: String(r.id ?? r.Id ?? ''),
+    name: String(r.name ?? r.Name ?? ''),
+    description: r.description != null || r.Description != null
+      ? String(r.description ?? r.Description)
+      : undefined,
+    eventId: r.eventId != null || r.EventId != null ? String(r.eventId ?? r.EventId) : undefined,
+    accountId: r.accountId != null || r.AccountId != null ? String(r.accountId ?? r.AccountId) : undefined,
+    organizationId: r.organizationId != null || r.OrganizationId != null
+      ? String(r.organizationId ?? r.OrganizationId)
+      : undefined,
+    wallpaperId: r.wallpaperId != null || r.WallpaperId != null
+      ? String(r.wallpaperId ?? r.WallpaperId)
+      : undefined,
+    parameters: params,
+  };
+}
+
 /** Получить альбомы события */
 export async function getEventAlbums(eventId: string): Promise<IAlbum[]> {
   const res = await apiClient.get<IAlbum[]>(`/api/media/albums/byEvent/${eventId}`);
-  return ((res as any).result ?? res) as IAlbum[];
+  const list = ((res as any).result ?? res) as unknown[];
+  return Array.isArray(list) ? list.map(normalizeAlbum) : [];
 }
 
 export interface IEventAlbumsGroup {
@@ -76,7 +117,7 @@ function normalizeAlbumsGroup(raw: unknown): IEventAlbumsGroup {
   const row = (raw ?? {}) as Record<string, unknown>;
   const event = row.event ?? row.Event;
   const albumsRaw = row.albums ?? row.Albums;
-  const albums = Array.isArray(albumsRaw) ? albumsRaw as IAlbum[] : [];
+  const albums = Array.isArray(albumsRaw) ? albumsRaw.map(normalizeAlbum) : [];
   return {
     event: normalizeEventListItem(event),
     albums,

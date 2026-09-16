@@ -13,7 +13,7 @@ interface DiscussionComposerSheetProps {
   onClose: () => void;
   replyingTo: string | null;
   onCancelReply: () => void;
-  onSubmit: (text: string) => Promise<void>;
+  onSubmit: (payload: { text: string; fileIds: string[] }) => Promise<void>;
   sheetRef?: RefObject<HTMLDivElement | null>;
   /** Колонка обсуждения в viewport — форма fixed внизу экрана с этой шириной */
   slot: DiscussionSlotRect;

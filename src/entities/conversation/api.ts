@@ -105,6 +105,11 @@ function normalizeMessageVote(raw: unknown): MessageVoteValue | null {
   return null;
 }
 
+function normalizeFileIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(String).filter(Boolean);
+}
+
 function normalizeMessage(raw: unknown): IMessage {
   const r = (raw ?? {}) as Record<string, unknown>;
   const msg = (raw ?? {}) as IMessage;
@@ -118,6 +123,7 @@ function normalizeMessage(raw: unknown): IMessage {
     likesCount: Number(r.likesCount ?? r.LikesCount ?? msg.likesCount ?? 0) || 0,
     dislikesCount: Number(r.dislikesCount ?? r.DislikesCount ?? msg.dislikesCount ?? 0) || 0,
     currentUserVote: normalizeMessageVote(r.currentUserVote ?? r.CurrentUserVote ?? msg.currentUserVote),
+    fileIds: normalizeFileIds(r.fileIds ?? r.FileIds ?? msg.fileIds),
   };
 }
 
@@ -232,16 +238,35 @@ export async function fetchMessageLocation(
 }
 
 export async function createMessage(request: IMessageRequest): Promise<string> {
-  const lengthError = textLengthError(request.messageText.trim().length, DISCUSSION_MESSAGE_MAX_LENGTH);
+  const text = (request.messageText ?? '').trim();
+  const fileIds = (request.fileIds ?? []).filter(Boolean);
+  if (!text && fileIds.length === 0) {
+    throw new Error('Сообщение должно содержать текст или фото');
+  }
+  const lengthError = textLengthError(text.length, DISCUSSION_MESSAGE_MAX_LENGTH);
   if (lengthError) throw new Error(lengthError);
-  const data = await apiClient.post<string>('/api/conversations/messages/create', request);
+  if (fileIds.length > 10) throw new Error('Не больше 10 фото на комментарий');
+  const data = await apiClient.post<string>('/api/conversations/messages/create', {
+    ...request,
+    messageText: text,
+    fileIds: fileIds.length ? fileIds : undefined,
+  });
   return data.result;
 }
 
 export async function updateMessage(request: IMessageRequest): Promise<void> {
-  const lengthError = textLengthError(request.messageText.trim().length, DISCUSSION_MESSAGE_MAX_LENGTH);
+  const text = (request.messageText ?? '').trim();
+  const fileIds = request.fileIds;
+  if (fileIds != null && fileIds.length === 0 && !text) {
+    throw new Error('Сообщение должно содержать текст или фото');
+  }
+  const lengthError = textLengthError(text.length, DISCUSSION_MESSAGE_MAX_LENGTH);
   if (lengthError) throw new Error(lengthError);
-  await apiClient.put('/api/conversations/messages/update', request);
+  if (fileIds != null && fileIds.length > 10) throw new Error('Не больше 10 фото на комментарий');
+  await apiClient.put('/api/conversations/messages/update', {
+    ...request,
+    messageText: text,
+  });
 }
 
 export async function deleteMessage(messageId: string): Promise<void> {

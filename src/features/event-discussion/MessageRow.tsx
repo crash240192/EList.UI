@@ -12,6 +12,8 @@ import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
 import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { ImageLightbox } from '@/shared/ui/ImageLightbox';
 import { ContentReportModal } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import {
@@ -25,10 +27,12 @@ import {
   messageHasReplies,
   scrollDiscussionMessageIntoView,
 } from './messageUtils';
-import { DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
+import { DISCUSSION_MESSAGE_MAX_FILES, DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import { MessageReplies } from './MessageReplies';
 import type { DiscussionViewMode } from './discussionViewMode';
 import { useDiscussionRefresh } from './discussionRefreshContext';
+import { uploadFile } from '@/shared/api/fileStorageClient';
+import { filterImageFiles } from '@/shared/lib/imageFile';
 import styles from './MessageRow.module.css';
 
 interface MessageRowProps {
@@ -176,8 +180,14 @@ export function MessageRow({
     () => message.currentUserVote ?? null,
   );
   const [voting, setVoting] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [editFileIds, setEditFileIds] = useState<string[]>(() => message.fileIds ?? []);
+  const [uploadingEdit, setUploadingEdit] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const replyBump = useDiscussionRefresh(message.id);
+  const fileIds = message.fileIds ?? [];
+  const [displayFileIds, setDisplayFileIds] = useState(fileIds);
   const prevReplyBump = useRef(replyBump);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
   const isHidden = Boolean(message.hidden);
@@ -215,9 +225,11 @@ export function MessageRow({
   useEffect(() => {
     setDisplayText(message.messageText);
     setEditText(clampText(message.messageText, DISCUSSION_MESSAGE_MAX_LENGTH));
+    setDisplayFileIds(message.fileIds ?? []);
+    setEditFileIds(message.fileIds ?? []);
     setTextExpanded(false);
     setEditError(null);
-  }, [message.id, message.messageText]);
+  }, [message.id, message.messageText, message.fileIds?.join(',')]);
 
   useEffect(() => {
     if (replyBump > prevReplyBump.current) setExpanded(true);
@@ -245,25 +257,66 @@ export function MessageRow({
 
   const startEdit = () => {
     setEditText(displayText);
+    setEditFileIds(displayFileIds);
     setEditError(null);
     setEditing(true);
   };
 
   const cancelEdit = () => {
     setEditText(displayText);
+    setEditFileIds(displayFileIds);
     setEditError(null);
     setEditing(false);
+  };
+
+  const removeEditFile = (fileId: string) => {
+    setEditFileIds(prev => prev.filter(id => id !== fileId));
+  };
+
+  const handleEditFiles = async (list: FileList | null) => {
+    if (!list?.length || uploadingEdit || savingEdit) return;
+    const remaining = DISCUSSION_MESSAGE_MAX_FILES - editFileIds.length;
+    if (remaining <= 0) {
+      setEditError(`Не больше ${DISCUSSION_MESSAGE_MAX_FILES} фото`);
+      return;
+    }
+    const images = filterImageFiles(list).slice(0, remaining);
+    if (!images.length) {
+      setEditError('Можно прикладывать только изображения');
+      return;
+    }
+    setUploadingEdit(true);
+    setEditError(null);
+    try {
+      const uploaded: string[] = [];
+      for (const file of images) {
+        const result = await uploadFile(file);
+        uploaded.push(result.id);
+      }
+      if (uploaded.length) {
+        setEditFileIds(prev => [...prev, ...uploaded].slice(0, DISCUSSION_MESSAGE_MAX_FILES));
+      }
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : 'Не удалось загрузить фото');
+    } finally {
+      setUploadingEdit(false);
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    }
   };
 
   const saveEdit = async () => {
     const trimmed = editText.trim();
     const lengthErr = textLengthError(trimmed.length, DISCUSSION_MESSAGE_MAX_LENGTH);
-    if (!trimmed || !currentAccountId || savingEdit) return;
+    if ((!trimmed && editFileIds.length === 0) || !currentAccountId || savingEdit || uploadingEdit) return;
     if (lengthErr) {
       setEditError(lengthErr);
       return;
     }
-    if (trimmed === displayText) {
+    const textSame = trimmed === displayText;
+    const filesSame =
+      editFileIds.length === displayFileIds.length
+      && editFileIds.every((id, i) => id === displayFileIds[i]);
+    if (textSame && filesSame) {
       setEditing(false);
       return;
     }
@@ -276,8 +329,10 @@ export function MessageRow({
         messageText: trimmed,
         accountId: currentAccountId,
         replyTo: message.replyTo ?? null,
+        fileIds: editFileIds,
       });
       setDisplayText(trimmed);
+      setDisplayFileIds(editFileIds);
       setEditing(false);
     } catch (e) {
       setEditError(e instanceof Error ? e.message : 'Не удалось сохранить');
@@ -400,7 +455,7 @@ export function MessageRow({
                   className={styles.editInput}
                   rows={3}
                   value={editText}
-                  disabled={savingEdit}
+                  disabled={savingEdit || uploadingEdit}
                   maxLength={DISCUSSION_MESSAGE_MAX_LENGTH}
                   onChange={(e) => setEditText(clampText(e.target.value, DISCUSSION_MESSAGE_MAX_LENGTH))}
                   onKeyDown={(e) => {
@@ -410,9 +465,51 @@ export function MessageRow({
                     }
                   }}
                 />
+                {editFileIds.length > 0 && (
+                  <div className={styles.gallery}>
+                    {editFileIds.map(fileId => (
+                      <div key={fileId} className={styles.editShot}>
+                        <AuthImage fileId={fileId} alt="" className={styles.galleryImg} />
+                        <button
+                          type="button"
+                          className={styles.editShotRemove}
+                          aria-label="Убрать фото"
+                          disabled={savingEdit || uploadingEdit}
+                          onClick={() => removeEditFile(fileId)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className={styles.editAttachRow}>
+                  <input
+                    ref={editFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    className={styles.fileInputHidden}
+                    disabled={savingEdit || uploadingEdit || editFileIds.length >= DISCUSSION_MESSAGE_MAX_FILES}
+                    onChange={(e) => void handleEditFiles(e.target.files)}
+                  />
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    disabled={savingEdit || uploadingEdit || editFileIds.length >= DISCUSSION_MESSAGE_MAX_FILES}
+                    onClick={() => editFileInputRef.current?.click()}
+                  >
+                    {uploadingEdit ? 'Загрузка…' : 'Фото'}
+                  </button>
+                  {editFileIds.length > 0 && (
+                    <span className={styles.editAttachCount}>
+                      {editFileIds.length}/{DISCUSSION_MESSAGE_MAX_FILES}
+                    </span>
+                  )}
+                </div>
                 {editError && <p className={styles.editError}>{editError}</p>}
                 <div className={styles.editActions}>
-                  <button type="button" className={styles.actionBtn} disabled={savingEdit} onClick={cancelEdit}>
+                  <button type="button" className={styles.actionBtn} disabled={savingEdit || uploadingEdit} onClick={cancelEdit}>
                     Отмена
                   </button>
                   <div className={styles.saveRow}>
@@ -420,7 +517,12 @@ export function MessageRow({
                     <button
                     type="button"
                     className={styles.saveBtn}
-                    disabled={savingEdit || !editText.trim() || editText.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH}
+                    disabled={
+                      savingEdit
+                      || uploadingEdit
+                      || (!editText.trim() && editFileIds.length === 0)
+                      || editText.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH
+                    }
                     onClick={() => void saveEdit()}
                   >
                     {savingEdit ? 'Сохранение…' : 'Сохранить'}
@@ -435,9 +537,11 @@ export function MessageRow({
                     в ответ <span className={styles.replyToName}>{replyToAuthor}</span>
                   </div>
                 )}
-                <p className={`${styles.text} ${isLongText && !textExpanded ? styles.textClamped : ''}`}>
-                  {displayText}
-                </p>
+                {displayText.trim() && (
+                  <p className={`${styles.text} ${isLongText && !textExpanded ? styles.textClamped : ''}`}>
+                    {displayText}
+                  </p>
+                )}
                 {isLongText && (
                   <button
                     type="button"
@@ -456,6 +560,22 @@ export function MessageRow({
                     </span>
                     {textExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
                   </button>
+                )}
+                {displayFileIds.length > 0 && (
+                  <div className={styles.gallery} role="list">
+                    {displayFileIds.map((fileId, index) => (
+                      <button
+                        key={fileId}
+                        type="button"
+                        className={styles.galleryItem}
+                        role="listitem"
+                        aria-label={`Фото ${index + 1}`}
+                        onClick={() => setLightboxIdx(index)}
+                      >
+                        <AuthImage fileId={fileId} alt="" className={styles.galleryImg} />
+                      </button>
+                    ))}
+                  </div>
                 )}
               </>
             )}
@@ -594,6 +714,15 @@ export function MessageRow({
           onReply={onReply}
           onDeleted={onDeleted}
           onTotalLoaded={setReplyTotal}
+        />
+      )}
+
+      {lightboxIdx != null && displayFileIds.length > 0 && (
+        <ImageLightbox
+          fileIds={displayFileIds}
+          startIndex={lightboxIdx}
+          alt="Фото из комментария"
+          onClose={() => setLightboxIdx(null)}
         />
       )}
     </div>
