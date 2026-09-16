@@ -199,6 +199,7 @@ export default function EventPage() {
   const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
   const [inviteModalOpen,       setInviteModalOpen]       = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
+  const [descTogglePressed, setDescTogglePressed] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
@@ -1091,8 +1092,16 @@ export default function EventPage() {
             {(event.description?.length ?? 0) > 200 && (
               <button
                 type="button"
-                className={styles.descToggle}
-                onClick={() => setDescExpanded(v => !v)}
+                className={`${styles.descToggle} noHoverGlow ${descTogglePressed ? styles.descTogglePressed : ''}`}
+                onPointerDown={() => setDescTogglePressed(true)}
+                onPointerUp={() => setDescTogglePressed(false)}
+                onPointerCancel={() => setDescTogglePressed(false)}
+                onPointerLeave={() => setDescTogglePressed(false)}
+                onClick={e => {
+                  setDescExpanded(v => !v);
+                  setDescTogglePressed(false);
+                  e.currentTarget.blur();
+                }}
                 aria-expanded={descExpanded}
               >
                 <span className={styles.descToggleLine} aria-hidden />
