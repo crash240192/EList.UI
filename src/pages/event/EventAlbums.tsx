@@ -1,7 +1,7 @@
 // pages/event/EventAlbums.tsx
 // Блок альбомов на странице мероприятия
 
-import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import {
   getEventAlbums,
@@ -100,7 +100,9 @@ interface AlbumCardProps {
 function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpen, onEdit, onDelete }: AlbumCardProps) {
   const [cover, setCover] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const menuElRef = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({ visibility: 'hidden' });
 
   useEffect(() => {
     let cancelled = false;
@@ -110,13 +112,44 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpe
     return () => { cancelled = true; };
   }, [album.id, coverVersion]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+  useLayoutEffect(() => {
+    if (!menuOpen) {
+      setMenuStyle({ visibility: 'hidden' });
+      return;
+    }
+
+    const place = () => {
+      const btn = menuBtnRef.current;
+      const menu = menuElRef.current;
+      if (!btn || !menu) return;
+      const pad = 8;
+      const gap = 4;
+      const rect = btn.getBoundingClientRect();
+      const mw = menu.offsetWidth;
+      const mh = menu.offsetHeight;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      let left = rect.right - mw;
+      if (left < pad) left = pad;
+      if (left + mw > vw - pad) left = Math.max(pad, vw - pad - mw);
+
+      let top = rect.bottom + gap;
+      if (top + mh > vh - pad) {
+        const above = rect.top - gap - mh;
+        top = above >= pad ? above : Math.max(pad, vh - pad - mh);
+      }
+
+      setMenuStyle({ top, left, visibility: 'visible' });
     };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
   }, [menuOpen]);
 
   return (
@@ -150,27 +183,39 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpe
       </div>
 
       {canManage && (
-        <div className={styles.albumMenuWrap} ref={menuRef}>
+        <div className={styles.albumMenuWrap}>
           <button
+            ref={menuBtnRef}
             type="button"
             className={styles.albumMenuBtn}
             aria-label="Меню альбома"
+            aria-expanded={menuOpen}
             onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
             </svg>
           </button>
-          {menuOpen && (
-            <div className={styles.albumMenu}>
-              <button type="button" className={styles.albumMenuItem} onClick={e => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}>
-                Редактировать
-              </button>
-              <button type="button" className={`${styles.albumMenuItem} ${styles.albumMenuItemDanger}`}
-                onClick={e => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}>
-                Удалить
-              </button>
-            </div>
+          {menuOpen && createPortal(
+            <>
+              <div className={styles.albumMenuBackdrop} onClick={() => setMenuOpen(false)} aria-hidden />
+              <div
+                ref={menuElRef}
+                className={styles.albumMenu}
+                style={menuStyle}
+                role="menu"
+              >
+                <button type="button" className={styles.albumMenuItem} role="menuitem"
+                  onClick={e => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}>
+                  Редактировать
+                </button>
+                <button type="button" className={`${styles.albumMenuItem} ${styles.albumMenuItemDanger}`} role="menuitem"
+                  onClick={e => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}>
+                  Удалить
+                </button>
+              </div>
+            </>,
+            document.body,
           )}
         </div>
       )}
