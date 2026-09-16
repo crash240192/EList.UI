@@ -129,7 +129,7 @@
     flex-direction: row;
     align-items: stretch;
     border-radius: 12px;
-    min-height: 88px;
+    min-height: 76px;
   }
 
   .clickable:hover {
@@ -138,11 +138,12 @@
   }
 
   .cover {
-    width: 108px;
-    flex: 0 0 108px;
-    aspect-ratio: auto;
-    align-self: stretch;
-    min-height: 88px;
+    width: 88px;
+    flex: 0 0 88px;
+    aspect-ratio: 1 / 1;
+    align-self: center;
+    min-height: 0;
+    border-radius: 0;
   }
 
   .coverOverlay {
@@ -187,7 +188,7 @@
   .title {
     font-size: var(--font-sm);
     line-height: 1.25;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
   }
 
   .meta {
