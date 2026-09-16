@@ -3,11 +3,13 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EventCard } from '@/entities/event';
+import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
 import { useMyEvents, type OwnerFilter } from '@/features/event-list/useMyEvents';
 import { FilterBar } from '@/features/event-filters/FilterBar';
 import { useMyEventsFiltersStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
-import { useInfiniteScroll, useDebounce, usePageTitle } from '@/shared/hooks';
+import { useInfiniteScroll, useDebounce, usePageTitle, useMediaQuery } from '@/shared/hooks';
+import { media } from '@/shared/lib/breakpoints';
 import type { IEventsSearchParams, EventViewMode } from '@/entities/event';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
@@ -54,6 +56,7 @@ const OWNER_TABS = [
 
 export default function MyEventsPage() {
   usePageTitle('Мои события');
+  const isMobileList = useMediaQuery(media.mobile);
   const navigate = useNavigate();
   const { accountId, loading: accountLoading } = useAccountId();
   const { filters, setFilter, resetFilters } = useMyEventsFiltersStore();
@@ -218,7 +221,7 @@ export default function MyEventsPage() {
       {/* ---- Content ---- */}
       <div className={styles.list} ref={listElRef}>
         {!isReady || isLoading ? (
-          <div className={styles.grid}>
+          <div className={isMobileList ? styles.eventListSkeleton : styles.grid}>
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className={styles.skeleton} />
             ))}
@@ -232,6 +235,27 @@ export default function MyEventsPage() {
               </button>
             )}
           </div>
+        ) : isMobileList ? (
+          <EventList>
+            {events.map((event, idx) => (
+              <Fragment key={event.id}>
+                <EventListItem
+                  event={event}
+                  bleedCover
+                  onClick={() => navigate(`/event/${event.id}`)}
+                  className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                  header={
+                    event.isOrganizer ? (
+                      <span className={styles.organizerTagInline}>Организатор</span>
+                    ) : undefined
+                  }
+                />
+                {shouldInsertAdAfterIndex(idx) && (
+                  <AdSlot key={`ad-${event.id}`} />
+                )}
+              </Fragment>
+            ))}
+          </EventList>
         ) : (
           <div className={styles.grid}>
             {events.map((event, idx) => (

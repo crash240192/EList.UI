@@ -74,9 +74,8 @@
 
 @media (max-width: 639px) {
   .wrap {
-    min-height: 76px;
-    border-radius: 12px;
-    flex-direction: row;
+    min-height: 120px;
+    border-radius: 14px;
   }
 
   .inner {
@@ -85,21 +84,21 @@
 
   .placeholder {
     flex-direction: row;
-    min-height: 76px;
-    align-items: center;
+    min-height: 120px;
+    align-items: stretch;
   }
 
   .placeholderCover {
-    width: 88px;
-    flex: 0 0 88px;
-    height: 88px;
-    align-self: center;
+    width: 132px;
+    flex: 0 0 132px;
+    height: auto;
+    align-self: stretch;
     border-bottom: none;
     border-right: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
   }
 
   .placeholderBody {
-    padding: 8px 10px;
+    padding: 12px 12px 12px 10px;
     gap: 6px;
     justify-content: center;
   }
