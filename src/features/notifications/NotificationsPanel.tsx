@@ -54,6 +54,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const historyLoaded = useNotificationsStore(s => s.historyLoaded);
   const historyLoading = useNotificationsStore(s => s.historyLoading);
 
+  const [tab, setTab] = useState<'new' | 'read'>('new');
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [stats, setStats] = useState<string | null>(null);
@@ -129,7 +130,15 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     void markRead(n.id);
   }, [markRead]);
 
-  const visibleItems = items.filter(i => !i.readAt);
+  const unreadItems = items.filter(i => !i.readAt);
+  const readItems = items
+    .filter((i): i is INotification & { readAt: string } => !!i.readAt)
+    .slice()
+    .sort((a, b) => new Date(b.readAt).getTime() - new Date(a.readAt).getTime());
+  const visibleItems = tab === 'new' ? unreadItems : readItems;
+  const emptyText = tab === 'new'
+    ? 'Пока нет уведомлений. Новые появятся здесь по WebSocket.'
+    : 'Нет прочитанных уведомлений';
 
   const handleTestSend = async () => {
     if (!accountId || !testMsg.trim()) return;
@@ -184,13 +193,33 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         {stats && <span className={styles.statsText}>{stats}</span>}
       </div>
 
+      <div className={styles.tabsBar} role="tablist" aria-label="Фильтр уведомлений">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'new'}
+          className={`${styles.tabBtn} ${tab === 'new' ? styles.tabBtnActive : ''}`}
+          onClick={() => setTab('new')}
+        >
+          Новые
+          {unreadItems.length > 0 && <span className={styles.tabCnt}>{unreadItems.length}</span>}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'read'}
+          className={`${styles.tabBtn} ${tab === 'read' ? styles.tabBtnActive : ''}`}
+          onClick={() => setTab('read')}
+        >
+          Прочитанные
+        </button>
+      </div>
+
       <ul className={styles.list}>
         {historyLoading && visibleItems.length === 0 ? (
           <li className={styles.empty}>Загрузка…</li>
         ) : visibleItems.length === 0 ? (
-          <li className={styles.empty}>
-            Пока нет уведомлений. Новые появятся здесь по WebSocket.
-          </li>
+          <li className={styles.empty}>{emptyText}</li>
         ) : (
           visibleItems.map(n => {
             const hasTitle = !!n.title;
@@ -268,15 +297,17 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                   )}
                   <span className={styles.itemMeta}>{formatWhen(n.createdAt)}</span>
                 </button>
-                <button
-                  type="button"
-                  className={styles.itemDismiss}
-                  onClick={e => closeNotification(e, n)}
-                  aria-label="Скрыть уведомление"
-                  title="Отметить прочитанным"
-                >
-                  ×
-                </button>
+                {!n.readAt && (
+                  <button
+                    type="button"
+                    className={styles.itemDismiss}
+                    onClick={e => closeNotification(e, n)}
+                    aria-label="Скрыть уведомление"
+                    title="Отметить прочитанным"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             </li>
           );
@@ -303,7 +334,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         </div>
       )}
 
-      {visibleItems.length > 0 && (
+      {tab === 'new' && unreadItems.length > 0 && (
         <button type="button" className={styles.clearBtn} onClick={() => { void clearAll(); }}>
           Прочитать все
         </button>
