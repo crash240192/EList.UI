@@ -43,15 +43,27 @@ function mergeNotifications(
   incoming: INotification[],
 ): INotification[] {
   const byId = new Map<string, INotification>();
-  for (const item of incoming) {
+  for (const item of existing) {
     byId.set(item.id, item);
   }
-  for (const item of existing) {
-    if (!byId.has(item.id)) {
+  for (const item of incoming) {
+    const prev = byId.get(item.id);
+    // Prefer payload that still has usable deep-link scalars (WS Newtonsoft vs broken REST history).
+    if (prev && notificationDataHasMessageRef(prev.data) && !notificationDataHasMessageRef(item.data)) {
+      byId.set(item.id, { ...item, data: prev.data });
+    } else {
       byId.set(item.id, item);
     }
   }
   return sortByDate(Array.from(byId.values())).slice(0, MAX_ITEMS);
+}
+
+function notificationDataHasMessageRef(data: unknown): boolean {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const o = data as Record<string, unknown>;
+  const id = o.id ?? o.Id ?? o.messageId ?? o.MessageId;
+  if (id == null || Array.isArray(id) || typeof id === 'object') return false;
+  return String(id).trim() !== '';
 }
 
 export const useNotificationsStore = create<NotificationsState>((set, get) => ({

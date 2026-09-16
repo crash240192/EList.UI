@@ -94,14 +94,16 @@ export async function fetchEventConversations(eventId: string): Promise<IConvers
 
 function normalizeMessageVote(raw: unknown): MessageVoteValue | null {
   if (raw == null || raw === '') return null;
+  // Reject arrays/objects (broken serializers) and numeric 0 (C# default enum footgun).
+  if (typeof raw === 'object') return null;
   if (typeof raw === 'number') {
-    if (raw === 0) return 'like';
-    if (raw === 1) return 'dislike';
+    if (raw === 1) return 'like';
+    if (raw === 2) return 'dislike';
     return null;
   }
-  const s = String(raw).toLowerCase();
-  if (s === 'like' || s === '0') return 'like';
-  if (s === 'dislike' || s === '1') return 'dislike';
+  const s = String(raw).trim().toLowerCase();
+  if (s === 'like') return 'like';
+  if (s === 'dislike') return 'dislike';
   return null;
 }
 

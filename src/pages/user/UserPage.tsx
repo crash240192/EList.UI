@@ -13,7 +13,7 @@ import { useSafeBack } from '@/shared/lib/useSafeBack';
 import {
   fetchSubscriptionsCount,
   fetchSubscribersCount,
-  fetchSubscriptions,
+  fetchIsSubscribed,
   subscribe,
   unsubscribe,
   type INotifySettings,
@@ -393,11 +393,15 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!profileAccountId || !myAccountId || isOwnProfile) return;
-    fetchSubscriptions(myAccountId, { pageSize: 200 })
-      .then(page => {
-        setIsSubscribed(page.items.some((s: { account: { id: string } }) => s.account.id === profileAccountId));
+    let cancelled = false;
+    fetchIsSubscribed(profileAccountId)
+      .then(subscribed => {
+        if (!cancelled) setIsSubscribed(subscribed);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setIsSubscribed(false);
+      });
+    return () => { cancelled = true; };
   }, [profileAccountId, myAccountId, isOwnProfile]);
 
   const handleSubscribe = useCallback(async (settings: INotifySettings) => {
