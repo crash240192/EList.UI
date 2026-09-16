@@ -569,9 +569,14 @@
   border:none; background:transparent;
   cursor:pointer; text-align:left; font-family:inherit;
   border-radius:0 10px 10px 0;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
   transition:background .12s;
 }
-.descToggle:hover { background:color-mix(in srgb, var(--accent) 5%, var(--surface-2) 95%); }
+.descToggle:active,
+.descTogglePressed {
+  background:color-mix(in srgb, var(--accent) 5%, var(--surface-2) 95%);
+}
 .descToggleLine {
   width:2px; align-self:stretch; flex-shrink:0; border-radius:2px;
   background:linear-gradient(
