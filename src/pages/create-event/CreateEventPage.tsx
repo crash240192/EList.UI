@@ -1856,7 +1856,7 @@ export default function CreateEventPage() {
 
             <div className={styles.toggles}>
               <Toggle
-                label="Приватное мероприятие"
+                label="Закрытое мероприятие"
                 checked={form.isPrivate}
                 locked={!canSetPrivate}
                 onChange={v => {
@@ -1925,8 +1925,10 @@ export default function CreateEventPage() {
                 </div>
                 <p className={styles.whitelistHint}>
                   {form.isPrivate
-                    ? 'Только эти пользователи смогут записаться на мероприятие'
-                    : 'Эти пользователи не смогут записаться на мероприятие'}
+                    ? (draftWhiteListIds.length > 0
+                      ? 'Только люди из этого списка видят мероприятие и могут войти (по приглашению или сами). Остальным приглашения отправить нельзя.'
+                      : 'Список пуст: мероприятие видят и могут войти только по приглашению. Добавьте людей, чтобы ограничить доступ списком.')
+                    : 'Эти пользователи не смогут увидеть и записаться на мероприятие'}
                 </p>
 
                 {currentList.length > 0 && (
