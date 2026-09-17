@@ -345,7 +345,7 @@
 .bleedCover {
   --bleed-min-h: 108px;
   --bleed-cover-w: calc(var(--bleed-min-h) * 4 / 3);
-  --bleed-text-inset: calc(var(--bleed-cover-w) * 0.75 + 5px);
+  --bleed-text-inset: calc(var(--bleed-cover-w) * 0.75);
   min-height: var(--bleed-min-h);
 }
 
@@ -444,7 +444,7 @@
   position: relative;
   z-index: 2;
   isolation: isolate;
-  padding-left: var(--bleed-text-inset);
+  padding-left: calc(var(--bleed-text-inset) + 5px);
   justify-content: center;
   min-width: 0;
   overflow: visible;
