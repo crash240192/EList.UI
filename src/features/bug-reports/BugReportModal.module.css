@@ -21,6 +21,7 @@
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .modalHeader {
@@ -61,6 +62,8 @@
   flex-direction: column;
   gap: 14px;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .hint {
@@ -84,6 +87,62 @@
   letter-spacing: 0.05em;
 }
 
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+  width: 100%;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.fileChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.fileChipName {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileChipRemove {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .textarea {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -101,6 +160,10 @@
 
 .textarea:focus {
   border-color: var(--accent);
+}
+
+.textareaCompact {
+  min-height: 72px;
 }
 
 .screenshots {
