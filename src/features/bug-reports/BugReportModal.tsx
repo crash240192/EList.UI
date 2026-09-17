@@ -327,11 +327,11 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
                     </label>
                     <textarea
                       id="support-partnership-text"
-                      className={styles.textarea}
+                      className={`${styles.textarea} ${styles.textareaCompact}`}
                       value={description}
                       onChange={e => setDescription(e.target.value)}
                       placeholder={descriptionPlaceholder}
-                      rows={5}
+                      rows={3}
                     />
                   </div>
 
