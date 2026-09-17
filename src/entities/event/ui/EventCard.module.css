@@ -29,8 +29,9 @@
   position: absolute; inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.18) 12%,
-    rgba(0, 0, 0, 0.5) 52%,
+    transparent 65%,
+    rgba(0, 0, 0, 0.18) 70%,
+    rgba(0, 0, 0, 0.5) 82%,
     rgba(0, 0, 0, 0.86) 100%
   );
   pointer-events: none;
@@ -148,8 +149,9 @@
   .coverOverlay {
     background: linear-gradient(
       to right,
-      rgba(0, 0, 0, 0.08) 0%,
-      rgba(0, 0, 0, 0.42) 55%,
+      transparent 60%,
+      rgba(0, 0, 0, 0.08) 65%,
+      rgba(0, 0, 0, 0.42) 82%,
       rgba(0, 0, 0, 0.55) 100%
     );
   }
