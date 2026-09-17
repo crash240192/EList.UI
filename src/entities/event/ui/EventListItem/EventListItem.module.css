@@ -387,6 +387,17 @@
   z-index: 1;
 }
 
+:global(body.light-theme) .bleedCover .cover::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 62%,
+    color-mix(in srgb, var(--surface-2) 35%, rgba(255, 255, 255, 0.55)) 78%,
+    color-mix(in srgb, var(--surface-2) 72%, rgba(255, 255, 255, 0.35)) 90%,
+    var(--surface-2) 100%
+  );
+}
+
 .bleedCover .coverImg,
 .bleedCover .coverPlaceholder {
   position: relative;
@@ -442,6 +453,25 @@
       in srgb,
       color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 55%,
       rgba(0, 0, 0, 0.55)
+    ) 90%,
+    color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 100%
+  );
+}
+
+:global(body.light-theme) .bleedCover:hover .cover::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 62%,
+    color-mix(
+      in srgb,
+      color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 35%,
+      rgba(255, 255, 255, 0.55)
+    ) 78%,
+    color-mix(
+      in srgb,
+      color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 72%,
+      rgba(255, 255, 255, 0.35)
     ) 90%,
     color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 100%
   );
