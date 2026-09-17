@@ -83,24 +83,36 @@
   }
 
   .placeholder {
+    position: relative;
     flex-direction: row;
     min-height: 120px;
     align-items: stretch;
+    container-type: size;
   }
 
+  /* Match EventListItem bleedCover: 16:9, body from 2/3 width */
   .placeholderCover {
-    width: 132px;
-    flex: 0 0 132px;
-    height: auto;
-    align-self: stretch;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: auto;
+    height: 100%;
+    aspect-ratio: 16 / 9;
+    flex: none;
     border-bottom: none;
-    border-right: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
+    border-right: none;
   }
 
   .placeholderBody {
-    padding: 12px 12px 12px 10px;
+    position: relative;
+    z-index: 1;
+    padding: 12px 12px 12px calc(100cqh * 16 / 9 * 2 / 3);
     gap: 6px;
     justify-content: center;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .placeholderText {
