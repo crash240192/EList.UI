@@ -378,9 +378,9 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    transparent 48%,
-    color-mix(in srgb, var(--surface-2) 18%, rgba(0, 0, 0, 0.42)) 68%,
-    color-mix(in srgb, var(--surface-2) 55%, rgba(0, 0, 0, 0.55)) 82%,
+    transparent 62%,
+    color-mix(in srgb, var(--surface-2) 18%, rgba(0, 0, 0, 0.42)) 78%,
+    color-mix(in srgb, var(--surface-2) 55%, rgba(0, 0, 0, 0.55)) 90%,
     var(--surface-2) 100%
   );
   pointer-events: none;
@@ -432,17 +432,17 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    transparent 48%,
+    transparent 62%,
     color-mix(
       in srgb,
       color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 18%,
       rgba(0, 0, 0, 0.42)
-    ) 68%,
+    ) 78%,
     color-mix(
       in srgb,
       color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 55%,
       rgba(0, 0, 0, 0.55)
-    ) 82%,
+    ) 90%,
     color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 100%
   );
 }
