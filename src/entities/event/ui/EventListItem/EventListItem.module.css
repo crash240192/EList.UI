@@ -301,9 +301,12 @@
 /*
  * Bleed cover: same 16:9 as desktop EventCard.
  * Gradient + text start at 2/3 of cover width so the photo stays readable.
+ * Width is derived from --bleed-min-h (not cqh — size containment collapses auto height to 0).
  */
 .bleedCover {
   --bleed-min-h: 108px;
+  --bleed-cover-w: calc(var(--bleed-min-h) * 16 / 9);
+  --bleed-text-inset: calc(var(--bleed-cover-w) * 2 / 3);
   min-height: var(--bleed-min-h);
 }
 
@@ -313,7 +316,6 @@
   gap: 0;
   padding: 12px 14px 12px 0;
   min-height: var(--bleed-min-h);
-  container-type: size;
 }
 
 .bleedCover .cover {
@@ -322,8 +324,8 @@
   top: 0;
   bottom: 0;
   height: 100%;
-  width: auto;
-  aspect-ratio: 16 / 9;
+  width: var(--bleed-cover-w);
+  aspect-ratio: auto;
   border-radius: 0;
   border: none;
   z-index: 0;
@@ -357,9 +359,7 @@
 .bleedCover .content {
   position: relative;
   z-index: 1;
-  /* fallback ≈ 2/3 of (108px × 16/9); live value tracks row height */
-  padding-left: calc(var(--bleed-min-h) * 16 / 9 * 2 / 3);
-  padding-left: calc(100cqh * 16 / 9 * 2 / 3);
+  padding-left: var(--bleed-text-inset);
   justify-content: center;
 }
 

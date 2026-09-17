@@ -87,7 +87,9 @@
     flex-direction: row;
     min-height: 120px;
     align-items: stretch;
-    container-type: size;
+    --ad-bleed-h: 120px;
+    --ad-cover-w: calc(var(--ad-bleed-h) * 16 / 9);
+    --ad-text-inset: calc(var(--ad-cover-w) * 2 / 3);
   }
 
   /* Match EventListItem bleedCover: 16:9, body from 2/3 width */
@@ -96,9 +98,8 @@
     left: 0;
     top: 0;
     bottom: 0;
-    width: auto;
+    width: var(--ad-cover-w);
     height: 100%;
-    aspect-ratio: 16 / 9;
     flex: none;
     border-bottom: none;
     border-right: none;
@@ -107,7 +108,7 @@
   .placeholderBody {
     position: relative;
     z-index: 1;
-    padding: 12px 12px 12px calc(100cqh * 16 / 9 * 2 / 3);
+    padding: 12px 12px 12px var(--ad-text-inset);
     gap: 6px;
     justify-content: center;
     min-width: 0;
