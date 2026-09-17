@@ -108,16 +108,21 @@ export function AppLayout() {
           >
             <HamburgerIcon />
           </button>
-          <button className={styles.logo} onClick={() => {
-            navigate('/');
-            // Приоритет: выбранный город в фильтрах → координаты пользователя
-            const userCoords = getStoredUserCoords();
-            const lat = filters.latitude  ?? userCoords?.lat ?? 55.7558;
-            const lng = filters.longitude ?? userCoords?.lng ?? 37.6173;
-            window.dispatchEvent(new CustomEvent('elist:centerMap', {
-              detail: { lat, lng },
-            }));
-          }} aria-label="На главную">
+          <button
+            className={`${styles.logo} noHoverGlow`}
+            onClick={(e) => {
+              navigate('/');
+              // Приоритет: выбранный город в фильтрах → координаты пользователя
+              const userCoords = getStoredUserCoords();
+              const lat = filters.latitude  ?? userCoords?.lat ?? 55.7558;
+              const lng = filters.longitude ?? userCoords?.lng ?? 37.6173;
+              window.dispatchEvent(new CustomEvent('elist:centerMap', {
+                detail: { lat, lng },
+              }));
+              e.currentTarget.blur();
+            }}
+            aria-label="На главную"
+          >
             <img src={brandLogo} alt="EList" className={styles.logoImg} />
           </button>
         </div>
