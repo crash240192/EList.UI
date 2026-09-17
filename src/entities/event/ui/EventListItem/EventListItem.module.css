@@ -299,14 +299,14 @@
 }
 
 /*
- * Bleed cover: same 16:9 as desktop EventCard.
- * Gradient + text start at 2/3 of cover width so the photo stays readable.
- * Width is derived from --bleed-min-h (not cqh — size containment collapses auto height to 0).
+ * Bleed cover 4:3. Cover WIDTH is fixed from --bleed-min-h so growing text
+ * does not widen the cover and squeeze the content column further.
+ * Text + gradient start at 75% of that cover width; row height may grow.
  */
 .bleedCover {
   --bleed-min-h: 108px;
-  --bleed-cover-w: calc(var(--bleed-min-h) * 16 / 9);
-  --bleed-text-inset: calc(var(--bleed-cover-w) * 2 / 3);
+  --bleed-cover-w: calc(var(--bleed-min-h) * 4 / 3);
+  --bleed-text-inset: calc(var(--bleed-cover-w) * 0.75);
   min-height: var(--bleed-min-h);
 }
 
@@ -316,6 +316,7 @@
   gap: 0;
   padding: 12px 14px 12px 0;
   min-height: var(--bleed-min-h);
+  height: auto;
 }
 
 .bleedCover .cover {
@@ -338,8 +339,8 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    transparent 66.666%,
-    color-mix(in srgb, var(--surface-2) 28%, rgba(0, 0, 0, 0.55)) 84%,
+    transparent 75%,
+    color-mix(in srgb, var(--surface-2) 28%, rgba(0, 0, 0, 0.55)) 90%,
     var(--surface-2) 100%
   );
   pointer-events: none;
@@ -361,6 +362,44 @@
   z-index: 1;
   padding-left: var(--bleed-text-inset);
   justify-content: center;
+  min-width: 0;
+  overflow: visible;
+}
+
+/* Soft clamps so dense meta/chips don’t pile up on top of each other */
+.bleedCover .name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bleedCover .meta {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.bleedCover .metaItem {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bleedCover .metaAge,
+.bleedCover .metaFree,
+.bleedCover .metaPaid {
+  flex-shrink: 0;
+}
+
+.bleedCover .chips {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.bleedCover .chip {
+  flex-shrink: 0;
 }
 
 .bleedCover .header,
@@ -386,12 +425,12 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    transparent 66.666%,
+    transparent 75%,
     color-mix(
       in srgb,
       color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 28%,
       rgba(0, 0, 0, 0.55)
-    ) 84%,
+    ) 90%,
     color-mix(in srgb, var(--surface-2) 85%, var(--surface)) 100%
   );
 }

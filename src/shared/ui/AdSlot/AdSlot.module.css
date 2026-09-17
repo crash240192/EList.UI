@@ -88,11 +88,11 @@
     min-height: 120px;
     align-items: stretch;
     --ad-bleed-h: 120px;
-    --ad-cover-w: calc(var(--ad-bleed-h) * 16 / 9);
-    --ad-text-inset: calc(var(--ad-cover-w) * 2 / 3);
+    --ad-cover-w: calc(var(--ad-bleed-h) * 4 / 3);
+    --ad-text-inset: calc(var(--ad-cover-w) * 0.75);
   }
 
-  /* Match EventListItem bleedCover: 16:9, body from 2/3 width */
+  /* Match EventListItem bleedCover: 4:3, body from 75% width */
   .placeholderCover {
     position: absolute;
     left: 0;
