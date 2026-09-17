@@ -15,6 +15,23 @@ export const COOKIE_AUTH_TOKEN  = 'elist_auth_token';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/eList';
 
+/** Must match elist.api / filestorage ClientHash inputs (X-Client-Platform). */
+export function getClientPlatform(): string {
+  return 'web';
+}
+
+/** Must match elist.api / filestorage ClientHash inputs (X-App-Version). */
+export function getAppVersion(): string {
+  return (import.meta.env.VITE_APP_VERSION as string | undefined) || '0.1.0';
+}
+
+function clientIdentityHeaders(): Record<string, string> {
+  return {
+    'X-Client-Platform': getClientPlatform(),
+    'X-App-Version': getAppVersion(),
+  };
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly code: number,
@@ -68,6 +85,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'authorization-jwt': clientHash,
+    ...clientIdentityHeaders(),
     ...(options.headers as Record<string, string>),
   };
   if (authToken) headers['Authorization'] = authToken;
@@ -139,6 +157,7 @@ async function requestWithClientJwtOnly<T>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'authorization-jwt': clientHash,
+    ...clientIdentityHeaders(),
     ...(options.headers as Record<string, string>),
   };
 
@@ -206,6 +225,7 @@ async function getStatus(path: string): Promise<boolean> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'authorization-jwt': clientHash,
+    ...clientIdentityHeaders(),
   };
   if (authToken) headers['Authorization'] = authToken;
 
@@ -231,6 +251,7 @@ async function getStatusWithClientJwt(path: string): Promise<boolean> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'authorization-jwt': clientHash,
+    ...clientIdentityHeaders(),
   };
 
   const fetchPromise = fetch(`${BASE_URL}${path}`, { method: 'GET', headers }).then(async response => {
