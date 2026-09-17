@@ -20,6 +20,7 @@ export interface EventListItemData {
     ageLimit?: number | null;
     maxPersonsCount?: number | null;
     ticketsEnabled?: boolean;
+    private?: boolean;
   } | null;
   participantsCount?: number | null;
   colors?: string[];
@@ -46,6 +47,7 @@ export function getEventListParams(event: EventListItemData) {
     ageLimit: p?.ageLimit ?? null,
     maxPersonsCount: p?.maxPersonsCount ?? null,
     participantsCount: event.participantsCount ?? null,
+    isPrivate: Boolean(p?.private),
   };
 }
 

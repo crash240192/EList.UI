@@ -79,6 +79,7 @@ export function normalizeEventListItem(raw: unknown): EventListItemData {
           ) as number | null,
           maxPersonsCount: (params.maxPersonsCount ?? params.MaxPersonsCount ?? null) as number | null,
           ticketsEnabled: Boolean(params.ticketsEnabled ?? params.TicketsEnabled ?? false),
+          private: Boolean(params.private ?? params.Private ?? false),
         }
       : null,
     participantsCount: (e.participantsCount ?? e.ParticipantsCount ?? null) as number | null,
