@@ -370,7 +370,8 @@
   border-radius: 0;
   background: linear-gradient(
     90deg,
-    rgba(0, 0, 0, 0.42) 0%,
+    transparent 0,
+    rgba(0, 0, 0, 0.42) 10px,
     rgba(0, 0, 0, 0.28) 42%,
     rgba(0, 0, 0, 0.12) 72%,
     transparent 100%
@@ -381,7 +382,8 @@
 :global(body.light-theme) .bleedCover .main::before {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.72) 0%,
+    transparent 0,
+    rgba(255, 255, 255, 0.72) 10px,
     rgba(255, 255, 255, 0.5) 42%,
     rgba(255, 255, 255, 0.22) 72%,
     transparent 100%
