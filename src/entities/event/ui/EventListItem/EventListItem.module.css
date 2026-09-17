@@ -345,7 +345,7 @@
 .bleedCover {
   --bleed-min-h: 108px;
   --bleed-cover-w: calc(var(--bleed-min-h) * 4 / 3);
-  --bleed-text-inset: calc(var(--bleed-cover-w) * 0.75);
+  --bleed-text-inset: calc(var(--bleed-cover-w) * 0.75 + 5px);
   min-height: var(--bleed-min-h);
 }
 
