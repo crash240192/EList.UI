@@ -47,12 +47,14 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 18px;
+  -webkit-touch-callout: none;
 }
 .logoLink {
   display: block;
   line-height: 0;
   border-radius: 8px;
   transition: opacity 0.15s;
+  -webkit-touch-callout: none;
 }
 .logoLink:hover { opacity: 0.85; }
 .logoLink:focus-visible {
@@ -64,6 +66,10 @@
   height: 68px;
   object-fit: contain;
   display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 .logoSub {
   font-size: 11px; color: var(--text-muted);
