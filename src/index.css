@@ -88,7 +88,12 @@ input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; }
 
 /* Плавная цветовая схема на всех элементах при смене темы */
 * { transition: background-color var(--transition), border-color var(--transition); }
-/* Кнопки — плавные переходы; скругление по умолчанию для hover/focus */
+/* Кнопки — плавные переходы; скругление по умолчанию для hover/focus.
+   Tap-overlay браузера квадратный — на круге это голубой квадрат, glow не трогаем. */
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
 button {
   border-radius: 8px;
   transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition);
