@@ -186,14 +186,6 @@
   flex-shrink: 0;
 }
 
-.statGroupDivider {
-  width: 1px;
-  align-self: stretch;
-  margin: 6px 10px;
-  background: var(--border);
-  flex-shrink: 0;
-}
-
 .statItem {
   display: flex;
   flex-direction: column;
@@ -787,10 +779,6 @@
 
   .statGroup .statItem {
     padding: 4px 12px;
-  }
-
-  .statGroupDivider {
-    margin: 6px 8px;
   }
 
   .tabsBar,

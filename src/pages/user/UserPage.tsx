@@ -595,19 +595,6 @@ export default function UserPage() {
 
         <div className={styles.statsBar}>
           <div className={styles.statGroup}>
-            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{eventScopes.created.total || eventScopes.created.events.length}</span>
-              <span className={styles.statLabel}>организовал</span>
-            </div>
-            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{eventScopes.participating.total || eventScopes.participating.events.length}</span>
-              <span className={styles.statLabel}>посетил</span>
-            </div>
-          </div>
-
-          <div className={styles.statGroupDivider} aria-hidden />
-
-          <div className={styles.statGroup}>
             <button
               type="button"
               className={`${styles.statItem} ${listModal === 'subscribers' ? styles.statItemActive : ''}`}
