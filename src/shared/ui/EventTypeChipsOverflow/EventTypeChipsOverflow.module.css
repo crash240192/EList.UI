@@ -7,10 +7,13 @@
 }
 
 .rowFit {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  align-content: flex-start;
   overflow: hidden;
   width: 100%;
   min-width: 0;
+  /* chip ~22px + gap 5px between lines */
+  max-height: calc(22px * var(--fit-lines, 2) + 5px * (var(--fit-lines, 2) - 1));
 }
 
 .measure {
