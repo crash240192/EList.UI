@@ -106,17 +106,29 @@ export function HeaderAvatarMenu() {
             <span>Мой профиль</span>
           </button>
 
+          {organizations.length > 0 && (
+            <button
+              type="button"
+              className={styles.menuItem}
+              role="menuitem"
+              onClick={openOrganizations}
+            >
+              <OrgIcon />
+              <span>Мои организации</span>
+            </button>
+          )}
+
           <button
             type="button"
             className={styles.menuItem}
             role="menuitem"
             onClick={() => {
               closeMenu();
-              navigate('/settings');
+              navigate('/my-tickets');
             }}
           >
-            <SettingsIcon />
-            <span>Настройки</span>
+            <TicketIcon />
+            <span>Мои билеты</span>
           </button>
 
           <button
@@ -138,24 +150,12 @@ export function HeaderAvatarMenu() {
             role="menuitem"
             onClick={() => {
               closeMenu();
-              navigate('/my-tickets');
+              navigate('/settings');
             }}
           >
-            <TicketIcon />
-            <span>Мои билеты</span>
+            <SettingsIcon />
+            <span>Настройки</span>
           </button>
-
-          {organizations.length > 0 && (
-            <button
-              type="button"
-              className={styles.menuItem}
-              role="menuitem"
-              onClick={openOrganizations}
-            >
-              <OrgIcon />
-              <span>Мои организации</span>
-            </button>
-          )}
 
           {isMobile && (
             <>
