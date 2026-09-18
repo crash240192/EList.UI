@@ -94,17 +94,29 @@ button {
   transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition);
 }
 
-/* Glow при hover на интерактивных элементах с подсветкой */
-button:hover:not(:disabled):not(.noHoverGlow),
-[role="button"]:hover:not(:disabled):not(.noHoverGlow),
-a.controlLink:hover {
-  box-shadow: var(--hover-glow);
+/* Glow: мышь — hover; тач — только пока кнопка зажата (:hover иначе залипает). */
+@media (hover: hover) {
+  button:hover:not(:disabled):not(.noHoverGlow),
+  [role="button"]:hover:not(:disabled):not(.noHoverGlow),
+  a.controlLink:hover {
+    box-shadow: var(--hover-glow);
+  }
+}
+@media (hover: none) {
+  button:active:not(:disabled):not(.noHoverGlow),
+  [role="button"]:active:not(:disabled):not(.noHoverGlow),
+  a.controlLink:active {
+    box-shadow: var(--hover-glow);
+  }
 }
 
 /* Круглые иконки без прямоугольной подсветки — без glow */
 button.noHoverGlow:hover,
+button.noHoverGlow:active,
 [class*="avatar"]:hover,
+[class*="avatar"]:active,
 [class*="Avatar"]:hover,
+[class*="Avatar"]:active,
 input[type="checkbox"]:hover,
 input[type="radio"]:hover {
   box-shadow: none;
