@@ -2,7 +2,7 @@
 // Клиент для сервиса файлохранилища
 // basePath: /elist/filestorage
 
-import { getOrCreateClientHash, getAuthToken, notifyUnauthorized } from './client';
+import { getOrCreateClientHash, getAuthToken, notifyUnauthorized, getClientPlatform, getAppVersion } from './client';
 import { shouldForceLogoutForApi } from '@/shared/auth/unauthorized';
 
 const FILE_STORAGE_BASE = import.meta.env.VITE_FILE_STORAGE_URL ?? '/elist/filestorage';
@@ -39,6 +39,8 @@ function authHeaders(): Record<string, string> {
   const authToken  = getAuthToken();
   const headers: Record<string, string> = {
     'authorization-jwt': clientHash,
+    'X-Client-Platform': getClientPlatform(),
+    'X-App-Version': getAppVersion(),
   };
   if (authToken) headers['Authorization'] = authToken;
   return headers;
