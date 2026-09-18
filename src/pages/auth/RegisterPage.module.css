@@ -73,6 +73,13 @@
 }
 .docLink:hover { opacity: 0.85; }
 
+.policyHint {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 /* Хинты */
 .fieldHint { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
 .loadingSelect { font-size: 13px; color: var(--text-muted); padding: 8px 0; }

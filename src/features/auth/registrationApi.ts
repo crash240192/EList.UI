@@ -28,6 +28,12 @@ export interface ICreateAccountRequest {
   acceptConsent: boolean;
   /** Обязательно: согласие с пользовательским соглашением (Agreement). */
   acceptAgreement: boolean;
+  /** Профиль создаётся в той же TX create (имя, фамилия, ДР ≥ 14 обязательны на бэке). */
+  firstName: string;
+  lastName: string;
+  patronymic?: string;
+  gender?: Gender;
+  birthDate: string; // ISO 8601
 }
 
 export interface IPersonRequest {
@@ -50,7 +56,7 @@ export async function fetchContactTypes(): Promise<IContactType[]> {
 }
 
 /**
- * Создать аккаунт.
+ * Создать аккаунт (+ профиль и согласия в одной TX).
  * POST /api/accounts/create
  * Не требует авторизации (authorization-jwt клиентского хеша достаточно).
  */
