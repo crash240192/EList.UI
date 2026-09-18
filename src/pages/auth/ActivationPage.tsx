@@ -11,7 +11,7 @@ import { useAuthStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { OtpCodeInput } from '@/shared/ui/OtpCodeInput';
 import { usePageTitle } from '@/shared/hooks';
-import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
+import { AuthLogoImg } from './AuthBrand';
 import styles from './AuthPage.module.css';
 import actStyles from './ActivationPage.module.css';
 
@@ -96,7 +96,7 @@ export default function ActivationPage() {
   if (success) return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.logoWrap}><img src={brandLogo} alt="EList" className={styles.logoImg} /></div>
+        <div className={styles.logoWrap} onContextMenu={e => e.preventDefault()}><AuthLogoImg /></div>
         <h1 className={styles.heading}>Аккаунт активирован!</h1>
         <p className={styles.subheading}>Переходим на главную...</p>
       </div>
@@ -108,8 +108,8 @@ export default function ActivationPage() {
     <div className={styles.page}>
       <div className={styles.card}>
 
-        <div className={styles.logoWrap}>
-          <img src={brandLogo} alt="EList" className={styles.logoImg} />
+        <div className={styles.logoWrap} onContextMenu={e => e.preventDefault()}>
+          <AuthLogoImg />
         </div>
 
         <h1 className={styles.heading}>Подтверждение</h1>
