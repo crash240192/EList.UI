@@ -451,7 +451,7 @@
   position: relative;
   z-index: 2;
   isolation: isolate;
-  padding-left: calc(var(--bleed-text-inset) + 5px);
+  padding-left: calc(var(--bleed-text-inset) + 15px);
   justify-content: center;
   min-width: 0;
   overflow: visible;
