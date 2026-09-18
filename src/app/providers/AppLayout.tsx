@@ -121,9 +121,10 @@ export function AppLayout() {
               }));
               e.currentTarget.blur();
             }}
+            onContextMenu={(e) => e.preventDefault()}
             aria-label="На главную"
           >
-            <img src={brandLogo} alt="EList" className={styles.logoImg} />
+            <img src={brandLogo} alt="EList" className={styles.logoImg} draggable={false} />
           </button>
         </div>
 
