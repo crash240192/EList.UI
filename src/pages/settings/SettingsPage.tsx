@@ -18,7 +18,7 @@ import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
 import { Select } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
-import { birthDateToApiIso, parseBirthDateFromApi, todayLocalDateString } from '@/shared/lib/datetime';
+import { birthDateToApiIso, getAge, parseBirthDateFromApi, todayLocalDateString } from '@/shared/lib/datetime';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { useAuthStore, useFiltersStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
@@ -253,10 +253,22 @@ function ProfileTab() {
     setSaving(true);
     setMsg(null);
     try {
+      if (!form.firstName.trim() || !form.lastName.trim()) {
+        setMsg({ text: 'Укажите имя и фамилию', ok: false });
+        return;
+      }
+      if (!form.birthDate) {
+        setMsg({ text: 'Укажите дату рождения', ok: false });
+        return;
+      }
+      if (getAge(form.birthDate) < 14) {
+        setMsg({ text: 'Сервис доступен только по достижению 14 лет', ok: false });
+        return;
+      }
       await savePersonInfo({
-        firstName: form.firstName || undefined,
-        lastName: form.lastName || undefined,
-        patronymic: form.patronymic || undefined,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        patronymic: form.patronymic.trim() || undefined,
         gender: form.gender || undefined,
         birthDate: birthDateToApiIso(form.birthDate),
       });
