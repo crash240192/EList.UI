@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EList — Главная (макет v2)</title>
+<link rel="stylesheet" href="elist_shared.css">
+<style>
+/* ── Page-specific ── */
+.page-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px 16px 0;
+  gap: 12px;
+}
+
+/* Filter bar */
+.filter-bar {
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.filter-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--bd);
+}
+
+.search-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-ico {
+  position: absolute;
+  left: 10px;
+  color: var(--t3);
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  padding: 8px 32px 8px 32px;
+  background: var(--sur2);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  color: var(--t1);
+  font-family: inherit;
+  outline: none;
+}
+.search-input:focus { border-color: var(--ac); }
+.search-input::placeholder { color: var(--t3); }
+
+.view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--t2);
+  padding: 4px 6px;
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.view-toggle:hover { background: var(--sur2); }
+.view-label { font-weight: 500; white-space: nowrap; }
+
+.filter-quick-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.city-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--bd);
+  background: var(--sur2);
+  color: var(--t1);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.city-btn:hover { border-color: var(--ac); }
+
+.quick-btn {
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px solid var(--bd);
+  background: none;
+  color: var(--t2);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.quick-btn:hover { border-color: var(--ac); color: var(--ac); }
+.quick-btn.on { background: var(--ac); border-color: var(--ac); color: #fff; }
+
+.more-btn {
+  margin-left: auto;
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px dashed var(--bd);
+  background: none;
+  color: var(--t2);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Mobile compact bar */
+.mobile-filter-bar {
+  display: none;
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-lg);
+  padding: 8px 10px;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.filter-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--sur2);
+  border: 1px solid var(--bd);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--t2);
+  flex-shrink: 0;
+  position: relative;
+}
+.filter-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--ac);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Content area */
+.content-area {
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--bd);
+}
+
+/* Map */
+.map-view {
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px),
+    linear-gradient(160deg, #1a1f35 0%, #13141a 40%, #1a2030 100%);
+  background-size: 40px 40px, 40px 40px, 100% 100%;
+  position: relative;
+}
+
+.map-marker {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--sur);
+  border: 2px solid var(--ac);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(99,102,241,0.35);
+  transition: transform 0.15s;
+}
+.map-marker:hover { transform: scale(1.15); z-index: 2; }
+.map-marker:nth-child(1) { top: 28%; left: 42%; }
+.map-marker:nth-child(2) { top: 45%; left: 58%; }
+.map-marker:nth-child(3) { top: 62%; left: 35%; }
+.map-marker:nth-child(4) { top: 38%; left: 68%; }
+.map-marker:nth-child(5) { top: 55%; left: 22%; }
+
+.map-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 11px;
+  color: var(--t2);
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+/* List */
+.list-view {
+  display: none;
+  height: 100%;
+  overflow-y: auto;
+  padding: 14px;
+  background: var(--bg);
+}
+
+.event-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.event-card {
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.event-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--ac);
+  box-shadow: 0 8px 24px rgba(99,102,241,0.18);
+}
+
+.ev-cover {
+  height: 130px;
+  position: relative;
+  overflow: hidden;
+}
+.ev-cover-bg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ev-cover-grad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.5));
+}
+.ev-type {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+}
+.ev-body { padding: 11px 13px 13px; }
+.ev-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+  line-height: 1.35;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ev-meta {
+  font-size: 11px;
+  color: var(--t2);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ev-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.ev-price {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--oks);
+  color: var(--ok);
+}
+
+/* Bottom sheet preview */
+.sheet-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 400;
+  backdrop-filter: blur(2px);
+}
+.sheet-backdrop.open { display: block; }
+
+.event-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(100%);
+  width: min(400px, 100%);
+  background: var(--sur);
+  border-radius: 20px 20px 0 0;
+  z-index: 401;
+  transition: transform 0.25s ease;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+.event-sheet.open { transform: translateX(-50%) translateY(0); }
+
+.sheet-cover {
+  height: 140px;
+  background: linear-gradient(135deg, #312e81, #4f46e5, #7c3aed);
+  position: relative;
+}
+.sheet-cover-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.5));
+}
+.sheet-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.45);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.sheet-types {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  display: flex;
+  gap: 5px;
+}
+.sheet-body { padding: 14px 16px 20px; }
+.sheet-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  line-height: 1.3;
+}
+.sheet-meta { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.sheet-meta-row { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--t2); }
+.sheet-desc {
+  font-size: 12px;
+  color: var(--t2);
+  line-height: 1.6;
+  margin-bottom: 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* View modes */
+body.mode-list .map-view { display: none; }
+body.mode-list .list-view { display: block; }
+body.mode-map .map-view { display: block; }
+body.mode-map .list-view { display: none; }
+
+/* Mobile overrides */
+@media (max-width: 639px) {
+  .page-content { padding: 10px 10px 0; gap: 8px; }
+  .filter-bar { display: none; }
+  .mobile-filter-bar { display: flex; }
+  .event-grid { grid-template-columns: 1fr; }
+  .ev-cover { height: 110px; }
+  .more-btn { display: none; }
+  .view-label { display: none; }
+}
+
+/* Desktop frame simulation */
+body.frame-mobile .app { max-width: 390px; margin: 0 auto; border-left: 1px solid var(--bd); border-right: 1px solid var(--bd); }
+body.frame-mobile .viewport-toggle { right: calc(50% - 180px); }
+</style>
+</head>
+<body class="mode-map">
+
+<div class="mockup-ribbon">Макет v2 — Главная</div>
+
+<div class="app">
+  <!-- Header -->
+  <header class="app-header">
+    <div class="app-header-left">
+      <button class="menu-btn" aria-label="Меню">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <button class="logo-btn">EList</button>
+    </div>
+    <div class="app-header-right">
+      <button class="icon-btn" title="Тема">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2"/></svg>
+      </button>
+      <button class="icon-btn" title="Уведомления" style="position:relative">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span style="position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--ac)"></span>
+      </button>
+      <button class="avatar-btn">АК</button>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <!-- Sidebar (desktop) -->
+    <aside class="app-sidebar">
+      <a class="nav-item active" href="#" title="Поиск">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </a>
+      <a class="nav-item" href="elist_my_events.html" title="Мои события">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </a>
+      <a class="nav-item" href="elist_invitations.html" title="Приглашения">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 019.29-5"/><circle cx="19" cy="17" r="4"/><line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/></svg>
+        <span class="nav-badge">3</span>
+      </a>
+      <a class="nav-item" href="elist_create_event.html" title="Создать">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      </a>
+      <a class="nav-item" href="elist_settings_wallet.html" title="Настройки" style="margin-top:auto">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 001 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </a>
+    </aside>
+
+    <main class="app-main">
+      <div class="page-content">
+        <!-- Desktop filter bar -->
+        <div class="filter-bar">
+          <div class="filter-search-row">
+            <div class="search-wrap">
+              <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input class="search-input" placeholder="Название мероприятия..." value="">
+            </div>
+            <button class="view-toggle" id="viewToggle" onclick="toggleView()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span class="view-label" id="viewLabel">Карта</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </button>
+          </div>
+          <div class="filter-quick-row">
+            <button class="city-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Москва
+            </button>
+            <button class="quick-btn on">Сегодня</button>
+            <button class="quick-btn">Завтра</button>
+            <button class="quick-btn">Выходные</button>
+            <button class="quick-btn">Бесплатно</button>
+            <button class="more-btn">Дополнительно ▾</button>
+          </div>
+        </div>
+
+        <!-- Mobile compact bar -->
+        <div class="mobile-filter-bar">
+          <div class="search-wrap" style="flex:1">
+            <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input class="search-input" placeholder="Поиск..." style="font-size:16px">
+          </div>
+          <button class="filter-icon-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+            <span class="filter-badge">2</span>
+          </button>
+          <button class="view-toggle" onclick="toggleView()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div class="content-area">
+          <div class="map-view">
+            <div class="map-marker" onclick="openSheet()" title="Дизайн-спринт 2025">🎨</div>
+            <div class="map-marker" onclick="openSheet()">🎵</div>
+            <div class="map-marker" onclick="openSheet()">🏃</div>
+            <div class="map-marker" onclick="openSheet()">📚</div>
+            <div class="map-marker" onclick="openSheet()">🎂</div>
+            <div class="map-hint">Нажмите на маркер для превью · Перетащите для поиска в области</div>
+          </div>
+
+          <div class="list-view">
+            <div class="event-grid">
+              <div class="event-card" onclick="openSheet()">
+                <div class="ev-cover" style="background:linear-gradient(135deg,#312e81,#7c3aed)">
+                  <div class="ev-cover-grad"></div>
+                  <span class="ev-type badge-overlay">Конференция</span>
+                </div>
+                <div class="ev-body">
+                  <div class="ev-title">Дизайн-спринт 2025: UX для городских сервисов</div>
+                  <div class="ev-meta">
+                    <span>5 июл, 10:00</span>
+                    <span>Artplay, Москва</span>
+                  </div>
+                  <div class="ev-foot"><span class="ev-price">Бесплатно</span><span style="font-size:11px;color:var(--t3)">⭐ 4.8</span></div>
+                </div>
+              </div>
+              <div class="event-card">
+                <div class="ev-cover" style="background:linear-gradient(135deg,#7c2d12,#b45309)">
+                  <div class="ev-cover-grad"></div>
+                  <span class="ev-type badge-overlay">Концерт</span>
+                </div>
+                <div class="ev-body">
+                  <div class="ev-title">Джаз на крыше — летний вечер</div>
+                  <div class="ev-meta"><span>6 июл, 20:00</span><span>Парк Горького</span></div>
+                  <div class="ev-foot"><span class="ev-price" style="background:var(--acs);color:var(--ac)">1 500 ₽</span></div>
+                </div>
+              </div>
+              <div class="event-card">
+                <div class="ev-cover" style="background:linear-gradient(135deg,#064e3b,#059669)">
+                  <div class="ev-cover-grad"></div>
+                  <span class="ev-type badge-overlay">Спорт</span>
+                </div>
+                <div class="ev-body">
+                  <div class="ev-title">Утренняя пробежка в Измайловском парке</div>
+                  <div class="ev-meta"><span>7 июл, 07:30</span><span>Измайлово</span></div>
+                  <div class="ev-foot"><span class="ev-price">Бесплатно</span></div>
+                </div>
+              </div>
+              <div class="event-card">
+                <div class="ev-cover" style="background:linear-gradient(135deg,#831843,#be185d)">
+                  <div class="ev-cover-grad"></div>
+                  <span class="ev-type badge-overlay">День рождения</span>
+                </div>
+                <div class="ev-body">
+                  <div class="ev-title">День рождения Маши — пикник у пруда</div>
+                  <div class="ev-meta"><span>8 июл, 14:00</span><span>Сокольники</span></div>
+                  <div class="ev-foot"><span class="ev-price">Бесплатно</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Bottom nav (mobile) -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <button class="bnav-item active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Поиск
+      </button>
+      <a class="bnav-item" href="elist_my_events.html">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Мои
+      </a>
+      <div class="bnav-item create">
+        <a href="elist_create_event.html" class="bnav-create-btn" aria-label="Создать">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </a>
+      </div>
+      <a class="bnav-item" href="elist_invitations.html">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 019.29-5"/><circle cx="19" cy="17" r="4"/><line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/></svg>
+        Инвайты
+      </a>
+      <button class="bnav-item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Профиль
+      </button>
+    </div>
+  </nav>
+</div>
+
+<!-- Event preview sheet -->
+<div class="sheet-backdrop" id="sheetBackdrop" onclick="closeSheet()"></div>
+<div class="event-sheet" id="eventSheet">
+  <div class="sheet-cover">
+    <div class="sheet-cover-overlay"></div>
+    <button class="sheet-close" onclick="closeSheet()">✕</button>
+    <div class="sheet-types">
+      <span class="badge-overlay">Конференция</span>
+      <span class="badge-overlay" style="background:rgba(16,185,129,0.65);border-color:rgba(16,185,129,0.4)">Бесплатно</span>
+    </div>
+  </div>
+  <div class="sheet-body">
+    <div class="sheet-title">Дизайн-спринт 2025: UX для городских сервисов</div>
+    <div class="sheet-meta">
+      <div class="sheet-meta-row">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        5 июл, 10:00 — 18:00
+      </div>
+      <div class="sheet-meta-row">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Artplay, Нижняя Сыромятническая ул., 10
+      </div>
+      <div class="sheet-meta-row">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        38 участников
+      </div>
+    </div>
+    <p class="sheet-desc">Двухдневный интенсив по проектированию пользовательского опыта для городских платформ. Воркшопы, нетворкинг, питч-сессии.</p>
+    <button class="btn btn-primary btn-block" onclick="location.href='elist_event_page.html'">Подробнее →</button>
+  </div>
+</div>
+
+<!-- Viewport toggle -->
+<div class="viewport-toggle">
+  <button class="active" onclick="setFrame('desktop', this)">Desktop</button>
+  <button onclick="setFrame('mobile', this)">Mobile</button>
+</div>
+
+<script>
+let isMap = true;
+function toggleView() {
+  isMap = !isMap;
+  document.body.classList.toggle('mode-map', isMap);
+  document.body.classList.toggle('mode-list', !isMap);
+  const label = document.getElementById('viewLabel');
+  if (label) label.textContent = isMap ? 'Карта' : 'Список';
+}
+function openSheet() {
+  document.getElementById('sheetBackdrop').classList.add('open');
+  document.getElementById('eventSheet').classList.add('open');
+}
+function closeSheet() {
+  document.getElementById('sheetBackdrop').classList.remove('open');
+  document.getElementById('eventSheet').classList.remove('open');
+}
+function setFrame(mode, btn) {
+  document.querySelectorAll('.viewport-toggle button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.body.classList.toggle('frame-mobile', mode === 'mobile');
+}
+</script>
+</body>
+</html>

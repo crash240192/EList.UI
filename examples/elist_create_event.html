@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EList — Создание события (макет v2)</title>
+<link rel="stylesheet" href="elist_shared.css">
+<style>
+.page-scroll {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+/* Desktop layout */
+.page-inner {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 20px;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px;
+  align-items: start;
+}
+
+.form-card {
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+}
+
+.form-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--bd);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.form-header h1 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Wizard steps — mobile */
+.wizard-steps {
+  display: none;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--bd);
+  gap: 0;
+}
+.wizard-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+.wizard-step::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--bd);
+  z-index: 0;
+}
+.wizard-step:last-child::after { display: none; }
+.wizard-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sur2);
+  border: 2px solid var(--bd);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t3);
+  position: relative;
+  z-index: 1;
+}
+.wizard-step.done .wizard-dot { background: var(--ac); border-color: var(--ac); color: #fff; }
+.wizard-step.active .wizard-dot { border-color: var(--ac); color: var(--ac); background: var(--acs); }
+.wizard-label { font-size: 9px; color: var(--t3); text-align: center; font-weight: 500; }
+.wizard-step.active .wizard-label { color: var(--ac); }
+
+.form-section {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--bd);
+}
+.form-section:last-child { border-bottom: none; }
+
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.field-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t2);
+  margin-bottom: 5px;
+  display: block;
+}
+.field-input, .field-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--sur2);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  color: var(--t1);
+  font-family: inherit;
+  outline: none;
+}
+.field-input:focus, .field-textarea:focus { border-color: var(--ac); }
+.field-textarea { min-height: 72px; resize: vertical; line-height: 1.6; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.picker-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: var(--sur2);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  color: var(--t2);
+  cursor: pointer;
+  font-family: inherit;
+}
+.picker-btn:hover { border-color: var(--ac); }
+
+.cover-upload {
+  border: 1.5px dashed var(--bd);
+  border-radius: var(--r);
+  padding: 24px;
+  text-align: center;
+  color: var(--t3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.cover-upload:hover { border-color: var(--ac); color: var(--ac); }
+
+.map-picker {
+  height: 160px;
+  border-radius: var(--r);
+  border: 1px solid var(--bd);
+  background: linear-gradient(160deg, #1a1f35, #13141a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t3);
+  font-size: 12px;
+  position: relative;
+}
+.map-pin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  font-size: 28px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+}
+
+.form-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--bd);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Side panel checklist */
+.side-panel { display: flex; flex-direction: column; gap: 14px; }
+.checklist-card {
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-lg);
+  padding: 16px;
+}
+.checklist-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t1);
+  margin-bottom: 12px;
+}
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--t2);
+}
+.check-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.check-icon.done { background: var(--oks); color: var(--ok); }
+.check-icon.pending { background: var(--sur2); border: 1.5px solid var(--bd); color: var(--t3); }
+
+.preview-card {
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.preview-cover {
+  height: 90px;
+  background: linear-gradient(135deg, #312e81, #7c3aed);
+}
+.preview-body { padding: 10px 12px; }
+.preview-title { font-size: 12px; font-weight: 600; color: var(--t1); line-height: 1.35; }
+.preview-meta { font-size: 10px; color: var(--t3); margin-top: 4px; }
+
+/* Wizard panes */
+.wizard-pane { display: none; }
+.wizard-pane.active { display: block; }
+
+/* Mobile */
+@media (max-width: 639px) {
+  .page-inner { grid-template-columns: 1fr; padding: 0; gap: 0; }
+  .form-card { border-radius: 0; border-left: none; border-right: none; }
+  .side-panel { display: none; }
+  .wizard-steps { display: flex; }
+  .field-row { grid-template-columns: 1fr; }
+  .form-footer { position: sticky; bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px)); background: var(--sur); z-index: 50; }
+}
+
+body.frame-mobile .app { max-width: 390px; margin: 0 auto; border-left: 1px solid var(--bd); border-right: 1px solid var(--bd); }
+body.frame-mobile .page-inner { padding: 0; grid-template-columns: 1fr; }
+body.frame-mobile .side-panel { display: none; }
+body.frame-mobile .wizard-steps { display: flex; }
+body.frame-mobile .field-row { grid-template-columns: 1fr; }
+body.frame-mobile .form-footer { position: sticky; bottom: calc(var(--bottom-nav-h)); }
+</style>
+</head>
+<body>
+
+<div class="mockup-ribbon">Макет v2 — Создание</div>
+
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-left">
+      <button class="menu-btn" onclick="location.href='elist_home.html'">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="display-sm">Создать событие</span>
+    </div>
+    <div class="app-header-right">
+      <button class="btn btn-ghost btn-sm" id="desktopSave" style="display:none">Сохранить черновик</button>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <main class="app-main" style="width:100%">
+      <div class="page-scroll">
+        <div class="page-inner">
+          <div class="form-card">
+            <!-- Desktop header -->
+            <div class="form-header" id="desktopHeader">
+              <button class="hero-btn" style="background:var(--sur2);border:1px solid var(--bd);color:var(--t2);width:34px;height:34px;border-radius:50%" onclick="location.href='elist_home.html'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <h1>Новое мероприятие</h1>
+            </div>
+
+            <!-- Mobile wizard steps -->
+            <div class="wizard-steps" id="wizardSteps">
+              <div class="wizard-step done" data-step="1">
+                <div class="wizard-dot">✓</div>
+                <span class="wizard-label">Что и когда</span>
+              </div>
+              <div class="wizard-step active" data-step="2">
+                <div class="wizard-dot">2</div>
+                <span class="wizard-label">Где</span>
+              </div>
+              <div class="wizard-step" data-step="3">
+                <div class="wizard-dot">3</div>
+                <span class="wizard-label">Кто может</span>
+              </div>
+            </div>
+
+            <!-- Step 1 -->
+            <div class="wizard-pane" id="pane1">
+              <div class="form-section">
+                <div class="sec-label" style="margin-bottom:12px">Основное</div>
+                <div class="field">
+                  <label class="field-label">Название *</label>
+                  <input class="field-input" placeholder="Например: Джаз на крыше" value="Дизайн-спринт 2025">
+                </div>
+                <div class="field">
+                  <label class="field-label">Тип мероприятия *</label>
+                  <button class="picker-btn">
+                    <span>🎯</span> Конференция, Воркшоп
+                    <span style="margin-left:auto;color:var(--t3)">▾</span>
+                  </button>
+                </div>
+                <div class="field">
+                  <label class="field-label">Описание</label>
+                  <textarea class="field-textarea" placeholder="Расскажите подробнее о мероприятии...">Двухдневный интенсив по UX для городских сервисов.</textarea>
+                </div>
+              </div>
+              <div class="form-section">
+                <div class="sec-label" style="margin-bottom:12px">Дата и время</div>
+                <div class="field-row">
+                  <div class="field">
+                    <label class="field-label">Начало *</label>
+                    <input class="field-input" type="date" value="2025-07-05">
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Время *</label>
+                    <input class="field-input" type="time" value="10:00">
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label">Длительность</label>
+                  <div class="field-row">
+                    <input class="field-input" value="8" style="text-align:center"> 
+                    <span style="display:flex;align-items:center;font-size:12px;color:var(--t2)">часов</span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-section">
+                <div class="sec-label" style="margin-bottom:12px">Обложка</div>
+                <div class="cover-upload">
+                  <div style="font-size:24px;margin-bottom:6px">📷</div>
+                  Загрузить обложку<br>
+                  <span style="font-size:11px;color:var(--t3)">JPG, PNG до 5 МБ</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="wizard-pane active" id="pane2">
+              <div class="form-section">
+                <div class="sec-label" style="margin-bottom:12px">Место проведения</div>
+                <div class="field">
+                  <label class="field-label">Адрес *</label>
+                  <input class="field-input" placeholder="Улица, дом, город" value="Нижняя Сыромятническая ул., 10, Москва">
+                </div>
+                <div class="field">
+                  <label class="field-label">Точка на карте *</label>
+                  <div class="map-picker">
+                    <span class="map-pin">📍</span>
+                    <span>Нажмите на карту или перетащите маркер</span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-section">
+                <div class="sec-label" style="margin-bottom:12px">Стоимость</div>
+                <div class="field-row">
+                  <div class="field">
+                    <label class="field-label">Цена участия</label>
+                    <input class="field-input" value="0" type="number">
+                  </div>
+                  <div class="field" style="display:flex;align-items:flex-end">
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer;padding-bottom:10px">
+                      <input type="checkbox" checked> Бесплатное
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="wizard-pane" id="pane3">
+              <div class="form-section">
+                <div class="sec-label" style="margin-bottom:12px">Доступ</div>
+                <div class="field">
+                  <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
+                    <input type="checkbox"> Закрытое мероприятие (только по списку)
+                  </label>
+                </div>
+                <div class="field-row">
+                  <div class="field">
+                    <label class="field-label">Макс. участников</label>
+                    <input class="field-input" placeholder="Без ограничений" value="50">
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Возраст</label>
+                    <input class="field-input" placeholder="Без ограничений" value="18">
+                  </div>
+                </div>
+                <div class="field">
+                  <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer">
+                    <input type="checkbox" checked> Участники могут приглашать других
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-footer">
+              <button class="btn btn-ghost btn-sm" id="btnBack" onclick="prevStep()" style="visibility:hidden">← Назад</button>
+              <div style="font-size:11px;color:var(--t3)" id="stepHint">Шаг 2 из 3</div>
+              <button class="btn btn-primary btn-sm" id="btnNext" onclick="nextStep()">Далее →</button>
+            </div>
+          </div>
+
+          <!-- Side panel (desktop) -->
+          <div class="side-panel">
+            <div class="checklist-card">
+              <div class="checklist-title">Чеклист готовности</div>
+              <div class="check-item"><span class="check-icon done">✓</span> Название</div>
+              <div class="check-item"><span class="check-icon done">✓</span> Тип мероприятия</div>
+              <div class="check-item"><span class="check-icon done">✓</span> Дата и время</div>
+              <div class="check-item"><span class="check-icon pending">4</span> Адрес и карта</div>
+              <div class="check-item"><span class="check-icon pending">5</span> Параметры доступа</div>
+            </div>
+            <div class="preview-card">
+              <div class="preview-cover"></div>
+              <div class="preview-body">
+                <div class="preview-title">Дизайн-спринт 2025</div>
+                <div class="preview-meta">5 июл, 10:00 · Москва</div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" style="opacity:0.5;cursor:not-allowed">Опубликовать</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <a class="bnav-item" href="elist_home.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>Поиск</a>
+      <a class="bnav-item" href="elist_my_events.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Мои</a>
+      <div class="bnav-item create"><span class="bnav-create-btn" style="background:var(--ac-hover)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></div>
+      <a class="bnav-item" href="elist_invitations.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="9" cy="7" r="4"/><circle cx="19" cy="17" r="4"/></svg>Инвайты</a>
+      <button class="bnav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Профиль</button>
+    </div>
+  </nav>
+</div>
+
+<div class="viewport-toggle">
+  <button class="active" onclick="setFrame('desktop',this)">Desktop</button>
+  <button onclick="setFrame('mobile',this)">Mobile</button>
+</div>
+
+<script>
+let step = 2;
+const total = 3;
+
+function showStep(n) {
+  step = n;
+  document.querySelectorAll('.wizard-pane').forEach((p, i) => p.classList.toggle('active', i + 1 === n));
+  document.querySelectorAll('.wizard-step').forEach((s, i) => {
+    s.classList.remove('active', 'done');
+    if (i + 1 < n) s.classList.add('done');
+    if (i + 1 === n) s.classList.add('active');
+    const dot = s.querySelector('.wizard-dot');
+    if (i + 1 < n) dot.textContent = '✓';
+    else dot.textContent = i + 1;
+  });
+  document.getElementById('btnBack').style.visibility = n > 1 ? 'visible' : 'hidden';
+  document.getElementById('btnNext').textContent = n === total ? 'Опубликовать' : 'Далее →';
+  document.getElementById('stepHint').textContent = `Шаг ${n} из ${total}`;
+}
+
+function nextStep() { if (step < total) showStep(step + 1); }
+function prevStep() { if (step > 1) showStep(step - 1); }
+
+function setFrame(mode, btn) {
+  document.querySelectorAll('.viewport-toggle button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.body.classList.toggle('frame-mobile', mode === 'mobile');
+  document.getElementById('wizardSteps').style.display = mode === 'mobile' ? 'flex' : '';
+  document.getElementById('desktopHeader').style.display = mode === 'mobile' ? 'none' : 'flex';
+  if (mode === 'mobile') showStep(step);
+}
+</script>
+</body>
+</html>
