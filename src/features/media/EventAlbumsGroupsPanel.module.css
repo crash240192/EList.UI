@@ -55,12 +55,13 @@
 
 .albumCardThumb {
   width: 60px;
+  height: 60px;
   border-radius: 10px;
 }
 
 .albumCardThumb .albumCover {
-  height: 60px;
-  width: 60px;
+  height: 100%;
+  width: 100%;
 }
 
 .albumCardThumb .privateBadge {
