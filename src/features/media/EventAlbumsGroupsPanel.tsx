@@ -20,8 +20,17 @@ function albumCountLabel(count: number): string {
   return `${count} альбомов`;
 }
 
-function AlbumTile({ album, onOpen }: { album: IAlbum; onOpen: () => void }) {
+function AlbumTile({
+  album,
+  compact,
+  onOpen,
+}: {
+  album: IAlbum;
+  compact?: boolean;
+  onOpen: () => void;
+}) {
   const [cover, setCover] = useState<string | null>(null);
+  const emptyIconSize = compact ? 16 : 24;
 
   useEffect(() => {
     let cancelled = false;
@@ -32,13 +41,19 @@ function AlbumTile({ album, onOpen }: { album: IAlbum; onOpen: () => void }) {
   }, [album.id]);
 
   return (
-    <button type="button" className={styles.albumCard} onClick={onOpen}>
+    <button
+      type="button"
+      className={`${styles.albumCard} ${compact ? styles.albumCardThumb : ''}`}
+      onClick={onOpen}
+      aria-label={compact ? album.name : undefined}
+      title={compact ? album.name : undefined}
+    >
       <div className={styles.albumCover}>
         {cover
           ? <AuthImage fileId={cover} alt="" className={styles.albumCoverImg} />
           : (
             <div className={styles.albumCoverEmpty}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+              <svg width={emptyIconSize} height={emptyIconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <path d="M3 9h18" />
                 <circle cx="9" cy="15" r="2" />
@@ -55,10 +70,12 @@ function AlbumTile({ album, onOpen }: { album: IAlbum; onOpen: () => void }) {
           </div>
         )}
       </div>
-      <div className={styles.albumMeta}>
-        <div className={styles.albumName}>{album.name}</div>
-        {album.description && <div className={styles.albumDesc}>{album.description}</div>}
-      </div>
+      {!compact && (
+        <div className={styles.albumMeta}>
+          <div className={styles.albumName}>{album.name}</div>
+          {album.description && <div className={styles.albumDesc}>{album.description}</div>}
+        </div>
+      )}
     </button>
   );
 }
@@ -73,6 +90,7 @@ function EventGroupSection({
   onOpenEvent: (eventId: string) => void;
 }) {
   const { event, albums } = group;
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <section className={styles.eventGroup}>
@@ -83,9 +101,17 @@ function EventGroupSection({
         bleedCover
         footer={<span>{albumCountLabel(albums.length)}</span>}
       />
-      <div className={styles.albumGrid}>
+      <div className={expanded ? styles.albumGrid : styles.albumGridCollapsed}>
         {albums.map(album => (
-          <AlbumTile key={album.id} album={album} onOpen={() => onOpenAlbum(album)} />
+          <AlbumTile
+            key={album.id}
+            album={album}
+            compact={!expanded}
+            onOpen={() => {
+              if (expanded) onOpenAlbum(album);
+              else setExpanded(true);
+            }}
+          />
         ))}
       </div>
     </section>

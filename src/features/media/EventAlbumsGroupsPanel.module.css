@@ -29,6 +29,15 @@
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 }
 
+.albumGridCollapsed {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fill, 60px);
+  justify-content: start;
+  width: 100%;
+  max-width: 100%;
+}
+
 .albumCard {
   display: block;
   width: 100%;
@@ -42,6 +51,22 @@
   text-align: left;
   font-family: inherit;
   transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.albumCardThumb {
+  width: 60px;
+  border-radius: 10px;
+}
+
+.albumCardThumb .albumCover {
+  height: 60px;
+  width: 60px;
+}
+
+.albumCardThumb .privateBadge {
+  top: 4px;
+  right: 4px;
+  padding: 2px 3px;
 }
 
 .albumCard:hover {
