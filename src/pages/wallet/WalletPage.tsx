@@ -8,8 +8,10 @@ import {
   createWalletDeposit,
   completeWalletDeposit,
   fetchWalletDeposits,
+  fetchWalletTariffCharges,
   type IWallet,
   type IWalletDeposit,
+  type IWalletTariffCharge,
 } from '@/entities/user/walletApi';
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
@@ -79,6 +81,29 @@ function formatValidatorRows(v: ITariffValidator): { label: string; value: strin
 }
 
 const TARIFF_CAROUSEL_MIN = 4;
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/** Статус периода тарифа по NextChargeAt (без минуса / без сдвига от депозита). */
+function tariffPeriodStatus(wallet: IWallet, tariff: ITariff | null): string | null {
+  if (!tariff) return null;
+  const next = wallet.nextChargeAt ? new Date(wallet.nextChargeAt).getTime() : NaN;
+  if (Number.isFinite(next) && next > Date.now()) {
+    return `Активен до ${formatDateTime(wallet.nextChargeAt!)} · следующее списание`;
+  }
+  if (tariff.cost <= 0) {
+    return 'Бесплатный тариф активен';
+  }
+  return 'Период не активен — пополните баланс до суммы тарифа для списания';
+}
 
 function TariffPlansCarousel({ children, count }: { children: ReactNode; count: number }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -163,27 +188,32 @@ export default function WalletPage() {
   const [topUpAmount, setTopUpAmount] = useState('');
   const [topUpBusy, setTopUpBusy] = useState(false);
 
-  const loadHistory = useCallback(async (currentTariff: ITariff | null, currentWallet: IWallet | null) => {
+  const loadHistory = useCallback(async (
+    currentTariff: ITariff | null,
+    currentWallet: IWallet | null,
+    tariffsCatalog: ITariff[] = [],
+  ) => {
     setHistoryLoading(true);
     try {
-      // Единая лента финдеятельности: тарифный кошелёк + билеты (ЮKassa).
+      // Единая лента: депозиты + ledger списаний тарифа + билеты (ЮKassa).
       // Баланс карточки при этом остаётся только тарифным.
       const rows: HistoryRow[] = [];
+      const tariffNameById = new Map<string, string>();
+      for (const t of tariffsCatalog) {
+        if (t.id) tariffNameById.set(t.id, t.name);
+      }
+      if (currentTariff?.id) tariffNameById.set(currentTariff.id, currentTariff.name);
 
       if (currentWallet?.id) {
-        const deposits = await fetchWalletDeposits(currentWallet.id).catch(() => [] as IWalletDeposit[]);
+        const [deposits, charges] = await Promise.all([
+          fetchWalletDeposits(currentWallet.id).catch(() => [] as IWalletDeposit[]),
+          fetchWalletTariffCharges(currentWallet.id).catch(() => [] as IWalletTariffCharge[]),
+        ]);
+
         for (const d of deposits.filter(x => x.status === 'Succeeded')) {
           const when = d.paidAt || d.createDate;
           const sortAt = when ? new Date(when).getTime() : 0;
-          const dateLabel = when
-            ? new Date(when).toLocaleString('ru-RU', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-            : '';
+          const dateLabel = when ? formatDateTime(when) : '';
           rows.push({
             id: `deposit-${d.id}`,
             kind: 'in',
@@ -193,24 +223,24 @@ export default function WalletPage() {
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
         }
-      }
 
-      if (currentWallet?.lastChargeDate && currentTariff) {
-        const sortAt = new Date(currentWallet.lastChargeDate).getTime();
-        rows.push({
-          id: `tariff-${currentWallet.id}`,
-          kind: 'tariff',
-          name: `Тариф «${currentTariff.name}»`,
-          meta: `${new Date(currentWallet.lastChargeDate).toLocaleString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })} · Списание тарифа`,
-          amount: currentTariff.cost > 0
-            ? `− ${currentTariff.cost.toLocaleString('ru-RU')} ₽`
-            : '0 ₽',
-          sortAt: Number.isFinite(sortAt) ? sortAt : 0,
-        });
+        for (const c of charges) {
+          const sortAt = c.chargedAt ? new Date(c.chargedAt).getTime() : 0;
+          const dateLabel = c.chargedAt ? formatDateTime(c.chargedAt) : '';
+          const name = tariffNameById.get(c.tariffId)
+            ? `Тариф «${tariffNameById.get(c.tariffId)}»`
+            : 'Списание тарифа';
+          rows.push({
+            id: `charge-${c.id}`,
+            kind: 'tariff',
+            name,
+            meta: `${dateLabel} · Списание тарифа`,
+            amount: c.amount > 0
+              ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
+              : '0 ₽',
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
       }
 
       const orders = await fetchMyOrders().catch(() => [] as IOrder[]);
@@ -226,15 +256,7 @@ export default function WalletPage() {
       for (const order of orders) {
         const when = order.paidAt || order.createDate;
         const sortAt = when ? new Date(when).getTime() : 0;
-        const dateLabel = when
-          ? new Date(when).toLocaleString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-          : '';
+        const dateLabel = when ? formatDateTime(when) : '';
         const status = ORDER_STATUS_LABELS[order.status] ?? order.status;
         const qty = order.quantity > 1 ? ` · ${order.quantity} билета` : ' · Билет';
         const isRefund = order.status === 'Refunded' || order.status === 'PartiallyRefunded';
@@ -278,10 +300,10 @@ export default function WalletPage() {
       if (w?.tariffId) {
         const t = tariffs.find(x => x.id === w!.tariffId) ?? null;
         setTariff(t);
-        await loadHistory(t, w);
+        await loadHistory(t, w, tariffs);
       } else {
         setTariff(null);
-        await loadHistory(null, w);
+        await loadHistory(null, w, tariffs);
       }
 
       const validatorEntries = await Promise.all(
@@ -422,6 +444,11 @@ export default function WalletPage() {
                   {(wallet.balance ?? 0).toLocaleString('ru-RU')}
                   <span className={styles.cardCurrency}>₽</span>
                 </div>
+                {tariff && (
+                  <div className={styles.cardTariffStatus}>
+                    {tariffPeriodStatus(wallet, tariff)}
+                  </div>
+                )}
               </div>
               <div className={styles.cardBottom}>
                 <div>
@@ -503,7 +530,9 @@ export default function WalletPage() {
                     </button>
                   </div>
                   <p className={styles.topUpHint}>
-                    Баланс только для оплаты тарифа платформы. Билеты и прочие платежи проходят через ЮKassa (сплит), не через этот кошелёк. Сейчас оплата — stub, как у билетов.
+                    Баланс только для оплаты тарифа платформы. Пополнение не сдвигает активный период —
+                    списание происходит при наступлении NextChargeAt и достаточном балансе (без минуса).
+                    Билеты идут через ЮKassa (сплит). Сейчас оплата — stub, как у билетов.
                   </p>
                 </div>
               </div>
@@ -555,7 +584,7 @@ export default function WalletPage() {
                   <div>
                     <div className={styles.sectionTitle}>История операций</div>
                     <div className={styles.sectionSubtitle}>
-                      Вся финдеятельностьность: тариф платформы и билеты (ЮKassa). Баланс выше — только тариф.
+                      Пополнения и списания тарифа, плюс билеты (ЮKassa). Баланс выше — только тариф.
                     </div>
                   </div>
                 </div>
