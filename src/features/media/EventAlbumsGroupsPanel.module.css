@@ -23,6 +23,108 @@
   padding-bottom: 0;
 }
 
+.eventHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+
+.eventHeader:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--surface));
+}
+
+.eventCover {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.eventCoverImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.eventInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.eventName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eventDate {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.eventDate svg {
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+.eventChevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.collapseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 2px;
+  padding: 4px 8px;
+  min-height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: 8px;
+  position: relative;
+  box-shadow: none;
+}
+
+.collapseTitle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.collapseBtn svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
 .albumGrid {
   display: grid;
   gap: 10px;
@@ -34,6 +136,14 @@
   gap: 6px;
   grid-template-columns: repeat(auto-fill, 60px);
   justify-content: start;
+  width: 100%;
+  max-width: 100%;
+}
+
+.albumGridWide {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   width: 100%;
   max-width: 100%;
 }
@@ -68,6 +178,99 @@
   top: 4px;
   right: 4px;
   padding: 2px 3px;
+}
+
+.albumCardStretched {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+  max-height: 168px;
+  border-radius: 12px;
+}
+
+.albumCardStretched .albumCover {
+  height: 100%;
+  width: 100%;
+}
+
+.stack {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: 168px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: 12px;
+}
+
+.stackLayers {
+  position: absolute;
+  inset: 0;
+}
+
+.stackLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 16px;
+  bottom: 16px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.stackLayer .albumCover {
+  height: 100%;
+  width: 100%;
+}
+
+.stackLayer:nth-last-child(4) { transform: translate(16px, 16px); opacity: 0.5; }
+.stackLayer:nth-last-child(3) { transform: translate(10px, 10px); opacity: 0.7; }
+.stackLayer:nth-last-child(2) { transform: translate(5px, 5px); opacity: 0.88; }
+.stackLayer:nth-last-child(1) { transform: none; opacity: 1; }
+
+.stackPlus {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 16px;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 8, 14, 0.48);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.stack:hover .stackLayer:last-child {
+  border-color: var(--accent);
+  box-shadow: var(--hover-glow);
+}
+
+@media (max-width: 639px) {
+  .stackLayer {
+    right: 12px;
+    bottom: 12px;
+  }
+  .stackLayer:nth-last-child(4) { transform: translate(12px, 12px); }
+  .stackLayer:nth-last-child(3) { transform: translate(8px, 8px); }
+  .stackLayer:nth-last-child(2) { transform: translate(4px, 4px); }
+  .stackPlus {
+    right: 12px;
+    bottom: 12px;
+    font-size: 15px;
+  }
 }
 
 .albumCard:hover {
