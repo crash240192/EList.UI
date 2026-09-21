@@ -116,6 +116,14 @@
   margin-left: 4px;
 }
 
+.cardTariffStatus {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 28rem;
+}
+
 .cardBottom {
   display: flex;
   justify-content: space-between;

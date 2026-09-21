@@ -1,7 +1,18 @@
 // pages/wallet/WalletPage.tsx — макет examples/elist_settings_wallet.html
 
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import { createWallet, getWalletByAccount, setWalletTariff, type IWallet } from '@/entities/user/walletApi';
+import {
+  createWallet,
+  getWalletByAccount,
+  setWalletTariff,
+  createWalletDeposit,
+  completeWalletDeposit,
+  fetchWalletDeposits,
+  fetchWalletTariffCharges,
+  type IWallet,
+  type IWalletDeposit,
+  type IWalletTariffCharge,
+} from '@/entities/user/walletApi';
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
 import {
@@ -70,6 +81,29 @@ function formatValidatorRows(v: ITariffValidator): { label: string; value: strin
 }
 
 const TARIFF_CAROUSEL_MIN = 4;
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/** Статус периода тарифа по NextChargeAt (без минуса / без сдвига от депозита). */
+function tariffPeriodStatus(wallet: IWallet, tariff: ITariff | null): string | null {
+  if (!tariff) return null;
+  const next = wallet.nextChargeAt ? new Date(wallet.nextChargeAt).getTime() : NaN;
+  if (Number.isFinite(next) && next > Date.now()) {
+    return `Активен до ${formatDateTime(wallet.nextChargeAt!)} · следующее списание`;
+  }
+  if (tariff.cost <= 0) {
+    return 'Бесплатный тариф активен';
+  }
+  return 'Период не активен — пополните баланс до суммы тарифа для списания';
+}
 
 function TariffPlansCarousel({ children, count }: { children: ReactNode; count: number }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -151,10 +185,64 @@ export default function WalletPage() {
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpBusy, setTopUpBusy] = useState(false);
 
-  const loadHistory = useCallback(async (currentTariff: ITariff | null, currentWallet: IWallet | null) => {
+  const loadHistory = useCallback(async (
+    currentTariff: ITariff | null,
+    currentWallet: IWallet | null,
+    tariffsCatalog: ITariff[] = [],
+  ) => {
     setHistoryLoading(true);
     try {
+      // Единая лента: депозиты + ledger списаний тарифа + билеты (ЮKassa).
+      // Баланс карточки при этом остаётся только тарифным.
+      const rows: HistoryRow[] = [];
+      const tariffNameById = new Map<string, string>();
+      for (const t of tariffsCatalog) {
+        if (t.id) tariffNameById.set(t.id, t.name);
+      }
+      if (currentTariff?.id) tariffNameById.set(currentTariff.id, currentTariff.name);
+
+      if (currentWallet?.id) {
+        const [deposits, charges] = await Promise.all([
+          fetchWalletDeposits(currentWallet.id).catch(() => [] as IWalletDeposit[]),
+          fetchWalletTariffCharges(currentWallet.id).catch(() => [] as IWalletTariffCharge[]),
+        ]);
+
+        for (const d of deposits.filter(x => x.status === 'Succeeded')) {
+          const when = d.paidAt || d.createDate;
+          const sortAt = when ? new Date(when).getTime() : 0;
+          const dateLabel = when ? formatDateTime(when) : '';
+          rows.push({
+            id: `deposit-${d.id}`,
+            kind: 'in',
+            name: 'Пополнение тарифа',
+            meta: `${dateLabel} · Тариф платформы`,
+            amount: `+ ${d.amount.toLocaleString('ru-RU')} ₽`,
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
+
+        for (const c of charges) {
+          const sortAt = c.chargedAt ? new Date(c.chargedAt).getTime() : 0;
+          const dateLabel = c.chargedAt ? formatDateTime(c.chargedAt) : '';
+          const name = tariffNameById.get(c.tariffId)
+            ? `Тариф «${tariffNameById.get(c.tariffId)}»`
+            : 'Списание тарифа';
+          rows.push({
+            id: `charge-${c.id}`,
+            kind: 'tariff',
+            name,
+            meta: `${dateLabel} · Списание тарифа`,
+            amount: c.amount > 0
+              ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
+              : '0 ₽',
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
+      }
+
       const orders = await fetchMyOrders().catch(() => [] as IOrder[]);
       const eventIds = [...new Set(orders.map(o => o.eventId).filter(Boolean))];
       const nameById = new Map<string, string>();
@@ -165,46 +253,20 @@ export default function WalletPage() {
         } catch { /* ignore */ }
       }));
 
-      const rows: HistoryRow[] = orders.map((order) => {
+      for (const order of orders) {
         const when = order.paidAt || order.createDate;
         const sortAt = when ? new Date(when).getTime() : 0;
-        const dateLabel = when
-          ? new Date(when).toLocaleString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-          : '';
+        const dateLabel = when ? formatDateTime(when) : '';
         const status = ORDER_STATUS_LABELS[order.status] ?? order.status;
         const qty = order.quantity > 1 ? ` · ${order.quantity} билета` : ' · Билет';
         const isRefund = order.status === 'Refunded' || order.status === 'PartiallyRefunded';
         const amountAbs = formatMoney(order.amountTotal, order.currency);
-        return {
-          id: order.id,
+        rows.push({
+          id: `order-${order.id}`,
           kind: isRefund ? 'in' : 'out',
           name: nameById.get(order.eventId) || 'Билет на мероприятие',
-          meta: `${dateLabel}${qty} · ${status}`,
+          meta: `${dateLabel}${qty} · ${status} · ЮKassa`,
           amount: isRefund ? `+ ${amountAbs}` : `− ${amountAbs}`,
-          sortAt,
-        };
-      });
-
-      if (currentWallet?.lastChargeDate && currentTariff) {
-        const sortAt = new Date(currentWallet.lastChargeDate).getTime();
-        rows.push({
-          id: `tariff-${currentWallet.id}`,
-          kind: 'tariff',
-          name: `Тариф «${currentTariff.name}»`,
-          meta: `${new Date(currentWallet.lastChargeDate).toLocaleString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })} · Списание тарифа`,
-          amount: currentTariff.cost > 0
-            ? `− ${formatMoney(currentTariff.cost)}`
-            : '0 ₽',
           sortAt: Number.isFinite(sortAt) ? sortAt : 0,
         });
       }
@@ -238,10 +300,10 @@ export default function WalletPage() {
       if (w?.tariffId) {
         const t = tariffs.find(x => x.id === w!.tariffId) ?? null;
         setTariff(t);
-        await loadHistory(t, w);
+        await loadHistory(t, w, tariffs);
       } else {
         setTariff(null);
-        await loadHistory(null, w);
+        await loadHistory(null, w, tariffs);
       }
 
       const validatorEntries = await Promise.all(
@@ -273,6 +335,78 @@ export default function WalletPage() {
       setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const scrollToTopUp = () => {
+    document.getElementById('wallet-top-up')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleTopUp = async () => {
+    if (!wallet || topUpBusy) return;
+    const amount = Number(String(topUpAmount).replace(/\s/g, '').replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMsg({ text: 'Укажите сумму больше нуля', ok: false });
+      return;
+    }
+    setTopUpBusy(true);
+    setMsg(null);
+    try {
+      const returnUrl = `${window.location.origin}/payments/return`;
+      const result = await createWalletDeposit({
+        walletId: wallet.id,
+        amount,
+        returnUrl,
+      });
+
+      const pending = {
+        depositId: result.deposit.id,
+        providerPaymentId: result.providerPaymentId,
+        amount,
+      };
+      try {
+        sessionStorage.setItem('elist_pending_wallet_deposit', JSON.stringify(pending));
+      } catch { /* ignore */ }
+
+      if (result.paidImmediately) {
+        setTopUpAmount('');
+        setMsg({ text: 'Баланс пополнен', ok: true });
+        await load();
+        return;
+      }
+
+      const confirmationUrl = result.confirmationUrl?.trim() || null;
+      if (confirmationUrl) {
+        let useInAppStub = false;
+        try {
+          const url = new URL(confirmationUrl, window.location.origin);
+          useInAppStub = url.searchParams.get('stub') === '1'
+            || url.pathname.includes('/payments/return');
+        } catch {
+          useInAppStub = false;
+        }
+        if (!useInAppStub) {
+          window.location.assign(confirmationUrl);
+          return;
+        }
+        // Stub: подтверждаем через return-страницу / complete API.
+        window.location.assign(confirmationUrl.startsWith('http')
+          ? confirmationUrl
+          : `${window.location.origin}${confirmationUrl.startsWith('/') ? '' : '/'}${confirmationUrl}`);
+        return;
+      }
+
+      await completeWalletDeposit({
+        depositId: result.deposit.id,
+        providerPaymentId: result.providerPaymentId ?? undefined,
+      });
+      setTopUpAmount('');
+      setMsg({ text: 'Баланс пополнен', ok: true });
+      await load();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось создать пополнение', ok: false });
+    } finally {
+      setTopUpBusy(false);
     }
   };
 
@@ -310,6 +444,11 @@ export default function WalletPage() {
                   {(wallet.balance ?? 0).toLocaleString('ru-RU')}
                   <span className={styles.cardCurrency}>₽</span>
                 </div>
+                {tariff && (
+                  <div className={styles.cardTariffStatus}>
+                    {tariffPeriodStatus(wallet, tariff)}
+                  </div>
+                )}
               </div>
               <div className={styles.cardBottom}>
                 <div>
@@ -326,21 +465,21 @@ export default function WalletPage() {
               </div>
 
               <div className={styles.cardActionsRow}>
-                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
+                <button type="button" className={styles.cardActionBtn} onClick={scrollToTopUp}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <polyline points="19 12 12 19 5 12" />
                   </svg>
                   Пополнить
                 </button>
-                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
+                <button type="button" className={styles.cardActionBtn} disabled title="Недоступно: кошелёк только для тарифа">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <line x1="12" y1="19" x2="12" y2="5" />
                     <polyline points="5 12 12 5 19 12" />
                   </svg>
                   Вывести
                 </button>
-                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
+                <button type="button" className={styles.cardActionBtn} disabled title="Недоступно">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <rect x="5" y="2" width="14" height="20" rx="2" />
                     <line x1="12" y1="18" x2="12.01" y2="18" />
@@ -361,8 +500,8 @@ export default function WalletPage() {
 
           {wallet && (
             <>
-              <div className={styles.topUpSection}>
-                <div className={styles.sectionTitle}>Пополнение кошелька</div>
+              <div className={styles.topUpSection} id="wallet-top-up">
+                <div className={styles.sectionTitle}>Пополнение тарифа</div>
                 <div className={styles.topUpStub}>
                   <div className={styles.topUpStubForm}>
                     <label className={styles.topUpLabel}>
@@ -370,20 +509,30 @@ export default function WalletPage() {
                       <div className={styles.topUpInputRow}>
                         <input
                           type="text"
+                          inputMode="decimal"
                           className={styles.topUpInput}
                           placeholder="1 000"
-                          disabled
-                          aria-disabled
+                          value={topUpAmount}
+                          onChange={e => setTopUpAmount(e.target.value)}
+                          disabled={topUpBusy}
+                          autoComplete="off"
                         />
                         <span className={styles.topUpCurrency}>₽</span>
                       </div>
                     </label>
-                    <button type="button" className={styles.topUpBtn} disabled>
-                      Перейти к оплате
+                    <button
+                      type="button"
+                      className={styles.topUpBtn}
+                      disabled={topUpBusy || !topUpAmount.trim()}
+                      onClick={() => { void handleTopUp(); }}
+                    >
+                      {topUpBusy ? '…' : 'Перейти к оплате'}
                     </button>
                   </div>
                   <p className={styles.topUpHint}>
-                    Механизм пополнения в разработке. Здесь появится выбор способа оплаты: банковская карта, СБП и другие.
+                    Баланс только для оплаты тарифа платформы. Пополнение не сдвигает активный период —
+                    списание происходит при наступлении NextChargeAt и достаточном балансе (без минуса).
+                    Билеты идут через ЮKassa (сплит). Сейчас оплата — stub, как у билетов.
                   </p>
                 </div>
               </div>
@@ -435,7 +584,7 @@ export default function WalletPage() {
                   <div>
                     <div className={styles.sectionTitle}>История операций</div>
                     <div className={styles.sectionSubtitle}>
-                      Покупки билетов и списания тарифа
+                      Пополнения и списания тарифа, плюс билеты (ЮKassa). Баланс выше — только тариф.
                     </div>
                   </div>
                 </div>
