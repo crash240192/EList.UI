@@ -13,6 +13,8 @@ import { useInfiniteScroll } from '@/shared/hooks';
 import styles from './EventAlbumsGroupsPanel.module.css';
 
 const PAGE_SIZE = 10;
+const COLLAPSED_MAX = 5;
+const STACK_LAYER_MAX = 4;
 
 function albumCountLabel(count: number): string {
   if (count === 1) return '1 альбом';
@@ -20,17 +22,14 @@ function albumCountLabel(count: number): string {
   return `${count} альбомов`;
 }
 
-function AlbumTile({
+function AlbumCover({
   album,
-  compact,
-  onOpen,
+  iconSize,
 }: {
   album: IAlbum;
-  compact?: boolean;
-  onOpen: () => void;
+  iconSize: number;
 }) {
   const [cover, setCover] = useState<string | null>(null);
-  const emptyIconSize = compact ? 16 : 24;
 
   useEffect(() => {
     let cancelled = false;
@@ -41,40 +40,96 @@ function AlbumTile({
   }, [album.id]);
 
   return (
+    <div className={styles.albumCover}>
+      {cover
+        ? <AuthImage fileId={cover} alt="" className={styles.albumCoverImg} />
+        : (
+          <div className={styles.albumCoverEmpty}>
+            <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 9h18" />
+              <circle cx="9" cy="15" r="2" />
+              <path d="M14 13l3 4" />
+            </svg>
+          </div>
+        )}
+      {album.parameters?.private && (
+        <div className={styles.privateBadge} aria-label="Приватный альбом">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <rect x="3" y="11" width="18" height="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0110 0v4" />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlbumTile({
+  album,
+  compact,
+  stretched,
+  onOpen,
+}: {
+  album: IAlbum;
+  compact?: boolean;
+  stretched?: boolean;
+  onOpen: () => void;
+}) {
+  const iconSize = compact ? (stretched ? 22 : 16) : 24;
+  const className = [
+    styles.albumCard,
+    compact && !stretched ? styles.albumCardThumb : '',
+    stretched ? styles.albumCardStretched : '',
+  ].filter(Boolean).join(' ');
+
+  return (
     <button
       type="button"
-      className={`${styles.albumCard} ${compact ? styles.albumCardThumb : ''}`}
+      className={className}
       onClick={onOpen}
       aria-label={compact ? album.name : undefined}
       title={compact ? album.name : undefined}
     >
-      <div className={styles.albumCover}>
-        {cover
-          ? <AuthImage fileId={cover} alt="" className={styles.albumCoverImg} />
-          : (
-            <div className={styles.albumCoverEmpty}>
-              <svg width={emptyIconSize} height={emptyIconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M3 9h18" />
-                <circle cx="9" cy="15" r="2" />
-                <path d="M14 13l3 4" />
-              </svg>
-            </div>
-          )}
-        {album.parameters?.private && (
-          <div className={styles.privateBadge} aria-label="Приватный альбом">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <rect x="3" y="11" width="18" height="11" rx="2" />
-              <path d="M7 11V7a5 5 0 0110 0v4" />
-            </svg>
-          </div>
-        )}
-      </div>
+      <AlbumCover album={album} iconSize={iconSize} />
       {!compact && (
         <div className={styles.albumMeta}>
           <div className={styles.albumName}>{album.name}</div>
           {album.description && <div className={styles.albumDesc}>{album.description}</div>}
         </div>
+      )}
+    </button>
+  );
+}
+
+function AlbumStack({
+  albums,
+  extraCount,
+  onOpen,
+}: {
+  albums: IAlbum[];
+  extraCount: number;
+  onOpen: () => void;
+}) {
+  const layers = albums.slice(0, STACK_LAYER_MAX).reverse();
+
+  return (
+    <button
+      type="button"
+      className={styles.stack}
+      onClick={onOpen}
+      aria-label={`Ещё ${albumCountLabel(extraCount)}`}
+      title={`Ещё ${albumCountLabel(extraCount)}`}
+    >
+      <span className={styles.stackLayers}>
+        {layers.map(album => (
+          <span key={album.id} className={styles.stackLayer}>
+            <AlbumCover album={album} iconSize={16} />
+          </span>
+        ))}
+      </span>
+      {extraCount > 0 && (
+        <span className={styles.stackPlus}>+{extraCount}</span>
       )}
     </button>
   );
@@ -91,6 +146,57 @@ function EventGroupSection({
 }) {
   const { event, albums } = group;
   const [expanded, setExpanded] = useState(false);
+  const stretchCollapsed = !expanded && albums.length >= COLLAPSED_MAX;
+  const showStack = !expanded && albums.length > COLLAPSED_MAX;
+  const expand = () => setExpanded(true);
+
+  const gridClass = expanded
+    ? styles.albumGrid
+    : stretchCollapsed
+      ? styles.albumGridWide
+      : styles.albumGridCollapsed;
+
+  let tiles;
+  if (expanded) {
+    tiles = albums.map(album => (
+      <AlbumTile
+        key={album.id}
+        album={album}
+        onOpen={() => onOpenAlbum(album)}
+      />
+    ));
+  } else if (showStack) {
+    const head = albums.slice(0, COLLAPSED_MAX - 1);
+    const rest = albums.slice(COLLAPSED_MAX - 1);
+    tiles = (
+      <>
+        {head.map(album => (
+          <AlbumTile
+            key={album.id}
+            album={album}
+            compact
+            stretched
+            onOpen={expand}
+          />
+        ))}
+        <AlbumStack
+          albums={rest}
+          extraCount={albums.length - COLLAPSED_MAX}
+          onOpen={expand}
+        />
+      </>
+    );
+  } else {
+    tiles = albums.map(album => (
+      <AlbumTile
+        key={album.id}
+        album={album}
+        compact
+        stretched={albums.length === COLLAPSED_MAX}
+        onOpen={expand}
+      />
+    ));
+  }
 
   return (
     <section className={styles.eventGroup}>
@@ -101,18 +207,8 @@ function EventGroupSection({
         bleedCover
         footer={<span>{albumCountLabel(albums.length)}</span>}
       />
-      <div className={expanded ? styles.albumGrid : styles.albumGridCollapsed}>
-        {albums.map(album => (
-          <AlbumTile
-            key={album.id}
-            album={album}
-            compact={!expanded}
-            onOpen={() => {
-              if (expanded) onOpenAlbum(album);
-              else setExpanded(true);
-            }}
-          />
-        ))}
+      <div className={gridClass}>
+        {tiles}
       </div>
     </section>
   );
