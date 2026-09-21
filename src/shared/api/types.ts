@@ -12,6 +12,8 @@ export interface CommandResult<T = void> {
   result: T;
   /** Заполняется ReConsentMiddleware при 403 AgreementNotFound */
   missingDocuments?: string[];
+  /** Заполняется ErrorHandlingMiddleware при необработанном 500 */
+  correlationId?: string | null;
 }
 
 /** Пагинированный список */

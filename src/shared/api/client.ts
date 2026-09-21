@@ -38,7 +38,28 @@ export class ApiError extends Error {
     message: string,
     public readonly serverMessage: string | null = null,
     public readonly missingDocuments: string[] | null = null,
+    public readonly correlationId: string | null = null,
   ) { super(message); this.name = 'ApiError'; }
+}
+
+/** Достаёт correlation id из JSON тела или заголовка X-Correlation-Id. */
+export function readCorrelationId(
+  body: { correlationId?: string | null } | null | undefined,
+  response?: Response | null,
+): string | null {
+  const fromBody = body?.correlationId?.trim();
+  if (fromBody) return fromBody;
+  const fromHeader = response?.headers.get('X-Correlation-Id')?.trim()
+    || response?.headers.get('x-correlation-id')?.trim();
+  return fromHeader || null;
+}
+
+/** Добавляет (id: …) к тексту ошибки, если id есть и ещё не в тексте. */
+export function withCorrelationId(message: string, correlationId: string | null | undefined): string {
+  const id = correlationId?.trim();
+  if (!id) return message;
+  if (message.includes(id)) return message;
+  return `${message} (id: ${id})`;
 }
 
 function generateClientHash(): string {
@@ -98,35 +119,49 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
     }
     if (!response.ok) {
       // ReConsentMiddleware отвечает 403 + JSON { errorCode, missingDocuments }.
+      // 500 ErrorHandlingMiddleware: message + correlationId (+ stack на Staging/Dev).
       try {
         const errBody = await response.json() as {
           errorCode?: number;
           message?: string | null;
           missingDocuments?: string[];
+          correlationId?: string | null;
         };
         const code = errBody.errorCode ?? response.status;
-        const msg = errBody.message || `HTTP ${response.status}: ${response.statusText}`;
+        const correlationId = readCorrelationId(errBody, response);
+        const msg = withCorrelationId(
+          errBody.message || `HTTP ${response.status}: ${response.statusText}`,
+          correlationId,
+        );
         if (isAgreementNotFoundCode(code)) {
           window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
             detail: { missingDocuments: errBody.missingDocuments ?? [] },
           }));
         }
-        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null);
+        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null, correlationId);
       } catch (e) {
         if (e instanceof ApiError) throw e;
-        throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+        const correlationId = readCorrelationId(null, response);
+        throw new ApiError(
+          response.status,
+          withCorrelationId(`HTTP ${response.status}: ${response.statusText}`, correlationId),
+          null,
+          null,
+          correlationId,
+        );
       }
     }
     const data: CommandResult<T> = await response.json();
     if (!data.success) {
       const code = data.errorCode ?? 0;
-      const msg = data.message || 'Ошибка API';
+      const correlationId = readCorrelationId(data, response);
+      const msg = withCorrelationId(data.message || 'Ошибка API', correlationId);
       if (shouldForceLogoutForApi(path, Boolean(authToken)) && isUnauthorizedApiErrorCode(code)) {
         notifyUnauthorized();
       }
       // Ошибки доступа показываем в UI блока/страницы, без тоста
       if (data.message && !isAccessDeniedApiCode(code) && !isAgreementNotFoundCode(code)) {
-        onApiError?.(data.message);
+        onApiError?.(msg);
       }
       if (isAgreementNotFoundCode(code)) {
         window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
@@ -138,6 +173,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
         msg,
         data.message,
         (data as { missingDocuments?: string[] }).missingDocuments ?? null,
+        correlationId,
       );
     }
     return data;
@@ -173,29 +209,42 @@ async function requestWithClientJwtOnly<T>(
           errorCode?: number;
           message?: string | null;
           missingDocuments?: string[];
+          correlationId?: string | null;
         };
         const code = errBody.errorCode ?? response.status;
-        const msg = errBody.message || `HTTP ${response.status}: ${response.statusText}`;
+        const correlationId = readCorrelationId(errBody, response);
+        const msg = withCorrelationId(
+          errBody.message || `HTTP ${response.status}: ${response.statusText}`,
+          correlationId,
+        );
         if (isAgreementNotFoundCode(code)) {
           window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
             detail: { missingDocuments: errBody.missingDocuments ?? [] },
           }));
         }
-        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null);
+        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null, correlationId);
       } catch (e) {
         if (e instanceof ApiError) throw e;
-        throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+        const correlationId = readCorrelationId(null, response);
+        throw new ApiError(
+          response.status,
+          withCorrelationId(`HTTP ${response.status}: ${response.statusText}`, correlationId),
+          null,
+          null,
+          correlationId,
+        );
       }
     }
     const data: CommandResult<T> = await response.json();
     if (!data.success) {
       const code = data.errorCode ?? 0;
-      const msg = data.message || 'Ошибка API';
+      const correlationId = readCorrelationId(data, response);
+      const msg = withCorrelationId(data.message || 'Ошибка API', correlationId);
       if (shouldForceLogoutForApi(path, hadAuthToken) && isUnauthorizedApiErrorCode(code)) {
         notifyUnauthorized();
       }
       if (data.message && !isAccessDeniedApiCode(code) && !isAgreementNotFoundCode(code)) {
-        onApiError?.(data.message);
+        onApiError?.(msg);
       }
       if (isAgreementNotFoundCode(code)) {
         window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
@@ -207,6 +256,7 @@ async function requestWithClientJwtOnly<T>(
         msg,
         data.message,
         (data as { missingDocuments?: string[] }).missingDocuments ?? null,
+        correlationId,
       );
     }
     return data;

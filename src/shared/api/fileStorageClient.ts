@@ -2,7 +2,7 @@
 // Клиент для сервиса файлохранилища
 // basePath: /elist/filestorage
 
-import { getOrCreateClientHash, getAuthToken, notifyUnauthorized, getClientPlatform, getAppVersion } from './client';
+import { getOrCreateClientHash, getAuthToken, notifyUnauthorized, getClientPlatform, getAppVersion, readCorrelationId, withCorrelationId } from './client';
 import { shouldForceLogoutForApi } from '@/shared/auth/unauthorized';
 
 const FILE_STORAGE_BASE = import.meta.env.VITE_FILE_STORAGE_URL ?? '/elist/filestorage';
@@ -34,6 +34,20 @@ function handleFileStorageUnauthorized(status: number): void {
   }
 }
 
+async function throwFileStorageError(res: Response, fallback: string): Promise<never> {
+  handleFileStorageUnauthorized(res.status);
+  let message = fallback;
+  let correlationId: string | null = null;
+  try {
+    const data = await res.json() as { message?: string | null; correlationId?: string | null };
+    correlationId = readCorrelationId(data, res);
+    if (data.message?.trim()) message = data.message.trim();
+  } catch {
+    correlationId = readCorrelationId(null, res);
+  }
+  throw new Error(withCorrelationId(message, correlationId));
+}
+
 function authHeaders(): Record<string, string> {
   const clientHash = getOrCreateClientHash();
   const authToken  = getAuthToken();
@@ -61,11 +75,15 @@ export async function uploadFile(file: File): Promise<IUploadResult> {
   });
 
   if (!res.ok) {
-    handleFileStorageUnauthorized(res.status);
-    throw new Error(`Ошибка загрузки файла: ${res.status}`);
+    await throwFileStorageError(res, `Ошибка загрузки файла: ${res.status}`);
   }
   const data = await res.json();
-  if (!data.success) throw new Error(data.message ?? 'Ошибка загрузки файла');
+  if (!data.success) {
+    throw new Error(withCorrelationId(
+      data.message ?? 'Ошибка загрузки файла',
+      readCorrelationId(data, res),
+    ));
+  }
 
   const id = data.result.id as string;
   return {
