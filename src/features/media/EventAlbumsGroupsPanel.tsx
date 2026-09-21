@@ -6,9 +6,14 @@ import {
   type IAlbum,
   type IEventAlbumsGroup,
 } from '@/entities/media/albumApi';
-import { EventListItem } from '@/entities/event/ui/EventListItem';
+import {
+  formatEventListItemDate,
+  getEventListCoverBackground,
+  type EventListItemData,
+} from '@/entities/event/lib/eventListItemUtils';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { useInfiniteScroll } from '@/shared/hooks';
 import styles from './EventAlbumsGroupsPanel.module.css';
 
@@ -20,6 +25,69 @@ function albumCountLabel(count: number): string {
   if (count === 1) return '1 альбом';
   if (count < 5) return `${count} альбома`;
   return `${count} альбомов`;
+}
+
+function ClockIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function ChevronUpIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
+  );
+}
+
+function EventGroupHeader({
+  event,
+  onOpen,
+}: {
+  event: EventListItemData;
+  onOpen: () => void;
+}) {
+  const coverBg = getEventListCoverBackground(event);
+  const dateLabel = formatEventListItemDate(event.startTime);
+  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+
+  return (
+    <button type="button" className={styles.eventHeader} onClick={onOpen}>
+      <div className={styles.eventCover} style={{ background: coverBg }}>
+        {event.coverImageId ? (
+          <AuthImage
+            fileId={event.coverImageId}
+            alt=""
+            className={styles.eventCoverImg}
+            style={focusStyle}
+            fallback={
+              event.coverUrl
+                ? <img src={event.coverUrl} alt="" className={styles.eventCoverImg} style={focusStyle} />
+                : null
+            }
+          />
+        ) : event.coverUrl ? (
+          <img src={event.coverUrl} alt="" className={styles.eventCoverImg} style={focusStyle} />
+        ) : null}
+      </div>
+      <div className={styles.eventInfo}>
+        <div className={styles.eventName}>{event.name}</div>
+        {dateLabel && (
+          <div className={styles.eventDate}>
+            <ClockIcon />
+            {dateLabel}
+          </div>
+        )}
+      </div>
+      <svg className={styles.eventChevron} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
+    </button>
+  );
 }
 
 function AlbumCover({
@@ -200,16 +268,21 @@ function EventGroupSection({
 
   return (
     <section className={styles.eventGroup}>
-      <EventListItem
-        event={event}
-        onClick={() => onOpenEvent(event.id)}
-        showChevron
-        bleedCover
-        footer={<span>{albumCountLabel(albums.length)}</span>}
-      />
+      <EventGroupHeader event={event} onOpen={() => onOpenEvent(event.id)} />
       <div className={gridClass}>
         {tiles}
       </div>
+      {expanded && (
+        <button
+          type="button"
+          className={`${styles.collapseBtn} noHoverGlow`}
+          onClick={() => setExpanded(false)}
+        >
+          <ChevronUpIcon />
+          <span className={styles.collapseTitle}>Свернуть</span>
+          <ChevronUpIcon />
+        </button>
+      )}
     </section>
   );
 }
