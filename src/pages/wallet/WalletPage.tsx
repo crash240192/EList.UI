@@ -1,22 +1,24 @@
 // pages/wallet/WalletPage.tsx — макет examples/elist_settings_wallet.html
 
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import { createWallet, getWalletByAccount, setWalletTariff, type IWallet } from '@/entities/user/walletApi';
+import {
+  createWallet,
+  getWalletByAccount,
+  setWalletTariff,
+  createWalletDeposit,
+  completeWalletDeposit,
+  fetchWalletDeposits,
+  type IWallet,
+  type IWalletDeposit,
+} from '@/entities/user/walletApi';
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
-import {
-  fetchMyOrders,
-  formatMoney,
-  ORDER_STATUS_LABELS,
-  type IOrder,
-} from '@/entities/order';
-import { fetchEventById } from '@/entities/event';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { usePageTitle } from '@/shared/hooks';
 import { formatTariffAgeCapability } from '@/shared/lib/ageLimit';
 import styles from './WalletPage.module.css';
 
-type HistoryKind = 'in' | 'out' | 'tariff';
+type HistoryKind = 'in' | 'tariff';
 
 interface HistoryRow {
   id: string;
@@ -29,13 +31,11 @@ interface HistoryRow {
 
 const HIST_ICO_CLASS = {
   in: styles.histIcoIn,
-  out: styles.histIcoOut,
   tariff: styles.histIcoTariff,
 } as const;
 
 const HIST_AMT_CLASS = {
   in: styles.histAmtIn,
-  out: styles.histAmtOut,
   tariff: styles.histAmtTariff,
 } as const;
 
@@ -151,45 +151,38 @@ export default function WalletPage() {
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpBusy, setTopUpBusy] = useState(false);
 
   const loadHistory = useCallback(async (currentTariff: ITariff | null, currentWallet: IWallet | null) => {
     setHistoryLoading(true);
     try {
-      const orders = await fetchMyOrders().catch(() => [] as IOrder[]);
-      const eventIds = [...new Set(orders.map(o => o.eventId).filter(Boolean))];
-      const nameById = new Map<string, string>();
-      await Promise.all(eventIds.map(async (eventId) => {
-        try {
-          const ev = await fetchEventById(eventId);
-          if (ev?.name) nameById.set(eventId, ev.name);
-        } catch { /* ignore */ }
-      }));
+      const rows: HistoryRow[] = [];
 
-      const rows: HistoryRow[] = orders.map((order) => {
-        const when = order.paidAt || order.createDate;
-        const sortAt = when ? new Date(when).getTime() : 0;
-        const dateLabel = when
-          ? new Date(when).toLocaleString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-          : '';
-        const status = ORDER_STATUS_LABELS[order.status] ?? order.status;
-        const qty = order.quantity > 1 ? ` · ${order.quantity} билета` : ' · Билет';
-        const isRefund = order.status === 'Refunded' || order.status === 'PartiallyRefunded';
-        const amountAbs = formatMoney(order.amountTotal, order.currency);
-        return {
-          id: order.id,
-          kind: isRefund ? 'in' : 'out',
-          name: nameById.get(order.eventId) || 'Билет на мероприятие',
-          meta: `${dateLabel}${qty} · ${status}`,
-          amount: isRefund ? `+ ${amountAbs}` : `− ${amountAbs}`,
-          sortAt,
-        };
-      });
+      if (currentWallet?.id) {
+        const deposits = await fetchWalletDeposits(currentWallet.id).catch(() => [] as IWalletDeposit[]);
+        for (const d of deposits.filter(x => x.status === 'Succeeded')) {
+          const when = d.paidAt || d.createDate;
+          const sortAt = when ? new Date(when).getTime() : 0;
+          const dateLabel = when
+            ? new Date(when).toLocaleString('ru-RU', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+            : '';
+          rows.push({
+            id: d.id,
+            kind: 'in',
+            name: 'Пополнение тарифа',
+            meta: dateLabel,
+            amount: `+ ${d.amount.toLocaleString('ru-RU')} ₽`,
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
+      }
 
       if (currentWallet?.lastChargeDate && currentTariff) {
         const sortAt = new Date(currentWallet.lastChargeDate).getTime();
@@ -203,7 +196,7 @@ export default function WalletPage() {
             year: 'numeric',
           })} · Списание тарифа`,
           amount: currentTariff.cost > 0
-            ? `− ${formatMoney(currentTariff.cost)}`
+            ? `− ${currentTariff.cost.toLocaleString('ru-RU')} ₽`
             : '0 ₽',
           sortAt: Number.isFinite(sortAt) ? sortAt : 0,
         });
@@ -276,6 +269,78 @@ export default function WalletPage() {
     }
   };
 
+  const scrollToTopUp = () => {
+    document.getElementById('wallet-top-up')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleTopUp = async () => {
+    if (!wallet || topUpBusy) return;
+    const amount = Number(String(topUpAmount).replace(/\s/g, '').replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMsg({ text: 'Укажите сумму больше нуля', ok: false });
+      return;
+    }
+    setTopUpBusy(true);
+    setMsg(null);
+    try {
+      const returnUrl = `${window.location.origin}/payments/return`;
+      const result = await createWalletDeposit({
+        walletId: wallet.id,
+        amount,
+        returnUrl,
+      });
+
+      const pending = {
+        depositId: result.deposit.id,
+        providerPaymentId: result.providerPaymentId,
+        amount,
+      };
+      try {
+        sessionStorage.setItem('elist_pending_wallet_deposit', JSON.stringify(pending));
+      } catch { /* ignore */ }
+
+      if (result.paidImmediately) {
+        setTopUpAmount('');
+        setMsg({ text: 'Баланс пополнен', ok: true });
+        await load();
+        return;
+      }
+
+      const confirmationUrl = result.confirmationUrl?.trim() || null;
+      if (confirmationUrl) {
+        let useInAppStub = false;
+        try {
+          const url = new URL(confirmationUrl, window.location.origin);
+          useInAppStub = url.searchParams.get('stub') === '1'
+            || url.pathname.includes('/payments/return');
+        } catch {
+          useInAppStub = false;
+        }
+        if (!useInAppStub) {
+          window.location.assign(confirmationUrl);
+          return;
+        }
+        // Stub: подтверждаем через return-страницу / complete API.
+        window.location.assign(confirmationUrl.startsWith('http')
+          ? confirmationUrl
+          : `${window.location.origin}${confirmationUrl.startsWith('/') ? '' : '/'}${confirmationUrl}`);
+        return;
+      }
+
+      await completeWalletDeposit({
+        depositId: result.deposit.id,
+        providerPaymentId: result.providerPaymentId ?? undefined,
+      });
+      setTopUpAmount('');
+      setMsg({ text: 'Баланс пополнен', ok: true });
+      await load();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось создать пополнение', ok: false });
+    } finally {
+      setTopUpBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -326,21 +391,21 @@ export default function WalletPage() {
               </div>
 
               <div className={styles.cardActionsRow}>
-                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
+                <button type="button" className={styles.cardActionBtn} onClick={scrollToTopUp}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <polyline points="19 12 12 19 5 12" />
                   </svg>
                   Пополнить
                 </button>
-                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
+                <button type="button" className={styles.cardActionBtn} disabled title="Недоступно: кошелёк только для тарифа">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <line x1="12" y1="19" x2="12" y2="5" />
                     <polyline points="5 12 12 5 19 12" />
                   </svg>
                   Вывести
                 </button>
-                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
+                <button type="button" className={styles.cardActionBtn} disabled title="Недоступно">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <rect x="5" y="2" width="14" height="20" rx="2" />
                     <line x1="12" y1="18" x2="12.01" y2="18" />
@@ -361,8 +426,8 @@ export default function WalletPage() {
 
           {wallet && (
             <>
-              <div className={styles.topUpSection}>
-                <div className={styles.sectionTitle}>Пополнение кошелька</div>
+              <div className={styles.topUpSection} id="wallet-top-up">
+                <div className={styles.sectionTitle}>Пополнение тарифа</div>
                 <div className={styles.topUpStub}>
                   <div className={styles.topUpStubForm}>
                     <label className={styles.topUpLabel}>
@@ -370,20 +435,28 @@ export default function WalletPage() {
                       <div className={styles.topUpInputRow}>
                         <input
                           type="text"
+                          inputMode="decimal"
                           className={styles.topUpInput}
                           placeholder="1 000"
-                          disabled
-                          aria-disabled
+                          value={topUpAmount}
+                          onChange={e => setTopUpAmount(e.target.value)}
+                          disabled={topUpBusy}
+                          autoComplete="off"
                         />
                         <span className={styles.topUpCurrency}>₽</span>
                       </div>
                     </label>
-                    <button type="button" className={styles.topUpBtn} disabled>
-                      Перейти к оплате
+                    <button
+                      type="button"
+                      className={styles.topUpBtn}
+                      disabled={topUpBusy || !topUpAmount.trim()}
+                      onClick={() => { void handleTopUp(); }}
+                    >
+                      {topUpBusy ? '…' : 'Перейти к оплате'}
                     </button>
                   </div>
                   <p className={styles.topUpHint}>
-                    Механизм пополнения в разработке. Здесь появится выбор способа оплаты: банковская карта, СБП и другие.
+                    Баланс только для оплаты тарифа платформы. Билеты и прочие платежи проходят через ЮKassa (сплит), не через этот кошелёк. Сейчас оплата — stub, как у билетов.
                   </p>
                 </div>
               </div>
@@ -435,7 +508,7 @@ export default function WalletPage() {
                   <div>
                     <div className={styles.sectionTitle}>История операций</div>
                     <div className={styles.sectionSubtitle}>
-                      Покупки билетов и списания тарифа
+                      Пополнения и списания тарифа платформы
                     </div>
                   </div>
                 </div>

@@ -13,6 +13,53 @@ export interface IWallet {
   lastChargeDate?: string | null;
 }
 
+export type WalletDepositStatus = 'Pending' | 'Succeeded' | 'Canceled' | 'Failed';
+
+export interface IWalletDeposit {
+  id: string;
+  walletId: string;
+  amount: number;
+  currency: string;
+  status: WalletDepositStatus;
+  providerPaymentId: string | null;
+  createDate: string;
+  paidAt: string | null;
+}
+
+export interface ICreateWalletDepositResponse {
+  deposit: IWalletDeposit;
+  confirmationUrl: string | null;
+  providerPaymentId: string | null;
+  paidImmediately: boolean;
+}
+
+function asStr(v: unknown): string {
+  return v == null ? '' : String(v);
+}
+
+function asNum(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeDeposit(raw: Record<string, unknown>): IWalletDeposit {
+  return {
+    id: asStr(raw.id ?? raw.Id),
+    walletId: asStr(raw.walletId ?? raw.WalletId),
+    amount: asNum(raw.amount ?? raw.Amount),
+    currency: asStr(raw.currency ?? raw.Currency) || 'RUB',
+    status: asStr(raw.status ?? raw.Status) as WalletDepositStatus,
+    providerPaymentId: (() => {
+      const v = raw.providerPaymentId ?? raw.ProviderPaymentId;
+      return v == null || v === '' ? null : String(v);
+    })(),
+    createDate: asStr(raw.createDate ?? raw.CreateDate),
+    paidAt: raw.paidAt != null || raw.PaidAt != null
+      ? asStr(raw.paidAt ?? raw.PaidAt)
+      : null,
+  };
+}
+
 /** GET /api/Wallets/create — создать кошелёк (без тела) */
 export async function createWallet(): Promise<IWallet | null> {
   try {
@@ -71,4 +118,57 @@ export async function ensureOrganizationWallet(organizationId: string): Promise<
  */
 export async function setWalletTariff(walletId: string, tariffId: string): Promise<void> {
   await apiClient.put(`/api/Wallets/setTariff?walletId=${walletId}&tariffId=${tariffId}`, {});
+}
+
+function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `wd-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** POST /api/Wallets/deposits — пополнение тарифного кошелька (stub/ЮKassa) */
+export async function createWalletDeposit(payload: {
+  walletId: string;
+  amount: number;
+  currency?: string;
+  returnUrl?: string;
+  idempotencyKey?: string;
+}): Promise<ICreateWalletDepositResponse> {
+  const r = await apiClient.post<Record<string, unknown>>('/api/Wallets/deposits', {
+    walletId: payload.walletId,
+    amount: payload.amount,
+    currency: payload.currency ?? 'RUB',
+    returnUrl: payload.returnUrl,
+    idempotencyKey: payload.idempotencyKey ?? newIdempotencyKey(),
+  });
+  const raw = (r.result ?? {}) as Record<string, unknown>;
+  const depositRaw = (raw.deposit ?? raw.Deposit ?? {}) as Record<string, unknown>;
+  return {
+    deposit: normalizeDeposit(depositRaw),
+    confirmationUrl: (() => {
+      const v = raw.confirmationUrl ?? raw.ConfirmationUrl;
+      return v == null || v === '' ? null : String(v);
+    })(),
+    providerPaymentId: (() => {
+      const v = raw.providerPaymentId ?? raw.ProviderPaymentId;
+      return v == null || v === '' ? null : String(v);
+    })(),
+    paidImmediately: Boolean(raw.paidImmediately ?? raw.PaidImmediately),
+  };
+}
+
+/** POST /api/Wallets/deposits/complete — stub подтверждение пополнения */
+export async function completeWalletDeposit(payload: {
+  depositId?: string;
+  providerPaymentId?: string;
+}): Promise<IWalletDeposit> {
+  const r = await apiClient.post<Record<string, unknown>>('/api/Wallets/deposits/complete', payload);
+  return normalizeDeposit((r.result ?? {}) as Record<string, unknown>);
+}
+
+/** GET /api/Wallets/{walletId}/deposits */
+export async function fetchWalletDeposits(walletId: string): Promise<IWalletDeposit[]> {
+  const r = await apiClient.get<Record<string, unknown>[]>(`/api/Wallets/${walletId}/deposits`);
+  return (r.result ?? []).map(row => normalizeDeposit(row as Record<string, unknown>));
 }
