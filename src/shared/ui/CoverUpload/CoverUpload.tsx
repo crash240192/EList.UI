@@ -2,7 +2,7 @@
 // Загрузка обложки мероприятия — прямоугольная зона с drag-and-drop и фокусом кадра
 
 import { useRef, useState, useEffect } from 'react';
-import { uploadFile } from '@/shared/api/fileStorageClient';
+import { isFileStorageDownloadUrl, uploadFile } from '@/shared/api/fileStorageClient';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import {
   DEFAULT_COVER_FOCUS,
@@ -38,17 +38,26 @@ export function CoverUpload({
     focusY: number;
     moved: boolean;
   } | null>(null);
-  const [preview, setPreview] = useState<string | null>(currentUrl ?? null);
+  const [preview, setPreview] = useState<string | null>(() =>
+    currentUrl && !isFileStorageDownloadUrl(currentUrl) ? currentUrl : null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [panning, setPanning] = useState(false);
 
   useEffect(() => {
-    if (currentUrl) setPreview(currentUrl);
-  }, [currentUrl]);
+    if (!currentUrl && !currentFileId) {
+      setPreview(null);
+      return;
+    }
+    if (currentUrl && !isFileStorageDownloadUrl(currentUrl)) {
+      setPreview(currentUrl);
+    }
+  }, [currentUrl, currentFileId]);
 
-  const hasStoredCover = !!(preview || currentFileId);
+  const displayUrl = preview && !isFileStorageDownloadUrl(preview) ? preview : null;
+  const hasStoredCover = !!(displayUrl || currentFileId);
   const objectPosition = coverObjectPosition(focus);
 
   const handleFile = async (file: File) => {
@@ -73,7 +82,7 @@ export function CoverUpload({
       onUploaded(result.url, result.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
-      setPreview(currentUrl ?? null);
+      setPreview(currentUrl && !isFileStorageDownloadUrl(currentUrl) ? currentUrl : null);
     } finally {
       setLoading(false);
     }
@@ -155,9 +164,9 @@ export function CoverUpload({
       onPointerUp={endPan}
       onPointerCancel={endPan}
     >
-      {preview ? (
+      {displayUrl ? (
         <img
-          src={preview}
+          src={displayUrl}
           alt="Обложка"
           className={styles.preview}
           style={{ objectPosition }}

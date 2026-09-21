@@ -43,6 +43,7 @@ import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker'
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { isFileStorageDownloadUrl } from '@/shared/api/fileStorageClient';
 import { saveCoverFocusToFile, loadCoverFocusFromFile } from '@/entities/event/coverFocusApi';
 import {
   DEFAULT_COVER_FOCUS,
@@ -1973,15 +1974,15 @@ export default function CreateEventPage() {
             className={styles.previewCover}
             style={!coverUrl && !coverImageId ? { background: previewCoverBg } : undefined}
           >
-            {coverUrl ? (
-              <img src={coverUrl} alt="Обложка" style={{ width: '100%', height: '100%', ...coverFocusImgStyle(coverFocus), display: 'block' }} />
-            ) : coverImageId ? (
+            {coverImageId ? (
               <AuthImage
                 fileId={coverImageId}
                 alt="Обложка"
                 imageFit="cover"
                 style={{ width: '100%', height: '100%', ...coverFocusImgStyle(coverFocus), display: 'block' }}
               />
+            ) : coverUrl && !isFileStorageDownloadUrl(coverUrl) ? (
+              <img src={coverUrl} alt="Обложка" style={{ width: '100%', height: '100%', ...coverFocusImgStyle(coverFocus), display: 'block' }} />
             ) : (
               <span className={styles.previewCoverEmpty}>нет обложки</span>
             )}

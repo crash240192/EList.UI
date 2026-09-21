@@ -144,6 +144,14 @@ export function fileUrl(fileId: string): string {
   return `${FILE_STORAGE_BASE}/api/download/${fileId}`;
 }
 
+/** URL из `fileUrl()` — обычный `<img src>` не может передать заголовки filestorage. */
+export function isFileStorageDownloadUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const base = FILE_STORAGE_BASE.replace(/\/$/, '');
+  return url.startsWith(`${base}/api/download/`)
+    || url.includes('/elist/filestorage/api/download/');
+}
+
 /** Заголовки для GET /api/download/{fileId}: FullSize=true — оригинал; FullSize=false — превью. */
 function downloadHeaders(options?: { fullSize?: boolean }): Record<string, string> {
   const h = { ...authHeaders() };
