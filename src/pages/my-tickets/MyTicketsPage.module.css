@@ -122,6 +122,11 @@
   color: var(--danger);
 }
 
+.statusRefundPending {
+  background: color-mix(in srgb, var(--warning, #f59e0b) 18%, transparent);
+  color: var(--warning, #b45309);
+}
+
 .metaText {
   font-size: 12px;
   color: var(--text-muted);
@@ -137,30 +142,4 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.giftField {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.giftField input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-.giftField input:focus {
-  outline: none;
-  border-color: var(--accent);
 }

@@ -2,15 +2,18 @@
 
 import { apiClient } from '@/shared/api/client';
 import type {
+  ICancelRefundRequest,
   ICompletePaymentRequest,
   ICreateOrderRequest,
   ICreateOrderResponse,
   ICreateRefundRequest,
   IOrder,
+  IRefund,
   ITicket,
   ITicketCheckInRequest,
   ITransferTicketRequest,
   OrderStatus,
+  RefundStatus,
   TicketStatus,
 } from './types';
 
@@ -146,6 +149,29 @@ export async function fetchTicketByCode(code: string): Promise<ITicket | null> {
   }
 }
 
+function normalizeRefund(raw: Record<string, unknown>): IRefund {
+  const ticketIdsRaw = raw.ticketIds ?? raw.TicketIds;
+  const ticketIds = Array.isArray(ticketIdsRaw)
+    ? ticketIdsRaw.map(id => String(id)).filter(Boolean)
+    : [];
+  return {
+    id: asStr(raw.id ?? raw.Id),
+    orderId: asStr(raw.orderId ?? raw.OrderId),
+    amount: asNum(raw.amount ?? raw.Amount),
+    reason: (() => {
+      const v = raw.reason ?? raw.Reason;
+      return v == null || v === '' ? null : String(v);
+    })(),
+    status: asStr(raw.status ?? raw.Status) as RefundStatus,
+    createDate: asStr(raw.createDate ?? raw.CreateDate),
+    providerRefundId: (() => {
+      const v = raw.providerRefundId ?? raw.ProviderRefundId;
+      return v == null || v === '' ? null : String(v);
+    })(),
+    ticketIds,
+  };
+}
+
 /** POST /api/orders/tickets/transfer */
 export async function transferTicket(payload: ITransferTicketRequest): Promise<ITicket> {
   const r = await apiClient.post<Record<string, unknown>>(
@@ -156,8 +182,21 @@ export async function transferTicket(payload: ITransferTicketRequest): Promise<I
 }
 
 /** POST /api/orders/refunds */
-export async function createRefund(payload: ICreateRefundRequest): Promise<void> {
-  await apiClient.post('/api/orders/refunds', payload);
+export async function createRefund(payload: ICreateRefundRequest): Promise<IRefund> {
+  const r = await apiClient.post<Record<string, unknown>>('/api/orders/refunds', payload);
+  return normalizeRefund((r.result ?? {}) as Record<string, unknown>);
+}
+
+/** POST /api/orders/refunds/cancel */
+export async function cancelRefund(payload: ICancelRefundRequest): Promise<IRefund> {
+  const r = await apiClient.post<Record<string, unknown>>('/api/orders/refunds/cancel', payload);
+  return normalizeRefund((r.result ?? {}) as Record<string, unknown>);
+}
+
+/** GET /api/orders/{orderId}/refunds */
+export async function fetchRefundsByOrder(orderId: string): Promise<IRefund[]> {
+  const r = await apiClient.get<Record<string, unknown>[]>(`/api/orders/${orderId}/refunds`);
+  return (r.result ?? []).map(row => normalizeRefund(row as Record<string, unknown>));
 }
 
 /** POST /api/orders/tickets/validate — проверка кода без погашения */
