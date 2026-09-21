@@ -13,12 +13,19 @@ import {
 } from '@/entities/user/walletApi';
 import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
+import {
+  fetchMyOrders,
+  formatMoney,
+  ORDER_STATUS_LABELS,
+  type IOrder,
+} from '@/entities/order';
+import { fetchEventById } from '@/entities/event';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { usePageTitle } from '@/shared/hooks';
 import { formatTariffAgeCapability } from '@/shared/lib/ageLimit';
 import styles from './WalletPage.module.css';
 
-type HistoryKind = 'in' | 'tariff';
+type HistoryKind = 'in' | 'out' | 'tariff';
 
 interface HistoryRow {
   id: string;
@@ -31,11 +38,13 @@ interface HistoryRow {
 
 const HIST_ICO_CLASS = {
   in: styles.histIcoIn,
+  out: styles.histIcoOut,
   tariff: styles.histIcoTariff,
 } as const;
 
 const HIST_AMT_CLASS = {
   in: styles.histAmtIn,
+  out: styles.histAmtOut,
   tariff: styles.histAmtTariff,
 } as const;
 
@@ -157,6 +166,8 @@ export default function WalletPage() {
   const loadHistory = useCallback(async (currentTariff: ITariff | null, currentWallet: IWallet | null) => {
     setHistoryLoading(true);
     try {
+      // Единая лента финдеятельности: тарифный кошелёк + билеты (ЮKassa).
+      // Баланс карточки при этом остаётся только тарифным.
       const rows: HistoryRow[] = [];
 
       if (currentWallet?.id) {
@@ -174,10 +185,10 @@ export default function WalletPage() {
             })
             : '';
           rows.push({
-            id: d.id,
+            id: `deposit-${d.id}`,
             kind: 'in',
             name: 'Пополнение тарифа',
-            meta: dateLabel,
+            meta: `${dateLabel} · Тариф платформы`,
             amount: `+ ${d.amount.toLocaleString('ru-RU')} ₽`,
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
@@ -198,6 +209,42 @@ export default function WalletPage() {
           amount: currentTariff.cost > 0
             ? `− ${currentTariff.cost.toLocaleString('ru-RU')} ₽`
             : '0 ₽',
+          sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+        });
+      }
+
+      const orders = await fetchMyOrders().catch(() => [] as IOrder[]);
+      const eventIds = [...new Set(orders.map(o => o.eventId).filter(Boolean))];
+      const nameById = new Map<string, string>();
+      await Promise.all(eventIds.map(async (eventId) => {
+        try {
+          const ev = await fetchEventById(eventId);
+          if (ev?.name) nameById.set(eventId, ev.name);
+        } catch { /* ignore */ }
+      }));
+
+      for (const order of orders) {
+        const when = order.paidAt || order.createDate;
+        const sortAt = when ? new Date(when).getTime() : 0;
+        const dateLabel = when
+          ? new Date(when).toLocaleString('ru-RU', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          : '';
+        const status = ORDER_STATUS_LABELS[order.status] ?? order.status;
+        const qty = order.quantity > 1 ? ` · ${order.quantity} билета` : ' · Билет';
+        const isRefund = order.status === 'Refunded' || order.status === 'PartiallyRefunded';
+        const amountAbs = formatMoney(order.amountTotal, order.currency);
+        rows.push({
+          id: `order-${order.id}`,
+          kind: isRefund ? 'in' : 'out',
+          name: nameById.get(order.eventId) || 'Билет на мероприятие',
+          meta: `${dateLabel}${qty} · ${status} · ЮKassa`,
+          amount: isRefund ? `+ ${amountAbs}` : `− ${amountAbs}`,
           sortAt: Number.isFinite(sortAt) ? sortAt : 0,
         });
       }
@@ -508,7 +555,7 @@ export default function WalletPage() {
                   <div>
                     <div className={styles.sectionTitle}>История операций</div>
                     <div className={styles.sectionSubtitle}>
-                      Пополнения и списания тарифа платформы
+                      Вся финдеятельностьность: тариф платформы и билеты (ЮKassa). Баланс выше — только тариф.
                     </div>
                   </div>
                 </div>
