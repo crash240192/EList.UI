@@ -1088,7 +1088,6 @@ function OrgContactForm({
 
 const ORG_DOCUMENT_TYPES: DocumentTypeValue[] = [
   DocumentType.OrganizationAgreement,
-  DocumentType.TicketingAgreement,
 ];
 
 function OrganizationAgreementsSection({
@@ -1157,8 +1156,7 @@ function OrganizationAgreementsSection({
       <div className={styles.scardHead}>
         <div className={styles.scardTitle}>Документы организации</div>
         <div className={styles.scardDesc}>
-          Нажмите на документ, чтобы прочитать
-          {isOwner ? ' или принять согласие' : ''}
+          Договор оферты с организацией. Соглашение на продажу билетов — на вкладке «Продажа билетов».
         </div>
       </div>
       <div className={styles.formBody}>
@@ -1474,6 +1472,8 @@ function OrganizationMembersSection({
 interface ReadinessChecklistItem {
   label: string;
   ok: boolean;
+  /** Короткая расшифровка пункта (под подписью). */
+  detail?: string;
 }
 
 function OrganizationSalesReadinessCard({ items }: { items: ReadinessChecklistItem[] }) {
@@ -1489,7 +1489,10 @@ function OrganizationSalesReadinessCard({ items }: { items: ReadinessChecklistIt
         {items.map(item => (
           <li key={item.label} className={item.ok ? styles.checkOk : styles.checkNo}>
             <span className={styles.checkMark} aria-hidden>{item.ok ? '✓' : '·'}</span>
-            {item.label}
+            <span className={styles.checkText}>
+              <span className={styles.checkLabel}>{item.label}</span>
+              {item.detail && <span className={styles.checkDetail}>{item.detail}</span>}
+            </span>
           </li>
         ))}
       </ul>
@@ -1599,7 +1602,7 @@ function OrganizationBillingSection({
   });
 
   const salesReady =
-    verified && onboardingActive && ticketingAgreed && legalFilled && payoutFilled;
+    verified && ticketingAgreed && legalFilled && payoutFilled;
 
   const checklist: ReadinessChecklistItem[] = [
     { ok: ticketingAgreed, label: 'Соглашение на продажу билетов принято' },
@@ -1609,6 +1612,12 @@ function OrganizationBillingSection({
     {
       ok: onboardingActive,
       label: `Подключение выплат (${formatOnboardingStatus(onboardingStatus as never)})`,
+      detail:
+        'Не путать с реквизитами: это регистрация организации как продавца в ЮKassa (split), '
+        + 'чтобы деньги за билеты поступали на ваш счёт. '
+        + (onboardingActive
+          ? 'Продавец подключён.'
+          : 'Сейчас статус «не начат» — сохранение реквизитов онбординг не запускает; шаг появится после интеграции с ЮKassa.'),
     },
     org.canSellTickets
       ? { ok: true, label: 'Продажа билетов включена' }
@@ -1778,7 +1787,21 @@ function OrganizationBillingSection({
             </div>
             {ticketingAgreed ? (
               <div className={styles.formBody}>
-                <div className={styles.bannerOk} style={{ margin: 0 }}>Соглашение принято</div>
+                <div className={styles.bannerOk} style={{ margin: 0 }}>
+                  Соглашение принято
+                  {ticketingDoc && (
+                    <>
+                      {' · '}
+                      <button
+                        type="button"
+                        className={styles.linkBtn}
+                        onClick={() => setTicketingDocOpen(true)}
+                      >
+                        открыть документ
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ) : (
               <>
@@ -1827,7 +1850,9 @@ function OrganizationBillingSection({
             <div className={styles.scardHead}>
               <div className={styles.scardTitle}>Подключение продаж</div>
               <div className={styles.scardDesc}>
-                Включение продаж — после соглашения, верификации и подключения выплат (см. чеклист выше).
+                Включение продаж — после соглашения и успешной верификации.
+                Выплаты покупателей на ваши реквизиты через ЮKassa split появятся после
+                статуса подключения выплат «активен» (сейчас онбординг провайдера из UI ещё не запускается).
               </div>
             </div>
             {rejected && (
@@ -1875,7 +1900,9 @@ function OrganizationBillingSection({
           <div className={styles.scardHead}>
             <div className={styles.scardTitle}>Реквизиты</div>
             <div className={styles.scardDesc}>
-              Банковские реквизиты для выплат · подключение к платёжному провайдеру: {formatOnboardingStatus(onboardingStatus as never)}
+              Банковские реквизиты для получения оплаты за билеты.
+              Статус провайдера выплат (онбординг продавца в ЮKassa): {formatOnboardingStatus(onboardingStatus as never)}.
+              Заполнение счёта/БИК/банка само по себе статус не меняет — подключение продавца к ЮKassa будет отдельным шагом.
             </div>
           </div>
           <div className={styles.formBody}>

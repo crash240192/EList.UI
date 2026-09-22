@@ -627,7 +627,7 @@
 .checkOk,
 .checkNo {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   font-size: var(--font-sm);
 }
@@ -644,6 +644,30 @@
   width: 16px;
   text-align: center;
   font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.checkText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.checkLabel {
+  line-height: 1.4;
+}
+
+.checkDetail {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  opacity: 0.95;
+}
+
+.checkOk .checkDetail {
+  color: color-mix(in srgb, #34d399 55%, var(--text-muted));
 }
 
 /* ── Contacts ── */
