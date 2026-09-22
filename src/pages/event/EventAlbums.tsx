@@ -477,7 +477,7 @@ export function EventAlbums({
         </div>
         {hasAlbums && !showExpandedAlbums && (
           <div className={styles.gridCollapsed}>
-            {albums.slice(0, 4).map(a => (
+            {albums.map(a => (
               <AlbumCard
                 key={a.id}
                 album={a}
@@ -492,7 +492,7 @@ export function EventAlbums({
           </div>
         )}
         {(showExpandedAlbums || (!hasAlbums && canManage)) && (
-          renderGrid(albums.slice(0, canManage ? albums.length : 4), true)
+          renderGrid(albums, true)
         )}
         {modals}
       </div>
