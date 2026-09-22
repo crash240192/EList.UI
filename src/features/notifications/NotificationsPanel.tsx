@@ -1,6 +1,6 @@
 // features/notifications/NotificationsPanel.tsx
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccountId } from '@/features/auth/useAccountId';
 import type { INotification } from '@/entities/notification/types';
@@ -58,6 +58,13 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [stats, setStats] = useState<string | null>(null);
+  const closeAfterReadAllRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (closeAfterReadAllRef.current != null) {
+      clearTimeout(closeAfterReadAllRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!historyLoaded && !historyLoading) {
@@ -139,6 +146,17 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const emptyText = tab === 'new'
     ? 'Пока нет уведомлений. Новые появятся здесь по WebSocket.'
     : 'Нет прочитанных уведомлений';
+
+  const handleReadAll = useCallback(() => {
+    void clearAll();
+    if (closeAfterReadAllRef.current != null) {
+      clearTimeout(closeAfterReadAllRef.current);
+    }
+    closeAfterReadAllRef.current = setTimeout(() => {
+      closeAfterReadAllRef.current = null;
+      onClose();
+    }, 500);
+  }, [clearAll, onClose]);
 
   const handleTestSend = async () => {
     if (!accountId || !testMsg.trim()) return;
@@ -335,7 +353,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       )}
 
       {tab === 'new' && unreadItems.length > 0 && (
-        <button type="button" className={styles.clearBtn} onClick={() => { void clearAll(); }}>
+        <button type="button" className={styles.clearBtn} onClick={handleReadAll}>
           Прочитать все
         </button>
       )}
