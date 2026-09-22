@@ -14,7 +14,8 @@ import {
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
-import { useInfiniteScroll } from '@/shared/hooks';
+import { media } from '@/shared/lib/breakpoints';
+import { useInfiniteScroll, useMediaQuery } from '@/shared/hooks';
 import styles from './EventAlbumsGroupsPanel.module.css';
 
 const PAGE_SIZE = 10;
@@ -136,19 +137,16 @@ function AlbumCover({
 function AlbumTile({
   album,
   compact,
-  stretched,
   onOpen,
 }: {
   album: IAlbum;
   compact?: boolean;
-  stretched?: boolean;
   onOpen: () => void;
 }) {
-  const iconSize = compact ? (stretched ? 22 : 16) : 24;
+  const iconSize = compact ? 16 : 24;
   const className = [
     styles.albumCard,
-    compact && !stretched ? styles.albumCardThumb : '',
-    stretched ? styles.albumCardStretched : '',
+    compact ? styles.albumCardThumb : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -184,20 +182,20 @@ function AlbumStack({
   return (
     <button
       type="button"
-      className={styles.stack}
+      className={styles.stackThumb}
       onClick={onOpen}
       aria-label={`Ещё ${albumCountLabel(extraCount)}`}
       title={`Ещё ${albumCountLabel(extraCount)}`}
     >
-      <span className={styles.stackLayers}>
+      <span className={styles.stackThumbLayers}>
         {layers.map(album => (
-          <span key={album.id} className={styles.stackLayer}>
-            <AlbumCover album={album} iconSize={16} />
+          <span key={album.id} className={styles.stackThumbLayer}>
+            <AlbumCover album={album} iconSize={14} />
           </span>
         ))}
       </span>
       {extraCount > 0 && (
-        <span className={styles.stackPlus}>+{extraCount}</span>
+        <span className={styles.stackThumbPlus}>+{extraCount}</span>
       )}
     </button>
   );
@@ -213,16 +211,14 @@ function EventGroupSection({
   onOpenEvent: (eventId: string) => void;
 }) {
   const { event, albums } = group;
-  const [expanded, setExpanded] = useState(false);
-  const stretchCollapsed = !expanded && albums.length >= COLLAPSED_MAX;
+  const isMobile = useMediaQuery(media.mobile);
+  // Свёртка только на мобилке; на tablet/desktop всегда развёрнутые карточки.
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const expanded = !isMobile || mobileExpanded;
   const showStack = !expanded && albums.length > COLLAPSED_MAX;
-  const expand = () => setExpanded(true);
+  const expand = () => setMobileExpanded(true);
 
-  const gridClass = expanded
-    ? styles.albumGrid
-    : stretchCollapsed
-      ? styles.albumGridWide
-      : styles.albumGridCollapsed;
+  const gridClass = expanded ? styles.albumGrid : styles.albumGridCollapsed;
 
   let tiles;
   if (expanded) {
@@ -243,7 +239,6 @@ function EventGroupSection({
             key={album.id}
             album={album}
             compact
-            stretched
             onOpen={expand}
           />
         ))}
@@ -260,7 +255,6 @@ function EventGroupSection({
         key={album.id}
         album={album}
         compact
-        stretched={albums.length === COLLAPSED_MAX}
         onOpen={expand}
       />
     ));
@@ -272,11 +266,11 @@ function EventGroupSection({
       <div className={gridClass}>
         {tiles}
       </div>
-      {expanded && (
+      {isMobile && mobileExpanded && (
         <button
           type="button"
           className={`${styles.collapseBtn} noHoverGlow`}
-          onClick={() => setExpanded(false)}
+          onClick={() => setMobileExpanded(false)}
         >
           <ChevronUpIcon />
           <span className={styles.collapseTitle}>Свернуть</span>

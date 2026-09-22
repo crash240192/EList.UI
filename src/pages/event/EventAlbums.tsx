@@ -16,6 +16,8 @@ import { AlbumGridModal } from '@/features/media/AlbumGridModal';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
+import { media } from '@/shared/lib/breakpoints';
+import { useMediaQuery } from '@/shared/hooks';
 import styles from './EventAlbums.module.css';
 
 // ── Изображение со спиннером ─────────────────────────────────────────────────
@@ -268,6 +270,9 @@ export function EventAlbums({
   const [deleting, setDeleting] = useState(false);
   const [coverVersionByAlbumId, setCoverVersionByAlbumId] = useState<Record<string, number>>({});
   const [albumsExpanded, setAlbumsExpanded] = useState(false);
+  const isMobile = useMediaQuery(media.mobile);
+  // Свёртка ряда альбомов — только на мобилке; на tablet/desktop всегда развёрнуто.
+  const showExpandedAlbums = !isMobile || albumsExpanded;
 
   const bumpAlbumCover = useCallback((albumId: string) => {
     setCoverVersionByAlbumId(prev => ({
@@ -444,7 +449,7 @@ export function EventAlbums({
       <div className={styles.albumsSection}>
         <div className={styles.header}>
           <div className={styles.title}>Фотоальбомы</div>
-          {hasAlbums && (
+          {hasAlbums && isMobile && (
             <button
               type="button"
               className={styles.count}
@@ -466,8 +471,11 @@ export function EventAlbums({
               </svg>
             </button>
           )}
+          {hasAlbums && !isMobile && (
+            <span className={styles.count}>{albums.length}</span>
+          )}
         </div>
-        {hasAlbums && !albumsExpanded && (
+        {hasAlbums && !showExpandedAlbums && (
           <div className={styles.gridCollapsed}>
             {albums.slice(0, 4).map(a => (
               <AlbumCard
@@ -483,7 +491,7 @@ export function EventAlbums({
             ))}
           </div>
         )}
-        {(albumsExpanded || (!hasAlbums && canManage)) && (
+        {(showExpandedAlbums || (!hasAlbums && canManage)) && (
           renderGrid(albums.slice(0, canManage ? albums.length : 4), true)
         )}
         {modals}
