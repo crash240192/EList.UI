@@ -57,7 +57,7 @@ button.count {
   max-width: 100%;
 }
 
-/* Compact свёрнутый ряд: 4 плитки на ширину контейнера */
+/* Compact свёрнутый ряд: до 4 плиток в ряд, остальные переносятся */
 .gridCollapsed {
   display: grid;
   gap: 6px;
