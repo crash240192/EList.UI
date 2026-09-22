@@ -51,6 +51,7 @@ export const ApiErrorCode = {
   TariffNotAssigned: 10004,
   PaymentValueMustBeOverZero: 10005,
   AccountWalletAlreadyExists: 10006,
+  DefaultFreeTariffAlreadyExists: 10007,
 
   OrganizationNotFound: 11001,
   OrganizationPaymentRequired: 11006,

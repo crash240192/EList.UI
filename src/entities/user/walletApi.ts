@@ -6,13 +6,20 @@ export interface IWallet {
   id: string;
   accountId?: string | null;
   organizationId?: string | null;
+  /** Выбранный тариф (сохраняется даже если период не оплачен). */
   tariffId: string | null;
   balance: number;
   createdAt?: string;
   paidDate?: string | null;
   lastChargeDate?: string | null;
-  /** Следующее списание тарифа; null = не активен / ждёт средств */
+  /** Следующее списание тарифа; null = выбранный платный не активен / ждёт средств */
   nextChargeAt?: string | null;
+  /** Тариф, чьи лимиты сейчас действуют (выбранный или free default). */
+  effectiveTariffId?: string | null;
+  /** Выбранный тариф сейчас активен (оплаченный период или cost=0). */
+  isSelectedTariffActive?: boolean;
+  /** Статус биллинга с бэка. */
+  tariffBillingStatus?: string | null;
 }
 
 export type WalletDepositStatus = 'Pending' | 'Succeeded' | 'Canceled' | 'Failed';
@@ -92,6 +99,9 @@ function normalizeWallet(raw: Record<string, unknown> | null | undefined): IWall
     paidDate: nullableStr(raw.paidDate ?? raw.PaidDate),
     lastChargeDate: nullableStr(raw.lastChargeDate ?? raw.LastChargeDate),
     nextChargeAt: nullableStr(raw.nextChargeAt ?? raw.NextChargeAt),
+    effectiveTariffId: nullableStr(raw.effectiveTariffId ?? raw.EffectiveTariffId),
+    isSelectedTariffActive: Boolean(raw.isSelectedTariffActive ?? raw.IsSelectedTariffActive),
+    tariffBillingStatus: nullableStr(raw.tariffBillingStatus ?? raw.TariffBillingStatus),
   };
 }
 
@@ -164,8 +174,11 @@ export async function ensureOrganizationWallet(organizationId: string): Promise<
  * PUT /api/Wallets/setTariff?walletId=...&tariffId=...
  * query-параметры
  */
-export async function setWalletTariff(walletId: string, tariffId: string): Promise<void> {
-  await apiClient.put(`/api/Wallets/setTariff?walletId=${walletId}&tariffId=${tariffId}`, {});
+/** PUT /api/Wallets/setTariff?walletId=...&tariffId=... */
+export async function setWalletTariff(walletId: string, tariffId: string): Promise<string | null> {
+  const r = await apiClient.put<unknown>(`/api/Wallets/setTariff?walletId=${walletId}&tariffId=${tariffId}`, {});
+  const msg = (r as { message?: string | null }).message;
+  return msg == null || msg === '' ? null : String(msg);
 }
 
 function newIdempotencyKey(): string {

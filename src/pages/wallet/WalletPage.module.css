@@ -328,6 +328,15 @@
   cursor: default;
 }
 
+.tcInactiveSelected {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.tcFallback {
+  border-color: color-mix(in srgb, var(--border) 60%, var(--text-muted));
+}
+
 .tariffCarousel {
   display: flex;
   align-items: center;
@@ -397,6 +406,16 @@
 .tcBadgeActive {
   background: rgba(34, 197, 94, 0.15);
   color: var(--success);
+}
+
+.tcBadgeInactive {
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+.tcBadgeFallback {
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  color: var(--text-secondary);
 }
 
 .tcName {
