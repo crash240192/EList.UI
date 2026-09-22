@@ -711,9 +711,9 @@ function OrganizationProfileSection({
     setMsg(null);
     try {
       const w = wallet?.id ? wallet : await ensureOrganizationWallet(org.id);
-      await setWalletTariff(w.id, selectedTariffId);
+      const apiMsg = await setWalletTariff(w.id, selectedTariffId);
       setWallet(w);
-      setMsg({ text: 'Тариф организации обновлён', ok: true });
+      setMsg({ text: apiMsg || 'Тариф организации обновлён', ok: true });
       await loadTariffState();
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'Не удалось сменить тариф', ok: false });

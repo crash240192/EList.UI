@@ -92,17 +92,18 @@ function formatDateTime(iso: string): string {
   });
 }
 
-/** Статус периода тарифа по NextChargeAt (без минуса / без сдвига от депозита). */
+/** Статус биллинга: предпочитаем текст с API, иначе локальный fallback. */
 function tariffPeriodStatus(wallet: IWallet, tariff: ITariff | null): string | null {
+  if (wallet.tariffBillingStatus) return wallet.tariffBillingStatus;
   if (!tariff) return null;
-  const next = wallet.nextChargeAt ? new Date(wallet.nextChargeAt).getTime() : NaN;
-  if (Number.isFinite(next) && next > Date.now()) {
-    return `Активен до ${formatDateTime(wallet.nextChargeAt!)} · следующее списание`;
+  if (wallet.isSelectedTariffActive || tariff.cost <= 0) {
+    const next = wallet.nextChargeAt ? new Date(wallet.nextChargeAt).getTime() : NaN;
+    if (Number.isFinite(next) && next > Date.now()) {
+      return `Активен до ${formatDateTime(wallet.nextChargeAt!)} · следующее списание`;
+    }
+    if (tariff.cost <= 0) return 'Бесплатный тариф активен';
   }
-  if (tariff.cost <= 0) {
-    return 'Бесплатный тариф активен';
-  }
-  return 'Период не активен — пополните баланс до суммы тарифа для списания';
+  return 'Выбранный тариф не активен — недостаточно средств. Действует бесплатный тариф по умолчанию.';
 }
 
 function TariffPlansCarousel({ children, count }: { children: ReactNode; count: number }) {
@@ -327,8 +328,8 @@ export default function WalletPage() {
     setSaving(true);
     setMsg(null);
     try {
-      await setWalletTariff(wallet.id, selectedTariffId);
-      setMsg({ text: 'Тариф подключён', ok: true });
+      const apiMsg = await setWalletTariff(wallet.id, selectedTariffId);
+      setMsg({ text: apiMsg || 'Тариф подключён', ok: true });
       setSelectedTariffId('');
       await load();
     } catch (e) {
@@ -559,8 +560,16 @@ export default function WalletPage() {
                           key={t.id}
                           tariff={t}
                           validator={validators[t.id] ?? null}
-                          isCurrent={tariff?.id === t.id}
-                          isSelected={selectedTariffId === t.id}
+                          isSelectedPlan={wallet?.tariffId === t.id}
+                          isActive={Boolean(
+                            wallet?.tariffId === t.id && (wallet.isSelectedTariffActive || t.cost <= 0),
+                          )}
+                          isEffectiveFallback={Boolean(
+                            wallet?.effectiveTariffId === t.id
+                            && wallet?.tariffId
+                            && wallet.tariffId !== t.id,
+                          )}
+                          isPicked={selectedTariffId === t.id}
                           onSelect={() => setSelectedTariffId(prev => prev === t.id ? '' : t.id)}
                         />
                       ))}
@@ -620,14 +629,18 @@ export default function WalletPage() {
 function TariffCard({
   tariff,
   validator,
-  isCurrent,
-  isSelected,
+  isSelectedPlan,
+  isActive,
+  isEffectiveFallback,
+  isPicked,
   onSelect,
 }: {
   tariff: ITariff;
   validator: ITariffValidator | null;
-  isCurrent: boolean;
-  isSelected: boolean;
+  isSelectedPlan: boolean;
+  isActive: boolean;
+  isEffectiveFallback: boolean;
+  isPicked: boolean;
   onSelect: () => void;
 }) {
   const days = (tariff as { periodDays?: number }).periodDays ?? tariff.period?.days ?? '?';
@@ -635,27 +648,35 @@ function TariffCard({
 
   const cardClass = [
     styles.tc,
-    isCurrent ? styles.tcCurrent : '',
-    isSelected && !isCurrent ? styles.tcSelected : '',
+    isActive ? styles.tcCurrent : '',
+    isSelectedPlan && !isActive ? styles.tcInactiveSelected : '',
+    isEffectiveFallback ? styles.tcFallback : '',
+    isPicked && !isSelectedPlan ? styles.tcSelected : '',
   ].filter(Boolean).join(' ');
 
   return (
     <div
       className={cardClass}
-      onClick={isCurrent ? undefined : onSelect}
+      onClick={isSelectedPlan && isActive ? undefined : onSelect}
       role="button"
-      tabIndex={isCurrent ? -1 : 0}
-      aria-pressed={isSelected}
-      aria-disabled={isCurrent}
-      onKeyDown={e => { if (e.key === 'Enter' && !isCurrent) onSelect(); }}
+      tabIndex={isSelectedPlan && isActive ? -1 : 0}
+      aria-pressed={isPicked}
+      aria-disabled={isSelectedPlan && isActive}
+      onKeyDown={e => { if (e.key === 'Enter' && !(isSelectedPlan && isActive)) onSelect(); }}
     >
-      {isCurrent && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>Активен</div>}
+      {isActive && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>Активен</div>}
+      {isSelectedPlan && !isActive && (
+        <div className={`${styles.tcBadge} ${styles.tcBadgeInactive}`}>Выбран · неактивен</div>
+      )}
+      {isEffectiveFallback && (
+        <div className={`${styles.tcBadge} ${styles.tcBadgeFallback}`}>По умолчанию</div>
+      )}
       <div className={styles.tcName}>{tariff.name}</div>
       <div className={`${styles.tcPrice} ${tariff.cost === 0 ? styles.tcPriceFree : ''}`}>
         {tariff.cost === 0 ? '0 ₽' : `${tariff.cost.toLocaleString('ru-RU')} ₽`}
       </div>
       <div className={styles.tcPeriod}>
-        {tariff.cost === 0 ? 'навсегда' : `в месяц · ${days} дн.`}
+        {tariff.cost === 0 ? 'навсегда / fallback' : `в месяц · ${days} дн.`}
       </div>
       <div className={styles.tcDivider} />
       <div className={styles.tcFeat}>

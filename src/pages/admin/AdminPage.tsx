@@ -897,6 +897,7 @@ function TariffsTab() {
           <TariffForm
             key={editing === 'new' ? 'new-tariff' : (editing as ITariff).id}
             tariff={editing === 'new' ? null : editing}
+            existingTariffs={tariffs}
             onSave={async (validatorData, tariffData) => {
               if (editing === 'new') {
                 const validatorId = await tariffValidatorApi.create(validatorData);
@@ -937,8 +938,9 @@ const EMPTY_VALIDATOR_STR = {
   allowPrivate: false, allowGenderSegregation: false, allowMultidaysEvent: false,
 };
 
-function TariffForm({ tariff, onSave, onCancel }: {
+function TariffForm({ tariff, existingTariffs, onSave, onCancel }: {
   tariff: ITariff | null;
+  existingTariffs: ITariff[];
   onSave: (v: ITariffValidator, t: ITariffRequest) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -983,6 +985,22 @@ function TariffForm({ tariff, onSave, onCancel }: {
 
   const handleSave = async () => {
     if (!name.trim()) { setErr('Укажите название'); return; }
+    const parsedCost = parseFloat(cost) || 0;
+    if (parsedCost < 0) { setErr('Стоимость не может быть отрицательной'); return; }
+    if (parsedCost === 0) {
+      const otherFree = existingTariffs.find(t =>
+        t.cost <= 0
+        && !!t.forOrganization === forOrganization
+        && t.id !== tariff?.id,
+      );
+      if (otherFree) {
+        setErr(
+          `В этом контуре уже есть бесплатный тариф «${otherFree.name}». `
+          + 'Допустим только один тариф со стоимостью 0.',
+        );
+        return;
+      }
+    }
     if (
       validatorStr.ageLimit !== ''
       && !EVENT_AGE_LIMIT_OPTIONS.includes(parseInt(validatorStr.ageLimit, 10) as EventAgeLimit)
@@ -1004,7 +1022,7 @@ function TariffForm({ tariff, onSave, onCancel }: {
     try {
       await onSave(validator, {
         name,
-        cost: parseFloat(cost) || 0,
+        cost: parsedCost,
         periodDays: parseInt(days) || 30,
         forOrganization,
         validatorId: '',
@@ -1028,6 +1046,9 @@ function TariffForm({ tariff, onSave, onCancel }: {
       <div className={styles.field}>
         <label className={styles.label}>Стоимость (₽/период)</label>
         <input className={styles.input} type="number" min={0} value={cost} onChange={e => setCost(e.target.value)} />
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+          В каждом контуре (личный / организация) допускается только один тариф со стоимостью 0 — он назначается по умолчанию и служит fallback.
+        </div>
       </div>
       <div className={styles.field}>
         <label className={styles.label}>Период действия (дней)</label>
