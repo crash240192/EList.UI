@@ -36,6 +36,7 @@ import {
   removeOrganizationMember,
   saveOrganizationLegal,
   saveOrganizationPayout,
+  startOrganizationProviderOnboarding,
   setOrganizationActive,
   setOrganizationMemberActive,
   setOrganizationTicketsEnabled,
@@ -67,10 +68,11 @@ import {
   type IWalletDeposit,
   type IWalletTariffCharge,
 } from '@/entities/user/walletApi';
-import { tariffApi, type ITariff } from '@/entities/admin/adminApi';
+import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { AgreementDocumentModal } from '@/features/agreements';
 import { OrgAgreementAcceptDialog } from '@/features/agreements';
+import { TariffPlansPicker } from '@/features/wallet';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
@@ -87,13 +89,6 @@ type View =
   | { kind: 'detail'; id: string };
 
 type OrgDetailSection = 'profile' | 'members' | 'legal' | 'finance' | 'sales';
-
-function formatOrgTariffLabel(t: ITariff): string {
-  const days = t.periodDays ?? t.period?.days;
-  const price = t.cost === 0 ? 'Бесплатно' : `${t.cost.toLocaleString('ru-RU')} ₽`;
-  const period = days != null ? `${days} дн.` : null;
-  return [t.name, price, period].filter(Boolean).join(' · ');
-}
 
 function formatWalletDateTime(iso: string): string {
   return new Date(iso).toLocaleString('ru-RU', {
@@ -1194,6 +1189,7 @@ function OrganizationWalletSection({
 }) {
   const [wallet, setWallet] = useState<IWallet | null>(null);
   const [orgTariffs, setOrgTariffs] = useState<ITariff[]>([]);
+  const [validators, setValidators] = useState<Record<string, ITariffValidator | null>>({});
   const [selectedTariff, setSelectedTariff] = useState<ITariff | null>(null);
   const [effectiveTariff, setEffectiveTariff] = useState<ITariff | null>(null);
   const [pickedTariffId, setPickedTariffId] = useState('');
@@ -1232,6 +1228,16 @@ function OrganizationWalletSection({
       setSelectedTariff(selected);
       setEffectiveTariff(effective);
       setPickedTariffId(w?.tariffId ?? '');
+
+      const validatorEntries = await Promise.all(
+        sorted
+          .filter(t => t.validatorId)
+          .map(async t => {
+            const v = await tariffValidatorApi.getByTariff(t.id).catch(() => null);
+            return [t.id, v] as const;
+          }),
+      );
+      setValidators(Object.fromEntries(validatorEntries));
 
       if (w?.id) {
         const [deposits, charges] = await Promise.all([
@@ -1380,14 +1386,6 @@ function OrganizationWalletSection({
     }
   };
 
-  const tariffOptions = orgTariffs.map(t => ({
-    value: t.id,
-    label: formatOrgTariffLabel(t),
-  }));
-  const canApplyTariff =
-    canEdit
-    && !!pickedTariffId
-    && pickedTariffId !== (wallet?.tariffId ?? '');
   const billingStatus = wallet
     ? orgTariffPeriodStatus(wallet, selectedTariff)
     : null;
@@ -1465,47 +1463,23 @@ function OrganizationWalletSection({
           </div>
         )}
 
-        <div className={styles.tariffBlock}>
-          <div className={styles.tariffCurrent}>
-            <span className={styles.tariffCurrentLabel}>Выбранный тариф</span>
-            <span className={`${styles.tariffCurrentValue} ${!selectedTariff ? styles.tariffCurrentMuted : ''}`}>
-              {selectedTariff
-                ? formatOrgTariffLabel(selectedTariff)
-                : wallet?.tariffId
-                  ? `Тариф выбран (id: ${wallet.tariffId.slice(0, 8)}…)`
-                  : 'Не выбран'}
-            </span>
-          </div>
-
-          <div className={styles.field}>
-            <span className={styles.fieldLabel}>Тариф организации</span>
-            {orgTariffs.length === 0 ? (
-              <div className={styles.tariffCurrentMuted}>
-                Нет доступных тарифов для организаций. Обратитесь к администратору.
-              </div>
-            ) : (
-              <Select
-                value={pickedTariffId}
-                disabled={!canEdit}
-                placeholder="Выберите тариф"
-                onChange={setPickedTariffId}
-                options={tariffOptions}
-              />
-            )}
-          </div>
-
-          {canApplyTariff && (
-            <div className={styles.tariffApplyRow}>
-              <Button
-                size="sm"
-                loading={saving}
-                onClick={() => { void handleApplyTariff(); }}
-              >
-                Применить тариф
-              </Button>
-            </div>
-          )}
-        </div>
+        <TariffPlansPicker
+          tariffs={orgTariffs}
+          validators={validators}
+          walletTariffId={wallet?.tariffId}
+          walletEffectiveTariffId={wallet?.effectiveTariffId}
+          isSelectedTariffActive={wallet?.isSelectedTariffActive}
+          pickedTariffId={pickedTariffId}
+          onPick={setPickedTariffId}
+          onCancel={() => setPickedTariffId(wallet?.tariffId ?? '')}
+          onConfirm={() => { void handleApplyTariff(); }}
+          confirming={saving}
+          disabled={!canEdit}
+          title="Тариф организации"
+          subtitle="Те же планы и ограничения, что у личного кошелька — карточки с преимуществами каждого тарифа"
+          emptyText="Нет доступных тарифов для организаций. Обратитесь к администратору."
+          confirmLabel="Применить тариф"
+        />
 
         <div className={styles.field}>
           <span className={styles.fieldLabel}>История операций</span>
@@ -1925,13 +1899,13 @@ function OrganizationBillingSection({
     { ok: verified, label: 'Верификация пройдена' },
     {
       ok: onboardingActive,
-      label: `Подключение выплат (${formatOnboardingStatus(onboardingStatus as never)})`,
+      label: `Онбординг организации в платёжной системе (${formatOnboardingStatus(onboardingStatus as never)})`,
       detail:
         'Не путать с реквизитами: это регистрация организации как продавца в ЮKassa (split), '
         + 'чтобы деньги за билеты поступали на ваш счёт. '
         + (onboardingActive
           ? 'Продавец подключён.'
-          : 'Сейчас статус «не начат» — сохранение реквизитов онбординг не запускает; шаг появится после интеграции с ЮKassa.'),
+          : 'Запускается отдельно кнопкой на вкладке «Финансы» (сейчас — stub через DI, как платежи).'),
     },
     org.canSellTickets
       ? { ok: true, label: 'Продажа билетов включена' }
@@ -2028,6 +2002,38 @@ function OrganizationBillingSection({
     }
   };
 
+  const startProviderOnboarding = async () => {
+    if (!isOwner) return;
+    if (!payoutFilled) {
+      setMsg({ text: 'Сначала сохраните банковские реквизиты', ok: false });
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const result = await startOrganizationProviderOnboarding(
+        organizationId,
+        `${window.location.origin}/settings/organizations`,
+      );
+      setOnboardingStatus(result.onboardingStatus ?? OrganizationOnboardingStatus.None);
+      if (result.confirmationUrl?.trim()) {
+        window.location.assign(result.confirmationUrl);
+        return;
+      }
+      setMsg({
+        text: result.onboardingStatus === OrganizationOnboardingStatus.Active
+          ? 'Онбординг в платёжной системе завершён (stub ЮKassa)'
+          : 'Онбординг запущен',
+        ok: true,
+      });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось запустить онбординг', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitVerification = async () => {
     if (!isOwner) return;
     if (!ticketingAgreed) {
@@ -2093,7 +2099,8 @@ function OrganizationBillingSection({
               <div className={styles.scardDesc}>
                 Включение продаж — после соглашения и успешной верификации.
                 Выплаты покупателей на ваши реквизиты через ЮKassa split появятся после
-                статуса подключения выплат «активен» (сейчас онбординг провайдера из UI ещё не запускается).
+                статуса «Онбординг организации в платёжной системе» = активен
+                (запуск — на вкладке «Финансы», сейчас stub через DI).
               </div>
             </div>
             {rejected && (
@@ -2142,8 +2149,8 @@ function OrganizationBillingSection({
             <div className={styles.scardTitle}>Банковские реквизиты</div>
             <div className={styles.scardDesc}>
               Реквизиты для получения оплаты за билеты (не путать с балансом тарифа выше).
-              Статус провайдера выплат (онбординг продавца в ЮKassa): {formatOnboardingStatus(onboardingStatus as never)}.
-              Заполнение счёта/БИК/банка само по себе статус не меняет — подключение продавца к ЮKassa будет отдельным шагом.
+              Онбординг организации в платёжной системе (ЮKassa): {formatOnboardingStatus(onboardingStatus as never)}.
+              Сохранение счёта/БИК/банка само по себе статус не меняет — ниже отдельный шаг онбординга продавца.
             </div>
           </div>
           <div className={styles.formBody}>
@@ -2175,6 +2182,32 @@ function OrganizationBillingSection({
               </Button>
             </div>
           )}
+
+          <div className={styles.formBody} style={{ paddingTop: 0 }}>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Онбординг организации в платёжной системе</span>
+              <div className={styles.scardDesc}>
+                Регистрация организации как продавца в ЮKassa (split). Сейчас — DI-заглушка:
+                по кнопке статус сразу становится «активен», без редиректа в кабинет ЮKassa.
+              </div>
+              {isOwner && !onboardingActive && (
+                <div className={styles.tariffApplyRow}>
+                  <Button
+                    size="sm"
+                    loading={busy}
+                    disabled={!payoutFilled}
+                    title={!payoutFilled ? 'Сначала сохраните реквизиты' : undefined}
+                    onClick={() => { void startProviderOnboarding(); }}
+                  >
+                    Запустить онбординг (ЮKassa)
+                  </Button>
+                </div>
+              )}
+              {onboardingActive && (
+                <div className={styles.bannerOk}>Продавец подключён к платёжной системе</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

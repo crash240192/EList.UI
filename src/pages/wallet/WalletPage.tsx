@@ -1,6 +1,6 @@
 // pages/wallet/WalletPage.tsx — макет examples/elist_settings_wallet.html
 
-import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   createWallet,
   getWalletByAccount,
@@ -23,8 +23,8 @@ import {
 } from '@/entities/order';
 import { fetchEventById } from '@/entities/event';
 import { getOrFetchAccountId } from '@/entities/user/api';
+import { TariffPlansPicker } from '@/features/wallet';
 import { usePageTitle } from '@/shared/hooks';
-import { formatTariffAgeCapability } from '@/shared/lib/ageLimit';
 import styles from './WalletPage.module.css';
 
 type HistoryKind = 'in' | 'out' | 'tariff';
@@ -49,38 +49,6 @@ const HIST_AMT_CLASS = {
   out: styles.histAmtOut,
   tariff: styles.histAmtTariff,
 } as const;
-
-function formatValidatorRows(v: ITariffValidator): { label: string; value: string; type: 'ok' | 'warn' | 'no' }[] {
-  return [
-    {
-      label: 'Приватные события',
-      value: v.allowPrivate ? 'Разрешены' : 'Недоступны',
-      type: v.allowPrivate ? 'ok' : 'no',
-    },
-    {
-      label: 'Фильтр по полу',
-      value: v.allowGenderSegregation ? 'Разрешён' : 'Недоступен',
-      type: v.allowGenderSegregation ? 'ok' : 'no',
-    },
-    {
-      label: 'Макс. стоимость',
-      value: v.costLimit == null ? 'Без ограничений' : v.costLimit === 0 ? 'Только бесплатные' : `до ${v.costLimit.toLocaleString()} ₽`,
-      type: v.costLimit == null ? 'ok' : v.costLimit === 0 ? 'no' : 'warn',
-    },
-    {
-      label: 'Макс. участников',
-      value: v.personsLimit == null ? 'Без ограничений' : v.personsLimit === 0 ? 'Нельзя ограничивать' : `до ${v.personsLimit} чел.`,
-      type: v.personsLimit == null ? 'ok' : v.personsLimit === 0 ? 'no' : 'warn',
-    },
-    {
-      label: 'Возрастной ценз',
-      value: formatTariffAgeCapability(v.ageLimit),
-      type: v.ageLimit == null ? 'ok' : v.ageLimit === 0 ? 'no' : 'warn',
-    },
-  ];
-}
-
-const TARIFF_CAROUSEL_MIN = 4;
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('ru-RU', {
@@ -109,73 +77,6 @@ function tariffPeriodStatus(wallet: IWallet, tariff: ITariff | null): string | n
     if (tariff.cost <= 0) return 'Бесплатный тариф активен';
   }
   return 'Выбранный тариф не активен — недостаточно средств. Действует бесплатный тариф по умолчанию.';
-}
-
-function TariffPlansCarousel({ children, count }: { children: ReactNode; count: number }) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [canScrollPrev, setCanScrollPrev] = useState(false);
-  const [canScrollNext, setCanScrollNext] = useState(false);
-
-  const updateScrollState = useCallback(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    setCanScrollPrev(el.scrollLeft > 4);
-    setCanScrollNext(el.scrollLeft < maxScroll - 4);
-  }, []);
-
-  useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    updateScrollState();
-    el.addEventListener('scroll', updateScrollState, { passive: true });
-    const ro = new ResizeObserver(updateScrollState);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener('scroll', updateScrollState);
-      ro.disconnect();
-    };
-  }, [count, updateScrollState]);
-
-  const scrollByPage = (dir: -1 | 1) => {
-    const el = trackRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' });
-  };
-
-  if (count < TARIFF_CAROUSEL_MIN) {
-    return <div className={styles.tariffGrid}>{children}</div>;
-  }
-
-  return (
-    <div className={styles.tariffCarousel}>
-      <button
-        type="button"
-        className={styles.tariffCarouselBtn}
-        onClick={() => scrollByPage(-1)}
-        disabled={!canScrollPrev}
-        aria-label="Предыдущие тарифы"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-      </button>
-      <div ref={trackRef} className={styles.tariffCarouselTrack}>
-        {children}
-      </div>
-      <button
-        type="button"
-        className={styles.tariffCarouselBtn}
-        onClick={() => scrollByPage(1)}
-        disabled={!canScrollNext}
-        aria-label="Следующие тарифы"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-      </button>
-    </div>
-  );
 }
 
 export default function WalletPage() {
@@ -546,53 +447,18 @@ export default function WalletPage() {
               </div>
 
               <div>
-                <div className={styles.tariffHeader}>
-                  <div>
-                    <div className={styles.sectionTitle}>Тарифный план</div>
-                    <div className={styles.sectionSubtitle}>
-                      Выберите план для доступа к расширенным возможностям создания событий
-                    </div>
-                  </div>
-                </div>
-
-                {allTariffs.length === 0 ? (
-                  <div className={styles.noTariff}>
-                    Тарифы пока не добавлены. Обратитесь к администратору.
-                  </div>
-                ) : (
-                  <>
-                    <TariffPlansCarousel count={allTariffs.length}>
-                      {allTariffs.map(t => (
-                        <TariffCard
-                          key={t.id}
-                          tariff={t}
-                          validator={validators[t.id] ?? null}
-                          isSelectedPlan={wallet?.tariffId === t.id}
-                          isActive={Boolean(
-                            wallet?.tariffId === t.id && (wallet.isSelectedTariffActive || t.cost <= 0),
-                          )}
-                          isEffectiveFallback={Boolean(
-                            wallet?.effectiveTariffId === t.id
-                            && wallet?.tariffId
-                            && wallet.tariffId !== t.id,
-                          )}
-                          isPicked={selectedTariffId === t.id}
-                          onSelect={() => setSelectedTariffId(prev => prev === t.id ? '' : t.id)}
-                        />
-                      ))}
-                    </TariffPlansCarousel>
-                    {selectedTariffId && selectedTariffId !== tariff?.id && (
-                      <div className={styles.selectActions}>
-                        <button type="button" className={styles.cancelBtn} onClick={() => setSelectedTariffId('')}>
-                          Отмена
-                        </button>
-                        <button type="button" className={styles.confirmBtn} onClick={handleSetTariff} disabled={saving}>
-                          {saving ? 'Подключение...' : 'Подключить'}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
+                <TariffPlansPicker
+                  tariffs={allTariffs}
+                  validators={validators}
+                  walletTariffId={wallet?.tariffId}
+                  walletEffectiveTariffId={wallet?.effectiveTariffId}
+                  isSelectedTariffActive={wallet?.isSelectedTariffActive}
+                  pickedTariffId={selectedTariffId}
+                  onPick={setSelectedTariffId}
+                  onCancel={() => setSelectedTariffId('')}
+                  onConfirm={() => { void handleSetTariff(); }}
+                  confirming={saving}
+                />
               </div>
 
               <div className={styles.historySection}>
@@ -628,72 +494,6 @@ export default function WalletPage() {
             </>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function TariffCard({
-  tariff,
-  validator,
-  isSelectedPlan,
-  isActive,
-  isEffectiveFallback,
-  isPicked,
-  onSelect,
-}: {
-  tariff: ITariff;
-  validator: ITariffValidator | null;
-  isSelectedPlan: boolean;
-  isActive: boolean;
-  isEffectiveFallback: boolean;
-  isPicked: boolean;
-  onSelect: () => void;
-}) {
-  const days = (tariff as { periodDays?: number }).periodDays ?? tariff.period?.days ?? '?';
-  const rows = validator ? formatValidatorRows(validator) : null;
-
-  const cardClass = [
-    styles.tc,
-    isActive ? styles.tcCurrent : '',
-    isSelectedPlan && !isActive ? styles.tcInactiveSelected : '',
-    isEffectiveFallback ? styles.tcFallback : '',
-    isPicked && !isSelectedPlan ? styles.tcSelected : '',
-  ].filter(Boolean).join(' ');
-
-  return (
-    <div
-      className={cardClass}
-      onClick={isSelectedPlan && isActive ? undefined : onSelect}
-      role="button"
-      tabIndex={isSelectedPlan && isActive ? -1 : 0}
-      aria-pressed={isPicked}
-      aria-disabled={isSelectedPlan && isActive}
-      onKeyDown={e => { if (e.key === 'Enter' && !(isSelectedPlan && isActive)) onSelect(); }}
-    >
-      {isActive && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>Активен</div>}
-      {isSelectedPlan && !isActive && (
-        <div className={`${styles.tcBadge} ${styles.tcBadgeInactive}`}>Выбран · неактивен</div>
-      )}
-      {isEffectiveFallback && (
-        <div className={`${styles.tcBadge} ${styles.tcBadgeFallback}`}>По умолчанию</div>
-      )}
-      <div className={styles.tcName}>{tariff.name}</div>
-      <div className={`${styles.tcPrice} ${tariff.cost === 0 ? styles.tcPriceFree : ''}`}>
-        {tariff.cost === 0 ? '0 ₽' : `${tariff.cost.toLocaleString('ru-RU')} ₽`}
-      </div>
-      <div className={styles.tcPeriod}>
-        {tariff.cost === 0 ? 'навсегда / fallback' : `в месяц · ${days} дн.`}
-      </div>
-      <div className={styles.tcDivider} />
-      <div className={styles.tcFeat}>
-        {!rows && <div className={styles.detailsLoader}>Нет данных об ограничениях</div>}
-        {rows?.map(row => (
-          <div key={row.label} className={styles.tcRow}>
-            <div className={`${styles.tcRowIcon} ${row.type === 'ok' ? styles.iconOk : row.type === 'warn' ? styles.iconWarn : styles.iconNo}`} aria-hidden />
-            <div className={styles.tcRowText}>{row.label}: {row.value}</div>
-          </div>
-        ))}
       </div>
     </div>
   );

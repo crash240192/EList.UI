@@ -152,6 +152,13 @@ export interface OrganizationPayoutResponse {
   onboardingStatus?: OrganizationOnboardingStatusValue | null;
 }
 
+export interface OrganizationProviderOnboardingResponse {
+  provider?: PaymentProviderValue | null;
+  providerSellerId?: string | null;
+  onboardingStatus: OrganizationOnboardingStatusValue;
+  confirmationUrl?: string | null;
+}
+
 export interface OrganizationResponse {
   id: string;
   active: boolean;
