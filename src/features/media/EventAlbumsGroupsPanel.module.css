@@ -1,26 +1,17 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 12px;
 }
 
 .eventGroup {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px 0;
-}
-
-.eventGroup + .eventGroup {
-  border-top: 1px solid var(--border);
-}
-
-.eventGroup:first-of-type {
-  padding-top: 0;
-}
-
-.eventGroup:last-of-type {
-  padding-bottom: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
 }
 
 .eventHeader {
@@ -28,10 +19,10 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 12px 8px 8px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface-2);
+  padding: 0 4px 0 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
   text-align: left;
   font-family: inherit;
@@ -39,8 +30,7 @@
 }
 
 .eventHeader:hover {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
-  background: color-mix(in srgb, var(--surface-2) 80%, var(--surface));
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
 }
 
 .eventCover {
