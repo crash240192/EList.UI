@@ -313,6 +313,117 @@
   gap: 8px;
 }
 
+.walletBalanceCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--accent) 18%, var(--surface-2)),
+    var(--surface-2)
+  );
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+}
+
+.walletBalanceLabel {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.walletBalanceValue {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.walletBalanceCurrency {
+  margin-left: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.walletBalanceStatus {
+  margin-top: 4px;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.walletBalanceHint {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-muted));
+  line-height: 1.35;
+}
+
+.topUpRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.topUpRow .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.walletHistoryList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.walletHistoryRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.walletHistoryInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.walletHistoryName {
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.walletHistoryMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.walletHistoryAmtIn {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: #34d399;
+  white-space: nowrap;
+}
+
+.walletHistoryAmtOut {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .orgDocsList {
   list-style: none;
   margin: 0;
