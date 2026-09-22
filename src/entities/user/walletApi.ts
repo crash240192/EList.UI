@@ -33,6 +33,8 @@ export interface IWalletDeposit {
   providerPaymentId: string | null;
   createDate: string;
   paidAt: string | null;
+  /** Баланс сразу после зачисления (до возможного автосписания тарифа). */
+  balanceAfter?: number | null;
 }
 
 export interface IWalletTariffCharge {
@@ -77,6 +79,12 @@ function normalizeDeposit(raw: Record<string, unknown>): IWalletDeposit {
     paidAt: raw.paidAt != null || raw.PaidAt != null
       ? asStr(raw.paidAt ?? raw.PaidAt)
       : null,
+    balanceAfter: (() => {
+      const v = raw.balanceAfter ?? raw.BalanceAfter;
+      if (v == null || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    })(),
   };
 }
 

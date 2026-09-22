@@ -92,6 +92,11 @@ function formatDateTime(iso: string): string {
   });
 }
 
+function formatBalanceAfter(balance: number | null | undefined): string | null {
+  if (balance == null || !Number.isFinite(balance)) return null;
+  return `остаток ${balance.toLocaleString('ru-RU')} ₽`;
+}
+
 /** Статус биллинга: предпочитаем текст с API, иначе локальный fallback. */
 function tariffPeriodStatus(wallet: IWallet, tariff: ITariff | null): string | null {
   if (wallet.tariffBillingStatus) return wallet.tariffBillingStatus;
@@ -215,11 +220,12 @@ export default function WalletPage() {
           const when = d.paidAt || d.createDate;
           const sortAt = when ? new Date(when).getTime() : 0;
           const dateLabel = when ? formatDateTime(when) : '';
+          const balanceLabel = formatBalanceAfter(d.balanceAfter);
           rows.push({
             id: `deposit-${d.id}`,
             kind: 'in',
             name: 'Пополнение тарифа',
-            meta: `${dateLabel} · Тариф платформы`,
+            meta: [dateLabel, 'Тариф платформы', balanceLabel].filter(Boolean).join(' · '),
             amount: `+ ${d.amount.toLocaleString('ru-RU')} ₽`,
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
@@ -231,11 +237,12 @@ export default function WalletPage() {
           const name = tariffNameById.get(c.tariffId)
             ? `Тариф «${tariffNameById.get(c.tariffId)}»`
             : 'Списание тарифа';
+          const balanceLabel = formatBalanceAfter(c.balanceAfter);
           rows.push({
             id: `charge-${c.id}`,
             kind: 'tariff',
             name,
-            meta: `${dateLabel} · Списание тарифа`,
+            meta: [dateLabel, 'Списание тарифа', balanceLabel].filter(Boolean).join(' · '),
             amount: c.amount > 0
               ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
               : '0 ₽',
