@@ -67,16 +67,19 @@ function MessageThreadInner({
     focusMessageId ? null : 0,
   );
   const focusHandledRef = useRef(false);
+  /** После успешного скролла: путь оставляем (ветки раскрыты), скролл/highlight больше не гоняем */
+  const [focusSettled, setFocusSettled] = useState(false);
 
   useEffect(() => {
-    focusHandledRef.current = false;
-
     if (!focusMessageId) {
-      setFocusLocation(null);
+      // Query уже очищен после успешного deep-link — не сбрасываем focusLocation,
+      // иначе ветки сворачиваются и MessageReplies перезагружается.
       setBootstrapPage((prev) => (prev === null ? 0 : prev));
       return;
     }
 
+    focusHandledRef.current = false;
+    setFocusSettled(false);
     let cancelled = false;
     setFocusLocation(null);
     setBootstrapPage(null);
@@ -121,30 +124,39 @@ function MessageThreadInner({
   const sheetRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const boundsRef = layoutBoundsRef ?? threadRef;
+  const onFocusHandledRef = useRef(onFocusHandled);
+  onFocusHandledRef.current = onFocusHandled;
 
   const focusTargetId = focusLocation?.messageId ?? null;
   const focusPath: IMessagePathNode[] = focusLocation?.path ?? [];
+  /** Скролл и «живой» highlight — только до settle; path оставляем для раскрытия веток */
+  const activeFocusTargetId = focusSettled ? null : focusTargetId;
 
   const markFocusHandled = useCallback(() => {
     if (focusHandledRef.current) return;
     focusHandledRef.current = true;
-    onFocusHandled?.();
-  }, [onFocusHandled]);
+    setFocusSettled(true);
+    // Чуть отложить очистку URL: вложенные ответы ещё дорисовываются на медленной сети
+    window.setTimeout(() => {
+      onFocusHandledRef.current?.();
+    }, 120);
+  }, []);
 
   /** Корень на экране — прокручиваем сразу; вложенные — после раскрытия веток */
   useEffect(() => {
-    if (!focusTargetId || loading || focusPath.length !== 1) return;
-    if (!messages.some((m) => m.id === focusTargetId)) return;
+    if (!activeFocusTargetId || loading || focusPath.length !== 1) return;
+    if (!messages.some((m) => m.id === activeFocusTargetId)) return;
 
-    const delays = [40, 160, 400].map((ms) =>
+    const delays = [40, 160, 400, 800].map((ms) =>
       window.setTimeout(() => {
-        if (scrollDiscussionMessageIntoView(focusTargetId)) {
+        if (focusHandledRef.current) return;
+        if (scrollDiscussionMessageIntoView(activeFocusTargetId)) {
           markFocusHandled();
         }
       }, ms),
     );
     return () => delays.forEach((id) => window.clearTimeout(id));
-  }, [focusTargetId, focusPath.length, loading, messages, markFocusHandled]);
+  }, [activeFocusTargetId, focusPath.length, loading, messages, markFocusHandled]);
 
   useEffect(() => {
     const node = anchorRef.current;
@@ -384,14 +396,14 @@ function MessageThreadInner({
                 message={msg}
                 depth={0}
                 highlighted={activeReplyId === msg.id || focusTargetId === msg.id}
-                focusTarget={focusTargetId === msg.id}
+                focusTarget={!focusSettled && focusTargetId === msg.id}
                 activeReplyId={activeReplyId}
                 conversationId={conversationId}
                 currentAccountId={currentAccountId}
                 viewMode={safeViewMode}
                 threadRootId={msg.id}
                 focusPathTail={onFocusPath ? focusPath.slice(1) : undefined}
-                focusTargetId={focusTargetId}
+                focusTargetId={focusSettled ? null : focusTargetId}
                 onFocusHandled={markFocusHandled}
                 onReply={canComment ? handleReply : undefined}
                 onDeleted={handleDeleted}

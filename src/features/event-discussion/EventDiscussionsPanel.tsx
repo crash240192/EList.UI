@@ -33,6 +33,9 @@ export function EventDiscussionsPanel({
   const [searchParams, setSearchParams] = useSearchParams();
   const focusConversationId = searchParams.get('conversation');
   const focusMessageId = searchParams.get('message');
+  /** Не кладём focusConversationId в deps loadConversations — иначе очистка query после deep-link перезагружает всю панель. */
+  const focusConversationIdRef = useRef(focusConversationId);
+  focusConversationIdRef.current = focusConversationId;
 
   const [conversations, setConversations] = useState<IConversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -62,13 +65,19 @@ export function EventDiscussionsPanel({
   const tabsRef = useRef<HTMLDivElement>(null);
   const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
 
+  /**
+   * Стабильный колбэк: не зависит от searchParams, чтобы не перезапускать
+   * scroll-retry эффекты в MessageThread/MessageRow при каждом replace URL.
+   */
   const clearFocusParams = useCallback(() => {
-    if (!searchParams.get('message') && !searchParams.get('conversation')) return;
-    const next = new URLSearchParams(searchParams);
-    next.delete('message');
-    next.delete('conversation');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+    setSearchParams((prev) => {
+      if (!prev.get('message') && !prev.get('conversation')) return prev;
+      const next = new URLSearchParams(prev);
+      next.delete('message');
+      next.delete('conversation');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const updateTabFades = useCallback(() => {
     const el = tabsRef.current;
@@ -91,8 +100,9 @@ export function EventDiscussionsPanel({
       const list = await fetchEventConversations(eventId);
       setConversations(list);
       setActiveId((prev) => {
-        if (focusConversationId && list.some((c) => c.id === focusConversationId)) {
-          return focusConversationId;
+        const focusId = focusConversationIdRef.current;
+        if (focusId && list.some((c) => c.id === focusId)) {
+          return focusId;
         }
         if (prev && list.some((c) => c.id === prev)) return prev;
         return list[0]?.id ?? null;
@@ -109,7 +119,7 @@ export function EventDiscussionsPanel({
     } finally {
       setLoading(false);
     }
-  }, [eventId, focusConversationId]);
+  }, [eventId]);
 
   useEffect(() => {
     void loadConversations();

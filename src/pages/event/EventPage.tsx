@@ -272,8 +272,9 @@ export default function EventPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, isOrganizer, id]);
 
+  const focusMessageParam = searchParams.get('message');
   useEffect(() => {
-    if (!searchParams.get('message')) return;
+    if (!focusMessageParam) return;
     const t = window.setTimeout(() => {
       document.getElementById('event-discussions')?.scrollIntoView({
         behavior: 'smooth',
@@ -281,7 +282,7 @@ export default function EventPage() {
       });
     }, 80);
     return () => window.clearTimeout(t);
-  }, [searchParams, id]);
+  }, [id, focusMessageParam]);
 
   const { orgOrganizers, personOrganizers } = useMemo(() => {
     const orgs: IEventOrganizator[] = [];
