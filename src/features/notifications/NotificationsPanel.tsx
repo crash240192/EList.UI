@@ -9,7 +9,7 @@ import {
   getNotificationNavigationTarget,
   notificationTypeLabel,
 } from '@/entities/notification/notificationNavigation';
-import { fetchConnectionStats, sendTestNotification } from '@/entities/notification/api';
+import { sendTestNotification } from '@/entities/notification/api';
 import { useNotificationsStore } from './notificationsStore';
 import { useDebouncedWsStatus } from './useDebouncedWsStatus';
 import { NotificationRatingPreview } from './NotificationRatingPreview';
@@ -57,7 +57,6 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const [tab, setTab] = useState<'new' | 'read'>('new');
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
-  const [stats, setStats] = useState<string | null>(null);
   const closeAfterReadAllRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -175,40 +174,24 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     }
   };
 
-  const loadStats = async () => {
-    try {
-      const s = await fetchConnectionStats();
-      setStats(
-        `подключений: ${s.totalConnectionsCount ?? '—'}, аккаунтов: ${s.connectedAccountCounts ?? '—'}`,
-      );
-    } catch {
-      setStats('не удалось загрузить stats');
-    }
-  };
-
   return (
     <div className={styles.panel} role="dialog" aria-label="Уведомления">
       <div className={styles.head}>
-        <h2 className={styles.title}>Уведомления</h2>
+        <div className={styles.titleRow}>
+          <h2 className={styles.title}>Уведомления</h2>
+          <span className={`${styles.wsPill} ${styles[`ws_${wsStatus}`]}`}>
+            {wsStatus === 'open' && 'Онлайн'}
+            {wsStatus === 'connecting' && 'Подключение…'}
+            {wsStatus === 'closed' && 'Переподключение…'}
+            {wsStatus === 'error' && (wsError || 'Ошибка')}
+            {wsStatus === 'idle' && '—'}
+          </span>
+        </div>
         <div className={styles.headActions}>
           <button type="button" className={styles.iconClose} onClick={onClose} aria-label="Закрыть">
             ×
           </button>
         </div>
-      </div>
-
-      <div className={styles.statusRow}>
-        <span className={`${styles.wsPill} ${styles[`ws_${wsStatus}`]}`}>
-          {wsStatus === 'open' && 'Онлайн'}
-          {wsStatus === 'connecting' && 'Подключение…'}
-          {wsStatus === 'closed' && 'Переподключение…'}
-          {wsStatus === 'error' && (wsError || 'Ошибка')}
-          {wsStatus === 'idle' && '—'}
-        </span>
-        <button type="button" className={styles.linkBtn} onClick={loadStats}>
-          Stats
-        </button>
-        {stats && <span className={styles.statsText}>{stats}</span>}
       </div>
 
       <div className={styles.tabsBar} role="tablist" aria-label="Фильтр уведомлений">
