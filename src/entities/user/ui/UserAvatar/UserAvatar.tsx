@@ -34,8 +34,6 @@ export function UserAvatar({
   const isOnline = onlineProp ?? presenceOnline;
 
   const style = {
-    width:    size,
-    height:   size,
     fontSize: size * 0.38,
     borderRadius: '50%',
     ...styleProp,

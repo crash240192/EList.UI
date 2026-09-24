@@ -3,6 +3,7 @@
   display: inline-flex;
   flex-shrink: 0;
   vertical-align: middle;
+  overflow: visible;
 }
 
 .avatar {
@@ -26,11 +27,12 @@
 
 .onlineDot {
   position: absolute;
-  right: 0;
-  bottom: 0;
+  right: -2px;
+  bottom: -2px;
+  z-index: 2;
   border-radius: 50%;
   background: var(--success, #22c55e);
-  border: 2px solid var(--surface, #fff);
+  border: 2px solid var(--bg);
   box-sizing: border-box;
   pointer-events: none;
 }
