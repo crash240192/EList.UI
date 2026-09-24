@@ -76,6 +76,11 @@ import {
 import type { Gender } from '@/shared/api/types';
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
+import {
+  CENSORSHIP_FIELD_ERROR,
+  CENSORSHIP_TOAST,
+  hasProfanity,
+} from '@/shared/lib/profanity';
 import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
 import {
@@ -283,6 +288,7 @@ export default function CreateEventPage() {
 
   // Refs
   const nameRef          = useRef<HTMLInputElement>(null);
+  const descriptionRef   = useRef<HTMLTextAreaElement>(null);
   const typeRef          = useRef<HTMLDivElement>(null);
   const locationRef      = useRef<HTMLDivElement>(null);
   const startDateRef     = useRef<HTMLInputElement>(null);
@@ -1130,7 +1136,20 @@ export default function CreateEventPage() {
     if (!autoInviteEnabled) setInviteUserIds([]);
   }, [autoInviteEnabled]);
 
+  const nameHasProfanity = hasProfanity(form.name);
+  const descriptionHasProfanity = hasProfanity(form.description);
+  const hasCensoredSpeech = nameHasProfanity || descriptionHasProfanity;
+
+  const rejectCensoredSpeech = (): boolean => {
+    if (!hasCensoredSpeech) return false;
+    showToast(CENSORSHIP_TOAST);
+    const el = nameHasProfanity ? nameRef.current : descriptionRef.current;
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return true;
+  };
+
   const handleSubmit = async () => {
+    if (rejectCensoredSpeech()) return;
     const firstErr = validate();
     if (firstErr) {
       showToast({ name:'Укажите название', type:'Выберите тип мероприятия',
@@ -1435,6 +1454,7 @@ export default function CreateEventPage() {
 
   const handlePublishClick = () => {
     void (async () => {
+      if (rejectCensoredSpeech()) return;
       if (!isEditing) {
         const firstErr = validate();
         if (firstErr) {
@@ -1623,14 +1643,14 @@ export default function CreateEventPage() {
 
         {/* Основное */}
         <Section title="Основное">
-          <Field label="Название *" error={hasErr('name') ? 'Обязательное поле' : undefined}>
+          <Field label="Название *" error={nameHasProfanity ? CENSORSHIP_FIELD_ERROR : hasErr('name') ? 'Обязательное поле' : undefined}>
             <input ref={nameRef}
-              className={`${styles.input} ${hasErr('name') ? styles.inputError : ''}`}
+              className={`${styles.input} ${nameHasProfanity || hasErr('name') ? styles.inputError : ''}`}
               placeholder="Название мероприятия" value={form.name} onChange={set('name')} 
                   onFocus={e => (e.target as HTMLInputElement).select()} />
           </Field>
-          <Field label="Описание">
-            <textarea className={`${styles.input} ${styles.textarea}`} rows={3}
+          <Field label="Описание" error={descriptionHasProfanity ? CENSORSHIP_FIELD_ERROR : undefined}>
+            <textarea ref={descriptionRef} className={`${styles.input} ${styles.textarea} ${descriptionHasProfanity ? styles.inputError : ''}`} rows={3}
               placeholder="Расскажите о мероприятии..." value={form.description} onChange={set('description')} />
           </Field>
         </Section>
@@ -2061,9 +2081,10 @@ export default function CreateEventPage() {
           <button type="button" className={styles.cancelBtn} onClick={goBack}>Отмена</button>
           <button
             type="button"
-            className={styles.saveBtn}
+            className={`${styles.saveBtn} ${hasCensoredSpeech ? styles.saveBtnInactive : ''}`}
             onClick={handlePublishClick}
             disabled={saving || checkingOrgAgreements}
+            aria-disabled={hasCensoredSpeech || saving || checkingOrgAgreements}
           >
             {saving || checkingOrgAgreements
               ? (checkingOrgAgreements ? 'Проверка...' : 'Сохранение...')

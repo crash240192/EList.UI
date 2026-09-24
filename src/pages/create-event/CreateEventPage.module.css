@@ -352,8 +352,10 @@
   border-radius: 10px; padding: 10px; font-size: 14px; font-weight: 600;
   cursor: pointer; transition: background 0.15s;
 }
-.saveBtn:hover:not(:disabled) { background: var(--accent-hover); }
-.saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.saveBtn:hover:not(:disabled):not(.saveBtnInactive) { background: var(--accent-hover); }
+.saveBtn:disabled,
+.saveBtnInactive { opacity: 0.5; cursor: not-allowed; }
+.saveBtn.saveBtnInactive:hover { background: var(--accent); }
 
 .templateSaveBtn {
   width: 100%;
@@ -514,7 +516,8 @@
   border-radius: 10px; padding: 10px 18px; font-size: 13px;
   color: var(--text-primary); box-shadow: 0 4px 16px rgba(0,0,0,0.25);
   opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 200;
-  white-space: nowrap;
+  max-width: min(420px, calc(100vw - 32px));
+  text-align: center; line-height: 1.4;
 }
 .toastVisible { opacity: 1; transform: translateX(-50%) translateY(0); }
 
