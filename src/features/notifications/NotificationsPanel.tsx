@@ -58,6 +58,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [stats, setStats] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
   const closeAfterReadAllRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -148,15 +149,17 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     : 'Нет прочитанных уведомлений';
 
   const handleReadAll = useCallback(() => {
+    if (closing) return;
     void clearAll();
     if (closeAfterReadAllRef.current != null) {
       clearTimeout(closeAfterReadAllRef.current);
     }
+    setClosing(true);
     closeAfterReadAllRef.current = setTimeout(() => {
       closeAfterReadAllRef.current = null;
       onClose();
-    }, 500);
-  }, [clearAll, onClose]);
+    }, 300);
+  }, [clearAll, closing, onClose]);
 
   const handleTestSend = async () => {
     if (!accountId || !testMsg.trim()) return;
@@ -187,7 +190,11 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   };
 
   return (
-    <div className={styles.panel} role="dialog" aria-label="Уведомления">
+    <div
+      className={`${styles.panel} ${closing ? styles.panelClosing : ''}`}
+      role="dialog"
+      aria-label="Уведомления"
+    >
       <div className={styles.head}>
         <h2 className={styles.title}>Уведомления</h2>
         <div className={styles.headActions}>
