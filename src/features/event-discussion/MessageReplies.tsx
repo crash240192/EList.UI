@@ -167,7 +167,6 @@ export function MessageReplies({
   useEffect(() => {
     requestGen.current += 1;
     const generation = requestGen.current;
-    setPreviewExpanded(Boolean(focusChild));
     setLoadedThroughPage(-1);
     if (viewMode === 'flat') {
       void loadFlat(generation);
@@ -175,7 +174,14 @@ export function MessageReplies({
       const through = Math.max(0, focusThroughPageRef.current);
       void fetchTreeRange(0, through, generation, 'replace');
     }
-  }, [loadFlat, fetchTreeRange, parent.id, refreshKey, viewMode, focusChild?.messageId]);
+    // focusChild намеренно не в deps: очистка deep-link не должна сбрасывать уже
+    // загруженное дерево (иначе скелетон + свёрнутые ветки на медленной сети).
+    // Догрузка до страницы цели — в эффекте ниже по focusThroughPage.
+  }, [loadFlat, fetchTreeRange, parent.id, refreshKey, viewMode]);
+
+  useEffect(() => {
+    if (focusChild) setPreviewExpanded(true);
+  }, [focusChild]);
 
   // Deep-link: дотянуть сиблингов до страницы цели
   useEffect(() => {

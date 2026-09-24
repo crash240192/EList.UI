@@ -214,7 +214,7 @@ export function MessageRow({
 
   useEffect(() => {
     if (!focusTarget) return;
-    const delays = [60, 200, 480].map((ms) =>
+    const delays = [60, 200, 480, 900].map((ms) =>
       window.setTimeout(() => {
         if (scrollDiscussionMessageIntoView(message.id)) {
           onFocusHandled?.();
