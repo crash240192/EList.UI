@@ -25,7 +25,7 @@ import {
   isLongMessageText,
   canDeleteMessage,
   messageHasReplies,
-  scrollDiscussionMessageIntoView,
+  scheduleDiscussionMessageFocusScroll,
 } from './messageUtils';
 import { DISCUSSION_MESSAGE_MAX_FILES, DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import { MessageReplies } from './MessageReplies';
@@ -56,7 +56,11 @@ interface MessageRowProps {
   autoExpandChain?: boolean;
   /** Оставшийся путь focus ниже этого узла (дети → … → цель) */
   focusPathTail?: IMessagePathNode[];
+  /** Id предков цели — всегда раскрыты на время deep-link */
+  focusExpandIds?: string[];
   focusTargetId?: string | null;
+  /** Сообщение с пульс-подсветкой (~3 с) */
+  focusHighlightId?: string | null;
   onFocusHandled?: () => void;
   onReply?: (message: IMessage, threadRootId: string) => void;
   onDeleted?: (messageId: string) => void;
@@ -144,12 +148,17 @@ export function MessageRow({
   replyToAuthor = null,
   autoExpandChain = false,
   focusPathTail,
+  focusExpandIds,
   focusTargetId = null,
+  focusHighlightId = null,
   onFocusHandled,
   onReply,
   onDeleted,
 }: MessageRowProps) {
   const navigate = useNavigate();
+  const expandFromFocus =
+    Boolean(focusPathTail && focusPathTail.length > 0)
+    || Boolean(focusExpandIds?.includes(message.id));
   /**
    * Корень ветки: сразу превью прямых ответов.
    * Автоцепочка: единственный ребёнок с продолжением — раскрыт.
@@ -157,7 +166,7 @@ export function MessageRow({
    * Иначе вложенное свёрнуто до клика.
    */
   const [expanded, setExpanded] = useState(() => {
-    if (focusPathTail && focusPathTail.length > 0) return true;
+    if (expandFromFocus) return true;
     if (!message.replied) return false;
     if (autoExpandChain) return true;
     return depth === 0;
@@ -209,20 +218,16 @@ export function MessageRow({
   const canNestReplies = viewMode === 'tree' || message.id === rootId;
 
   useEffect(() => {
-    if (focusPathTail && focusPathTail.length > 0) setExpanded(true);
-  }, [focusPathTail]);
+    if (expandFromFocus) setExpanded(true);
+  }, [expandFromFocus]);
 
+  /** Скролл к цели deep-link — только у целевого сообщения, с проверкой видимости */
   useEffect(() => {
-    if (!focusTarget) return;
-    const delays = [60, 200, 480, 900].map((ms) =>
-      window.setTimeout(() => {
-        if (scrollDiscussionMessageIntoView(message.id)) {
-          onFocusHandled?.();
-        }
-      }, ms),
-    );
-    return () => delays.forEach((id) => window.clearTimeout(id));
-  }, [focusTarget, message.id, onFocusHandled]);
+    if (focusTargetId !== message.id) return;
+    return scheduleDiscussionMessageFocusScroll(message.id, {
+      onDone: () => onFocusHandled?.(),
+    });
+  }, [focusTargetId, message.id, onFocusHandled]);
 
   useEffect(() => {
     setLikesCount(message.likesCount ?? 0);
@@ -408,7 +413,7 @@ export function MessageRow({
     }
   };
 
-  const expandForFocus = Boolean(focusPathTail && focusPathTail.length > 0);
+  const expandForFocus = expandFromFocus;
   const showNestedReplies = canNestReplies && (hasReplies || expandForFocus);
   const collapsedRepliesLabel = replyTotal != null && replyTotal > 0
     ? formatReplyCount(replyTotal)
@@ -794,7 +799,9 @@ export function MessageRow({
           viewMode={viewMode}
           threadRootId={rootId}
           focusPathTail={focusPathTail}
+          focusExpandIds={focusExpandIds}
           focusTargetId={focusTargetId}
+          focusHighlightId={focusHighlightId}
           onFocusHandled={onFocusHandled}
           onReply={onReply}
           onDeleted={onDeleted}

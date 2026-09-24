@@ -4,6 +4,22 @@ import { LONG_MESSAGE_CHAR_THRESHOLD, LONG_MESSAGE_LINE_CLAMP } from './discussi
 
 export const discussionMessageDomId = (messageId: string) => `discussion-msg-${messageId}`;
 
+/** Сообщение достаточно видно во viewport (для завершения deep-link скролла) */
+export function isDiscussionMessageInView(
+  messageId: string,
+  options?: { minVisiblePx?: number },
+): boolean {
+  const el = document.getElementById(discussionMessageDomId(messageId));
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  const vv = window.visualViewport;
+  const viewTop = vv?.offsetTop ?? 0;
+  const viewBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+  const visible = Math.min(rect.bottom, viewBottom) - Math.max(rect.top, viewTop);
+  const minVisible = options?.minVisiblePx ?? Math.min(64, Math.max(24, rect.height * 0.45));
+  return visible >= minVisible;
+}
+
 /** Прокрутка к комментарию (deep-link из уведомления) */
 export function scrollDiscussionMessageIntoView(
   messageId: string,
@@ -16,6 +32,46 @@ export function scrollDiscussionMessageIntoView(
     block: options?.block ?? 'center',
   });
   return true;
+}
+
+/**
+ * Повторные попытки прокрутки к сообщению.
+ * onDone — только когда элемент реально в зоне видимости (не по факту существования в DOM).
+ */
+export function scheduleDiscussionMessageFocusScroll(
+  messageId: string,
+  options: {
+    isCancelled?: () => boolean;
+    onDone?: () => void;
+    delaysMs?: number[];
+  },
+): () => void {
+  const delays = options.delaysMs ?? [50, 150, 350, 700, 1200, 2000, 3200];
+  let done = false;
+
+  const attempt = (behavior: ScrollBehavior) => {
+    if (done || options.isCancelled?.()) return;
+    if (!scrollDiscussionMessageIntoView(messageId, { behavior, block: 'center' })) return;
+    // Дать smooth-скроллу закончиться перед проверкой видимости
+    window.setTimeout(() => {
+      if (done || options.isCancelled?.()) return;
+      if (!isDiscussionMessageInView(messageId)) return;
+      done = true;
+      options.onDone?.();
+    }, behavior === 'smooth' ? 280 : 40);
+  };
+
+  // Первый кадр — мгновенно (без улёта «сначала наверх секции»), дальше — smooth доводка
+  const raf = requestAnimationFrame(() => attempt('auto'));
+  const timers = delays.map((ms, i) =>
+    window.setTimeout(() => attempt(i === 0 ? 'auto' : 'smooth'), ms),
+  );
+
+  return () => {
+    done = true;
+    cancelAnimationFrame(raf);
+    timers.forEach((id) => window.clearTimeout(id));
+  };
 }
 
 const DEFAULT_COMPOSER_HEIGHT = 180;

@@ -12,7 +12,6 @@ import {
   messageAuthorName,
   computeReplyScrollTailPx,
   scrollMessageIntoViewForReply,
-  scrollDiscussionMessageIntoView,
   discussionMessageDomId,
   findScrollParent,
   getReplyComposerReservePx,
@@ -63,13 +62,16 @@ function MessageThreadInner({
 }: MessageThreadProps) {
   const location = useLocation();
   const [focusLocation, setFocusLocation] = useState<IMessageLocation | null>(null);
-  /** null пока ждём location; иначе стартовая страница корней */
+  /** null пока ждём первый location; иначе стартовая страница корней (не сбрасываем при смене message) */
   const [bootstrapPage, setBootstrapPage] = useState<number | null>(
     focusMessageId ? null : 0,
   );
   const focusHandledRef = useRef(false);
-  /** После успешного скролла: путь оставляем (ветки раскрыты), скролл/highlight больше не гоняем */
+  /** После успешного скролла: путь оставляем (ветки раскрыты), скролл больше не гоняем */
   const [focusSettled, setFocusSettled] = useState(false);
+  /** Подсветка цели ~3 с после успешного перехода */
+  const [focusHighlightId, setFocusHighlightId] = useState<string | null>(null);
+  const highlightTimerRef = useRef(0);
 
   useEffect(() => {
     if (!focusMessageId) {
@@ -81,9 +83,9 @@ function MessageThreadInner({
 
     focusHandledRef.current = false;
     setFocusSettled(false);
+    // Не обнуляем bootstrapPage / focusLocation до ответа API —
+    // иначе лента схлопывается и экран улетает вверх при клике по уведомлению на той же странице.
     let cancelled = false;
-    setFocusLocation(null);
-    setBootstrapPage(null);
     void (async () => {
       try {
         const loc = await fetchMessageLocation(focusMessageId, {
@@ -96,7 +98,10 @@ function MessageThreadInner({
           return;
         }
         setFocusLocation(loc);
-        setBootstrapPage(loc.rootPageIndex);
+        setBootstrapPage((prev) => {
+          if (prev === null) return loc.rootPageIndex;
+          return Math.max(prev, loc.rootPageIndex);
+        });
       } catch {
         if (!cancelled) setBootstrapPage((prev) => (prev === null ? 0 : prev));
       }
@@ -106,6 +111,10 @@ function MessageThreadInner({
       cancelled = true;
     };
   }, [focusMessageId, conversationId]);
+
+  useEffect(() => () => {
+    if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+  }, []);
 
   const rootsConversationId = bootstrapPage !== null ? conversationId : null;
   const {
@@ -139,34 +148,38 @@ function MessageThreadInner({
 
   const focusTargetId = focusLocation?.messageId ?? null;
   const focusPath: IMessagePathNode[] = focusLocation?.path ?? [];
-  /** Скролл и «живой» highlight — только до settle; path оставляем для раскрытия веток */
-  const activeFocusTargetId = focusSettled ? null : focusTargetId;
+  /** Предки цели — принудительно раскрываем ветки даже если pathTail ещё не дошёл */
+  const focusExpandIds = focusLocation?.ancestorIds?.length
+    ? focusLocation.ancestorIds
+    : focusPath.slice(0, -1).map((n) => n.messageId);
+  /**
+   * Цель скролла: query message (даже пока location грузится),
+   * чтобы при клике по другому уведомлению на той же странице не доскролливать к старому.
+   */
+  const activeFocusTargetId = focusSettled
+    ? null
+    : (focusMessageId || focusTargetId);
+  const highlightMessageId = focusHighlightId
+    ?? (focusSettled ? null : activeFocusTargetId);
 
   const markFocusHandled = useCallback(() => {
     if (focusHandledRef.current) return;
     focusHandledRef.current = true;
     setFocusSettled(true);
+    const id = focusMessageId || focusTargetId;
+    if (id) {
+      setFocusHighlightId(id);
+      if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = window.setTimeout(() => {
+        setFocusHighlightId((prev) => (prev === id ? null : prev));
+        highlightTimerRef.current = 0;
+      }, 3000);
+    }
     // Чуть отложить очистку URL: вложенные ответы ещё дорисовываются на медленной сети
     window.setTimeout(() => {
       onFocusHandledRef.current?.();
     }, 120);
-  }, []);
-
-  /** Корень на экране — прокручиваем сразу; вложенные — после раскрытия веток */
-  useEffect(() => {
-    if (!activeFocusTargetId || loading || focusPath.length !== 1) return;
-    if (!messages.some((m) => m.id === activeFocusTargetId)) return;
-
-    const delays = [40, 160, 400, 800].map((ms) =>
-      window.setTimeout(() => {
-        if (focusHandledRef.current) return;
-        if (scrollDiscussionMessageIntoView(activeFocusTargetId)) {
-          markFocusHandled();
-        }
-      }, ms),
-    );
-    return () => delays.forEach((id) => window.clearTimeout(id));
-  }, [activeFocusTargetId, focusPath.length, loading, messages, markFocusHandled]);
+  }, [focusMessageId, focusTargetId]);
 
   useEffect(() => {
     const node = anchorRef.current;
@@ -423,20 +436,23 @@ function MessageThreadInner({
         <div className={styles.list}>
           {messages.map((msg) => {
             const onFocusPath = focusPath.length > 0 && focusPath[0]?.messageId === msg.id;
+            const isFocusHighlight = highlightMessageId === msg.id;
             return (
               <MessageRow
                 key={msg.id}
                 message={msg}
                 depth={0}
-                highlighted={activeReplyId === msg.id || focusTargetId === msg.id}
-                focusTarget={!focusSettled && focusTargetId === msg.id}
+                highlighted={activeReplyId === msg.id || isFocusHighlight}
+                focusTarget={isFocusHighlight}
                 activeReplyId={activeReplyId}
                 conversationId={conversationId}
                 currentAccountId={currentAccountId}
                 viewMode={safeViewMode}
                 threadRootId={msg.id}
                 focusPathTail={onFocusPath ? focusPath.slice(1) : undefined}
-                focusTargetId={focusSettled ? null : focusTargetId}
+                focusExpandIds={focusExpandIds}
+                focusTargetId={activeFocusTargetId}
+                focusHighlightId={highlightMessageId}
                 onFocusHandled={markFocusHandled}
                 onReply={canComment ? handleReply : undefined}
                 onDeleted={handleDeleted}

@@ -41,7 +41,9 @@ interface MessageRepliesProps {
   threadRootId: string;
   /** Путь от прямого ребёнка к цели deep-link */
   focusPathTail?: IMessagePathNode[];
+  focusExpandIds?: string[];
   focusTargetId?: string | null;
+  focusHighlightId?: string | null;
   onFocusHandled?: () => void;
   onReply?: (message: IMessage, threadRootId: string) => void;
   onDeleted?: (messageId: string) => void;
@@ -58,7 +60,9 @@ export function MessageReplies({
   viewMode,
   threadRootId,
   focusPathTail,
+  focusExpandIds,
   focusTargetId = null,
+  focusHighlightId = null,
   onFocusHandled,
   onReply,
   onDeleted,
@@ -289,14 +293,15 @@ export function MessageReplies({
             : null;
         const onFocusPath = Boolean(focusChild && focusChild.messageId === msg.id);
         const childTail = onFocusPath ? focusPathTail?.slice(1) : undefined;
+        const isFocusHighlight = focusHighlightId === msg.id;
 
         return (
           <MessageRow
             key={msg.id}
             message={msg}
             depth={childDepth}
-            highlighted={activeReplyId === msg.id || focusTargetId === msg.id}
-            focusTarget={focusTargetId === msg.id}
+            highlighted={activeReplyId === msg.id || isFocusHighlight}
+            focusTarget={isFocusHighlight}
             activeReplyId={activeReplyId}
             currentAccountId={currentAccountId}
             conversationId={conversationId}
@@ -305,7 +310,9 @@ export function MessageReplies({
             replyToAuthor={replyToAuthor}
             autoExpandChain={autoExpandChain && msg.id === items[0]?.id}
             focusPathTail={childTail}
+            focusExpandIds={focusExpandIds}
             focusTargetId={focusTargetId}
+            focusHighlightId={focusHighlightId}
             onFocusHandled={onFocusHandled}
             onReply={onReply}
             onDeleted={handleDeleted}
