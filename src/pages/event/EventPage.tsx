@@ -272,17 +272,8 @@ export default function EventPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, isOrganizer, id]);
 
-  const focusMessageParam = searchParams.get('message');
-  useEffect(() => {
-    if (!focusMessageParam) return;
-    const t = window.setTimeout(() => {
-      document.getElementById('event-discussions')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    }, 80);
-    return () => window.clearTimeout(t);
-  }, [id, focusMessageParam]);
+  // Deep-link к комментарию (?message=): скролл делает MessageThread/MessageRow.
+  // Не вызываем scrollIntoView(#event-discussions) — конкурирует с прокруткой к сообщению.
 
   const { orgOrganizers, personOrganizers } = useMemo(() => {
     const orgs: IEventOrganizator[] = [];

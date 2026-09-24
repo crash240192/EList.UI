@@ -38,16 +38,24 @@
 }
 
 .cardFocusTarget {
-  animation: discussionFocusPulse 1.8s ease-out;
+  animation: discussionFocusPulse 3s ease-out;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface, #fff));
 }
 
 @keyframes discussionFocusPulse {
   0% {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent);
     border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface, #fff));
+  }
+  55% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface, #fff));
   }
   100% {
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+    background: transparent;
   }
 }
 
