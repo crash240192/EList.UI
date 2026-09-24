@@ -5,7 +5,7 @@ import { usePresenceStore } from './presenceStore';
 
 /** Подписка на онлайн-статус аккаунта (батч-опрос WS presence) */
 export function useOnlinePresence(accountId: string | null | undefined): boolean {
-  const id = accountId?.trim() || '';
+  const id = accountId?.trim().toLowerCase() || '';
   const online = usePresenceStore(s => (id ? Boolean(s.onlineById[id]) : false));
   const watch = usePresenceStore(s => s.watch);
   const unwatch = usePresenceStore(s => s.unwatch);
