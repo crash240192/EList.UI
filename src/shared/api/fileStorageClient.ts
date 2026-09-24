@@ -26,8 +26,25 @@ export interface IFileInfo {
   metadata?:   IFileMetadata[] | null;
 }
 
-function handleFileStorageUnauthorized(status: number): void {
+/** Тело от download: «файл не найден»/заблокирован — не сброс сессии (раньше API отдавал Unauthorized). */
+function isFileAccessBusinessError(message: string | null | undefined, errorCode?: number | null): boolean {
+  if (errorCode === 404 || errorCode === 403) return true;
+  const msg = (message ?? '').toLowerCase();
+  if (!msg) return false;
+  return (
+    msg.includes('отсутствует')
+    || msg.includes('не найден')
+    || msg.includes('заблокирован')
+    || msg.includes('утерян')
+  );
+}
+
+function handleFileStorageUnauthorized(
+  status: number,
+  body?: { message?: string | null; errorCode?: number | null },
+): void {
   if (status !== 401) return;
+  if (isFileAccessBusinessError(body?.message, body?.errorCode)) return;
   const hadAuthToken = Boolean(getAuthToken());
   if (shouldForceLogoutForApi('/api/filestorage', hadAuthToken)) {
     notifyUnauthorized();
@@ -35,15 +52,22 @@ function handleFileStorageUnauthorized(status: number): void {
 }
 
 async function throwFileStorageError(res: Response, fallback: string): Promise<never> {
-  handleFileStorageUnauthorized(res.status);
   let message = fallback;
   let correlationId: string | null = null;
+  let errorCode: number | null = null;
   try {
-    const data = await res.json() as { message?: string | null; correlationId?: string | null };
+    const data = await res.json() as {
+      message?: string | null;
+      correlationId?: string | null;
+      errorCode?: number | null;
+    };
     correlationId = readCorrelationId(data, res);
     if (data.message?.trim()) message = data.message.trim();
+    if (typeof data.errorCode === 'number') errorCode = data.errorCode;
+    handleFileStorageUnauthorized(res.status, { message, errorCode });
   } catch {
     correlationId = readCorrelationId(null, res);
+    handleFileStorageUnauthorized(res.status);
   }
   throw new Error(withCorrelationId(message, correlationId));
 }
@@ -102,8 +126,7 @@ export async function attachFileContext(fileId: string, context: string): Promis
     body: JSON.stringify({ context }),
   });
   if (!res.ok) {
-    handleFileStorageUnauthorized(res.status);
-    throw new Error(`Ошибка привязки контекста: ${res.status}`);
+    await throwFileStorageError(res, `Ошибка привязки контекста: ${res.status}`);
   }
 }
 
@@ -174,8 +197,22 @@ export async function fetchAuthedImage(
 ): Promise<string> {
   const res = await fetch(fileUrl(fileId), { headers: downloadHeaders(options) });
   if (!res.ok) {
-    handleFileStorageUnauthorized(res.status);
-    throw new Error(`Файл не найден: ${res.status}`);
+    // Не разлогинивать при 401 с телом «файл отсутствует» (legacy download Unauthorized)
+    let message = `Файл не найден: ${res.status}`;
+    try {
+      const data = await res.clone().json() as {
+        message?: string | null;
+        errorCode?: number | null;
+      };
+      if (data.message?.trim()) message = data.message.trim();
+      handleFileStorageUnauthorized(res.status, {
+        message: data.message,
+        errorCode: data.errorCode,
+      });
+    } catch {
+      handleFileStorageUnauthorized(res.status);
+    }
+    throw new Error(message);
   }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
