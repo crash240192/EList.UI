@@ -20,17 +20,126 @@ export function isDiscussionMessageInView(
   return visible >= minVisible;
 }
 
-/** Прокрутка к комментарию (deep-link из уведомления) */
+/** Длительность плавной, но быстрой перемотки к комментарию из уведомления */
+export const DISCUSSION_FOCUS_SCROLL_DURATION_MS = 420;
+
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3;
+}
+
+type FocusScrollAnimation = { raf: number; cancelled: boolean };
+
+let activeFocusScroll: FocusScrollAnimation | null = null;
+
+function cancelActiveFocusScroll(): void {
+  if (!activeFocusScroll) return;
+  activeFocusScroll.cancelled = true;
+  cancelAnimationFrame(activeFocusScroll.raf);
+  activeFocusScroll = null;
+}
+
+function clampScrollTop(maxScroll: number, top: number): number {
+  return Math.max(0, Math.min(maxScroll, top));
+}
+
+/**
+ * Плавная быстрая прокрутка к центру элемента (window или ближайший scroll-parent).
+ * Длительность фиксированная — не зависит от расстояния, в отличие от native smooth.
+ */
+function animateScrollElementIntoCenter(
+  el: HTMLElement,
+  durationMs: number,
+): Promise<void> {
+  cancelActiveFocusScroll();
+
+  const scrollParent = findScrollParent(el);
+  const useWindow = !scrollParent;
+  const start = useWindow
+    ? window.scrollY
+    : scrollParent!.scrollTop;
+
+  const elRect = el.getBoundingClientRect();
+  let target: number;
+  if (useWindow) {
+    const vv = window.visualViewport;
+    const viewH = vv?.height ?? window.innerHeight;
+    const viewTop = vv?.offsetTop ?? 0;
+    target = window.scrollY + (elRect.top - viewTop) - viewH / 2 + elRect.height / 2;
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - viewH);
+    target = clampScrollTop(maxScroll, target);
+  } else {
+    const parentRect = scrollParent!.getBoundingClientRect();
+    target = scrollParent!.scrollTop + (elRect.top - parentRect.top)
+      - scrollParent!.clientHeight / 2 + elRect.height / 2;
+    const maxScroll = scrollParent!.scrollHeight - scrollParent!.clientHeight;
+    target = clampScrollTop(maxScroll, target);
+  }
+
+  const delta = target - start;
+  if (Math.abs(delta) < 2) {
+    return Promise.resolve();
+  }
+
+  // Короткий путь — чуть быстрее; дальние — не дольше durationMs
+  const distance = Math.abs(delta);
+  const duration = Math.min(
+    durationMs,
+    Math.max(220, Math.round(durationMs * (0.55 + Math.min(1, distance / 1400) * 0.45))),
+  );
+
+  const animation: FocusScrollAnimation = { raf: 0, cancelled: false };
+  activeFocusScroll = animation;
+  const t0 = performance.now();
+
+  return new Promise((resolve) => {
+    const tick = (now: number) => {
+      if (animation.cancelled) {
+        resolve();
+        return;
+      }
+      const t = Math.min(1, (now - t0) / duration);
+      const y = start + delta * easeOutCubic(t);
+      if (useWindow) {
+        window.scrollTo(0, y);
+      } else {
+        scrollParent!.scrollTop = y;
+      }
+      if (t < 1) {
+        animation.raf = requestAnimationFrame(tick);
+      } else {
+        if (activeFocusScroll === animation) activeFocusScroll = null;
+        resolve();
+      }
+    };
+    animation.raf = requestAnimationFrame(tick);
+  });
+}
+
+/** Прокрутка к комментарию (deep-link из уведомления) — плавная и быстрая */
 export function scrollDiscussionMessageIntoView(
   messageId: string,
-  options?: { behavior?: ScrollBehavior; block?: ScrollLogicalPosition },
+  options?: {
+    behavior?: ScrollBehavior;
+    block?: ScrollLogicalPosition;
+    durationMs?: number;
+  },
 ): boolean {
   const el = document.getElementById(discussionMessageDomId(messageId));
   if (!el) return false;
-  el.scrollIntoView({
-    behavior: options?.behavior ?? 'smooth',
-    block: options?.block ?? 'center',
-  });
+
+  // Deep-link: своя анимация. Legacy `behavior` оставляем для прочих вызовов.
+  if (options?.behavior === 'auto') {
+    el.scrollIntoView({
+      behavior: 'auto',
+      block: options?.block ?? 'center',
+    });
+    return true;
+  }
+
+  void animateScrollElementIntoCenter(
+    el,
+    options?.durationMs ?? DISCUSSION_FOCUS_SCROLL_DURATION_MS,
+  );
   return true;
 }
 
@@ -44,33 +153,56 @@ export function scheduleDiscussionMessageFocusScroll(
     isCancelled?: () => boolean;
     onDone?: () => void;
     delaysMs?: number[];
+    durationMs?: number;
   },
 ): () => void {
-  const delays = options.delaysMs ?? [50, 150, 350, 700, 1200, 2000, 3200];
+  const delays = options.delaysMs ?? [40, 180, 420, 900, 1600, 2800];
+  const durationMs = options.durationMs ?? DISCUSSION_FOCUS_SCROLL_DURATION_MS;
   let done = false;
+  let started = false;
 
-  const attempt = (behavior: ScrollBehavior) => {
+  const finishIfVisible = () => {
     if (done || options.isCancelled?.()) return;
-    if (!scrollDiscussionMessageIntoView(messageId, { behavior, block: 'center' })) return;
-    // Дать smooth-скроллу закончиться перед проверкой видимости
-    window.setTimeout(() => {
-      if (done || options.isCancelled?.()) return;
-      if (!isDiscussionMessageInView(messageId)) return;
-      done = true;
-      options.onDone?.();
-    }, behavior === 'smooth' ? 280 : 40);
+    if (!isDiscussionMessageInView(messageId)) return;
+    done = true;
+    options.onDone?.();
   };
 
-  // Первый кадр — мгновенно (без улёта «сначала наверх секции»), дальше — smooth доводка
-  const raf = requestAnimationFrame(() => attempt('auto'));
-  const timers = delays.map((ms, i) =>
-    window.setTimeout(() => attempt(i === 0 ? 'auto' : 'smooth'), ms),
-  );
+  const attempt = () => {
+    if (done || options.isCancelled?.()) return;
+    const el = document.getElementById(discussionMessageDomId(messageId));
+    if (!el) return;
+
+    // Уже в кадре — не дёргаем повторной анимацией
+    if (isDiscussionMessageInView(messageId)) {
+      done = true;
+      options.onDone?.();
+      return;
+    }
+
+    if (started && activeFocusScroll && !activeFocusScroll.cancelled) {
+      // Дождаться текущей анимации, потом проверить
+      return;
+    }
+
+    started = true;
+    void animateScrollElementIntoCenter(el, durationMs).then(() => {
+      started = false;
+      // Кадр после отрисовки — layout мог ещё догрузиться
+      requestAnimationFrame(() => {
+        window.setTimeout(finishIfVisible, 32);
+      });
+    });
+  };
+
+  const raf = requestAnimationFrame(() => attempt());
+  const timers = delays.map((ms) => window.setTimeout(() => attempt(), ms));
 
   return () => {
     done = true;
     cancelAnimationFrame(raf);
     timers.forEach((id) => window.clearTimeout(id));
+    cancelActiveFocusScroll();
   };
 }
 
