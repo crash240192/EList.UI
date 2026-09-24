@@ -20,6 +20,9 @@ interface NotificationsPanelProps {
   onClose: () => void;
 }
 
+/** Keep in sync with `.panel` close transition in NotificationsPanel.module.css */
+const READ_ALL_FADE_MS = 400;
+
 function formatEventStart(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -157,7 +160,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     closeAfterReadAllRef.current = setTimeout(() => {
       closeAfterReadAllRef.current = null;
       onClose();
-    }, 300);
+    }, READ_ALL_FADE_MS);
   }, [clearAll, closing, onClose]);
 
   const handleTestSend = async () => {
