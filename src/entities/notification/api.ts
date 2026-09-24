@@ -85,3 +85,20 @@ export async function fetchConnectionStats(): Promise<IConnectionStats> {
     connectedAccountCounts: raw?.connectedAccountCounts ?? (raw as { ConnectedAccountCounts?: number })?.ConnectedAccountCounts ?? null,
   };
 }
+
+/** GET /api/notifications/online?ids=guid,guid */
+export async function fetchOnlineAccountIds(accountIds: string[]): Promise<string[]> {
+  const unique = [...new Set(accountIds.map(id => id.trim()).filter(Boolean))];
+  if (unique.length === 0) return [];
+  const params = new URLSearchParams();
+  params.set('ids', unique.slice(0, 100).join(','));
+  const r = await apiClient.get<{ onlineAccountIds?: string[] | null } | string[]>(
+    `${BASE}/online?${params}`,
+  );
+  const raw = r.result;
+  if (Array.isArray(raw)) return raw.map(String);
+  const list = raw?.onlineAccountIds
+    ?? (raw as { OnlineAccountIds?: string[] } | null | undefined)?.OnlineAccountIds
+    ?? [];
+  return list.map(String);
+}

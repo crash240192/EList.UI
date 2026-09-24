@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import { ensureNotificationSoundUnlocked } from '@/shared/lib/playNotificationPop';
+import { useAccountId } from '@/features/auth/useAccountId';
+import { usePresenceStore } from '@/features/presence';
 import { useNotificationsStore } from './notificationsStore';
 import { useDebouncedWsStatus } from './useDebouncedWsStatus';
 import { useNotificationsWebSocket } from './useNotificationsWebSocket';
@@ -12,6 +14,7 @@ export function NotificationBell() {
   useNotificationsWebSocket(true);
   ensureNotificationSoundUnlocked();
 
+  const { accountId } = useAccountId();
   const panelOpen = useNotificationsStore(s => s.panelOpen);
   const togglePanel = useNotificationsStore(s => s.togglePanel);
   const setPanelOpen = useNotificationsStore(s => s.setPanelOpen);
@@ -19,12 +22,17 @@ export function NotificationBell() {
   const refreshUnreadCount = useNotificationsStore(s => s.refreshUnreadCount);
   const loadHistory = useNotificationsStore(s => s.loadHistory);
   const wsStatus = useDebouncedWsStatus(useNotificationsStore(s => s.wsStatus));
+  const setSelfOnline = usePresenceStore(s => s.setSelfOnline);
 
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void refreshUnreadCount();
   }, [refreshUnreadCount]);
+
+  useEffect(() => {
+    setSelfOnline(accountId, wsStatus === 'open');
+  }, [accountId, wsStatus, setSelfOnline]);
 
   useEffect(() => {
     if (panelOpen) {
