@@ -3,6 +3,7 @@ import type { CSSProperties, RefObject } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import type { IMessage, IMessageLocation, IMessagePathNode } from '@/entities/conversation';
 import { createMessage, fetchMessageLocation } from '@/entities/conversation';
+import { getCachedAvatarId } from '@/features/auth/useAvatar';
 import { useRootMessages } from './useRootMessages';
 import { MessageRow } from './MessageRow';
 import { MessageComposer } from './MessageComposer';
@@ -107,11 +108,20 @@ function MessageThreadInner({
   }, [focusMessageId, conversationId]);
 
   const rootsConversationId = bootstrapPage !== null ? conversationId : null;
-  const { messages, loading, loadingMore, remaining, error, loadMore, refresh, removeMessage } =
-    useRootMessages(rootsConversationId, {
-      loadThroughPage: bootstrapPage ?? 0,
-    });
-  const { bump } = useDiscussionRefreshActions();
+  const {
+    messages,
+    loading,
+    loadingMore,
+    remaining,
+    error,
+    loadMore,
+    removeMessage,
+    insertMessage,
+    patchMessage,
+  } = useRootMessages(rootsConversationId, {
+    loadThroughPage: bootstrapPage ?? 0,
+  });
+  const { appendChild } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
   const [replyThreadRootId, setReplyThreadRootId] = useState<string | null>(null);
   const safeViewMode: DiscussionViewMode = viewMode === 'flat' ? 'flat' : 'tree';
@@ -296,20 +306,43 @@ function MessageThreadInner({
   const handleSubmit = async ({ text, fileIds }: { text: string; fileIds: string[] }) => {
     if (!currentAccountId) return;
     const replyToId = replyTarget?.id ?? null;
-    await createMessage({
+    const messageId = await createMessage({
       conversationId,
       messageText: text,
       accountId: currentAccountId,
       replyTo: replyToId,
       fileIds: fileIds.length ? fileIds : undefined,
     });
+    const now = new Date().toISOString();
+    const cachedAvatar = getCachedAvatarId(currentAccountId);
+    const localMessage: IMessage = {
+      id: messageId,
+      conversationId,
+      messageText: text.trim(),
+      replied: false,
+      accountId: currentAccountId,
+      replyTo: replyToId,
+      createDate: now,
+      updateDate: now,
+      fileIds: fileIds.length ? fileIds : undefined,
+      likesCount: 0,
+      dislikesCount: 0,
+      currentUserVote: null,
+      account: {
+        id: currentAccountId,
+        avatarId: cachedAvatar === undefined ? null : cachedAvatar,
+      },
+    };
+
     if (replyToId) {
-      bump(replyToId);
+      // Дерево: в список прямых ответов родителя; лента: ещё и под корень ветки
+      appendChild(replyToId, localMessage);
+      patchMessage(replyToId, { replied: true });
       if (safeViewMode === 'flat' && replyThreadRootId && replyThreadRootId !== replyToId) {
-        bump(replyThreadRootId);
+        appendChild(replyThreadRootId, localMessage);
       }
     } else {
-      refresh();
+      insertMessage(localMessage);
     }
     closeSheet();
   };

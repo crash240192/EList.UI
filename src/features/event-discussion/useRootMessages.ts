@@ -163,6 +163,17 @@ export function useRootMessages(
     });
   }, []);
 
+  /** Локальная вставка нового корневого комментария без refetch */
+  const insertMessage = useCallback((message: IMessage) => {
+    setMessages((prev) => mergeById(prev, [message]));
+    setTotal((t) => t + 1);
+  }, []);
+
+  /** Пометить корень как replied (после первого ответа) */
+  const patchMessage = useCallback((messageId: string, patch: Partial<IMessage>) => {
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, ...patch } : m)));
+  }, []);
+
   return {
     messages,
     loading,
@@ -174,5 +185,7 @@ export function useRootMessages(
     loadMore,
     refresh,
     removeMessage,
+    insertMessage,
+    patchMessage,
   };
 }

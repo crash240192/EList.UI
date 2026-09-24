@@ -6,7 +6,7 @@ import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
 import { DiscussionLoadMore } from './DiscussionLoadMore';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
-import { useDiscussionRefreshActions } from './discussionRefreshContext';
+import { useDiscussionAppend, useDiscussionRefreshActions } from './discussionRefreshContext';
 import {
   DISCUSSION_REPLY_PREVIEW_COUNT,
   DISCUSSION_TREE_INDENT_CAP,
@@ -51,7 +51,7 @@ interface MessageRepliesProps {
 export function MessageReplies({
   parent,
   depth,
-  refreshKey,
+  refreshKey: _refreshKey,
   activeReplyId = null,
   conversationId,
   currentAccountId,
@@ -174,10 +174,21 @@ export function MessageReplies({
       const through = Math.max(0, focusThroughPageRef.current);
       void fetchTreeRange(0, through, generation, 'replace');
     }
-    // focusChild намеренно не в deps: очистка deep-link не должна сбрасывать уже
-    // загруженное дерево (иначе скелетон + свёрнутые ветки на медленной сети).
-    // Догрузка до страницы цели — в эффекте ниже по focusThroughPage.
-  }, [loadFlat, fetchTreeRange, parent.id, refreshKey, viewMode]);
+    // refreshKey намеренно не в deps: отправка ответа не должна сбрасывать список
+    // (новая запись приходит через useDiscussionAppend).
+  }, [loadFlat, fetchTreeRange, parent.id, viewMode]);
+
+  useDiscussionAppend(parent.id, (message) => {
+    setItems((prev) => mergeById(prev, [message]));
+    setTotal((prevTotal) => {
+      const nextTotal = Math.max(prevTotal + 1, (prevTotal || 0) + 1);
+      onTotalLoaded?.(nextTotal);
+      return nextTotal;
+    });
+    setPreviewExpanded(true);
+    setError(null);
+    // Не трогаем loading: если идёт первичный fetch, он сам дорисует список с бэка
+  });
 
   useEffect(() => {
     if (focusChild) setPreviewExpanded(true);
