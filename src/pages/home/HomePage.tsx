@@ -46,7 +46,7 @@ function readStoredListUi(): StoredListUi | null {
 }
 
 export default function HomePage() {
-  usePageTitle('Поиск событий');
+  usePageTitle();
   const isMobileList = useMediaQuery(media.mobile);
   const [selectedEvent, setSelectedEvent] = useState<IEvent | null>(null);
   const [searchName, setSearchName] = useState(() => {

@@ -7,6 +7,7 @@ import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirm
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
+import { BRAND_NAME } from '@/shared/config/brand';
 import {
   useInvitationsNotViewedCount,
   useInvitationsStore,
@@ -124,7 +125,7 @@ export function AppLayout() {
             onContextMenu={(e) => e.preventDefault()}
             aria-label="На главную"
           >
-            <img src={brandLogo} alt="EList" className={styles.logoImg} draggable={false} />
+            <img src={brandLogo} alt={BRAND_NAME} className={styles.logoImg} draggable={false} />
           </button>
         </div>
 

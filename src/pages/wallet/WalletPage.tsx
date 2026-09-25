@@ -1,6 +1,7 @@
 // pages/wallet/WalletPage.tsx — макет examples/elist_settings_wallet.html
 
 import { useState, useEffect, useCallback } from 'react';
+import { BRAND_NAME } from '@/shared/config/brand';
 import {
   createWallet,
   getWalletByAccount,
@@ -340,7 +341,7 @@ export default function WalletPage() {
           <div className={styles.cardHead}>
             <div className={styles.bankCard}>
               <div className={styles.cardTop}>
-                <div className={styles.cardBrand}>EList Pay</div>
+                <div className={styles.cardBrand}>{BRAND_NAME} Pay</div>
                 <div className={styles.cardChip}>
                   <div className={styles.chipLine} />
                   <div className={styles.chipLine} />
