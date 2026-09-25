@@ -1,4 +1,4 @@
-// entities/organization/types.ts — модели по swagger EList API
+// entities/organization/types.ts — модели по swagger API
 
 /** Роль участника (OrganizationMemberRole) */
 export const OrganizationRole = {
