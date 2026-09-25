@@ -353,8 +353,8 @@
 
 .editInput {
   width: 100%;
-  min-height: 64px;
-  padding: 10px 12px;
+  min-height: 40px;
+  padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -363,6 +363,10 @@
   line-height: 1.45;
   resize: vertical;
   font-family: inherit;
+}
+
+.editInputExpanded {
+  min-height: 88px;
 }
 
 .editInput:focus {
@@ -376,18 +380,23 @@
   color: var(--danger, #e74c3c);
 }
 
-.editActions {
+.editBar {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
-.saveRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.editBarSpacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.editBar .actionBtn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  flex-shrink: 0;
 }
 
 .saveBtn {
@@ -396,9 +405,12 @@
   color: #fff;
   font-size: 12px;
   font-weight: 600;
-  padding: 6px 14px;
+  height: 28px;
+  padding: 0 14px;
   border-radius: 8px;
   cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
 }
 
 .saveBtn:disabled {
@@ -462,6 +474,28 @@
     font-size: 10px;
   }
 
+  .editBar {
+    gap: 6px;
+  }
+
+  .editBar .actionBtn {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .saveBtn {
+    padding: 0 12px;
+  }
+
+  .editInput {
+    font-size: 12px;
+  }
+
+  .editInputExpanded {
+    min-height: 80px;
+  }
+
   .moreBtn {
     height: 26px;
     margin-left: 6px;
@@ -474,6 +508,10 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
+}
+
+.editBlock .gallery {
+  margin-top: 0;
 }
 
 .galleryItem {
@@ -567,16 +605,10 @@
   padding: 0;
 }
 
-.editAttachRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
 .editAttachCount {
   font-size: 11px;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .fileInputHidden {
