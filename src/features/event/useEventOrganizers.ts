@@ -15,7 +15,7 @@ interface UseEventOrganizersOptions {
   /**
    * Когда false — не ходим в API (и сбрасываем denied).
    * На EventPage включать только после успешного fetchEventById,
-   * иначе до age-agree getByEventId получает 13003 и оставляeт Access Denied.
+   * иначе до age-agree getByEventId получает 13003 и оставляет Access Denied.
    */
   enabled?: boolean;
   /** В mock-режиме считать текущего пользователя организатором */
