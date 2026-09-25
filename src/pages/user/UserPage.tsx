@@ -571,6 +571,7 @@ export default function UserPage() {
               avatarId={account.avatarId ?? null}
               initials={initials}
               size={88}
+              onlineDotSize={22}
               className={styles.avatar}
             />
           </button>

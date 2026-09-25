@@ -17,6 +17,8 @@ interface UserAvatarProps {
   showOnline?: boolean;
   /** Явный статус; если не задан — берётся из presence store */
   online?: boolean | null;
+  /** Диаметр точки онлайна; по умолчанию 28% от size (мин. 8px) */
+  onlineDotSize?: number;
 }
 
 export function UserAvatar({
@@ -28,6 +30,7 @@ export function UserAvatar({
   style: styleProp,
   showOnline = true,
   online: onlineProp,
+  onlineDotSize,
 }: UserAvatarProps) {
   const fileId = useAvatar(accountId, avatarId);
   const presenceOnline = useOnlinePresence(showOnline && onlineProp == null ? accountId : null);
@@ -39,7 +42,7 @@ export function UserAvatar({
     ...styleProp,
   };
 
-  const dotSize = Math.max(8, Math.round(size * 0.28));
+  const dotSize = onlineDotSize ?? Math.max(8, Math.round(size * 0.28));
 
   return (
     <div className={`${styles.wrap} ${className ?? ''}`} style={{ width: size, height: size }}>
