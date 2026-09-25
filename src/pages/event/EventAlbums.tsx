@@ -101,19 +101,24 @@ interface AlbumCardProps {
 }
 
 function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpen, onEdit, onDelete }: AlbumCardProps) {
-  const [cover, setCover] = useState<string | null>(null);
+  const [coverIds, setCoverIds] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const menuElRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({ visibility: 'hidden' });
 
+  // Свёрнутые thumbs — одно фото; развёрнутая карточка — до 4 для мозаики.
+  const previewLimit = hideMeta ? 1 : 4;
+
   useEffect(() => {
     let cancelled = false;
-    getAlbumFiles(album.id, 1, 1).then(files => {
-      if (!cancelled && files.length > 0) setCover(files[0].fileId);
+    setCoverIds([]);
+    getAlbumFiles(album.id, 1, previewLimit).then(files => {
+      if (cancelled) return;
+      setCoverIds(files.slice(0, previewLimit).map(f => f.fileId).filter(Boolean));
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [album.id, coverVersion]);
+  }, [album.id, coverVersion, previewLimit]);
 
   useLayoutEffect(() => {
     if (!menuOpen) {
@@ -155,20 +160,36 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpe
     };
   }, [menuOpen]);
 
+  const coverCount = coverIds.length;
+  const showMosaic = !hideMeta && coverCount > 1;
+
   return (
     <div className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : ''}`}>
       <div className={styles.albumCardBody} onClick={onOpen} role="button" tabIndex={0}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}>
         <div className={styles.albumCover}>
-          {cover
-            ? <SpinnerImage fileId={cover} alt={album.name} className={styles.albumCoverImg} />
-            : <div className={styles.albumCoverEmpty}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>
-                  <circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/>
-                </svg>
-              </div>
-          }
+          {showMosaic ? (
+            <div
+              className={styles.albumCoverMosaic}
+              data-count={Math.min(coverCount, 4)}
+              aria-hidden
+            >
+              {coverIds.slice(0, 4).map((fileId, i) => (
+                <div key={`${fileId}-${i}`} className={styles.albumCoverMosaicCell}>
+                  <SpinnerImage fileId={fileId} alt="" className={styles.albumCoverImg} />
+                </div>
+              ))}
+            </div>
+          ) : coverCount > 0 ? (
+            <SpinnerImage fileId={coverIds[0]} alt={album.name} className={styles.albumCoverImg} />
+          ) : (
+            <div className={styles.albumCoverEmpty}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>
+                <circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/>
+              </svg>
+            </div>
+          )}
           {album.parameters?.private && (
             <div className={styles.privateBadge}>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
