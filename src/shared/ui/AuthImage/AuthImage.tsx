@@ -4,7 +4,7 @@
 // Режим fullSize: превью → размытое превью + прелоадер → полный размер
 
 import { useEffect, useState } from 'react';
-import { fetchAuthedImage } from '@/shared/api/fileStorageClient';
+import { fetchAuthedImage, FileStorageHttpError } from '@/shared/api/fileStorageClient';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import styles from './AuthImage.module.css';
 
@@ -102,7 +102,7 @@ function AuthImageSingle({
   const [loading, setLoading] = useState(() => !blobCache.has(key));
   const [attempt, setAttempt] = useState(0);
   const showPreloader = useDelayedVisible(loading && !src && !error, preloaderDelayMs);
-  const maxAttempts = 3;
+  const maxAttempts = 4;
 
   useEffect(() => {
     setAttempt(0);
@@ -132,11 +132,14 @@ function AuthImageSingle({
           setError(false);
         }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (cancelled) return;
-        // При шторме download’ов (мозаики альбомов) первая попытка часто падает — ретраим.
+        // 503/429 (перегрузка filestorage / proxy) — длинный backoff + Retry-After.
         if (attempt < maxAttempts - 1) {
-          const delay = 400 * (attempt + 1);
+          let delay = 500 * (attempt + 1);
+          if (err instanceof FileStorageHttpError && (err.status === 503 || err.status === 429)) {
+            delay = Math.max(err.retryAfterMs ?? 2000, 1000 * (attempt + 1));
+          }
           retryTimer = window.setTimeout(() => {
             if (!cancelled) setAttempt(a => a + 1);
           }, delay);

@@ -8,8 +8,8 @@ import { createConcurrencyLimiter } from '@/shared/lib/concurrencyLimit';
 
 const FILE_STORAGE_BASE = import.meta.env.VITE_FILE_STORAGE_URL ?? '/elist/filestorage';
 
-/** Браузер держит ~6 соединений на хост; mosaics легко дают десятки параллельных download. */
-const limitAuthedImageFetch = createConcurrencyLimiter(6);
+/** Браузер ~6 conn/host; плюс серверный лимит download — держим клиентский потолок скромнее. */
+const limitAuthedImageFetch = createConcurrencyLimiter(4);
 
 export interface IUploadResult {
   id:  string;
@@ -28,6 +28,28 @@ export interface IFileInfo {
   description: string | null;
   url:         string;
   metadata?:   IFileMetadata[] | null;
+}
+
+/** Ошибка HTTP filestorage (в т.ч. 503 при перегрузке download). */
+export class FileStorageHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly retryAfterMs: number | null = null,
+  ) {
+    super(message);
+    this.name = 'FileStorageHttpError';
+  }
+}
+
+function parseRetryAfterMs(res: Response): number | null {
+  const raw = res.headers.get('Retry-After')?.trim();
+  if (!raw) return null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
+  const dateMs = Date.parse(raw);
+  if (!Number.isNaN(dateMs)) return Math.max(0, dateMs - Date.now());
+  return null;
 }
 
 /** Тело от download: «файл не найден»/заблокирован — не сброс сессии (раньше API отдавал Unauthorized). */
@@ -217,7 +239,10 @@ export async function fetchAuthedImage(
       } catch {
         handleFileStorageUnauthorized(res.status);
       }
-      throw new Error(message);
+      const retryAfterMs = (res.status === 503 || res.status === 429)
+        ? (parseRetryAfterMs(res) ?? 2000)
+        : null;
+      throw new FileStorageHttpError(res.status, message, retryAfterMs);
     }
     const blob = await res.blob();
     return URL.createObjectURL(blob);
