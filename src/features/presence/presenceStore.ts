@@ -1,6 +1,7 @@
 // features/presence/presenceStore.ts — онлайн по notifications WebSocket
 
 import { create } from 'zustand';
+import { isAuthenticated } from '@/shared/api/client';
 import { fetchOnlineAccountIds } from '@/entities/notification/api';
 
 const POLL_MS = 20_000;
@@ -87,6 +88,8 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
   refresh: async () => {
     if (refreshInFlight) return;
+    // Гость не ходит на /notifications/online (401)
+    if (!isAuthenticated()) return;
     const ids = watchedIds(get().watchers);
     if (ids.length === 0) return;
     refreshInFlight = true;

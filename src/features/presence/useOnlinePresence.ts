@@ -1,9 +1,10 @@
 // features/presence/useOnlinePresence.ts
 
 import { useEffect } from 'react';
+import { isAuthenticated } from '@/shared/api/client';
 import { usePresenceStore } from './presenceStore';
 
-/** Подписка на онлайн-статус аккаунта (батч-опрос WS presence) */
+/** Подписка на онлайн-статус аккаунта (батч-опрос /notifications/online). Гостям не нужен. */
 export function useOnlinePresence(accountId: string | null | undefined): boolean {
   const id = accountId?.trim() || '';
   const online = usePresenceStore(s => (id ? Boolean(s.onlineById[id]) : false));
@@ -11,7 +12,7 @@ export function useOnlinePresence(accountId: string | null | undefined): boolean
   const unwatch = usePresenceStore(s => s.unwatch);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !isAuthenticated()) return;
     watch(id);
     return () => unwatch(id);
   }, [id, watch, unwatch]);
