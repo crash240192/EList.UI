@@ -205,6 +205,7 @@ export function MessageRow({
   const [displayFileIds, setDisplayFileIds] = useState(fileIds);
   const uploadingEdit = editUploads.some(u => !u.error);
   const editSlotCount = editFileIds.length + editUploads.length;
+  const hasEditPhotos = editSlotCount > 0;
   const prevReplyBump = useRef(replyBump);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
   const isHidden = Boolean(message.hidden);
@@ -508,8 +509,8 @@ export function MessageRow({
             ) : editing ? (
               <div className={styles.editBlock}>
                 <textarea
-                  className={styles.editInput}
-                  rows={3}
+                  className={`${styles.editInput} ${hasEditPhotos ? styles.editInputExpanded : ''}`}
+                  rows={hasEditPhotos ? 3 : 2}
                   value={editText}
                   disabled={savingEdit || uploadingEdit}
                   maxLength={DISCUSSION_MESSAGE_MAX_LENGTH}
@@ -521,7 +522,7 @@ export function MessageRow({
                     }
                   }}
                 />
-                {(editFileIds.length > 0 || editUploads.length > 0) && (
+                {hasEditPhotos && (
                   <div className={styles.gallery}>
                     {editFileIds.map(fileId => (
                       <div key={fileId} className={styles.editShot}>
@@ -571,7 +572,8 @@ export function MessageRow({
                     ))}
                   </div>
                 )}
-                <div className={styles.editAttachRow}>
+                {editError && <p className={styles.editError}>{editError}</p>}
+                <div className={styles.editBar}>
                   <input
                     ref={editFileInputRef}
                     type="file"
@@ -591,20 +593,17 @@ export function MessageRow({
                       ? `Загрузка… (${editUploads.filter(u => !u.error).length})`
                       : 'Фото'}
                   </button>
-                  {(editFileIds.length > 0 || editUploads.length > 0) && (
+                  {hasEditPhotos && (
                     <span className={styles.editAttachCount}>
                       {editFileIds.length}/{DISCUSSION_MESSAGE_MAX_FILES}
                     </span>
                   )}
-                </div>
-                {editError && <p className={styles.editError}>{editError}</p>}
-                <div className={styles.editActions}>
+                  <span className={styles.editBarSpacer} />
+                  <TextLengthHint length={editText.length} maxLength={DISCUSSION_MESSAGE_MAX_LENGTH} />
                   <button type="button" className={styles.actionBtn} disabled={savingEdit || uploadingEdit} onClick={cancelEdit}>
                     Отмена
                   </button>
-                  <div className={styles.saveRow}>
-                    <TextLengthHint length={editText.length} maxLength={DISCUSSION_MESSAGE_MAX_LENGTH} />
-                    <button
+                  <button
                     type="button"
                     className={styles.saveBtn}
                     disabled={
@@ -617,7 +616,6 @@ export function MessageRow({
                   >
                     {savingEdit ? 'Сохранение…' : 'Сохранить'}
                   </button>
-                  </div>
                 </div>
               </div>
             ) : (

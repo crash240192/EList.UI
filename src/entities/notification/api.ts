@@ -96,9 +96,9 @@ export async function fetchOnlineAccountIds(accountIds: string[]): Promise<strin
     `${BASE}/online?${params}`,
   );
   const raw = r.result;
-  if (Array.isArray(raw)) return raw.map(String);
+  if (Array.isArray(raw)) return raw.map(id => String(id).trim().toLowerCase());
   const list = raw?.onlineAccountIds
     ?? (raw as { OnlineAccountIds?: string[] } | null | undefined)?.OnlineAccountIds
     ?? [];
-  return list.map(String);
+  return list.map(id => String(id).trim().toLowerCase());
 }
