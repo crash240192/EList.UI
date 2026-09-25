@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   getAlbumsByEvents,
   getAlbumsByOrganizationEvents,
-  getAlbumFiles,
+  getAlbumCoverFileIds,
   type IAlbum,
   type IEventAlbumsGroup,
 } from '@/entities/media/albumApi';
@@ -107,9 +107,8 @@ function AlbumCover({
   useEffect(() => {
     let cancelled = false;
     setCoverIds([]);
-    getAlbumFiles(album.id, 1, previewLimit).then(files => {
-      if (cancelled) return;
-      setCoverIds(files.slice(0, previewLimit).map(f => f.fileId).filter(Boolean));
+    getAlbumCoverFileIds(album.id, previewLimit).then(ids => {
+      if (!cancelled) setCoverIds(ids);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [album.id, previewLimit]);

@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import {
   getEventAlbums,
   getAlbumFiles,
+  getAlbumCoverFileIds,
   assignAlbumToEvent,
   deleteAlbum,
   type IAlbum,
@@ -113,9 +114,8 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpe
   useEffect(() => {
     let cancelled = false;
     setCoverIds([]);
-    getAlbumFiles(album.id, 1, previewLimit).then(files => {
-      if (cancelled) return;
-      setCoverIds(files.slice(0, previewLimit).map(f => f.fileId).filter(Boolean));
+    getAlbumCoverFileIds(album.id, previewLimit).then(ids => {
+      if (!cancelled) setCoverIds(ids);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [album.id, coverVersion, previewLimit]);

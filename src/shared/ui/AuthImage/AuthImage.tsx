@@ -102,6 +102,7 @@ function AuthImageSingle({
   const [loading, setLoading] = useState(() => !blobCache.has(key));
   const [attempt, setAttempt] = useState(0);
   const showPreloader = useDelayedVisible(loading && !src && !error, preloaderDelayMs);
+  const maxAttempts = 3;
 
   useEffect(() => {
     setAttempt(0);
@@ -122,6 +123,7 @@ function AuthImageSingle({
     }
     setLoading(true);
     let cancelled = false;
+    let retryTimer: number | undefined;
     getOrFetchBlob(fileId, fullSize)
       .then(url => {
         if (!cancelled) {
@@ -132,17 +134,22 @@ function AuthImageSingle({
       })
       .catch(() => {
         if (cancelled) return;
-        if (attempt < 1) {
-          window.setTimeout(() => {
+        // При шторме download’ов (мозаики альбомов) первая попытка часто падает — ретраим.
+        if (attempt < maxAttempts - 1) {
+          const delay = 400 * (attempt + 1);
+          retryTimer = window.setTimeout(() => {
             if (!cancelled) setAttempt(a => a + 1);
-          }, 400);
+          }, delay);
           return;
         }
         setError(true);
         setLoading(false);
         onErrorProp?.();
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (retryTimer != null) window.clearTimeout(retryTimer);
+    };
     // onErrorProp — опциональный колбэк; не включаем в deps, чтобы не рефетчить
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileId, fullSize, attempt]);

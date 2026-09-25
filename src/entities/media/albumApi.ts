@@ -6,7 +6,10 @@ import type { EventListItemData } from '@/entities/event/lib/eventListItemUtils'
 import { normalizeEventListItem } from '@/entities/event/normalizeEventListItem';
 import { fetchEventParameters } from '@/entities/event/eventExtrasApi';
 import { fetchEvents } from '@/entities/event/api';
+import { createConcurrencyLimiter } from '@/shared/lib/concurrencyLimit';
 
+/** Параллельные filesByAlbumId на ленте мозаик — не больше 4. */
+const limitAlbumCoverList = createConcurrencyLimiter(4);
 export interface IAlbumParams {
   albumId?: string;
   headAlbum?: boolean;
@@ -250,4 +253,16 @@ export async function getAlbumFiles(albumId: string, pageIndex = 1, pageSize = 5
   if (Array.isArray(data?.result)) return data.result;
   if (Array.isArray(data?.items)) return data.items;
   return [];
+}
+
+/**
+ * Первые fileId для превью обложки/мозаики.
+ * Через очередь — на страницах со многими альбомами не роняем API/браузер.
+ */
+export async function getAlbumCoverFileIds(albumId: string, limit = 4): Promise<string[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 4));
+  return limitAlbumCoverList(async () => {
+    const files = await getAlbumFiles(albumId, 1, safeLimit);
+    return files.slice(0, safeLimit).map(f => f.fileId).filter(Boolean);
+  });
 }

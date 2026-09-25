@@ -4,8 +4,12 @@
 
 import { getOrCreateClientHash, getAuthToken, notifyUnauthorized, getClientPlatform, getAppVersion, readCorrelationId, withCorrelationId } from './client';
 import { shouldForceLogoutForApi } from '@/shared/auth/unauthorized';
+import { createConcurrencyLimiter } from '@/shared/lib/concurrencyLimit';
 
 const FILE_STORAGE_BASE = import.meta.env.VITE_FILE_STORAGE_URL ?? '/elist/filestorage';
+
+/** Браузер держит ~6 соединений на хост; mosaics легко дают десятки параллельных download. */
+const limitAuthedImageFetch = createConcurrencyLimiter(6);
 
 export interface IUploadResult {
   id:  string;
@@ -195,25 +199,27 @@ export async function fetchAuthedImage(
   fileId: string,
   options?: { fullSize?: boolean },
 ): Promise<string> {
-  const res = await fetch(fileUrl(fileId), { headers: downloadHeaders(options) });
-  if (!res.ok) {
-    // Не разлогинивать при 401 с телом «файл отсутствует» (legacy download Unauthorized)
-    let message = `Файл не найден: ${res.status}`;
-    try {
-      const data = await res.clone().json() as {
-        message?: string | null;
-        errorCode?: number | null;
-      };
-      if (data.message?.trim()) message = data.message.trim();
-      handleFileStorageUnauthorized(res.status, {
-        message: data.message,
-        errorCode: data.errorCode,
-      });
-    } catch {
-      handleFileStorageUnauthorized(res.status);
+  return limitAuthedImageFetch(async () => {
+    const res = await fetch(fileUrl(fileId), { headers: downloadHeaders(options) });
+    if (!res.ok) {
+      // Не разлогинивать при 401 с телом «файл отсутствует» (legacy download Unauthorized)
+      let message = `Файл не найден: ${res.status}`;
+      try {
+        const data = await res.clone().json() as {
+          message?: string | null;
+          errorCode?: number | null;
+        };
+        if (data.message?.trim()) message = data.message.trim();
+        handleFileStorageUnauthorized(res.status, {
+          message: data.message,
+          errorCode: data.errorCode,
+        });
+      } catch {
+        handleFileStorageUnauthorized(res.status);
+      }
+      throw new Error(message);
     }
-    throw new Error(message);
-  }
-  const blob = await res.blob();
-  return URL.createObjectURL(blob);
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  });
 }
