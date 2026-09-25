@@ -94,34 +94,55 @@ function EventGroupHeader({
 function AlbumCover({
   album,
   iconSize,
+  mosaic = false,
 }: {
   album: IAlbum;
   iconSize: number;
+  /** Развёрнутая карточка: сетка до 4 первых фото */
+  mosaic?: boolean;
 }) {
-  const [cover, setCover] = useState<string | null>(null);
+  const [coverIds, setCoverIds] = useState<string[]>([]);
+  const previewLimit = mosaic ? 4 : 1;
 
   useEffect(() => {
     let cancelled = false;
-    getAlbumFiles(album.id, 1, 1).then(files => {
-      if (!cancelled && files.length > 0) setCover(files[0].fileId);
+    setCoverIds([]);
+    getAlbumFiles(album.id, 1, previewLimit).then(files => {
+      if (cancelled) return;
+      setCoverIds(files.slice(0, previewLimit).map(f => f.fileId).filter(Boolean));
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [album.id]);
+  }, [album.id, previewLimit]);
+
+  const coverCount = coverIds.length;
+  const showMosaic = mosaic && coverCount > 1;
 
   return (
     <div className={styles.albumCover}>
-      {cover
-        ? <AuthImage fileId={cover} alt="" className={styles.albumCoverImg} />
-        : (
-          <div className={styles.albumCoverEmpty}>
-            <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M3 9h18" />
-              <circle cx="9" cy="15" r="2" />
-              <path d="M14 13l3 4" />
-            </svg>
-          </div>
-        )}
+      {showMosaic ? (
+        <div
+          className={styles.albumCoverMosaic}
+          data-count={Math.min(coverCount, 4)}
+          aria-hidden
+        >
+          {coverIds.slice(0, 4).map((fileId, i) => (
+            <div key={`${fileId}-${i}`} className={styles.albumCoverMosaicCell}>
+              <AuthImage fileId={fileId} alt="" className={styles.albumCoverImg} />
+            </div>
+          ))}
+        </div>
+      ) : coverCount > 0 ? (
+        <AuthImage fileId={coverIds[0]} alt="" className={styles.albumCoverImg} />
+      ) : (
+        <div className={styles.albumCoverEmpty}>
+          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M3 9h18" />
+            <circle cx="9" cy="15" r="2" />
+            <path d="M14 13l3 4" />
+          </svg>
+        </div>
+      )}
       {album.parameters?.private && (
         <div className={styles.privateBadge} aria-label="Приватный альбом">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -157,7 +178,7 @@ function AlbumTile({
       aria-label={compact ? album.name : undefined}
       title={compact ? album.name : undefined}
     >
-      <AlbumCover album={album} iconSize={iconSize} />
+      <AlbumCover album={album} iconSize={iconSize} mosaic={!compact} />
       {!compact && (
         <div className={styles.albumMeta}>
           <div className={styles.albumName}>{album.name}</div>
