@@ -238,13 +238,15 @@ export default function EventPage() {
 
   usePageTitle(event?.name ?? null);
 
+  // После успешной загрузки события: иначе getByEventId ловит 13003 до «мне есть 18»
+  // и плашка Access Denied остаётся до F5.
   const {
     organizers,
     isOrganizer,
     organizerIds,
     denied: organizersDenied,
     refetch: refetchOrganizers,
-  } = useEventOrganizers(id, accountId);
+  } = useEventOrganizers(id, accountId, { enabled: Boolean(event) });
 
   const canSeeEventModeration = Boolean((isOrganizer || hasPlatformAccess) && id);
   const {
