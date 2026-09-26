@@ -49,7 +49,6 @@ import {
   getContactIconKind,
   getUpcomingPreview,
   isContactLink,
-  splitEventsByPhase,
   type ContactIconKind,
   type UserEventsPhase,
   type UserEventsScope,
@@ -204,20 +203,9 @@ function UserEventsPanel({
   onPhaseChange: (phase: UserEventsPhase) => void;
   onOpen: (eventId: string) => void;
 }) {
-  const filtered = useMemo(() => splitEventsByPhase(events, phase), [events, phase]);
-
   const sentinelRef = useInfiniteScroll(onLoadMore, {
     enabled: !isLoading && !isLoadingMore && hasMore,
   });
-
-  // Первая страница может целиком попасть в другую фазу — подгружаем дальше,
-  // пока не появятся карточки или не кончатся данные.
-  useEffect(() => {
-    if (isLoading || isLoadingMore || !hasMore) return;
-    if (filtered.length > 0) return;
-    if (events.length === 0) return;
-    onLoadMore();
-  }, [isLoading, isLoadingMore, hasMore, filtered.length, events.length, onLoadMore]);
 
   return (
     <div className={styles.tabContent}>
@@ -240,7 +228,7 @@ function UserEventsPanel({
         </div>
       )}
 
-      {!isLoading && filtered.length === 0 && !hasMore && (
+      {!isLoading && events.length === 0 && (
         <p className={styles.placeholder}>
           {scope === 'all'
             ? (phase === 'upcoming' ? 'Нет предстоящих мероприятий' : 'Нет прошедших мероприятий')
@@ -250,13 +238,9 @@ function UserEventsPanel({
         </p>
       )}
 
-      {!isLoading && filtered.length === 0 && hasMore && (
-        <p className={styles.placeholder}>Загрузка…</p>
-      )}
-
-      {!isLoading && filtered.length > 0 && (
+      {!isLoading && events.length > 0 && (
         <EventList className={styles.eventsList}>
-          {filtered.map(event => (
+          {events.map(event => (
             <EventListItem
               key={event.id}
               event={event}
@@ -273,7 +257,7 @@ function UserEventsPanel({
         </div>
       )}
 
-      {!isLoading && !hasMore && total > events.length && filtered.length > 0 && (
+      {!isLoading && !hasMore && total > events.length && events.length > 0 && (
         <p className={styles.moreHint}>Показано {events.length} из {total}</p>
       )}
     </div>
@@ -328,7 +312,10 @@ export default function UserPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
 
-  const { scopes: eventScopes } = useUserProfileEvents(profileAccountId || null);
+  const { scopes: eventScopes, upcomingScopes, scopeTotals } = useUserProfileEvents(
+    profileAccountId || null,
+    eventsPhase,
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -448,19 +435,19 @@ export default function UserPage() {
         };
 
   const tabCounts: Record<MainTab, number> = {
-    all: eventScopes.all.total || eventScopes.all.events.length,
-    created: eventScopes.created.total || eventScopes.created.events.length,
-    participating: eventScopes.participating.total || eventScopes.participating.events.length,
+    all: scopeTotals.all,
+    created: scopeTotals.created,
+    participating: scopeTotals.participating,
     albums: albumsCount,
   };
 
   const upcomingPreview = useMemo(() => {
-    const created = getUpcomingPreview(eventScopes.created.events, 'created', 2);
-    const participating = getUpcomingPreview(eventScopes.participating.events, 'participating', 2);
+    const created = getUpcomingPreview(upcomingScopes.created.events, 'created', 2);
+    const participating = getUpcomingPreview(upcomingScopes.participating.events, 'participating', 2);
     return [...created, ...participating]
       .sort((a, b) => new Date(a.event.startTime).getTime() - new Date(b.event.startTime).getTime())
       .slice(0, 3);
-  }, [eventScopes.created.events, eventScopes.participating.events]);
+  }, [upcomingScopes.created.events, upcomingScopes.participating.events]);
 
   const pageTitle = profile
     ? ([profile.person?.lastName, profile.person?.firstName].filter(Boolean).join(' ')
