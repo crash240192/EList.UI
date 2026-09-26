@@ -118,6 +118,13 @@ export interface IEventsSearchParams {
   /** true только для фильтра «только 18+» */
   adultOnly?: boolean;
   allowedGender?: Gender;
+  /** false — включать неактивные/отменённые (как на «Мои → Организую») */
+  active?: boolean;
+  /**
+   * Сортировка: "StartTime", "StartTime DESC", "EndTime DESC".
+   * Для прошедших (только endTime) бэкенд по умолчанию ставит EndTime DESC.
+   */
+  orderBy?: string;
   pageIndex?: number;
   pageSize?: number;
 }

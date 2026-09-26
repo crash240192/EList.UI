@@ -38,11 +38,10 @@ import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { TabBar } from '@/shared/ui/TabBar';
-import { usePageTitle } from '@/shared/hooks';
+import { useInfiniteScroll, usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import heroStyles from '@/shared/styles/hero.module.css';
-import { isEventFinished } from '@/features/event/RatingWidget';
-import type { IEvent } from '@/entities/event';
+import type { IEventsSearchParams } from '@/entities/event';
 import { ContentReportModal } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import styles from './OrganizationPage.module.css';
@@ -55,16 +54,17 @@ const MAIN_TABS: { key: MainTab; label: string }[] = [
   { key: 'albums', label: 'Альбомы' },
 ];
 
-function splitEventsByPhase(events: IEvent[], phase: EventsPhase): IEvent[] {
-  const upcoming = events.filter(ev => !isEventFinished(ev.startTime, ev.endTime));
-  const past = events.filter(ev => isEventFinished(ev.startTime, ev.endTime));
-  const list = phase === 'upcoming' ? upcoming : past;
-
-  return [...list].sort((a, b) => {
-    const aTime = new Date(a.startTime).getTime();
-    const bTime = new Date(b.startTime).getTime();
-    return phase === 'upcoming' ? aTime - bTime : bTime - aTime;
-  });
+function orgEventsSearchParams(
+  organizationId: string | undefined,
+  phase: EventsPhase,
+): IEventsSearchParams {
+  const now = new Date().toISOString();
+  return {
+    organizationId,
+    ...(phase === 'past'
+      ? { endTime: now, orderBy: 'EndTime DESC' }
+      : { startTime: now, orderBy: 'StartTime' }),
+  };
 }
 
 function OrgCoverBackground({ logoId }: { logoId: string | null }) {
@@ -251,15 +251,26 @@ export default function OrganizationPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const orgEvents = useEvents(
-    { organizationId: id },
-    !!id,
+  const orgUpcomingParams = useMemo(
+    () => orgEventsSearchParams(id, 'upcoming'),
+    [id],
+  );
+  const orgPastParams = useMemo(
+    () => orgEventsSearchParams(id, 'past'),
+    [id],
   );
 
-  const filteredEvents = useMemo(
-    () => splitEventsByPhase(orgEvents.events, eventsPhase),
-    [orgEvents.events, eventsPhase],
-  );
+  const orgUpcoming = useEvents(orgUpcomingParams, !!id);
+  const orgPast = useEvents(orgPastParams, !!id);
+  const orgEvents = eventsPhase === 'upcoming' ? orgUpcoming : orgPast;
+
+  const eventsSentinelRef = useInfiniteScroll(orgEvents.loadMore, {
+    enabled:
+      mainTab === 'events'
+      && !orgEvents.isLoading
+      && !orgEvents.isLoadingMore
+      && orgEvents.hasMore,
+  });
 
   const myRole = useMemo(() => {
     if (!myAccountId) return null;
@@ -281,7 +292,7 @@ export default function OrganizationPage() {
   );
 
   const tabCounts: Record<MainTab, number> = {
-    events: orgEvents.total || orgEvents.events.length,
+    events: (orgUpcoming.total || 0) + (orgPast.total || 0),
     albums: albumsCount,
   };
 
@@ -593,7 +604,7 @@ export default function OrganizationPage() {
                   <div className={styles.emptyEvents}>Загрузка...</div>
                 )}
 
-                {!orgEvents.isLoading && filteredEvents.length === 0 && (
+                {!orgEvents.isLoading && orgEvents.events.length === 0 && (
                   <p className={styles.emptyEvents}>
                     {eventsPhase === 'upcoming'
                       ? 'Нет предстоящих мероприятий'
@@ -601,9 +612,9 @@ export default function OrganizationPage() {
                   </p>
                 )}
 
-                {!orgEvents.isLoading && filteredEvents.length > 0 && (
+                {!orgEvents.isLoading && orgEvents.events.length > 0 && (
                   <EventList>
-                    {filteredEvents.map(event => (
+                    {orgEvents.events.map(event => (
                       <EventListItem
                         key={event.id}
                         event={event}
@@ -612,6 +623,14 @@ export default function OrganizationPage() {
                       />
                     ))}
                   </EventList>
+                )}
+
+                {orgEvents.hasMore && (
+                  <div ref={eventsSentinelRef} className={styles.sentinel}>
+                    {orgEvents.isLoadingMore && (
+                      <span className={styles.loadingMore}>Загрузка…</span>
+                    )}
+                  </div>
                 )}
               </div>
             )}
