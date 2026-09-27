@@ -16,7 +16,12 @@ import { storeActivationNotice } from '@/features/auth/activationNotice';
 import { useAuthStore } from '@/app/store';
 import { useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { cookies } from '@/shared/lib/cookies';
-import { validateContactValue, isRegexMask, resolveContactMaskTemplate, composeContactValue } from '@/shared/lib/contactMask';
+import {
+  validateContactValue,
+  isRegexMask,
+  resolveContactMaskTemplate,
+  canonicalizeContactValue,
+} from '@/shared/lib/contactMask';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { usePageTitle } from '@/shared/hooks';
 import { ContactMaskField } from '@/shared/ui/ContactMaskField/ContactMaskField';
@@ -83,10 +88,7 @@ function contactTypeLabel(ct: IContactType | undefined): string {
 }
 
 function contactSubmitValue(ct: IContactType | undefined, raw: string): string {
-  const template = resolveContactMaskTemplate(ct?.mask ?? null, contactTypeLabel(ct));
-  const trimmed = raw.trim();
-  if (!template) return trimmed;
-  return composeContactValue(template, trimmed);
+  return canonicalizeContactValue(raw, ct?.mask ?? null, contactTypeLabel(ct));
 }
 
 export default function RegisterPage() {
@@ -397,19 +399,19 @@ export default function RegisterPage() {
               </Field>
 
               <Field label={selectedContactType?.name || selectedContactType?.localizedName || 'Контакт'}>
-                <div className={`${styles.input} ${regStyles.contactMaskWrap} ${contactError ? styles.inputError : ''}`}>
-                  <ContactMaskField
-                    mask={selectedContactType?.mask ?? null}
-                    typeName={selectedContactType?.name || selectedContactType?.localizedName || ''}
-                    value={form1.contactValue}
-                    onChange={raw => {
-                      setForm1(f => ({ ...f, contactValue: raw }));
-                      if (contactError) setContactError(null);
-                    }}
-                    onBlur={handleContactBlur}
-                    ariaLabel={getContactPlaceholder(selectedContactType)}
-                  />
-                </div>
+                <ContactMaskField
+                  mask={selectedContactType?.mask ?? null}
+                  typeName={selectedContactType?.name || selectedContactType?.localizedName || ''}
+                  value={form1.contactValue}
+                  onChange={raw => {
+                    setForm1(f => ({ ...f, contactValue: raw }));
+                    if (contactError) setContactError(null);
+                  }}
+                  onBlur={handleContactBlur}
+                  placeholder={getContactPlaceholder(selectedContactType)}
+                  ariaLabel={getContactPlaceholder(selectedContactType)}
+                  error={Boolean(contactError)}
+                />
                 {contactError && (
                   <p style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3 }}>{contactError}</p>
                 )}

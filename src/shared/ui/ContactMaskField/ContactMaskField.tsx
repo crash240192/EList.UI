@@ -1,4 +1,7 @@
 // shared/ui/ContactMaskField/ContactMaskField.tsx
+//
+// phone_ru → визуальная маска; email/text → обычный input (без overlay).
+// Рамка поля всегда в .shell — иначе на iOS «голый» input рисует белый прямоугольник.
 
 import { useLayoutEffect, useRef } from 'react';
 import {
@@ -7,8 +10,8 @@ import {
   extractRawFromValue,
   getContactCaretIndex,
   getMaskInputMode,
-  processEmailRaw,
   processPhoneRaw,
+  resolveContactInputKind,
   resolveContactMaskTemplate,
   type MaskSegment,
 } from '@/shared/lib/contactMaskFormat';
@@ -27,6 +30,9 @@ interface ContactMaskFieldProps {
   onChange: (value: string) => void;
   onBlur?: () => void;
   ariaLabel?: string;
+  placeholder?: string;
+  /** Подсветка ошибки на рамке */
+  error?: boolean;
   className?: string;
 }
 
@@ -53,42 +59,55 @@ export function ContactMaskField({
   onChange,
   onBlur,
   ariaLabel,
+  placeholder,
+  error = false,
   className,
 }: ContactMaskFieldProps) {
+  const kind = resolveContactInputKind(mask, typeName);
   const template = resolveContactMaskTemplate(mask, typeName);
   const inputRef = useRef<HTMLInputElement>(null);
   const caretIndexRef = useRef<number | null>(null);
 
-  const isPhone = Boolean(template?.includes('#'));
+  const isPhone = kind === 'phone_ru' && Boolean(template);
   const raw = template ? extractRawFromValue(template, value) : value;
   const displayValue = template ? buildContactDisplayValue(template, raw) : value;
   const segments = template ? buildContactMaskSegments(template, raw) : [];
+  const inputMode = getMaskInputMode(mask, typeName);
 
   useLayoutEffect(() => {
     const input = inputRef.current;
     const pos = caretIndexRef.current;
-    if (!input || pos === null) return;
+    if (!input || pos === null || !isPhone) return;
     input.setSelectionRange(pos, pos);
     caretIndexRef.current = null;
-  }, [displayValue]);
+  }, [displayValue, isPhone]);
 
-  if (!template) {
-    const plainMode = getMaskInputMode(mask, typeName);
+  const shellClass = [
+    styles.shell,
+    error ? styles.shellError : '',
+    className ?? '',
+  ].filter(Boolean).join(' ');
+
+  // email / text — обычный контролируемый input внутри общей рамки
+  if (!isPhone || !template) {
     return (
-      <input
-        ref={inputRef}
-        type="text"
-        inputMode={plainMode}
-        autoCapitalize="off"
-        autoCorrect="off"
-        spellCheck={false}
-        className={className}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onBlur={onBlur}
-        aria-label={ariaLabel}
-        autoComplete={plainMode === 'email' ? 'email' : plainMode === 'tel' ? 'tel' : 'off'}
-      />
+      <div className={shellClass}>
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode={inputMode}
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          className={styles.plainInput}
+          value={value}
+          placeholder={placeholder}
+          onChange={e => onChange(e.target.value)}
+          onBlur={onBlur}
+          aria-label={ariaLabel ?? placeholder}
+          autoComplete={kind === 'email' ? 'email' : 'off'}
+        />
+      </div>
     );
   }
 
@@ -97,9 +116,7 @@ export function ContactMaskField({
   };
 
   const applyRaw = (nextRaw: string) => {
-    const processed = isPhone
-      ? processPhoneRaw(template, nextRaw)
-      : processEmailRaw(template, nextRaw);
+    const processed = processPhoneRaw(template, nextRaw);
     scheduleCaret(processed);
     onChange(processed);
   };
@@ -119,27 +136,13 @@ export function ContactMaskField({
 
     if (e.key === 'Backspace' || e.key === 'Delete') {
       e.preventDefault();
-      if (selected) {
-        applyRaw('');
-      } else {
-        applyRaw(raw.slice(0, -1));
-      }
+      applyRaw(selected ? '' : raw.slice(0, -1));
       return;
     }
 
     if (e.key.length !== 1 || mod || e.altKey) return;
 
-    if (isPhone) {
-      if (/\d/.test(e.key)) {
-        e.preventDefault();
-        applyRaw(selected ? e.key : raw + e.key);
-      } else {
-        e.preventDefault();
-      }
-      return;
-    }
-
-    if (/[a-zA-Z0-9@._+-]/.test(e.key)) {
+    if (/\d/.test(e.key)) {
       e.preventDefault();
       applyRaw(selected ? e.key : raw + e.key);
     } else {
@@ -149,17 +152,8 @@ export function ContactMaskField({
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData('text');
-    if (!pasted) return;
-
-    if (isPhone) {
-      const digits = pasted.replace(/\D/g, '');
-      if (digits) applyRaw(digits);
-      return;
-    }
-
-    const cleaned = pasted.replace(/[^a-zA-Z0-9@._+-]/g, '');
-    if (cleaned) applyRaw(cleaned);
+    const digits = e.clipboardData.getData('text').replace(/\D/g, '');
+    if (digits) applyRaw(digits);
   };
 
   const handleFocus = () => {
@@ -170,22 +164,24 @@ export function ContactMaskField({
   };
 
   return (
-    <div className={`${styles.field} ${className ?? ''}`}>
-      <MaskVisual segments={segments} />
-      <input
-        ref={inputRef}
-        type="text"
-        inputMode={isPhone ? 'tel' : 'email'}
-        autoComplete="off"
-        className={styles.input}
-        value={displayValue}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        onFocus={handleFocus}
-        onChange={() => {}}
-        onBlur={onBlur}
-        aria-label={ariaLabel}
-      />
+    <div className={shellClass}>
+      <div className={styles.maskField}>
+        <MaskVisual segments={segments} />
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="tel"
+          autoComplete="tel"
+          className={styles.maskInput}
+          value={displayValue}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          onFocus={handleFocus}
+          onChange={() => {}}
+          onBlur={onBlur}
+          aria-label={ariaLabel ?? placeholder}
+        />
+      </div>
     </div>
   );
 }
