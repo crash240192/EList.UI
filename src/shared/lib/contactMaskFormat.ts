@@ -29,8 +29,9 @@ export function resolveContactMaskTemplate(mask: string | null, typeName = ''): 
   }
 
   const name = typeName.toLowerCase();
+  // Email: без визуальной маски — на мобильных кастомный caret ломает ввод.
   if (mask.includes('@') || name.includes('email') || name.includes('почт') || name.includes('mail')) {
-    return '_@_._';
+    return null;
   }
 
   if (mask.includes('\\d') && !mask.includes('@')) {
@@ -67,7 +68,7 @@ export function formatPhoneMasked(digits: string): string {
   return `+7 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6, 8)}-${d.slice(8, 10)}`;
 }
 
-/** Компактный формат для отправки на API: +7XXXXXXXXXX */
+/** Компактный формат (+7XXXXXXXXXX) — для отображения/нормализации, не для API-маски Телефон. */
 export function phoneApiValue(digits: string): string {
   const d = digits.replace(/\D/g, '').slice(0, PHONE_DIGIT_SLOTS);
   return d.length ? `+7${d}` : '';
@@ -88,12 +89,12 @@ export function extractRawFromValue(template: string, value: string): string {
 }
 
 /**
- * Собирает итоговую строку для отправки на API.
- * Вызывается при валидации и submit — не на каждый keystroke.
+ * Итоговая строка для API.
+ * Телефон: формат маски БД `+7 (XXX) XXX-XX-XX` (не компактный +7XXXXXXXXXX).
  */
 export function composeContactValue(template: string, raw: string): string {
   if (isPhoneTemplate(template)) {
-    return phoneApiValue(raw);
+    return formatPhoneMasked(phoneDigitsFromValue(raw));
   }
   if (isEmailTemplate(template)) {
     return raw.replace(/[^a-zA-Z0-9@._+-]/g, '');
@@ -200,6 +201,16 @@ export function getMaskInputMode(
   mask: string | null,
   typeName = '',
 ): 'search' | 'text' | 'none' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | undefined {
+  const name = typeName.toLowerCase();
+  if (
+    (mask?.includes('@') ?? false)
+    || name.includes('email')
+    || name.includes('почт')
+    || name.includes('mail')
+  ) {
+    return 'email';
+  }
+
   const template = resolveContactMaskTemplate(mask, typeName);
   if (!template) return 'text';
   if (template.includes('#')) return 'tel';

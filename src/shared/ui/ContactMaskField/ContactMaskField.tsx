@@ -6,6 +6,7 @@ import {
   buildContactMaskSegments,
   extractRawFromValue,
   getContactCaretIndex,
+  getMaskInputMode,
   processEmailRaw,
   processPhoneRaw,
   resolveContactMaskTemplate,
@@ -72,16 +73,21 @@ export function ContactMaskField({
   }, [displayValue]);
 
   if (!template) {
+    const plainMode = getMaskInputMode(mask, typeName);
     return (
       <input
         ref={inputRef}
         type="text"
+        inputMode={plainMode}
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
         className={className}
         value={value}
         onChange={e => onChange(e.target.value)}
         onBlur={onBlur}
         aria-label={ariaLabel}
-        autoComplete="off"
+        autoComplete={plainMode === 'email' ? 'email' : plainMode === 'tel' ? 'tel' : 'off'}
       />
     );
   }

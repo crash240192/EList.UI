@@ -469,7 +469,6 @@ export default function RegisterPage() {
                   >
                     политикой обработки персональных данных
                   </button>
-                  {' '}(подпись не требуется)
                 </p>
               </div>
             </div>
