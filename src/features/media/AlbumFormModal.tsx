@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  assignAlbumToEvent,
   createAlbum,
   updateAlbum,
   type IAlbum,
@@ -19,6 +20,8 @@ interface AlbumFormModalProps {
   onSaved: (album: IAlbum) => void;
   accountId: string | null;
   organizationId?: string | null;
+  /** Если задан — после create сразу assign, затем загрузка фото (нужно для RO-альбомов). */
+  eventId?: string | null;
   album?: IAlbum | null;
 }
 
@@ -37,6 +40,7 @@ export function AlbumFormModal({
   onSaved,
   accountId,
   organizationId,
+  eventId = null,
   album,
 }: AlbumFormModalProps) {
   const isEdit = !!album;
@@ -111,6 +115,11 @@ export function AlbumFormModal({
           parameters,
         };
         const newId = await createAlbum(payload);
+        // Сначала привязка к событию: ParticipantsReadonly иначе блокирует AddFiles
+        // на ещё личном альбоме (флаг про участников мероприятия, не владельца).
+        if (eventId) {
+          await assignAlbumToEvent(eventId, newId);
+        }
         if (pendingPhotos.length > 0) {
           setUploadingPhotoIds(new Set(pendingPhotos.map(p => p.localId)));
           await Promise.all(pendingPhotos.map(async photo => {
@@ -131,6 +140,7 @@ export function AlbumFormModal({
           id: newId,
           name: name.trim(),
           description: description.trim() || undefined,
+          eventId: eventId ?? undefined,
           parameters,
         });
       }
@@ -185,7 +195,9 @@ export function AlbumFormModal({
               <input type="checkbox" checked={readOnly} onChange={e => setReadOnly(e.target.checked)} />
               <div>
                 <div className={styles.flagLabel}>Только просмотр для участников</div>
-                <div className={styles.flagHint}>Участники не смогут добавлять фото</div>
+                <div className={styles.flagHint}>
+                  Участники не смогут добавлять фото (организатор по-прежнему может)
+                </div>
               </div>
             </label>
             <label className={styles.flagRow}>
