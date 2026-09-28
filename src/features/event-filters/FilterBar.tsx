@@ -453,7 +453,7 @@ export function FilterBar({
         <div className={styles.sep}/>
 
         {/* Группа: цена */}
-        <span className={styles.groupLabel}>Цена</span>
+        <span className={styles.groupLabel}>Цена до</span>
         <button className={`${styles.quickBtn} ${filters.price === 0 ? styles.quickBtnOn : ''}`} onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>Бесплатно</button>
 
         <div className={styles.sep}/>
@@ -520,7 +520,7 @@ export function FilterBar({
               onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
           </div>
           <div className={styles.epBlock}>
-            <span className={styles.epLabel}>Цена, ₽</span>
+            <span className={styles.epLabel}>Цена до, ₽</span>
             <input type="number" className={styles.epInput}
               placeholder="Любая" value={filters.price ?? ''}
               min={0}

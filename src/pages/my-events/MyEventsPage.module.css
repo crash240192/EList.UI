@@ -261,32 +261,49 @@
 
 @media (max-width: 639px) {
   .subHeader {
-    flex-wrap: wrap;
-    align-items: stretch;
+    flex-wrap: nowrap;
     padding: 8px 12px;
   }
 
   .archiveTabs {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .subHeaderActions {
+    flex: 0 0 auto;
+  }
+
+  .createBtn {
+    flex-shrink: 0;
+  }
+
+  /* Галочка только на «Организую» — тогда переносим actions на вторую строку */
+  .subHeaderWithCancelled {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .subHeaderWithCancelled .archiveTabs {
     flex: 1 1 100%;
     width: 100%;
   }
 
-  .subHeaderActions {
+  .subHeaderWithCancelled .subHeaderActions {
     flex: 1 1 100%;
     width: 100%;
     justify-content: space-between;
     gap: 10px;
   }
 
-  .showCancelled {
+  .subHeaderWithCancelled .showCancelled {
     flex: 1 1 auto;
     min-width: 0;
     white-space: normal;
     line-height: 1.25;
   }
 
-  .createBtn {
-    flex-shrink: 0;
+  .subHeaderWithCancelled .createBtn {
     margin-left: auto;
   }
 }
