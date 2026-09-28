@@ -12,12 +12,14 @@ import {
   assignEventTypes,
   fetchEventParameters,
   fetchEventOrganizators,
+  checkIsEventOrganizator,
   createEventTemplate,
   updateEventTemplate,
   searchEventTemplates,
   type ICreateEventPayload,
   type IEventTemplate,
 } from '@/entities/event';
+import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import type { IEvent, IEventType } from '@/entities/event';
 import {
   fetchEventTypesByEvent,
@@ -226,6 +228,10 @@ export default function CreateEventPage() {
 
   const [form,        setForm]        = useState<FormState>(EMPTY);
   const [loading,     setLoading]     = useState(isEditing);
+  /** Редактирование: только организатор может открыть форму по ссылке */
+  const [editAccess,  setEditAccess]  = useState<'idle' | 'checking' | 'allowed' | 'denied'>(
+    isEditing ? 'checking' : 'idle',
+  );
   const [saving,      setSaving]      = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Set<FieldError>>(new Set());
 
@@ -615,9 +621,31 @@ export default function CreateEventPage() {
     return () => { cancelled = true; };
   }, [isEditing, hostGate, pendingTemplate, showToast]);
 
+  // Редактирование: проверка, что текущий пользователь — организатор
+  useEffect(() => {
+    if (!isEditing || !id) {
+      setEditAccess('idle');
+      return;
+    }
+    let cancelled = false;
+    setEditAccess('checking');
+    setLoading(true);
+    (async () => {
+      if (USE_MOCK) {
+        if (!cancelled) setEditAccess('allowed');
+        return;
+      }
+      const allowed = await checkIsEventOrganizator(id);
+      if (cancelled) return;
+      setEditAccess(allowed ? 'allowed' : 'denied');
+      if (!allowed) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [isEditing, id]);
+
   // Загрузка события для редактирования
   useEffect(() => {
-    if (!isEditing) return;
+    if (!isEditing || editAccess !== 'allowed') return;
     initialTypesAppliedRef.current = false;
     initialEventTypeIdsRef.current = null;
     setLoading(true);
@@ -732,11 +760,11 @@ export default function CreateEventPage() {
         setSelectedTypes([]);
       }
     }).finally(() => setLoading(false));
-  }, [id, isEditing]);
+  }, [id, isEditing, editAccess]);
 
   // Редактирование: хост события (организация / пользователь) и тариф организации
   useEffect(() => {
-    if (!isEditing || !id) {
+    if (!isEditing || !id || editAccess !== 'allowed') {
       setEditTicketsCapability('unknown');
       return;
     }
@@ -774,7 +802,7 @@ export default function CreateEventPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isEditing, id]);
+  }, [isEditing, id, editAccess]);
 
   // Сброс флага билетов, если продажа недоступна или стоимость 0
   useEffect(() => {
@@ -1588,7 +1616,25 @@ export default function CreateEventPage() {
     );
   }
 
-  if (loading) return (
+  if (isEditing && editAccess === 'denied') {
+    return (
+      <div className={styles.page}>
+        <div className={styles.pageInner}>
+          <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
+            <div className={styles.header}>
+              <HeroBackButton onClick={goBack} />
+              <h1 className={styles.title}>Редактировать мероприятие</h1>
+            </div>
+            <AccessDeniedGate denied variant="page">
+              <div className={styles.editDeniedPlaceholder} aria-hidden />
+            </AccessDeniedGate>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || (isEditing && editAccess === 'checking')) return (
     <div className={styles.page}>
       <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
         <div className={styles.header}><div className={styles.backBtn} /><div style={{width:180,height:20,borderRadius:8,background:'rgba(255,255,255,0.2)'}} /></div>
