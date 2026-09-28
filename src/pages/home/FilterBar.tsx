@@ -277,7 +277,7 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
               onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
           </div>
           <div className={styles.epBlock}>
-            <span className={styles.epLabel}>Цена, ₽</span>
+            <span className={styles.epLabel}>Цена до, ₽</span>
             <input type="number" min={0} max={MAX_EVENT_COST} step={100} className={styles.epInput}
               placeholder="Любая" value={filters.price ?? ''}
               onChange={e => {

@@ -145,7 +145,7 @@ export function MobileFilterSheet({
 
           {/* Цена */}
           <div className={styles.section}>
-            <div className={styles.sectionLabel}>Цена</div>
+            <div className={styles.sectionLabel}>Цена до</div>
             <div className={styles.pills}>
               <button
                 className={`${styles.pill} ${filters.price === 0 ? styles.pillOn : ''}`}
@@ -209,7 +209,7 @@ export function MobileFilterSheet({
                   onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
               </div>
               <div className={styles.field}>
-                <span className={styles.fieldLabel}>Цена, ₽</span>
+                <span className={styles.fieldLabel}>Цена до, ₽</span>
                 <input className={styles.input} type="number" min={0}
                   placeholder="Любая" value={filters.price ?? ''}
                   onFocus={e => e.currentTarget.select()}

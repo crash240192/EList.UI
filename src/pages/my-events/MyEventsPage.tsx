@@ -194,7 +194,7 @@ export default function MyEventsPage() {
       />
 
       {/* ── Кнопка создать + переключатель активные/прошедшие ── */}
-      <div className={styles.subHeader}>
+      <div className={`${styles.subHeader}${ownerFilter === 'mine' ? ` ${styles.subHeaderWithCancelled}` : ''}`}>
         <TabBar
           className={styles.archiveTabs}
           tabs={[
