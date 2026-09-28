@@ -589,3 +589,13 @@
   padding: 2px 7px; border-radius: 10px;
 }
 .previewPriceRow { margin-top: 4px; }
+
+/* Плейсхолдер под Access Denied на /edit-event/:id */
+.editDeniedPlaceholder {
+  min-height: 360px;
+  margin: 16px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, var(--surface-2) 0%, transparent 40%),
+    var(--surface-2);
+}
