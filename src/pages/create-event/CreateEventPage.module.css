@@ -501,6 +501,7 @@
   cursor: pointer;
   font-family: inherit;
   transition: background 0.15s, border-color 0.15s;
+  scroll-margin-bottom: 12px;
 }
 
 .pickInviteBtn:hover {

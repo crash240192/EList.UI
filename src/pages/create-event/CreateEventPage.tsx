@@ -274,6 +274,7 @@ export default function CreateEventPage() {
   const [listModalOpen, setListModalOpen] = useState(false);
   const [invitePickerOpen, setInvitePickerOpen] = useState(false);
   const [inviteUserIds, setInviteUserIds] = useState<string[]>([]);
+  const pickInviteBtnRef = useRef<HTMLButtonElement>(null);
   const [autoInviteEnabled, setAutoInviteEnabled] = useState(false);
   const [autoInviteMode, setAutoInviteMode] = useState<'all' | 'select'>('select');
 
@@ -1302,6 +1303,16 @@ export default function CreateEventPage() {
     if (!autoInviteEnabled) setInviteUserIds([]);
   }, [autoInviteEnabled]);
 
+  useEffect(() => {
+    if (isEditing || !autoInviteEnabled || autoInviteMode !== 'select' || !accountId) return;
+    const btn = pickInviteBtnRef.current;
+    if (!btn) return;
+    const id = window.requestAnimationFrame(() => {
+      btn.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [isEditing, autoInviteEnabled, autoInviteMode, accountId]);
+
   const nameHasProfanity = hasProfanity(form.name);
   const descriptionHasProfanity = hasProfanity(form.description);
   const hasCensoredSpeech = nameHasProfanity || descriptionHasProfanity;
@@ -2299,7 +2310,7 @@ export default function CreateEventPage() {
                 checked={autoInviteEnabled}
                 onChange={(e) => setAutoInviteEnabled(e.target.checked)}
               />
-              <span>Автоприглашение</span>
+              <span>Отправить приглашение</span>
             </label>
             <div className={`${styles.autoInviteModes} ${!autoInviteEnabled ? styles.autoInviteModesDisabled : ''}`}>
               <label
@@ -2332,6 +2343,7 @@ export default function CreateEventPage() {
             </div>
             {autoInviteEnabled && autoInviteMode === 'select' && accountId && (
               <button
+                ref={pickInviteBtnRef}
                 type="button"
                 className={styles.pickInviteBtn}
                 onClick={() => setInvitePickerOpen(true)}
