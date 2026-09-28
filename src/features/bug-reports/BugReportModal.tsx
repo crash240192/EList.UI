@@ -43,6 +43,34 @@ function isAllowedPartnershipFile(file: File): boolean {
   return PARTNERSHIP_EXTS.some(ext => name.endsWith(ext));
 }
 
+/** Картинки из Ctrl+V / буфера (скриншот OS часто без имени файла). */
+function filesFromClipboard(clipboard: DataTransfer | null): File[] {
+  if (!clipboard) return [];
+
+  const fromItems: File[] = [];
+  if (clipboard.items?.length) {
+    for (const item of Array.from(clipboard.items)) {
+      if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+      const raw = item.getAsFile();
+      if (!raw) continue;
+      const ext = raw.type === 'image/jpeg' ? 'jpg'
+        : raw.type === 'image/webp' ? 'webp'
+          : 'png';
+      const name = raw.name && raw.name !== 'image.png' && raw.name !== 'blob'
+        ? raw.name
+        : `screenshot-${Date.now()}-${fromItems.length + 1}.${ext}`;
+      fromItems.push(
+        raw.name === name
+          ? raw
+          : new File([raw], name, { type: raw.type || `image/${ext === 'jpg' ? 'jpeg' : ext}` }),
+      );
+    }
+  }
+  if (fromItems.length) return fromItems;
+
+  return Array.from(clipboard.files ?? []).filter(f => f.type.startsWith('image/'));
+}
+
 export function BugReportModal({ onClose }: BugReportModalProps) {
   const [topic, setTopic] = useState<SupportTopic | ''>('');
   const [categories, setCategories] = useState<IBugReportCategory[]>([]);
@@ -59,6 +87,8 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const shotsRef = useRef(shots);
+  shotsRef.current = shots;
 
   useModalBackButton(onClose);
 
@@ -103,9 +133,9 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
     clearShots();
   };
 
-  const handleImageFiles = async (files: FileList | null, upload: boolean) => {
+  const handleImageFiles = useCallback(async (files: FileList | File[] | null, upload: boolean) => {
     if (!files?.length) return;
-    const remaining = MAX_FILES - shots.length;
+    const remaining = MAX_FILES - shotsRef.current.length;
     if (remaining <= 0) {
       setError(`Можно приложить не больше ${MAX_FILES} скриншотов`);
       return;
@@ -142,7 +172,24 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
     }
-  };
+  }, []);
+
+  // Ctrl+V / Cmd+V — вставка скриншота из буфера, пока открыта модалка
+  useEffect(() => {
+    if (done) return;
+    if (topic !== 'bug' && topic !== 'suggestion') return;
+
+    const onPaste = (e: ClipboardEvent) => {
+      if (saving || uploading) return;
+      const images = filesFromClipboard(e.clipboardData);
+      if (!images.length) return;
+      e.preventDefault();
+      void handleImageFiles(images, topic === 'bug');
+    };
+
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [topic, done, saving, uploading, handleImageFiles]);
 
   const handleDocFiles = (files: FileList | null) => {
     if (!files?.length) return;
@@ -246,8 +293,8 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
                 <>
                   <p className={styles.hint}>
                     {topic === 'bug'
-                      ? 'Укажите раздел, опишите проблему и при необходимости приложите скриншот.'
-                      : 'Укажите раздел, опишите предложение и при необходимости приложите скриншот.'}
+                      ? 'Укажите раздел, опишите проблему и при необходимости приложите скриншот (файл или Ctrl+V).'
+                      : 'Укажите раздел, опишите предложение и при необходимости приложите скриншот (файл или Ctrl+V).'}
                   </p>
 
                   <div className={styles.field}>
@@ -305,7 +352,7 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
                       )}
                     </div>
                     <span className={styles.uploadHint}>
-                      JPG, PNG, WEBP · до 10 МБ · максимум {MAX_FILES}
+                      JPG, PNG, WEBP · до 10 МБ · максимум {MAX_FILES} · можно вставить Ctrl+V
                     </span>
                     <input
                       ref={inputRef}
