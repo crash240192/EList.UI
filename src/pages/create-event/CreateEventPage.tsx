@@ -593,7 +593,8 @@ export default function CreateEventPage() {
   }, [isEditing, id, accountId]);
 
   const draftSnapshotRef = useRef<Omit<CreateEventDraft, 'v' | 'savedAt'> | null>(null);
-  if (!isEditing && eventHost && hostGate === 'form') {
+  const discardCreateDraftRef = useRef(false);
+  if (!isEditing && eventHost && hostGate === 'form' && !discardCreateDraftRef.current) {
     draftSnapshotRef.current = {
       host: eventHost,
       form,
@@ -620,6 +621,7 @@ export default function CreateEventPage() {
     const aid = getStoredAccountId() ?? accountId;
     if (!aid) return;
     const persist = () => {
+      if (discardCreateDraftRef.current) return;
       const snap = draftSnapshotRef.current;
       if (snap) saveCreateEventDraft(aid, snap);
     };
@@ -2281,7 +2283,14 @@ export default function CreateEventPage() {
 
         {/* Кнопки */}
         <div className={styles.actions}>
-          <button type="button" className={styles.cancelBtn} onClick={goBack}>Отмена</button>
+          <button type="button" className={styles.cancelBtn} onClick={() => {
+            if (!isEditing) {
+              discardCreateDraftRef.current = true;
+              draftSnapshotRef.current = null;
+              clearCreateEventDraft(getStoredAccountId() ?? accountId);
+            }
+            goBack();
+          }}>Отмена</button>
           <button
             type="button"
             className={`${styles.saveBtn} ${hasCensoredSpeech ? styles.saveBtnInactive : ''}`}
