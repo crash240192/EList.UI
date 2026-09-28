@@ -31,7 +31,7 @@ import {
   type IBWListUser,
 } from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
-import { fetchAccountById, getOrFetchAccountId } from '@/entities/user/api';
+import { fetchAccountById, getOrFetchAccountId, getStoredAccountId } from '@/entities/user/api';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { getWalletByAccount, getWalletByOrganization } from '@/entities/user/walletApi';
 import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } from '@/entities/admin/adminApi';
@@ -89,6 +89,13 @@ import {
   CreateEventHostChooser,
   type CreateEventHost,
 } from './CreateEventHostChooser';
+import {
+  clearCreateEventDraft,
+  loadCreateEventDraft,
+  persistableCoverUrl,
+  saveCreateEventDraft,
+  type CreateEventDraft,
+} from './createEventDraft';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
   getMaxEventAgeForTariff,
@@ -233,6 +240,7 @@ export default function CreateEventPage() {
   const [eventHost, setEventHost] = useState<CreateEventHost | null>(null);
   const [canChooseHost, setCanChooseHost] = useState(false);
   const skipHostGateEffectRef = useRef(false);
+  const draftHydratedRef = useRef(false);
 
   const [form,        setForm]        = useState<FormState>(EMPTY);
   const [loading,     setLoading]     = useState(isEditing);
@@ -325,6 +333,32 @@ export default function CreateEventPage() {
       setHostGate('form');
       setCanChooseHost(false);
       return;
+    }
+
+    if (!hostParam && !orgIdParam) {
+      const restoredHost = loadCreateEventDraft(getStoredAccountId())?.host ?? null;
+      if (restoredHost) {
+        let cancelled = false;
+        setEventHost(restoredHost);
+        setHostGate('form');
+        fetchMyOrganizations()
+          .then(list => filterOrganizationsEligibleToHostEvents(list))
+          .then(eligible => {
+            if (cancelled) return;
+            setCanChooseHost(eligible.length > 0);
+            if (restoredHost.kind === 'organization') {
+              const stillAllowed = eligible.some(o => o.id === restoredHost.organizationId);
+              if (!stillAllowed) {
+                setEventHost(null);
+                setHostGate('chooser');
+              }
+            }
+          })
+          .catch(() => {
+            if (!cancelled) setCanChooseHost(false);
+          });
+        return () => { cancelled = true; };
+      }
     }
 
     if (hostParam === 'user') {
@@ -478,37 +512,127 @@ export default function CreateEventPage() {
     allTypesRef.current = allTypes;
   }, [allTypes]);
 
-  // Сброс формы при переходе из редактирования в создание (тот же компонент, React не размонтирует)
+  // Сброс формы при переходе из редактирования в создание + восстановление локального черновика
   useEffect(() => {
-    if (isEditing) return;
+    if (isEditing) {
+      draftHydratedRef.current = false;
+      return;
+    }
 
-    setForm(EMPTY);
-    setLoading(false);
-    setSaving(false);
-    setFieldErrors(new Set());
-    setLat(null);
-    setLng(null);
-    setCoverUrl(null);
-    setCoverImageId(null);
-    setCoverFocus(DEFAULT_COVER_FOCUS);
-    setSelectedCategories([]);
-    setSelectedTypes([]);
-    setPickerOpen(false);
-    setEndMode('duration');
-    setDurationH('2');
-    setDurationM('0');
-    setWhitelist([]);
-    setBlacklist([]);
-    setListModalOpen(false);
-    setInviteUserIds([]);
-    setAutoInviteEnabled(false);
-    setAutoInviteMode('select');
-    setSourceTemplate(null);
-    loadedBWListsRef.current = new Set();
-    initialEventTypeIdsRef.current = null;
-    initialTypesAppliedRef.current = false;
-    templateAppliedRef.current = false;
-  }, [isEditing, id]);
+    const applyEmpty = () => {
+      setForm(EMPTY);
+      setLoading(false);
+      setSaving(false);
+      setFieldErrors(new Set());
+      setLat(null);
+      setLng(null);
+      setCoverUrl(null);
+      setCoverImageId(null);
+      setCoverFocus(DEFAULT_COVER_FOCUS);
+      setSelectedCategories([]);
+      setSelectedTypes([]);
+      setPickerOpen(false);
+      setEndMode('duration');
+      setDurationH('2');
+      setDurationM('0');
+      setWhitelist([]);
+      setBlacklist([]);
+      setListModalOpen(false);
+      setInviteUserIds([]);
+      setAutoInviteEnabled(false);
+      setAutoInviteMode('select');
+      setSourceTemplate(null);
+      loadedBWListsRef.current = new Set();
+      initialEventTypeIdsRef.current = null;
+      initialTypesAppliedRef.current = false;
+      templateAppliedRef.current = false;
+    };
+
+    const applyDraft = (draft: CreateEventDraft) => {
+      setForm({ ...EMPTY, ...draft.form });
+      setLoading(false);
+      setSaving(false);
+      setFieldErrors(new Set());
+      setLat(draft.lat);
+      setLng(draft.lng);
+      setCoverUrl(draft.coverUrl);
+      setCoverImageId(draft.coverImageId);
+      setCoverFocus(draft.coverFocus);
+      setSelectedCategories(draft.selectedCategories);
+      setSelectedTypes(draft.selectedTypes);
+      setPickerOpen(false);
+      setEndMode(draft.endMode);
+      setDurationH(draft.durationH);
+      setDurationM(draft.durationM);
+      setWhitelist(draft.whitelist);
+      setBlacklist(draft.blacklist);
+      setListModalOpen(false);
+      setInviteUserIds(draft.inviteUserIds);
+      setAutoInviteEnabled(draft.autoInviteEnabled);
+      setAutoInviteMode(draft.autoInviteMode);
+      setSourceTemplate(null);
+      loadedBWListsRef.current = new Set();
+      initialEventTypeIdsRef.current = null;
+      initialTypesAppliedRef.current = false;
+      templateAppliedRef.current = false;
+    };
+
+    if (draftHydratedRef.current) return;
+
+    const aid = getStoredAccountId() ?? accountId;
+    if (!aid) {
+      applyEmpty();
+      return;
+    }
+
+    const draft = loadCreateEventDraft(aid);
+    if (draft) applyDraft(draft);
+    else applyEmpty();
+    draftHydratedRef.current = true;
+  }, [isEditing, id, accountId]);
+
+  const draftSnapshotRef = useRef<Omit<CreateEventDraft, 'v' | 'savedAt'> | null>(null);
+  if (!isEditing && eventHost && hostGate === 'form') {
+    draftSnapshotRef.current = {
+      host: eventHost,
+      form,
+      lat,
+      lng,
+      coverImageId,
+      coverUrl: persistableCoverUrl(coverUrl),
+      coverFocus,
+      selectedCategories,
+      selectedTypes,
+      endMode,
+      durationH,
+      durationM,
+      whitelist,
+      blacklist,
+      inviteUserIds,
+      autoInviteEnabled,
+      autoInviteMode,
+    };
+  }
+
+  useEffect(() => {
+    if (isEditing || hostGate !== 'form' || !eventHost) return;
+    const aid = getStoredAccountId() ?? accountId;
+    if (!aid) return;
+    const persist = () => {
+      const snap = draftSnapshotRef.current;
+      if (snap) saveCreateEventDraft(aid, snap);
+    };
+    const timer = window.setTimeout(persist, 400);
+    return () => {
+      window.clearTimeout(timer);
+      persist();
+    };
+  }, [
+    isEditing, hostGate, eventHost, accountId,
+    form, lat, lng, coverImageId, coverUrl, coverFocus,
+    selectedCategories, selectedTypes, endMode, durationH, durationM,
+    whitelist, blacklist, inviteUserIds, autoInviteEnabled, autoInviteMode,
+  ]);
 
   // Применение шаблона с chooser (включая даты, приглашения и ч/б списки)
   useEffect(() => {
@@ -1253,6 +1377,7 @@ export default function CreateEventPage() {
 
         const createResult = await apiClient.post<string>('/api/events/create', createPayload);
         const newEventId = createResult?.result ?? createResult as unknown as string;
+        clearCreateEventDraft(accountId);
         if (coverImageId) {
           try { await saveCoverFocusToFile(coverImageId, coverFocus); } catch { /* optional persistence channel */ }
         }
