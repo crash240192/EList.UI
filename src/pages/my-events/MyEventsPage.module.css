@@ -225,8 +225,68 @@
 
 /* Строка под FilterBar: вкладки + кнопка создать */
 .subHeader {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  min-width: 0;
+}
+
+.subHeaderActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.showCancelled {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.showCancelled input {
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .subHeader {
+    flex-wrap: wrap;
+    align-items: stretch;
+    padding: 8px 12px;
+  }
+
+  .archiveTabs {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .subHeaderActions {
+    flex: 1 1 100%;
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .showCancelled {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .createBtn {
+    flex-shrink: 0;
+    margin-left: auto;
+  }
 }
