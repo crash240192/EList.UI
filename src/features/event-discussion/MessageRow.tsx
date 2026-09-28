@@ -32,7 +32,7 @@ import { MessageReplies } from './MessageReplies';
 import type { DiscussionViewMode } from './discussionViewMode';
 import { useDiscussionRefresh } from './discussionRefreshContext';
 import { uploadFile } from '@/shared/api/fileStorageClient';
-import { filterImageFiles } from '@/shared/lib/imageFile';
+import { filesFromClipboard, filterImageFiles } from '@/shared/lib/imageFile';
 import styles from './MessageRow.module.css';
 
 interface MessageRowProps {
@@ -310,7 +310,7 @@ export function MessageRow({
     });
   };
 
-  const handleEditFiles = (list: FileList | null) => {
+  const handleEditFiles = (list: FileList | File[] | null) => {
     if (!list?.length || savingEdit) return;
     const remaining = DISCUSSION_MESSAGE_MAX_FILES - editSlotCount;
     if (remaining <= 0) {
@@ -355,6 +355,14 @@ export function MessageRow({
     }
 
     if (editFileInputRef.current) editFileInputRef.current.value = '';
+  };
+
+  const handleEditPasteImages = (e: React.ClipboardEvent) => {
+    if (savingEdit || uploadingEdit) return;
+    const images = filesFromClipboard(e.clipboardData);
+    if (!images.length) return;
+    e.preventDefault();
+    handleEditFiles(images);
   };
 
   const saveEdit = async () => {
@@ -515,6 +523,7 @@ export function MessageRow({
                   disabled={savingEdit || uploadingEdit}
                   maxLength={DISCUSSION_MESSAGE_MAX_LENGTH}
                   onChange={(e) => setEditText(clampText(e.target.value, DISCUSSION_MESSAGE_MAX_LENGTH))}
+                  onPaste={handleEditPasteImages}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();

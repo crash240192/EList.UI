@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
 import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
 import { uploadFile } from '@/shared/api/fileStorageClient';
-import { filterImageFiles } from '@/shared/lib/imageFile';
+import { filesFromClipboard, filterImageFiles } from '@/shared/lib/imageFile';
 import {
   DISCUSSION_MESSAGE_MAX_FILES,
   DISCUSSION_MESSAGE_MAX_LENGTH,
@@ -96,9 +96,9 @@ export function MessageComposer({
     });
   };
 
-  const handleFiles = (list: FileList | null) => {
+  const handleFiles = (list: FileList | File[] | null) => {
     if (!list?.length || disabled || sending) return;
-    const remaining = DISCUSSION_MESSAGE_MAX_FILES - shots.length;
+    const remaining = DISCUSSION_MESSAGE_MAX_FILES - shotsRef.current.length;
     if (remaining <= 0) {
       setAttachError(`Не больше ${DISCUSSION_MESSAGE_MAX_FILES} фото`);
       return;
@@ -146,6 +146,14 @@ export function MessageComposer({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handlePasteImages = (e: React.ClipboardEvent) => {
+    if (disabled || sending) return;
+    const images = filesFromClipboard(e.clipboardData);
+    if (!images.length) return;
+    e.preventDefault();
+    handleFiles(images);
+  };
+
   const handleSubmit = async () => {
     const trimmed = text.trim();
     const fileIds = readyShots.map(s => s.fileId!);
@@ -190,6 +198,7 @@ export function MessageComposer({
         placeholder={placeholder}
         maxLength={DISCUSSION_MESSAGE_MAX_LENGTH}
         onChange={(e) => handleTextChange(e.target.value)}
+        onPaste={handlePasteImages}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
@@ -264,7 +273,7 @@ export function MessageComposer({
               {readyShots.length}/{DISCUSSION_MESSAGE_MAX_FILES}
             </span>
           )}
-          <span className={styles.hint}>Ctrl+Enter — отправить</span>
+          <span className={styles.hint}>Ctrl+V — фото · Ctrl+Enter — отправить</span>
         </div>
         <div className={styles.submitRow}>
           <TextLengthHint length={text.length} maxLength={DISCUSSION_MESSAGE_MAX_LENGTH} />

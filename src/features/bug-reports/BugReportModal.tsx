@@ -8,6 +8,7 @@ import {
   type IBugReportCategory,
 } from '@/entities/bugReport';
 import { uploadFile } from '@/shared/api/fileStorageClient';
+import { filesFromClipboard } from '@/shared/lib/imageFile';
 import { Select } from '@/shared/ui/Select/Select';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import styles from './BugReportModal.module.css';
@@ -41,34 +42,6 @@ interface BugReportModalProps {
 function isAllowedPartnershipFile(file: File): boolean {
   const name = file.name.toLowerCase();
   return PARTNERSHIP_EXTS.some(ext => name.endsWith(ext));
-}
-
-/** Картинки из Ctrl+V / буфера (скриншот OS часто без имени файла). */
-function filesFromClipboard(clipboard: DataTransfer | null): File[] {
-  if (!clipboard) return [];
-
-  const fromItems: File[] = [];
-  if (clipboard.items?.length) {
-    for (const item of Array.from(clipboard.items)) {
-      if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
-      const raw = item.getAsFile();
-      if (!raw) continue;
-      const ext = raw.type === 'image/jpeg' ? 'jpg'
-        : raw.type === 'image/webp' ? 'webp'
-          : 'png';
-      const name = raw.name && raw.name !== 'image.png' && raw.name !== 'blob'
-        ? raw.name
-        : `screenshot-${Date.now()}-${fromItems.length + 1}.${ext}`;
-      fromItems.push(
-        raw.name === name
-          ? raw
-          : new File([raw], name, { type: raw.type || `image/${ext === 'jpg' ? 'jpeg' : ext}` }),
-      );
-    }
-  }
-  if (fromItems.length) return fromItems;
-
-  return Array.from(clipboard.files ?? []).filter(f => f.type.startsWith('image/'));
 }
 
 export function BugReportModal({ onClose }: BugReportModalProps) {
@@ -174,22 +147,16 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
     }
   }, []);
 
-  // Ctrl+V / Cmd+V — вставка скриншота из буфера, пока открыта модалка
-  useEffect(() => {
-    if (done) return;
+  /** Ctrl+V в поле описания (или по модалке) — приложить скриншот из буфера. */
+  const handlePasteImages = (e: React.ClipboardEvent) => {
+    if (done || saving || uploading) return;
     if (topic !== 'bug' && topic !== 'suggestion') return;
-
-    const onPaste = (e: ClipboardEvent) => {
-      if (saving || uploading) return;
-      const images = filesFromClipboard(e.clipboardData);
-      if (!images.length) return;
-      e.preventDefault();
-      void handleImageFiles(images, topic === 'bug');
-    };
-
-    document.addEventListener('paste', onPaste);
-    return () => document.removeEventListener('paste', onPaste);
-  }, [topic, done, saving, uploading, handleImageFiles]);
+    const images = filesFromClipboard(e.clipboardData);
+    if (!images.length) return; // обычная вставка текста
+    e.preventDefault();
+    e.stopPropagation();
+    void handleImageFiles(images, topic === 'bug');
+  };
 
   const handleDocFiles = (files: FileList | null) => {
     if (!files?.length) return;
@@ -259,7 +226,13 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
   return createPortal(
     <>
       <div className={styles.backdrop} onClick={onClose} />
-      <div className={styles.modal} role="dialog" aria-modal aria-labelledby="support-modal-title">
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal
+        aria-labelledby="support-modal-title"
+        onPaste={handlePasteImages}
+      >
         <div className={styles.modalHeader}>
           <span id="support-modal-title" className={styles.modalTitle}>
             Написать в поддержку
@@ -293,8 +266,8 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
                 <>
                   <p className={styles.hint}>
                     {topic === 'bug'
-                      ? 'Укажите раздел, опишите проблему и при необходимости приложите скриншот (файл или Ctrl+V).'
-                      : 'Укажите раздел, опишите предложение и при необходимости приложите скриншот (файл или Ctrl+V).'}
+                      ? 'Укажите раздел, опишите проблему и при необходимости приложите скриншот (файл или Ctrl+V в поле описания).'
+                      : 'Укажите раздел, опишите предложение и при необходимости приложите скриншот (файл или Ctrl+V в поле описания).'}
                   </p>
 
                   <div className={styles.field}>
@@ -317,6 +290,7 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
                       className={styles.textarea}
                       value={description}
                       onChange={e => setDescription(e.target.value)}
+                      onPaste={handlePasteImages}
                       placeholder={descriptionPlaceholder}
                       rows={5}
                       disabled={saving}
@@ -352,7 +326,7 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
                       )}
                     </div>
                     <span className={styles.uploadHint}>
-                      JPG, PNG, WEBP · до 10 МБ · максимум {MAX_FILES} · можно вставить Ctrl+V
+                      JPG, PNG, WEBP · до 10 МБ · максимум {MAX_FILES} · Ctrl+V в поле описания
                     </span>
                     <input
                       ref={inputRef}
