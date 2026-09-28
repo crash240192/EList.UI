@@ -204,12 +204,12 @@ export default function MyEventsPage() {
           activeId={tab}
           onChange={id => setTab(id as typeof tab)}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className={styles.subHeaderActions}>
           {ownerFilter === 'mine' && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <label className={styles.showCancelled}>
               <input type="checkbox" checked={showCancelled}
                 onChange={e => setShowCancelled(e.target.checked)} />
-              Показывать отменённые
+              <span>Показывать отменённые</span>
             </label>
           )}
           <button className={styles.createBtn} onClick={() => navigate('/create-event')}>
