@@ -28,6 +28,8 @@ import { useAgeFilterGate } from '@/features/event-filters/useAgeFilterGate';
 import styles from './FilterBar.module.css';
 
 const DEFAULT_RADIUS_M = 25000; // запасной радиус до первой синхронизации с картой
+/** Согласовано с API MaxEventCost */
+const MAX_EVENT_COST = 1_000_000;
 
 /** Текущий город в фильтре поиска (не путать с родным городом аккаунта). */
 function getSearchCityName(): string {
@@ -521,8 +523,21 @@ export function FilterBar({
             <span className={styles.epLabel}>Цена, ₽</span>
             <input type="number" className={styles.epInput}
               placeholder="Любая" value={filters.price ?? ''}
+              min={0}
+              max={MAX_EVENT_COST}
               onFocus={e => e.currentTarget.select()}
-              onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
+              onChange={e => {
+                if (e.target.value === '') {
+                  setFilter('price', undefined);
+                  return;
+                }
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n)) {
+                  setFilter('price', undefined);
+                  return;
+                }
+                setFilter('price', Math.min(Math.max(n, 0), MAX_EVENT_COST));
+              }} />
           </div>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Возраст, до</span>

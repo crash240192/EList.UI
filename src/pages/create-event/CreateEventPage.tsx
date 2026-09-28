@@ -126,6 +126,14 @@ const EMPTY: FormState = {
   ticketsEnabled: false,
 };
 
+/** Абсолютный потолок стоимости (₽), согласован с API / лимитом пополнения кошелька. */
+const MAX_EVENT_COST = 1_000_000;
+
+function parseEventCost(raw: string): number {
+  const n = Number.parseFloat(String(raw).replace(',', '.'));
+  return Number.isFinite(n) ? n : Number.NaN;
+}
+
 async function resolveAccountIdsToUsers(ids: string[]): Promise<IWhitelistUser[]> {
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return [];
@@ -1054,13 +1062,18 @@ export default function CreateEventPage() {
         ? 'По тарифу доступен только рейтинг 0+'
         : `Возрастной рейтинг превышает лимит тарифа (макс. ${maxEventAge}+)`;
 
-  const costToastMessage = parseFloat(form.cost) < 0
+  const parsedCost = parseEventCost(form.cost || '0');
+  const costToastMessage = !Number.isFinite(parsedCost) || parsedCost < 0
     ? 'Стоимость не может быть отрицательной'
-    : effectiveMaxCost === 0
-      ? (hasTariff
-        ? 'По тарифу доступны только бесплатные мероприятия'
-        : 'Без тарифа стоимость может быть только 0 ₽')
-      : `Стоимость превышает лимит тарифа (до ${effectiveMaxCost?.toLocaleString()} ₽)`;
+    : parsedCost > MAX_EVENT_COST
+      ? `Слишком большая стоимость (макс. ${MAX_EVENT_COST.toLocaleString('ru-RU')} ₽)`
+      : effectiveMaxCost === 0
+        ? (hasTariff
+          ? 'По тарифу доступны только бесплатные мероприятия'
+          : 'Без тарифа стоимость может быть только 0 ₽')
+        : effectiveMaxCost != null && parsedCost > effectiveMaxCost
+          ? `Стоимость превышает лимит тарифа (до ${effectiveMaxCost.toLocaleString('ru-RU')} ₽)`
+          : `Слишком большая стоимость (макс. ${MAX_EVENT_COST.toLocaleString('ru-RU')} ₽)`;
 
   // Validation
   const validate = (): FieldError | null => {
@@ -1097,8 +1110,9 @@ export default function CreateEventPage() {
         }
       }
     }
-    // Проверяем отрицательные значения
-    if (form.cost && parseFloat(form.cost) < 0)                                           errs.add('cost');
+    // Стоимость: конечное число, ≥ 0, абсолютный потолок и лимит тарифа
+    const costValue = parseEventCost(form.cost || '0');
+    if (!Number.isFinite(costValue) || costValue < 0 || costValue > MAX_EVENT_COST)        errs.add('cost');
     if (form.maxPersons && parseInt(form.maxPersons) < 0)                                 errs.add('maxPersons');
     // Возраст: если зафиксирован 0+ — не требуем ручного выбора
     if (hasWallet && tariffReady && !ageFixedToZero) {
@@ -1112,7 +1126,7 @@ export default function CreateEventPage() {
       }
     }
     // Ограничения тарифа / отсутствие тарифа (effectiveMaxCost = 0 без тарифа)
-    if (effectiveMaxCost != null && parseFloat(form.cost || '0') > effectiveMaxCost)      errs.add('cost');
+    if (effectiveMaxCost != null && Number.isFinite(costValue) && costValue > effectiveMaxCost) errs.add('cost');
     if (maxPersons != null && form.maxPersons && parseInt(form.maxPersons) > maxPersons)  errs.add('maxPersons');
 
     setFieldErrors(errs);
@@ -1211,7 +1225,12 @@ export default function CreateEventPage() {
         if (coverImageId) {
           try { await saveCoverFocusToFile(coverImageId, coverFocus); } catch { /* optional persistence channel */ }
         }
-        const editCost = parseFloat(form.cost) || 0;
+        const editCost = parseEventCost(form.cost);
+        if (!Number.isFinite(editCost) || editCost < 0 || editCost > MAX_EVENT_COST) {
+          showToast(costToastMessage);
+          setSaving(false);
+          return;
+        }
         await assignEventParameters(id!, {
           cost:               editCost,
           private:            form.isPrivate,
@@ -1257,7 +1276,8 @@ export default function CreateEventPage() {
     includeInvites?: boolean;
   } = {}): Promise<ICreateEventPayload> => {
     const accountId = opts.accountId ?? await getOrFetchAccountId();
-    const createCost = parseFloat(form.cost) || 0;
+    const parsedCreateCost = parseEventCost(form.cost);
+    const createCost = Number.isFinite(parsedCreateCost) ? Math.min(Math.max(parsedCreateCost, 0), MAX_EVENT_COST) : 0;
     const startTime = opts.startTime
       ?? (form.startDate && form.startTime
         ? localPartsToApiIso(form.startDate, form.startTime)
@@ -1866,20 +1886,21 @@ export default function CreateEventPage() {
                 <LockedInput
                   locked={!canSetCost}
                   value={form.cost}
-                  onChange={e => { const v = e.target.value.replace(/[^0-9.,]/g, ''); setForm(f => ({ ...f, cost: v })); }}
-                  type="number" min="0"
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^0-9.,]/g, '');
+                    const digits = v.replace(/[.,]/g, '');
+                    if (digits.length > 9) return;
+                    setForm(f => ({ ...f, cost: v }));
+                  }}
+                  type="number"
+                  min="0"
+                  max={MAX_EVENT_COST}
                   hasError={hasErr('cost')}
                   hint={hasErr('cost')
-                    ? (effectiveMaxCost === 0
-                      ? (hasTariff
-                        ? 'По тарифу доступны только бесплатные мероприятия'
-                        : 'Без тарифа стоимость может быть только 0 ₽')
-                      : `Превышает лимит тарифа (до ${effectiveMaxCost?.toLocaleString()} ₽)`)
-                    : canSetCost && effectiveMaxCost != null
-                    ? `до ${effectiveMaxCost.toLocaleString()} ₽`
-                    : !canSetCost
-                    ? (hasTariff ? 'Недоступно в тарифе' : 'Без тарифа — только бесплатные')
-                    : undefined}
+                    ? costToastMessage
+                    : canSetCost
+                      ? `до ${(effectiveMaxCost ?? MAX_EVENT_COST).toLocaleString('ru-RU')} ₽`
+                      : (hasTariff ? 'Недоступно в тарифе' : 'Без тарифа — только бесплатные')}
                 />
               </Field>
               <Field label="Макс. участников">
