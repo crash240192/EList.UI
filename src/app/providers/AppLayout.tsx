@@ -1,9 +1,12 @@
 // app/providers/AppLayout.tsx
 
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useThemeStore, useAuthStore, useFiltersStore, usePlatformRoleStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
+import { CreateEventDraftModal } from '@/shared/ui/CreateEventDraftModal/CreateEventDraftModal';
+import { getStoredAccountId } from '@/entities/user/api';
+import { clearCreateEventDraft, loadCreateEventDraft } from '@/pages/create-event/createEventDraft';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
@@ -41,8 +44,10 @@ export function AppLayout() {
   // На широком десктопе меню закреплено раскрытым (docked), на узких — оверлей.
   const [sidebarExpanded, setSidebarExpanded] = useState(isWide);
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
+  const [draftResumeOpen, setDraftResumeOpen] = useState(false);
   const { theme, toggleTheme } = useThemeStore();
-  const { isAuthenticated, logout } = useAuthStore();
+  const { isAuthenticated, logout, accountId } = useAuthStore();
+  const location = useLocation();
   const authenticated = isAuthenticated();
   const platformRole = usePlatformRoleStore(s => s.role);
   const platformActive = usePlatformRoleStore(s => s.active);
@@ -179,7 +184,15 @@ export function AppLayout() {
               className={({ isActive }) =>
                 `${styles.navItem} ${isActive ? styles.navActive : ''}`}
               title={label}
-              onClick={() => { if (!isWide) setSidebarExpanded(false); }}
+              onClick={(e) => {
+                if (!isWide) setSidebarExpanded(false);
+                if (to !== '/create-event') return;
+                if (location.pathname === '/create-event') return;
+                const aid = getStoredAccountId() ?? accountId;
+                if (!loadCreateEventDraft(aid)) return;
+                e.preventDefault();
+                setDraftResumeOpen(true);
+              }}
             >
               <span className={styles.navIcon}>
                 {icon}
@@ -256,6 +269,21 @@ export function AppLayout() {
 
       {logoutConfirm && (
         <LogoutConfirmModal onConfirm={handleLogout} onCancel={() => setLogoutConfirm(false)} />
+      )}
+
+      {draftResumeOpen && (
+        <CreateEventDraftModal
+          onCreateNew={() => {
+            clearCreateEventDraft(getStoredAccountId() ?? accountId);
+            setDraftResumeOpen(false);
+            navigate('/create-event');
+          }}
+          onContinue={() => {
+            setDraftResumeOpen(false);
+            navigate('/create-event');
+          }}
+          onCancel={() => setDraftResumeOpen(false)}
+        />
       )}
 
       {/* ---- Main ---- */}
