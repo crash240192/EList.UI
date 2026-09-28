@@ -138,6 +138,11 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* Длинные слова без пробелов — перенос, а не выезд за край; clamp держит высоту hero */
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .heroDateTime {
   position: relative;
@@ -559,7 +564,16 @@
 .mgmtBtnDanger:hover { background:rgba(239,68,68,.08); }
 
 /* Right: description */
-.desc { font-size:13px; color:var(--text-secondary); line-height:1.7; white-space:pre-line; }
+.desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  white-space: pre-line;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .descClamped { display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
 
 .descToggle {
