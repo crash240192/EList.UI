@@ -226,19 +226,23 @@
 .tabBtn {
   composes: tab from '../../shared/styles/tabs.module.css';
   padding: 6px 14px;
+}
+.tabsRow .tabBtn {
   border-radius: 10px;
   background: transparent;
 }
-.tabBtn:hover {
+.tabsRow .tabBtn:hover {
   background: transparent;
 }
 
 .tabBtnActive {
   composes: tabActive from '../../shared/styles/tabs.module.css';
+}
+.tabsRow .tabBtnActive {
   border-radius: 10px;
   background: color-mix(in srgb, var(--accent) 16%, color-mix(in srgb, #fff 7%, transparent));
 }
-.tabBtnActive:hover {
+.tabsRow .tabBtnActive:hover {
   background: color-mix(in srgb, var(--accent) 16%, color-mix(in srgb, #fff 7%, transparent));
 }
 
