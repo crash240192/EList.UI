@@ -141,7 +141,7 @@ export function loadCreateEventDraft(accountId: string | null | undefined): Crea
     const autoInviteMode = parsed.autoInviteMode === 'all' ? 'all' : 'select';
     const lat = typeof parsed.lat === 'number' && Number.isFinite(parsed.lat) ? parsed.lat : null;
     const lng = typeof parsed.lng === 'number' && Number.isFinite(parsed.lng) ? parsed.lng : null;
-    return {
+    const draft: CreateEventDraft = {
       v: DRAFT_VERSION,
       savedAt: typeof parsed.savedAt === 'number' ? parsed.savedAt : 0,
       host,
@@ -168,16 +168,64 @@ export function loadCreateEventDraft(accountId: string | null | undefined): Crea
       autoInviteEnabled: asBool(parsed.autoInviteEnabled),
       autoInviteMode,
     };
+    if (!isCreateEventDraftDirty(draft)) {
+      clearCreateEventDraft(accountId);
+      return null;
+    }
+    return draft;
   } catch {
     return null;
   }
 }
 
+export type CreateEventDraftSnapshot = Omit<CreateEventDraft, 'v' | 'savedAt'>;
+
+function durationIsDefault(h: string, m: string): boolean {
+  return (parseInt(h, 10) || 0) === 2 && (parseInt(m, 10) || 0) === 0;
+}
+
+function costIsDefault(raw: string): boolean {
+  const n = Number.parseFloat(String(raw).replace(',', '.'));
+  return !Number.isFinite(n) || n === 0;
+}
+
+/** Черновик пишем только если пользователь что-то менял относительно пустой формы. */
+export function isCreateEventDraftDirty(
+  draft: CreateEventDraftSnapshot | null | undefined,
+): boolean {
+  if (!draft) return false;
+  const f = draft.form;
+  if (f.name.trim() || f.description.trim() || f.address.trim()) return true;
+  if (f.startDate || f.startTime || f.endDate || f.endTime) return true;
+  if (!costIsDefault(f.cost)) return true;
+  if (f.ageLimit && f.ageLimit !== '0') return true;
+  if (f.isPrivate) return true;
+  if (f.maxPersons) return true;
+  if (f.allowUsersToInvite !== true) return true;
+  if (f.allowedGender) return true;
+  if (f.ticketsEnabled) return true;
+  if (draft.lat != null || draft.lng != null) return true;
+  if (draft.coverImageId || persistableCoverUrl(draft.coverUrl)) return true;
+  const focus = normalizeCoverFocus(draft.coverFocus);
+  if (focus.x !== DEFAULT_COVER_FOCUS.x || focus.y !== DEFAULT_COVER_FOCUS.y) return true;
+  if (draft.selectedCategories.length > 0 || draft.selectedTypes.length > 0) return true;
+  if (draft.endMode !== 'duration') return true;
+  if (!durationIsDefault(draft.durationH, draft.durationM)) return true;
+  if (draft.whitelist.length > 0 || draft.blacklist.length > 0 || draft.inviteUserIds.length > 0) return true;
+  if (draft.autoInviteEnabled) return true;
+  if (draft.autoInviteMode !== 'select') return true;
+  return false;
+}
+
 export function saveCreateEventDraft(
   accountId: string | null | undefined,
-  draft: Omit<CreateEventDraft, 'v' | 'savedAt'>,
+  draft: CreateEventDraftSnapshot,
 ): void {
   if (!accountId || !draft.host) return;
+  if (!isCreateEventDraftDirty(draft)) {
+    clearCreateEventDraft(accountId);
+    return;
+  }
   try {
     const payload: CreateEventDraft = {
       ...draft,

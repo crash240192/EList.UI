@@ -96,6 +96,7 @@ import {
   persistableCoverUrl,
   saveCreateEventDraft,
   type CreateEventDraft,
+  type CreateEventDraftSnapshot,
 } from './createEventDraft';
 import { CreateEventLeaveModal } from './CreateEventLeaveModal';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
@@ -518,41 +519,42 @@ export default function CreateEventPage() {
     allTypesRef.current = allTypes;
   }, [allTypes]);
 
+  const resetCreateForm = useCallback(() => {
+    setForm(EMPTY);
+    setLoading(false);
+    setSaving(false);
+    setFieldErrors(new Set());
+    setLat(null);
+    setLng(null);
+    setCoverUrl(null);
+    setCoverImageId(null);
+    setCoverFocus(DEFAULT_COVER_FOCUS);
+    setSelectedCategories([]);
+    setSelectedTypes([]);
+    setPickerOpen(false);
+    setEndMode('duration');
+    setDurationH('2');
+    setDurationM('0');
+    setWhitelist([]);
+    setBlacklist([]);
+    setListModalOpen(false);
+    setInviteUserIds([]);
+    setAutoInviteEnabled(false);
+    setAutoInviteMode('select');
+    setPendingTemplate(null);
+    setSourceTemplate(null);
+    loadedBWListsRef.current = new Set();
+    initialEventTypeIdsRef.current = null;
+    initialTypesAppliedRef.current = false;
+    templateAppliedRef.current = false;
+  }, []);
+
   // Сброс формы при переходе из редактирования в создание + восстановление локального черновика
   useEffect(() => {
     if (isEditing) {
       draftHydratedRef.current = false;
       return;
     }
-
-    const applyEmpty = () => {
-      setForm(EMPTY);
-      setLoading(false);
-      setSaving(false);
-      setFieldErrors(new Set());
-      setLat(null);
-      setLng(null);
-      setCoverUrl(null);
-      setCoverImageId(null);
-      setCoverFocus(DEFAULT_COVER_FOCUS);
-      setSelectedCategories([]);
-      setSelectedTypes([]);
-      setPickerOpen(false);
-      setEndMode('duration');
-      setDurationH('2');
-      setDurationM('0');
-      setWhitelist([]);
-      setBlacklist([]);
-      setListModalOpen(false);
-      setInviteUserIds([]);
-      setAutoInviteEnabled(false);
-      setAutoInviteMode('select');
-      setSourceTemplate(null);
-      loadedBWListsRef.current = new Set();
-      initialEventTypeIdsRef.current = null;
-      initialTypesAppliedRef.current = false;
-      templateAppliedRef.current = false;
-    };
 
     const applyDraft = (draft: CreateEventDraft) => {
       setForm({ ...EMPTY, ...draft.form });
@@ -587,17 +589,17 @@ export default function CreateEventPage() {
 
     const aid = getStoredAccountId() ?? accountId;
     if (!aid) {
-      applyEmpty();
+      resetCreateForm();
       return;
     }
 
     const draft = loadCreateEventDraft(aid);
     if (draft) applyDraft(draft);
-    else applyEmpty();
+    else resetCreateForm();
     draftHydratedRef.current = true;
-  }, [isEditing, id, accountId]);
+  }, [isEditing, id, accountId, resetCreateForm]);
 
-  const draftSnapshotRef = useRef<Omit<CreateEventDraft, 'v' | 'savedAt'> | null>(null);
+  const draftSnapshotRef = useRef<CreateEventDraftSnapshot | null>(null);
   const discardCreateDraftRef = useRef(false);
   if (!isEditing && eventHost && hostGate === 'form' && !discardCreateDraftRef.current) {
     draftSnapshotRef.current = {
@@ -1412,6 +1414,8 @@ export default function CreateEventPage() {
 
         const createResult = await apiClient.post<string>('/api/events/create', createPayload);
         const newEventId = createResult?.result ?? createResult as unknown as string;
+        discardCreateDraftRef.current = true;
+        draftSnapshotRef.current = null;
         clearCreateEventDraft(accountId);
         if (coverImageId) {
           try { await saveCoverFocusToFile(coverImageId, coverFocus); } catch { /* optional persistence channel */ }
@@ -1621,6 +1625,7 @@ export default function CreateEventPage() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const wantsTicketsEnabled = canEnableTickets
     && (parseFloat(form.cost) || 0) > 0
@@ -2301,9 +2306,15 @@ export default function CreateEventPage() {
 
         {/* Кнопки */}
         <div className={styles.actions}>
-          <button type="button" className={styles.leaveBtn} onClick={() => setLeaveConfirmOpen(true)}>
-            Отмена
-          </button>
+          {isEditing ? (
+            <button type="button" className={styles.leaveBtn} onClick={() => setLeaveConfirmOpen(true)}>
+              Отмена
+            </button>
+          ) : (
+            <button type="button" className={styles.leaveBtn} onClick={() => setResetConfirmOpen(true)}>
+              Сбросить
+            </button>
+          )}
           <button
             type="button"
             className={`${styles.saveBtn} ${hasCensoredSpeech ? styles.saveBtnInactive : ''}`}
@@ -2393,6 +2404,24 @@ export default function CreateEventPage() {
             else navigate('/', { replace: true });
           }}
           onStay={() => setLeaveConfirmOpen(false)}
+        />
+      )}
+
+      {resetConfirmOpen && (
+        <CreateEventLeaveModal
+          title="Сбросить все поля?"
+          resetLabel="Сбросить"
+          stayLabel="Вернуться"
+          titleId="create-event-reset-title"
+          onReset={() => {
+            discardCreateDraftRef.current = true;
+            draftSnapshotRef.current = null;
+            clearCreateEventDraft(getStoredAccountId() ?? accountId);
+            resetCreateForm();
+            discardCreateDraftRef.current = false;
+            setResetConfirmOpen(false);
+          }}
+          onStay={() => setResetConfirmOpen(false)}
         />
       )}
 
