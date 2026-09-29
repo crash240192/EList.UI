@@ -118,14 +118,14 @@
 .albumGrid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: 100%;
 }
 
 .albumGridCollapsed {
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(auto-fill, 60px);
-  justify-content: start;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   width: 100%;
   max-width: 100%;
 }
@@ -146,8 +146,9 @@
 }
 
 .albumCardThumb {
-  width: 60px;
-  height: 60px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
   border-radius: 10px;
 }
 
@@ -162,11 +163,12 @@
   padding: 2px 3px;
 }
 
-/* Compact stack tile (mobile collapsed, same 60px cell as thumbs) */
+/* Compact stack tile (mobile collapsed, same cell as thumbs) */
 .stackThumb {
   position: relative;
-  width: 60px;
-  height: 60px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
   padding: 0;
   border: none;
   background: transparent;
