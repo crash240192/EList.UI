@@ -140,14 +140,13 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     void markRead(n.id);
   }, [markRead]);
 
-  const openActorProfile = useCallback((e: React.MouseEvent, n: INotification, actorId: string) => {
+  const openActorProfile = useCallback((e: React.MouseEvent, actorId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    void markRead(n.id);
     onClose();
     const self = accountId && actorId.toLowerCase() === accountId.toLowerCase();
     navigate(self ? '/user/me' : `/user/${actorId}`);
-  }, [accountId, markRead, navigate, onClose]);
+  }, [accountId, navigate, onClose]);
 
   const unreadItems = items.filter(i => !i.readAt);
   const readItems = items
@@ -258,7 +257,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                     <button
                       type="button"
                       className={`noHoverGlow ${styles.itemAvatarBtn}`}
-                      onClick={e => openActorProfile(e, n, actorAccountId)}
+                      onClick={e => openActorProfile(e, actorAccountId)}
                       aria-label="Открыть профиль"
                       title="Открыть профиль"
                     >
