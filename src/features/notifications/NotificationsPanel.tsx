@@ -140,6 +140,15 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     void markRead(n.id);
   }, [markRead]);
 
+  const openActorProfile = useCallback((e: React.MouseEvent, n: INotification, actorId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void markRead(n.id);
+    onClose();
+    const self = accountId && actorId.toLowerCase() === accountId.toLowerCase();
+    navigate(self ? '/user/me' : `/user/${actorId}`);
+  }, [accountId, markRead, navigate, onClose]);
+
   const unreadItems = items.filter(i => !i.readAt);
   const readItems = items
     .filter((i): i is INotification & { readAt: string } => !!i.readAt)
@@ -246,7 +255,15 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
               <div className={`${styles.item} ${!n.readAt ? styles.itemUnread : ''}`}>
                 {actorAccountId && (
                   <div className={styles.itemAvatarCol}>
-                    <UserAvatar accountId={actorAccountId} initials="?" size={32} />
+                    <button
+                      type="button"
+                      className={`noHoverGlow ${styles.itemAvatarBtn}`}
+                      onClick={e => openActorProfile(e, n, actorAccountId)}
+                      aria-label="Открыть профиль"
+                      title="Открыть профиль"
+                    >
+                      <UserAvatar accountId={actorAccountId} initials="?" size={32} />
+                    </button>
                   </div>
                 )}
                 <button
