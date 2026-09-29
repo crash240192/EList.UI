@@ -86,19 +86,35 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: box-shadow 0.15s, transform 0.15s;
+  isolation: isolate;
 }
 
-.avatarWrap:hover {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 38%, transparent);
+.avatarWrap::before {
+  content: '';
+  position: absolute;
+  inset: -21px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    circle,
+    transparent 28%,
+    color-mix(in srgb, var(--accent) 88%, transparent) 38%,
+    color-mix(in srgb, var(--accent) 48%, transparent) 48%,
+    color-mix(in srgb, var(--accent) 22%, transparent) 60%,
+    color-mix(in srgb, var(--accent) 8%, transparent) 72%,
+    transparent 86%
+  );
+  filter: blur(7.5px);
 }
 
 .avatarWrap:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .avatar {
+  position: relative;
+  z-index: 1;
   width: 88px;
   height: 88px;
   border: 3px solid var(--surface);

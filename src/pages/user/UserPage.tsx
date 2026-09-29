@@ -542,7 +542,7 @@ export default function UserPage() {
         <div className={styles.profileHeader}>
           <button
             type="button"
-            className={styles.avatarWrap}
+            className={`noHoverGlow ${styles.avatarWrap}`}
             onClick={async () => {
               const history = await getAvatarHistory(profileAccountId);
               setLightboxFileIds(
