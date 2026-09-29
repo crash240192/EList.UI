@@ -226,11 +226,20 @@
 .tabBtn {
   composes: tab from '../../shared/styles/tabs.module.css';
   padding: 6px 14px;
+  border-radius: 10px;
+  background: transparent;
+}
+.tabBtn:hover {
+  background: transparent;
 }
 
 .tabBtnActive {
   composes: tabActive from '../../shared/styles/tabs.module.css';
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 16%, color-mix(in srgb, #fff 7%, transparent));
+}
+.tabBtnActive:hover {
+  background: color-mix(in srgb, var(--accent) 16%, color-mix(in srgb, #fff 7%, transparent));
 }
 
 /* ── Мобильная компактная строка ── */
@@ -276,15 +285,24 @@
   border: 1px solid var(--border); border-top: none;
   border-radius: 0 0 14px 14px;
   overflow: hidden;
+  box-sizing: border-box;
+  padding: 4px 10px 8px;
+  gap: 4px;
 }
 .mobileTab {
   flex: 1; padding: 9px 6px; font-size: 12px; font-weight: 500;
-  color: var(--text-secondary); background: none; border: none;
+  color: var(--text-secondary); background: transparent; border: none;
   border-bottom: 2px solid transparent;
+  border-radius: 10px;
   cursor: pointer; transition: all .12s; white-space: nowrap;
 }
-.mobileTab:hover { color: var(--text-primary); }
-.mobileTabActive { color: var(--accent) !important; border-bottom-color: var(--accent); }
+.mobileTab:hover { color: var(--text-primary); background: transparent; }
+.mobileTabActive,
+.mobileTabActive:hover {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, color-mix(in srgb, #fff 7%, transparent));
+}
 
 @media (max-width: 639px) {
   .mobileTabsRow { display: flex; }
