@@ -110,10 +110,56 @@
   cursor: pointer; color: var(--text-secondary); white-space: nowrap;
   flex-shrink: 0; transition: all .15s;
 }
-.quickBtn:hover { border-color: var(--accent); color: var(--accent); }
-.quickBtnOn { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
+.quickBtn:hover,
+.quickBtn:active,
+.quickBtn:focus {
+  border-color: var(--border);
+  color: var(--text-secondary);
+  box-shadow: none;
+  background: none;
+}
+.quickBtnOn,
+.quickBtnOn:hover,
+.quickBtnOn:active,
+.quickBtnOn:focus {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
 .quickBtnIcon { padding: 7px 9px; }
 .quickBtnLetter { font-size: 12px; font-weight: 600; color: currentColor; }
+
+.priceInput {
+  width: 92px;
+  height: 32px;
+  box-sizing: border-box;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 9px;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: inherit;
+  outline: none;
+  flex-shrink: 0;
+  transition: border-color .15s, opacity .15s;
+}
+.priceInput:focus { border-color: var(--accent); }
+.priceInput:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+.priceRub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  user-select: none;
+  line-height: 32px;
+  padding: 0 1px;
+}
+.priceRubOff { opacity: 0.45; }
 
 /* 2 — «Дополнительно» и «Сбросить» прижаты вправо блоком quickRowTail */
 .quickRowTail {

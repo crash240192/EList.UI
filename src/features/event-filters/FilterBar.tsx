@@ -336,9 +336,22 @@ export function FilterBar({
     setFilter('startTime', normalizeSearchStartTime(iso || undefined));
     setQuickDate(null);
   };
+  const isFree = filters.price === 0;
+  const priceInputValue = isFree ? '' : (filters.price ?? '');
+  const handlePriceInputChange = (raw: string) => {
+    if (raw === '') {
+      setFilter('price', undefined);
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n)) {
+      setFilter('price', undefined);
+      return;
+    }
+    setFilter('price', Math.min(Math.max(n, 0), MAX_EVENT_COST));
+  };
   const hasExpandedActive =
     (!quickDate && !!filters.endTime)
-    || (!!filters.price && filters.price > 0)
     || ageFiltersActive(filters);
 
   return (
@@ -446,15 +459,30 @@ export function FilterBar({
 
         {/* Группа: когда */}
         <span className={styles.groupLabel}>Когда</span>
-        <button className={`${styles.quickBtn} ${quickDate === 'today'    ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('today')}>Сегодня</button>
-        <button className={`${styles.quickBtn} ${quickDate === 'tomorrow' ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('tomorrow')}>Завтра</button>
-        <button className={`${styles.quickBtn} ${quickDate === 'weekend'  ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('weekend')}>Выходные</button>
+        <button className={`noHoverGlow ${styles.quickBtn} ${quickDate === 'today'    ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('today')}>Сегодня</button>
+        <button className={`noHoverGlow ${styles.quickBtn} ${quickDate === 'tomorrow' ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('tomorrow')}>Завтра</button>
+        <button className={`noHoverGlow ${styles.quickBtn} ${quickDate === 'weekend'  ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('weekend')}>Выходные</button>
 
         <div className={styles.sep}/>
 
         {/* Группа: цена */}
-        <span className={styles.groupLabel}>Цена до</span>
-        <button className={`${styles.quickBtn} ${filters.price === 0 ? styles.quickBtnOn : ''}`} onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>Бесплатно</button>
+        <span className={styles.groupLabel}>Стоимость, до</span>
+        <input
+          type="number"
+          className={styles.priceInput}
+          placeholder="Любая"
+          value={priceInputValue}
+          min={0}
+          max={MAX_EVENT_COST}
+          disabled={isFree}
+          onFocus={e => e.currentTarget.select()}
+          onChange={e => handlePriceInputChange(e.target.value)}
+        />
+        <span className={`${styles.priceRub} ${isFree ? styles.priceRubOff : ''}`}>₽</span>
+        <button
+          className={`noHoverGlow ${styles.quickBtn} ${isFree ? styles.quickBtnOn : ''}`}
+          onClick={() => isFree ? setFilter('price', undefined) : setFilter('price', 0)}
+        >Бесплатно</button>
 
         <div className={styles.sep}/>
 
@@ -474,14 +502,14 @@ export function FilterBar({
         <span className={styles.groupLabel}>Тип</span>
         {QUICK_TYPES.map(t => (
           <button key={t.id} title={t.name}
-            className={`${styles.quickBtn} ${styles.quickBtnIcon} ${draftTypes.includes(t.id) ? styles.quickBtnOn : ''}`}
+            className={`noHoverGlow ${styles.quickBtn} ${styles.quickBtnIcon} ${draftTypes.includes(t.id) ? styles.quickBtnOn : ''}`}
             onClick={() => toggleType(t.id)}>
             {t.ico
               ? <img src={icoToUrl(t.ico) ?? ''} alt={t.name} width={14} height={14} className="event-type-ico" style={{ objectFit: 'contain' }} />
               : <span className={styles.quickBtnLetter}>{t.name[0]}</span>}
           </button>
         ))}
-        <button className={`${styles.quickBtn} ${(draftTypes.length > 0 || draftCats.length > 0) ? styles.quickBtnOn : ''}`}
+        <button className={`noHoverGlow ${styles.quickBtn} ${(draftTypes.length > 0 || draftCats.length > 0) ? styles.quickBtnOn : ''}`}
           onClick={() => setPickerOpen(true)}>
           Ещё&nbsp;
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -518,26 +546,6 @@ export function FilterBar({
             <span className={styles.epLabel}>Дата до</span>
             <DatePicker className={styles.epDatePicker} withTime value={filters.endTime ?? ''} placeholder="Любая"
               onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
-          </div>
-          <div className={styles.epBlock}>
-            <span className={styles.epLabel}>Цена до, ₽</span>
-            <input type="number" className={styles.epInput}
-              placeholder="Любая" value={filters.price ?? ''}
-              min={0}
-              max={MAX_EVENT_COST}
-              onFocus={e => e.currentTarget.select()}
-              onChange={e => {
-                if (e.target.value === '') {
-                  setFilter('price', undefined);
-                  return;
-                }
-                const n = Number(e.target.value);
-                if (!Number.isFinite(n)) {
-                  setFilter('price', undefined);
-                  return;
-                }
-                setFilter('price', Math.min(Math.max(n, 0), MAX_EVENT_COST));
-              }} />
           </div>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Возраст, до</span>
