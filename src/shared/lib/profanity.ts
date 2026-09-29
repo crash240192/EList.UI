@@ -11,6 +11,10 @@ const PREFIXES = [
   'не', 'ни', 'во', 'вз', 'со', 'у', 'с', 'о', 'а',
 ].sort((a, b) => b.length - a.length);
 
+const EXCEPTIONS = new Set([
+  'себе',
+]);
+
 const EXACT = new Set([
   'бля',
   'еб',
@@ -69,6 +73,7 @@ function stripPrefixes(word: string): string {
 }
 
 function tokenIsProfane(token: string): boolean {
+  if (EXCEPTIONS.has(token)) return false;
   if (EXACT.has(token) || STEMS.some(stem => token.startsWith(stem))) return true;
   const stripped = stripPrefixes(token);
   if (stripped === token) return false;
