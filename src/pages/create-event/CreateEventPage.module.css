@@ -27,12 +27,6 @@
   /* Убираем предпросмотр обложки в карточке предпросмотра */
   .previewCover { display: none; }
   .actions { margin: 0 14px; }
-  .templateSaveBtn {
-    width: auto;
-    align-self: stretch;
-    margin-left: 14px;
-    margin-right: 14px;
-  }
 }
 
 /* ── Карточка формы ── */
@@ -390,6 +384,15 @@
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 .templateSaveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 639px) {
+  .templateSaveBtn {
+    width: auto;
+    align-self: stretch;
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+}
 
 .templateOverlay {
   position: fixed;
