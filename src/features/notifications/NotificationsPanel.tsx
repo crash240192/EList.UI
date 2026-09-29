@@ -160,15 +160,22 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
 
   const handleReadAll = useCallback(() => {
     if (closing) return;
-    void clearAll();
     if (closeAfterReadAllRef.current != null) {
       clearTimeout(closeAfterReadAllRef.current);
+      closeAfterReadAllRef.current = null;
     }
     setClosing(true);
-    closeAfterReadAllRef.current = setTimeout(() => {
-      closeAfterReadAllRef.current = null;
-      onClose();
-    }, READ_ALL_FADE_MS);
+    void (async () => {
+      const ok = await clearAll();
+      if (!ok) {
+        setClosing(false);
+        return;
+      }
+      closeAfterReadAllRef.current = setTimeout(() => {
+        closeAfterReadAllRef.current = null;
+        onClose();
+      }, READ_ALL_FADE_MS);
+    })();
   }, [clearAll, closing, onClose]);
 
   const handleTestSend = async () => {
