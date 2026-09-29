@@ -9,6 +9,9 @@ import type { IWhitelistUser } from './WhitelistModal';
 const STORAGE_PREFIX = 'elist_create_event_draft:';
 const DRAFT_VERSION = 1 as const;
 
+/** После clear блокируем повторную запись (cleanup persist-эффекта / таймер), пока не разрешат явно. */
+const persistSuppressedKeys = new Set<string>();
+
 export interface CreateEventDraftForm {
   name: string;
   description: string;
@@ -169,7 +172,7 @@ export function loadCreateEventDraft(accountId: string | null | undefined): Crea
       autoInviteMode,
     };
     if (!isCreateEventDraftDirty(draft)) {
-      clearCreateEventDraft(accountId);
+      removeCreateEventDraftStorage(accountId);
       return null;
     }
     return draft;
@@ -217,13 +220,24 @@ export function isCreateEventDraftDirty(
   return false;
 }
 
+function removeCreateEventDraftStorage(accountId: string): void {
+  try {
+    localStorage.removeItem(storageKey(accountId));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function saveCreateEventDraft(
   accountId: string | null | undefined,
   draft: CreateEventDraftSnapshot,
 ): void {
   if (!accountId || !draft.host) return;
+  const key = storageKey(accountId);
+  if (persistSuppressedKeys.has(key)) return;
   if (!isCreateEventDraftDirty(draft)) {
-    clearCreateEventDraft(accountId);
+    // Пустая форма — просто убрать ключ, без suppress (пользователь ещё может печатать).
+    removeCreateEventDraftStorage(accountId);
     return;
   }
   try {
@@ -233,17 +247,22 @@ export function saveCreateEventDraft(
       savedAt: Date.now(),
       coverUrl: persistableCoverUrl(draft.coverUrl),
     };
-    localStorage.setItem(storageKey(accountId), JSON.stringify(payload));
+    localStorage.setItem(key, JSON.stringify(payload));
   } catch {
     /* QuotaExceeded или приватный режим — черновик просто не пишется */
   }
 }
 
+/** Снова разрешить запись черновика (после монтирования формы / сброса полей). */
+export function allowCreateEventDraftPersist(accountId: string | null | undefined): void {
+  if (!accountId) return;
+  persistSuppressedKeys.delete(storageKey(accountId));
+}
+
 export function clearCreateEventDraft(accountId: string | null | undefined): void {
   if (!accountId) return;
-  try {
-    localStorage.removeItem(storageKey(accountId));
-  } catch {
-    /* ignore */
-  }
+  const key = storageKey(accountId);
+  // Сначала suppress — чтобы параллельный persist не успел записать снова.
+  persistSuppressedKeys.add(key);
+  removeCreateEventDraftStorage(accountId);
 }

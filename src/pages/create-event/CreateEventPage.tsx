@@ -91,6 +91,7 @@ import {
   type CreateEventHost,
 } from './CreateEventHostChooser';
 import {
+  allowCreateEventDraftPersist,
   clearCreateEventDraft,
   loadCreateEventDraft,
   persistableCoverUrl,
@@ -588,6 +589,8 @@ export default function CreateEventPage() {
     if (draftHydratedRef.current) return;
 
     const aid = getStoredAccountId() ?? accountId;
+    // Новая сессия формы — снимаем suppress после publish/discard.
+    allowCreateEventDraftPersist(aid);
     if (!aid) {
       resetCreateForm();
       return;
@@ -1414,9 +1417,12 @@ export default function CreateEventPage() {
 
         const createResult = await apiClient.post<string>('/api/events/create', createPayload);
         const newEventId = createResult?.result ?? createResult as unknown as string;
+        // Сразу глушим persist (cleanup эффекта / таймер), иначе черновик перезапишется после clear.
         discardCreateDraftRef.current = true;
         draftSnapshotRef.current = null;
-        clearCreateEventDraft(accountId);
+        const draftAccountId = getStoredAccountId() ?? accountId;
+        clearCreateEventDraft(draftAccountId);
+        if (draftAccountId !== accountId) clearCreateEventDraft(accountId);
         if (coverImageId) {
           try { await saveCoverFocusToFile(coverImageId, coverFocus); } catch { /* optional persistence channel */ }
         }
@@ -1425,6 +1431,9 @@ export default function CreateEventPage() {
         } catch {
           /* не блокируем публикацию, если обсуждение не создалось */
         }
+        // Повторный clear перед уходом со страницы — на случай гонки с persist.
+        clearCreateEventDraft(draftAccountId);
+        if (draftAccountId !== accountId) clearCreateEventDraft(accountId);
         navigate('/my-events');
       }
     } catch (err) {
@@ -2416,8 +2425,11 @@ export default function CreateEventPage() {
           onReset={() => {
             discardCreateDraftRef.current = true;
             draftSnapshotRef.current = null;
-            clearCreateEventDraft(getStoredAccountId() ?? accountId);
+            const aid = getStoredAccountId() ?? accountId;
+            clearCreateEventDraft(aid);
             resetCreateForm();
+            // Остаёмся на форме — снова разрешаем писать черновик при новых правках.
+            allowCreateEventDraftPersist(aid);
             discardCreateDraftRef.current = false;
             setResetConfirmOpen(false);
           }}
