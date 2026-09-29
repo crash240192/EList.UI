@@ -90,6 +90,40 @@
   cursor: pointer;
 }
 .selectPlaceholder { color: var(--text-muted); }
+.selectBtn {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  color: inherit;
+}
+.selectOpen, .selectBtn:focus { border-color: var(--accent); outline: none; }
+.selectMenu {
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--border));
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent),
+    0 12px 40px rgba(0, 0, 0, 0.35),
+    0 0 18px 2px color-mix(in srgb, var(--accent) 30%, transparent);
+  padding: 4px;
+  overflow: hidden;
+  max-height: 260px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.selectMenuItem {
+  padding: 9px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.selectMenuItem:hover { background: var(--surface-2); }
+.selectMenuItemActive {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
 .input:focus, .textarea:focus { border-color: var(--accent); }
 .textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
 .inputError { border-color: var(--danger) !important; }

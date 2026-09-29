@@ -1,6 +1,7 @@
 // pages/create-event/CreateEventPage.tsx
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import {
@@ -98,6 +99,9 @@ import {
 } from './createEventDraft';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
+  EVENT_AGE_LIMIT_OPTIONS,
+  formatAgeLimitLabel,
+  getAvailableAgeLimitOptions,
   getMaxEventAgeForTariff,
   isEventAgeAllowed,
   resolveAgeLimitBadge,
@@ -1129,6 +1133,23 @@ export default function CreateEventPage() {
   /** Нет тарифа или в тарифе только 0+ — поле возраста фиксируем */
   const ageFixedToZero   = tariffReady && maxEventAge === 0;
   const canSetAge        = tariffReady && (maxEventAge === null || maxEventAge > 0);
+  const ageLimitOptions = useMemo(() => {
+    const allowed = !tariffReady
+      ? [...EVENT_AGE_LIMIT_OPTIONS]
+      : getAvailableAgeLimitOptions(maxEventAge, hasTariff);
+    const opts = allowed.map(age => ({
+      value: String(age),
+      label: formatAgeLimitLabel(age),
+    }));
+    const current = ageFixedToZero ? '0' : form.ageLimit;
+    if (current && !opts.some(o => o.value === current)) {
+      const n = parseInt(current, 10);
+      if (!Number.isNaN(n) && n >= 0) {
+        opts.unshift({ value: current, label: formatAgeLimitLabel(n) });
+      }
+    }
+    return opts;
+  }, [tariffReady, maxEventAge, hasTariff, ageFixedToZero, form.ageLimit]);
   const canSetPrivate    = hasTariff ? !!tv!.allowPrivate : false;
   const canSetGender     = hasTariff ? !!tv!.allowGenderSegregation : false;
   const hasTariffWarning = hasWallet && (!canSetPrivate || !canSetGender);
@@ -2061,21 +2082,16 @@ export default function CreateEventPage() {
               label={canSetAge ? 'Возрастной рейтинг *' : 'Возрастной рейтинг'}
               error={hasErr('ageLimit') ? (!form.ageLimit ? 'Обязательное поле' : 'Недопустимое значение') : undefined}
             >
-              <LockedInput
+              <LockedSelect
                 locked={!canSetAge}
                 value={ageFixedToZero ? '0' : form.ageLimit}
-                placeholder={ageFixedToZero ? '0' : 'например 18'}
-                onChange={e => {
-                  const v = e.target.value.replace(/[^0-9]/g, '');
+                placeholder="Выберите"
+                options={ageLimitOptions}
+                onChange={v => {
                   setForm(f => ({ ...f, ageLimit: v }));
                   setFieldErrors(p => { const n = new Set(p); n.delete('ageLimit'); return n; });
                 }}
-                type="number"
-                min="0"
-                max={maxEventAge != null ? String(maxEventAge) : undefined}
-                inputMode="numeric"
                 hasError={hasErr('ageLimit')}
-                suffix={(ageFixedToZero || form.ageLimit !== '') ? '+' : undefined}
                 hint={hasErr('ageLimit') ? ageLimitErrorHint : ageLimitHint}
               />
             </Field>
@@ -2646,24 +2662,93 @@ function LockedSelect({ locked, hint, hasError, value, onChange, options, placeh
   options: { value: string; label: string }[];
   placeholder?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const [dropStyle, setDropStyle] = useState<CSSProperties>({});
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value);
+
+  const computePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    const dropH = Math.min(options.length * 38 + 12, 260);
+    const spaceBelow = window.innerHeight - r.bottom;
+    const showAbove = spaceBelow < dropH && r.top > spaceBelow;
+    setDropStyle({
+      position: 'fixed',
+      left: r.left,
+      width: r.width,
+      zIndex: 600,
+      ...(showAbove
+        ? { bottom: window.innerHeight - r.top + 6 }
+        : { top: r.bottom + 6 }),
+    });
+  }, [options.length]);
+
+  useEffect(() => {
+    if (locked) {
+      setOpen(false);
+      return;
+    }
+    if (!open) return;
+    computePos();
+    const close = (e: MouseEvent) => {
+      if (!btnRef.current?.contains(e.target as Node) &&
+          !dropRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onScrollOrResize = () => setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [open, locked, computePos]);
+
   return (
     <div>
       <div className={`${styles.inputShell} ${locked ? styles.inputShellLocked : ''}`}>
-        <select
-          className={`${styles.input} ${styles.inputInShell} ${styles.select} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''} ${!value ? styles.selectPlaceholder : ''}`}
+        <button
+          ref={btnRef}
+          type="button"
           disabled={locked}
-          value={value}
-          onChange={e => onChange(e.target.value)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className={`noHoverGlow ${styles.input} ${styles.inputInShell} ${styles.select} ${styles.selectBtn} ${open ? styles.selectOpen : ''} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''} ${!value ? styles.selectPlaceholder : ''}`}
+          onClick={() => !locked && setOpen(v => !v)}
         >
-          {placeholder && (
-            <option value="" disabled={value !== ''}>{placeholder}</option>
-          )}
-          {options.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+          {selected ? selected.label : (placeholder ?? '')}
+        </button>
         {locked && <span className={styles.lockBadge}>тариф</span>}
       </div>
+      {open && !locked && createPortal(
+        <div
+          ref={dropRef}
+          style={dropStyle}
+          className={styles.selectMenu}
+          role="listbox"
+        >
+          {options.map(opt => (
+            <div
+              key={opt.value}
+              role="option"
+              aria-selected={opt.value === value}
+              className={`${styles.selectMenuItem} ${opt.value === value ? styles.selectMenuItemActive : ''}`}
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>,
+        document.body,
+      )}
       {hint && <div className={`${styles.fieldHint} ${hasError ? styles.fieldHintErr : locked ? styles.fieldHintWarn : ''}`}>{hint}</div>}
     </div>
   );
