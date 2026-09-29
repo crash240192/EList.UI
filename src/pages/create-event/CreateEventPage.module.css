@@ -26,6 +26,13 @@
   .checklistCoverRow { display: none; }
   /* Убираем предпросмотр обложки в карточке предпросмотра */
   .previewCover { display: none; }
+  .actions { margin: 0 14px; }
+  .templateSaveBtn {
+    width: auto;
+    align-self: stretch;
+    margin-left: 14px;
+    margin-right: 14px;
+  }
 }
 
 /* ── Карточка формы ── */
@@ -347,6 +354,12 @@
   color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
 }
 .cancelBtn:hover { border-color: var(--accent); color: var(--accent); }
+.leaveBtn {
+  background: var(--danger); border: none; border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; font-weight: 600;
+  color: #fff; cursor: pointer; transition: opacity 0.15s;
+}
+.leaveBtn:hover { opacity: 0.85; }
 .saveBtn {
   flex: 1; background: var(--accent); color: #fff; border: none;
   border-radius: 10px; padding: 10px; font-size: 14px; font-weight: 600;
@@ -361,12 +374,12 @@
   width: 100%;
   margin-top: 8px;
   background: none;
-  border: 1px dashed var(--border);
+  border: 1px dashed color-mix(in srgb, var(--text-muted) 55%, var(--border));
   border-radius: 10px;
   padding: 10px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: color-mix(in srgb, var(--text-primary) 72%, var(--text-secondary));
   cursor: pointer;
   font-family: inherit;
   transition: border-color 0.15s, color 0.15s, background 0.15s;

@@ -96,6 +96,7 @@ import {
   saveCreateEventDraft,
   type CreateEventDraft,
 } from './createEventDraft';
+import { CreateEventLeaveModal } from './CreateEventLeaveModal';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
   getMaxEventAgeForTariff,
@@ -1598,6 +1599,7 @@ export default function CreateEventPage() {
   };
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
 
   const wantsTicketsEnabled = canEnableTickets
     && (parseFloat(form.cost) || 0) > 0
@@ -2283,14 +2285,9 @@ export default function CreateEventPage() {
 
         {/* Кнопки */}
         <div className={styles.actions}>
-          <button type="button" className={styles.cancelBtn} onClick={() => {
-            if (!isEditing) {
-              discardCreateDraftRef.current = true;
-              draftSnapshotRef.current = null;
-              clearCreateEventDraft(getStoredAccountId() ?? accountId);
-            }
-            goBack();
-          }}>Отмена</button>
+          <button type="button" className={styles.leaveBtn} onClick={() => setLeaveConfirmOpen(true)}>
+            Отмена
+          </button>
           <button
             type="button"
             className={`${styles.saveBtn} ${hasCensoredSpeech ? styles.saveBtnInactive : ''}`}
@@ -2366,6 +2363,22 @@ export default function CreateEventPage() {
         )}
       </div>{/* end sidePanel */}
       </div>{/* end pageInner */}
+
+      {leaveConfirmOpen && (
+        <CreateEventLeaveModal
+          onReset={() => {
+            if (!isEditing) {
+              discardCreateDraftRef.current = true;
+              draftSnapshotRef.current = null;
+              clearCreateEventDraft(getStoredAccountId() ?? accountId);
+            }
+            const idx = (window.history.state as { idx?: unknown } | null)?.idx;
+            if (typeof idx === 'number' && idx > 0) navigate(-2);
+            else navigate('/', { replace: true });
+          }}
+          onStay={() => setLeaveConfirmOpen(false)}
+        />
+      )}
 
       {/* Диалог подтверждения публикации */}
       {confirmOpen && (
