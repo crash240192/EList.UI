@@ -3,7 +3,7 @@
 /* Внешний скроллируемый контейнер */
 .page {
   height: 100%; overflow-y: auto; overflow-x: hidden;
-  background: var(--bg);
+  background: transparent;
 }
 
 /* Внутренняя сетка — центрируется и ограничивается по ширине */
