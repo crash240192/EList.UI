@@ -12,7 +12,8 @@
   overflow: hidden;
 }
 
-/* Аналоговый «белый шум» (вариант 2) — только тёмная тема */
+/* Аналоговый «белый шум» (вариант 2) — только тёмная тема.
+   Тайл 280×200 в нативных px, одинаково на мобилке и десктопе — без масштабирования под viewport. */
 .appBg {
   position: fixed;
   inset: 0;
@@ -24,18 +25,7 @@
     radial-gradient(ellipse 120% 110% at 50% 55%, transparent 40%, rgba(8, 9, 14, 0.52) 100%),
     url('../../shared/assets/bg-noise-tile.png');
   background-repeat: no-repeat, no-repeat, repeat;
-  /* Мобилка: текущий масштаб — лёгкая зашумлённость */
-  background-size: auto, auto, 168px 120px;
-}
-
-/*
- * Десктоп: тот же тайл со сканлайнами при 168×120 читается полосами и рябит.
- * Мельче тайл — частота выше, полосы сливаются в зерно как на мобилке.
- */
-@media (min-width: 1024px) {
-  .appBg {
-    background-size: auto, auto, 84px 60px;
-  }
+  background-size: auto, auto, 280px 200px;
 }
 
 :global(body.light-theme) .appBg {
