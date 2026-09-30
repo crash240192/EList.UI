@@ -1,6 +1,6 @@
 // pages/create-event/CreateEventPage.tsx
 
-import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
@@ -142,36 +142,13 @@ const EMPTY: FormState = {
 
 /** Абсолютный потолок стоимости (₽), согласован с API / лимитом пополнения кошелька. */
 const MAX_EVENT_COST = 1_000_000;
-const EVENT_NAME_MAX_LENGTH = 100;
+const EVENT_NAME_MAX_LENGTH = 80;
 const NAME_OVERFLOW_HINT_MS = 2500;
 
 function eventNameOverflowHint(attempts: number): string {
   if (attempts >= 7) return 'Угомонись, чорт!';
   if (attempts >= 4) return 'Слишком длинное название';
   return 'Краткость сестра таланта';
-}
-
-function nextValueLength(current: string, input: HTMLInputElement, inserted: string): number {
-  const start = input.selectionStart ?? current.length;
-  const end = input.selectionEnd ?? current.length;
-  return current.length - (end - start) + inserted.length;
-}
-
-function isReplacingEntireValue(current: string, input: HTMLInputElement): boolean {
-  if (!current) return false;
-  const start = input.selectionStart ?? 0;
-  const end = input.selectionEnd ?? 0;
-  return start === 0 && end === current.length;
-}
-
-/** next получен из old удалением одного непрерывного фрагмента (backspace / Delete / выделение). */
-function isContiguousDeletion(oldValue: string, next: string): boolean {
-  if (next.length >= oldValue.length) return false;
-  const removed = oldValue.length - next.length;
-  for (let i = 0; i <= next.length; i++) {
-    if (oldValue.slice(0, i) + oldValue.slice(i + removed) === next) return true;
-  }
-  return false;
 }
 
 function parseEventCost(raw: string): number {
@@ -291,6 +268,7 @@ export default function CreateEventPage() {
   const [nameOverflowAttempts, setNameOverflowAttempts] = useState(0);
   const [nameOverflowHintVisible, setNameOverflowHintVisible] = useState(false);
   const nameOverflowTimerRef = useRef<number | null>(null);
+  const nameValueRef = useRef('');
 
   const [lat,          setLat]          = useState<number | null>(null);
   const [lng,          setLng]          = useState<number | null>(null);
@@ -555,6 +533,7 @@ export default function CreateEventPage() {
   }, [allTypes]);
 
   const resetCreateForm = useCallback(() => {
+    nameValueRef.current = '';
     setForm(EMPTY);
     setLoading(false);
     setSaving(false);
@@ -1062,63 +1041,82 @@ export default function CreateEventPage() {
     hideNameOverflowHint();
   };
 
-  const onNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    const prev = form.name;
-    if (raw.length > EVENT_NAME_MAX_LENGTH) {
-      const kept = prev.length >= EVENT_NAME_MAX_LENGTH
-        ? prev.slice(0, EVENT_NAME_MAX_LENGTH)
-        : raw.slice(0, EVENT_NAME_MAX_LENGTH);
-      e.target.value = kept;
-      setForm(f => ({ ...f, name: kept }));
-      bumpNameOverflow();
-      clearNameFieldError();
+  const pinNameCaretToEnd = () => {
+    const el = nameRef.current;
+    if (!el) return;
+    const end = el.value.length;
+    if (el.selectionStart !== end || el.selectionEnd !== end) {
+      el.setSelectionRange(end, end);
+    }
+    el.scrollLeft = el.scrollWidth;
+  };
+
+  const schedulePinNameCaret = () => {
+    pinNameCaretToEnd();
+    requestAnimationFrame(pinNameCaretToEnd);
+  };
+
+  const commitNameValue = (next: string, input?: HTMLInputElement) => {
+    const clamped = next.slice(0, EVENT_NAME_MAX_LENGTH);
+    nameValueRef.current = clamped;
+    if (input && input.value !== clamped) input.value = clamped;
+    setForm(f => (f.name === clamped ? f : { ...f, name: clamped }));
+    schedulePinNameCaret();
+    return clamped;
+  };
+
+  useLayoutEffect(() => {
+    if (form.name.length > EVENT_NAME_MAX_LENGTH) {
+      const next = form.name.slice(0, EVENT_NAME_MAX_LENGTH);
+      nameValueRef.current = next;
+      setForm(f => (f.name === next ? f : { ...f, name: next }));
       return;
     }
-    if (prev.length >= EVENT_NAME_MAX_LENGTH && raw.length < prev.length && !isContiguousDeletion(prev, raw)) {
-      e.target.value = prev;
+    nameValueRef.current = form.name;
+    if (document.activeElement !== nameRef.current) return;
+    pinNameCaretToEnd();
+  }, [form.name, nameOverflowHintVisible]);
+
+  const onNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const prev = nameValueRef.current;
+    if (raw.length > EVENT_NAME_MAX_LENGTH) {
+      const kept = prev.length >= EVENT_NAME_MAX_LENGTH ? prev : raw;
+      commitNameValue(kept, e.target);
       bumpNameOverflow();
       clearNameFieldError();
       return;
     }
     if (raw.length < EVENT_NAME_MAX_LENGTH) resetNameOverflow();
-    setForm(f => ({ ...f, name: raw }));
+    commitNameValue(raw, e.target);
     clearNameFieldError();
   };
 
   const onNameBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
     const native = e.nativeEvent as InputEvent;
     if (native.inputType?.startsWith('delete') || native.inputType === 'insertFromPaste') return;
-    const inserted = native.data ?? '';
-    if (!inserted) return;
-    const input = e.currentTarget;
-    const nextLen = nextValueLength(form.name, input, inserted);
-    const blockAtMax = form.name.length >= EVENT_NAME_MAX_LENGTH
-      && isReplacingEntireValue(form.name, input);
-    if (nextLen > EVENT_NAME_MAX_LENGTH || blockAtMax) {
+    if (native.inputType && !native.inputType.startsWith('insert')) return;
+    if (nameValueRef.current.length >= EVENT_NAME_MAX_LENGTH) {
       e.preventDefault();
       bumpNameOverflow();
+      schedulePinNameCaret();
     }
   };
 
   const onNamePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
     const text = e.clipboardData.getData('text');
     if (!text) return;
-    if (nextValueLength(form.name, e.currentTarget, text) <= EVENT_NAME_MAX_LENGTH) return;
-    e.preventDefault();
-    const input = e.currentTarget;
-    const start = input.selectionStart ?? form.name.length;
-    const end = input.selectionEnd ?? form.name.length;
-    const next = (form.name.slice(0, start) + text + form.name.slice(end)).slice(0, EVENT_NAME_MAX_LENGTH);
-    setForm(f => ({ ...f, name: next }));
-    bumpNameOverflow();
+    const prev = nameValueRef.current;
+    if (prev.length >= EVENT_NAME_MAX_LENGTH) {
+      bumpNameOverflow();
+      schedulePinNameCaret();
+      return;
+    }
+    const next = commitNameValue(prev + text, e.currentTarget);
+    if (next.length < prev.length + text.length) bumpNameOverflow();
+    else if (next.length < EVENT_NAME_MAX_LENGTH) resetNameOverflow();
     clearNameFieldError();
-    requestAnimationFrame(() => {
-      const el = nameRef.current;
-      if (!el) return;
-      const caret = next.length;
-      el.setSelectionRange(caret, caret);
-    });
   };
 
   useEffect(() => () => {
@@ -2027,10 +2025,15 @@ export default function CreateEventPage() {
             <div className={`${styles.nameFieldWrap} ${nameOverflowHintVisible ? styles.nameFieldWrapHint : ''}`}>
               <input ref={nameRef}
                 className={`${styles.input} ${nameHasProfanity || hasErr('name') || nameOverflowHintVisible ? styles.inputError : ''}`}
-                placeholder="Название мероприятия" value={form.name}
+                placeholder="Название мероприятия"
+                value={form.name.slice(0, EVENT_NAME_MAX_LENGTH)}
                 onChange={onNameChange}
                 onBeforeInput={onNameBeforeInput}
-                onPaste={onNamePaste} />
+                onPaste={onNamePaste}
+                onFocus={schedulePinNameCaret}
+                onClick={schedulePinNameCaret}
+                onSelect={schedulePinNameCaret}
+                onKeyUp={schedulePinNameCaret} />
               {nameOverflowHintVisible && (
                 <div className={styles.nameOverflowHint} role="tooltip">
                   {eventNameOverflowHint(nameOverflowAttempts)}
