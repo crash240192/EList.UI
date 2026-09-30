@@ -151,6 +151,12 @@ function eventNameOverflowHint(attempts: number): string {
   return 'Краткость сестра таланта';
 }
 
+function nextNameLength(current: string, input: HTMLInputElement, inserted: string): number {
+  const start = input.selectionStart ?? current.length;
+  const end = input.selectionEnd ?? current.length;
+  return current.length - (end - start) + inserted.length;
+}
+
 function parseEventCost(raw: string): number {
   const n = Number.parseFloat(String(raw).replace(',', '.'));
   return Number.isFinite(n) ? n : Number.NaN;
@@ -269,6 +275,7 @@ export default function CreateEventPage() {
   const [nameOverflowHintVisible, setNameOverflowHintVisible] = useState(false);
   const nameOverflowTimerRef = useRef<number | null>(null);
   const nameValueRef = useRef('');
+  const nameSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
   const [lat,          setLat]          = useState<number | null>(null);
   const [lng,          setLng]          = useState<number | null>(null);
@@ -534,6 +541,7 @@ export default function CreateEventPage() {
 
   const resetCreateForm = useCallback(() => {
     nameValueRef.current = '';
+    nameSelectionRef.current = null;
     setForm(EMPTY);
     setLoading(false);
     setSaving(false);
@@ -1041,27 +1049,36 @@ export default function CreateEventPage() {
     hideNameOverflowHint();
   };
 
-  const pinNameCaretToEnd = () => {
+  const saveNameSelection = (input: HTMLInputElement, start?: number, end?: number) => {
+    const len = input.value.length;
+    const s = Math.max(0, Math.min(start ?? input.selectionStart ?? len, len));
+    const e = Math.max(0, Math.min(end ?? input.selectionEnd ?? s, len));
+    nameSelectionRef.current = { start: s, end: e };
+  };
+
+  const restoreNameSelection = () => {
     const el = nameRef.current;
-    if (!el) return;
-    const end = el.value.length;
-    if (el.selectionStart !== end || el.selectionEnd !== end) {
-      el.setSelectionRange(end, end);
+    const sel = nameSelectionRef.current;
+    if (!el || !sel || document.activeElement !== el) return;
+    const len = el.value.length;
+    const start = Math.max(0, Math.min(sel.start, len));
+    const end = Math.max(0, Math.min(sel.end, len));
+    if (el.selectionStart !== start || el.selectionEnd !== end) {
+      el.setSelectionRange(start, end);
     }
-    el.scrollLeft = el.scrollWidth;
   };
 
-  const schedulePinNameCaret = () => {
-    pinNameCaretToEnd();
-    requestAnimationFrame(pinNameCaretToEnd);
-  };
-
-  const commitNameValue = (next: string, input?: HTMLInputElement) => {
+  const commitNameValue = (next: string, input?: HTMLInputElement, caret?: number) => {
     const clamped = next.slice(0, EVENT_NAME_MAX_LENGTH);
     nameValueRef.current = clamped;
     if (input && input.value !== clamped) input.value = clamped;
+    if (caret != null) {
+      const pos = Math.max(0, Math.min(caret, clamped.length));
+      nameSelectionRef.current = { start: pos, end: pos };
+    } else if (input) {
+      saveNameSelection(input);
+    }
     setForm(f => (f.name === clamped ? f : { ...f, name: clamped }));
-    schedulePinNameCaret();
     return clamped;
   };
 
@@ -1073,20 +1090,22 @@ export default function CreateEventPage() {
       return;
     }
     nameValueRef.current = form.name;
-    if (document.activeElement !== nameRef.current) return;
-    pinNameCaretToEnd();
+    restoreNameSelection();
   }, [form.name, nameOverflowHintVisible]);
 
   const onNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     const prev = nameValueRef.current;
     if (raw.length > EVENT_NAME_MAX_LENGTH) {
-      const kept = prev.length >= EVENT_NAME_MAX_LENGTH ? prev : raw;
-      commitNameValue(kept, e.target);
+      const kept = prev.length >= EVENT_NAME_MAX_LENGTH ? prev : raw.slice(0, EVENT_NAME_MAX_LENGTH);
+      e.target.value = kept;
+      commitNameValue(kept, e.target, nameSelectionRef.current?.start);
       bumpNameOverflow();
       clearNameFieldError();
+      restoreNameSelection();
       return;
     }
+    saveNameSelection(e.target);
     if (raw.length < EVENT_NAME_MAX_LENGTH) resetNameOverflow();
     commitNameValue(raw, e.target);
     clearNameFieldError();
@@ -1096,11 +1115,24 @@ export default function CreateEventPage() {
     const native = e.nativeEvent as InputEvent;
     if (native.inputType?.startsWith('delete') || native.inputType === 'insertFromPaste') return;
     if (native.inputType && !native.inputType.startsWith('insert')) return;
-    if (nameValueRef.current.length >= EVENT_NAME_MAX_LENGTH) {
-      e.preventDefault();
-      bumpNameOverflow();
-      schedulePinNameCaret();
+    const input = e.currentTarget;
+    const prev = nameValueRef.current;
+    const inserted = native.data ?? '';
+    const start = input.selectionStart ?? prev.length;
+    const end = input.selectionEnd ?? prev.length;
+    saveNameSelection(input, start, end);
+    const nextLen = inserted
+      ? nextNameLength(prev, input, inserted)
+      : prev.length - (end - start) + 1;
+    if (nextLen <= EVENT_NAME_MAX_LENGTH) return;
+    e.preventDefault();
+    const room = EVENT_NAME_MAX_LENGTH - (prev.length - (end - start));
+    if (inserted && room > 0) {
+      const piece = inserted.slice(0, room);
+      commitNameValue(prev.slice(0, start) + piece + prev.slice(end), input, start + piece.length);
     }
+    bumpNameOverflow();
+    restoreNameSelection();
   };
 
   const onNamePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -1108,15 +1140,25 @@ export default function CreateEventPage() {
     const text = e.clipboardData.getData('text');
     if (!text) return;
     const prev = nameValueRef.current;
-    if (prev.length >= EVENT_NAME_MAX_LENGTH) {
+    const input = e.currentTarget;
+    const start = input.selectionStart ?? prev.length;
+    const end = input.selectionEnd ?? prev.length;
+    saveNameSelection(input, start, end);
+    const room = EVENT_NAME_MAX_LENGTH - (prev.length - (end - start));
+    if (room <= 0) {
       bumpNameOverflow();
-      schedulePinNameCaret();
+      restoreNameSelection();
       return;
     }
-    const next = commitNameValue(prev + text, e.currentTarget);
-    if (next.length < prev.length + text.length) bumpNameOverflow();
+    const insert = text.slice(0, room);
+    const next = commitNameValue(prev.slice(0, start) + insert + prev.slice(end), input, start + insert.length);
+    if (insert.length < text.length) bumpNameOverflow();
     else if (next.length < EVENT_NAME_MAX_LENGTH) resetNameOverflow();
     clearNameFieldError();
+  };
+
+  const onNameSelect = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    saveNameSelection(e.currentTarget);
   };
 
   useEffect(() => () => {
@@ -2030,10 +2072,7 @@ export default function CreateEventPage() {
                 onChange={onNameChange}
                 onBeforeInput={onNameBeforeInput}
                 onPaste={onNamePaste}
-                onFocus={schedulePinNameCaret}
-                onClick={schedulePinNameCaret}
-                onSelect={schedulePinNameCaret}
-                onKeyUp={schedulePinNameCaret} />
+                onSelect={onNameSelect} />
               {nameOverflowHintVisible && (
                 <div className={styles.nameOverflowHint} role="tooltip">
                   {eventNameOverflowHint(nameOverflowAttempts)}
