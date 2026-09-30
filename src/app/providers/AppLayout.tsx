@@ -103,6 +103,7 @@ export function AppLayout() {
   return (
     <UserAgreementsGate>
     <div className={styles.root}>
+      <div className={styles.appBg} aria-hidden />
       {/* ---- Header ---- */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
