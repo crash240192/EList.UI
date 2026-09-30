@@ -16,6 +16,8 @@ import styles from './BugReportModal.module.css';
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const PARTNERSHIP_EXTS = ['.docx', '.xlsx', '.pdf'];
+const BUG_REPORT_THANKS =
+  'Спасибо за ваше участие! Мы пошевелим модератора, чтобы быстрее разобрался с вашим запросом :)';
 
 type SupportTopic = 'bug' | 'suggestion' | 'partnership';
 
@@ -223,6 +225,30 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
         ? 'Ваше предложение по сотрудничеству'
         : 'Что произошло? Что вы ожидали увидеть?';
 
+  if (done) {
+    return createPortal(
+      <>
+        <div className={styles.thanksBackdrop} onClick={onClose} aria-hidden />
+        <div
+          className={styles.thanksModal}
+          role="dialog"
+          aria-modal
+          aria-labelledby="bug-report-thanks-title"
+        >
+          <p id="bug-report-thanks-title" className={styles.thanksText}>
+            {BUG_REPORT_THANKS}
+          </p>
+          <div className={styles.thanksActions}>
+            <button type="button" className={styles.thanksCloseBtn} onClick={onClose}>
+              Закрыть
+            </button>
+          </div>
+        </div>
+      </>,
+      document.body,
+    );
+  }
+
   return createPortal(
     <>
       <div className={styles.backdrop} onClick={onClose} />
@@ -246,13 +272,7 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
         </div>
 
         <div className={styles.modalBody}>
-          {done ? (
-            <div className={styles.success}>
-              Спасибо! Сообщение отправлено. Мы разберёмся с ошибкой.
-            </div>
-          ) : (
-            <>
-              <div className={styles.field}>
+          <div className={styles.field}>
                 <span className={styles.label}>Тема обращения</span>
                 <Select
                   value={topic}
@@ -437,30 +457,20 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
               )}
 
               {error && <div className={styles.error}>{error}</div>}
-            </>
-          )}
         </div>
 
         <div className={styles.modalFooter}>
-          {done ? (
-            <button type="button" className={styles.saveBtn} onClick={onClose}>
-              Закрыть
-            </button>
-          ) : (
-            <>
-              <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={saving}>
-                Отмена
-              </button>
-              <button
-                type="button"
-                className={styles.saveBtn}
-                onClick={() => { void handleSubmit(); }}
-                disabled={sendDisabled}
-              >
-                {saving ? 'Отправка...' : 'Отправить'}
-              </button>
-            </>
-          )}
+          <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={saving}>
+            Отмена
+          </button>
+          <button
+            type="button"
+            className={styles.saveBtn}
+            onClick={() => { void handleSubmit(); }}
+            disabled={sendDisabled}
+          >
+            {saving ? 'Отправка...' : 'Отправить'}
+          </button>
         </div>
       </div>
     </>,
