@@ -30,6 +30,7 @@ import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isApiError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { formatEventHeroDate, formatEventHeroTime, isSameCalendarDay } from '@/shared/lib/datetime';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
@@ -834,17 +835,17 @@ export default function EventPage() {
           <div className={styles.heroBottom}>
             <h1 className={styles.heroTitle}>{event.name}</h1>
             <div className={styles.heroDateTime}>
-              {isSameDay(event.startTime, event.endTime) ? (
+              {isSameCalendarDay(event.startTime, event.endTime) ? (
                 <>
-                  {formatDateStart(event.startTime)}
+                  {formatEventHeroDate(event.startTime, false)}
                   <span className={styles.heroDateDot}>·</span>
-                  {formatTime(event.startTime)}
-                  {event.endTime ? ` — ${formatTime(event.endTime)}` : ''}
+                  {formatEventHeroTime(event.startTime)}
+                  {event.endTime ? ` — ${formatEventHeroTime(event.endTime)}` : ''}
                 </>
               ) : (
                 <>
-                  {formatDateStart(event.startTime)}, {formatTime(event.startTime)}
-                  {event.endTime ? ` → ${formatDateStart(event.endTime)}, ${formatTime(event.endTime)}` : ''}
+                  {formatEventHeroDate(event.startTime, true)}, {formatEventHeroTime(event.startTime)}
+                  {event.endTime ? ` → ${formatEventHeroDate(event.endTime, true)}, ${formatEventHeroTime(event.endTime)}` : ''}
                 </>
               )}
             </div>
@@ -1452,27 +1453,14 @@ function PageSkeleton() {
 
 // ── Date helpers ──
 
-const RU_DATE = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
-const RU_TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
-const RU_SHORT = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-function formatDateStart(iso: string)   { return RU_DATE.format(new Date(iso)); }
-function formatTime(iso: string)        { return RU_TIME.format(new Date(iso)); }
-function isSameDay(start: string, end: string | null): boolean {
-  if (!end) return true;
-  const a = new Date(start), b = new Date(end);
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
-}
 function formatDateFull(start: string, end: string | null) {
-  if (!end) return RU_SHORT.format(new Date(start));
-  if (isSameDay(start, end)) {
-    // Одна дата: «24 мая, 19:00 — 23:00»
-    return `${RU_SHORT.format(new Date(start))} — ${RU_TIME.format(new Date(end))}`;
+  if (!end || isSameCalendarDay(start, end)) {
+    const times = end
+      ? `${formatEventHeroTime(start)} — ${formatEventHeroTime(end)}`
+      : formatEventHeroTime(start);
+    return `${formatEventHeroDate(start, false)} · ${times}`;
   }
-  // Разные даты: «24 мая, 19:00 — 25 мая, 23:00»
-  return `${RU_SHORT.format(new Date(start))} — ${RU_SHORT.format(new Date(end))}`;
+  return `${formatEventHeroDate(start, true)}, ${formatEventHeroTime(start)} → ${formatEventHeroDate(end, true)}, ${formatEventHeroTime(end)}`;
 }
 
 // ── Icons ──
