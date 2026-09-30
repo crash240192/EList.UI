@@ -142,6 +142,20 @@ const EMPTY: FormState = {
 
 /** Абсолютный потолок стоимости (₽), согласован с API / лимитом пополнения кошелька. */
 const MAX_EVENT_COST = 1_000_000;
+const EVENT_NAME_MAX_LENGTH = 100;
+const NAME_OVERFLOW_HINT_MS = 2500;
+
+function eventNameOverflowHint(attempts: number): string {
+  if (attempts >= 7) return 'Угомонись, чорт!';
+  if (attempts >= 4) return 'Слишком длинное название';
+  return 'Краткость сестра таланта';
+}
+
+function nextValueLength(current: string, input: HTMLInputElement, inserted: string): number {
+  const start = input.selectionStart ?? current.length;
+  const end = input.selectionEnd ?? current.length;
+  return current.length - (end - start) + inserted.length;
+}
 
 function parseEventCost(raw: string): number {
   const n = Number.parseFloat(String(raw).replace(',', '.'));
@@ -257,6 +271,9 @@ export default function CreateEventPage() {
   );
   const [saving,      setSaving]      = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Set<FieldError>>(new Set());
+  const [nameOverflowAttempts, setNameOverflowAttempts] = useState(0);
+  const [nameOverflowHintVisible, setNameOverflowHintVisible] = useState(false);
+  const nameOverflowTimerRef = useRef<number | null>(null);
 
   const [lat,          setLat]          = useState<number | null>(null);
   const [lng,          setLng]          = useState<number | null>(null);
@@ -525,6 +542,12 @@ export default function CreateEventPage() {
     setLoading(false);
     setSaving(false);
     setFieldErrors(new Set());
+    setNameOverflowAttempts(0);
+    setNameOverflowHintVisible(false);
+    if (nameOverflowTimerRef.current != null) {
+      window.clearTimeout(nameOverflowTimerRef.current);
+      nameOverflowTimerRef.current = null;
+    }
     setLat(null);
     setLng(null);
     setCoverUrl(null);
@@ -987,6 +1010,89 @@ export default function CreateEventPage() {
       };
       if (errMap[key]) setFieldErrors(p => { const n = new Set(p); n.delete(errMap[key]!); return n; });
     };
+
+  const clearNameFieldError = () => {
+    setFieldErrors(p => {
+      if (!p.has('name')) return p;
+      const n = new Set(p);
+      n.delete('name');
+      return n;
+    });
+  };
+
+  const hideNameOverflowHint = () => {
+    if (nameOverflowTimerRef.current != null) {
+      window.clearTimeout(nameOverflowTimerRef.current);
+      nameOverflowTimerRef.current = null;
+    }
+    setNameOverflowHintVisible(false);
+  };
+
+  const bumpNameOverflow = () => {
+    setNameOverflowAttempts(n => n + 1);
+    setNameOverflowHintVisible(true);
+    if (nameOverflowTimerRef.current != null) {
+      window.clearTimeout(nameOverflowTimerRef.current);
+    }
+    nameOverflowTimerRef.current = window.setTimeout(() => {
+      setNameOverflowHintVisible(false);
+      nameOverflowTimerRef.current = null;
+    }, NAME_OVERFLOW_HINT_MS);
+  };
+
+  const resetNameOverflow = () => {
+    setNameOverflowAttempts(0);
+    hideNameOverflowHint();
+  };
+
+  const onNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw.length > EVENT_NAME_MAX_LENGTH) {
+      setForm(f => ({ ...f, name: raw.slice(0, EVENT_NAME_MAX_LENGTH) }));
+      bumpNameOverflow();
+    } else {
+      if (raw.length < EVENT_NAME_MAX_LENGTH) resetNameOverflow();
+      setForm(f => ({ ...f, name: raw }));
+    }
+    clearNameFieldError();
+  };
+
+  const onNameBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const native = e.nativeEvent as InputEvent;
+    if (native.inputType?.startsWith('delete') || native.inputType === 'insertFromPaste') return;
+    const inserted = native.data ?? '';
+    if (!inserted) return;
+    if (nextValueLength(form.name, e.currentTarget, inserted) > EVENT_NAME_MAX_LENGTH) {
+      e.preventDefault();
+      bumpNameOverflow();
+    }
+  };
+
+  const onNamePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData('text');
+    if (!text) return;
+    if (nextValueLength(form.name, e.currentTarget, text) <= EVENT_NAME_MAX_LENGTH) return;
+    e.preventDefault();
+    const input = e.currentTarget;
+    const start = input.selectionStart ?? form.name.length;
+    const end = input.selectionEnd ?? form.name.length;
+    const next = (form.name.slice(0, start) + text + form.name.slice(end)).slice(0, EVENT_NAME_MAX_LENGTH);
+    setForm(f => ({ ...f, name: next }));
+    bumpNameOverflow();
+    clearNameFieldError();
+    requestAnimationFrame(() => {
+      const el = nameRef.current;
+      if (!el) return;
+      const caret = next.length;
+      el.setSelectionRange(caret, caret);
+    });
+  };
+
+  useEffect(() => () => {
+    if (nameOverflowTimerRef.current != null) {
+      window.clearTimeout(nameOverflowTimerRef.current);
+    }
+  }, []);
 
   const hasErr = (f: FieldError) => fieldErrors.has(f);
   const typeCount = selectedCategories.length + selectedTypes.length;
@@ -1885,10 +1991,20 @@ export default function CreateEventPage() {
         {/* Основное */}
         <Section title="Основное">
           <Field label="Название *" error={nameHasProfanity ? CENSORSHIP_FIELD_ERROR : hasErr('name') ? 'Обязательное поле' : undefined}>
-            <input ref={nameRef}
-              className={`${styles.input} ${nameHasProfanity || hasErr('name') ? styles.inputError : ''}`}
-              placeholder="Название мероприятия" value={form.name} onChange={set('name')} 
-                  onFocus={e => (e.target as HTMLInputElement).select()} />
+            <div className={`${styles.nameFieldWrap} ${nameOverflowHintVisible ? styles.nameFieldWrapHint : ''}`}>
+              <input ref={nameRef}
+                className={`${styles.input} ${nameHasProfanity || hasErr('name') || nameOverflowHintVisible ? styles.inputError : ''}`}
+                placeholder="Название мероприятия" value={form.name}
+                onChange={onNameChange}
+                onBeforeInput={onNameBeforeInput}
+                onPaste={onNamePaste}
+                onFocus={e => (e.target as HTMLInputElement).select()} />
+              {nameOverflowHintVisible && (
+                <div className={styles.nameOverflowHint} role="tooltip">
+                  {eventNameOverflowHint(nameOverflowAttempts)}
+                </div>
+              )}
+            </div>
           </Field>
           <Field label="Описание" error={descriptionHasProfanity ? CENSORSHIP_FIELD_ERROR : undefined}>
             <textarea ref={descriptionRef} className={`${styles.input} ${styles.textarea} ${descriptionHasProfanity ? styles.inputError : ''}`} rows={3}
