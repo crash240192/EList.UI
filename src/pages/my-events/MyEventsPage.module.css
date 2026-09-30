@@ -279,15 +279,17 @@
 
   .subHeaderActions {
     flex: 0 0 auto;
-    align-self: center;
+    align-self: stretch;
   }
 
-  .createBtn {
+  .subHeader .createBtn {
     flex-shrink: 0;
-    height: calc(1lh * 1.2);
+    box-sizing: border-box;
+    height: auto;
+    min-height: 0;
     padding-top: 0;
     padding-bottom: 0;
-    align-self: center;
+    align-self: stretch;
   }
 
   /* Галочка только на «Организую» — тогда переносим actions на вторую строку */
@@ -317,6 +319,8 @@
 
   .subHeaderWithCancelled .createBtn {
     margin-left: auto;
+    align-self: center;
+    height: 33px;
   }
 }
 

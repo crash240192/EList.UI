@@ -278,7 +278,7 @@
   overflow: hidden;
 }
 .mobileTab {
-  flex: 1; padding: 9px 6px; font-size: 12px; font-weight: 500;
+  flex: 1; padding: 6px 6px; font-size: 12px; font-weight: 500;
   color: var(--text-secondary); background: none; border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer; transition: all .12s; white-space: nowrap;
