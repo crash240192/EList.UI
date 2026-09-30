@@ -157,11 +157,6 @@ function nextNameLength(current: string, input: HTMLInputElement, inserted: stri
   return current.length - (end - start) + inserted.length;
 }
 
-function isEntireNameSelected(current: string, input: HTMLInputElement): boolean {
-  if (!current) return false;
-  return (input.selectionStart ?? 0) === 0 && (input.selectionEnd ?? 0) === current.length;
-}
-
 /** next получен из old удалением одного непрерывного фрагмента (Backspace / Delete / выделение). */
 function isContiguousDeletion(oldValue: string, next: string): boolean {
   if (next.length >= oldValue.length) return false;
@@ -1135,16 +1130,15 @@ export default function CreateEventPage() {
       restoreNameSelectionSoon();
       return;
     }
-    // Select-all + один символ на лимите выглядит как «поле обнулилось».
+    // На лимите лишние клавиши не должны съедать выделенный хвост названия.
     if (
       prev.length >= EVENT_NAME_MAX_LENGTH
-      && raw.length > 0
-      && raw.length <= 3
-      && prev.length - raw.length >= 10
+      && raw !== prev
       && !isContiguousDeletion(prev, raw)
     ) {
       e.target.value = prev;
-      commitNameValue(prev, e.target, prev.length);
+      nameValueRef.current = prev;
+      setForm(f => (f.name === prev ? f : { ...f, name: prev }));
       bumpNameOverflow();
       clearNameFieldError();
       restoreNameSelectionSoon();
@@ -1167,20 +1161,17 @@ export default function CreateEventPage() {
     const start = input.selectionStart ?? prev.length;
     const end = input.selectionEnd ?? prev.length;
     saveNameSelection(input, start, end);
-    const replacingEntireAtMax = prev.length >= EVENT_NAME_MAX_LENGTH
-      && isEntireNameSelected(prev, input)
-      && inserted.length < prev.length;
-    const nextLen = inserted
-      ? nextNameLength(prev, input, inserted)
-      : prev.length - (end - start) + 1;
-    if (!replacingEntireAtMax && nextLen <= EVENT_NAME_MAX_LENGTH) return;
-    e.preventDefault();
-    if (replacingEntireAtMax) {
-      nameSelectionRef.current = { start: prev.length, end: prev.length };
+    if (prev.length >= EVENT_NAME_MAX_LENGTH) {
+      e.preventDefault();
       bumpNameOverflow();
       restoreNameSelectionSoon();
       return;
     }
+    const nextLen = inserted
+      ? nextNameLength(prev, input, inserted)
+      : prev.length - (end - start) + 1;
+    if (nextLen <= EVENT_NAME_MAX_LENGTH) return;
+    e.preventDefault();
     const room = EVENT_NAME_MAX_LENGTH - (prev.length - (end - start));
     if (inserted && room > 0) {
       const piece = inserted.slice(0, room);
