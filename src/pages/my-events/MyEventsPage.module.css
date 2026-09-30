@@ -262,7 +262,7 @@
 @media (max-width: 639px) {
   .subHeader {
     flex-wrap: nowrap;
-    padding: 8px 12px;
+    padding: 5px 12px;
   }
 
   .archiveTabs {
@@ -270,12 +270,24 @@
     min-width: 0;
   }
 
-  .subHeaderActions {
-    flex: 0 0 auto;
+  .archiveTabs button {
+    padding-top: 6.5px;
+    padding-bottom: 6.5px;
   }
 
-  .createBtn {
+  .subHeaderActions {
+    flex: 0 0 auto;
+    align-self: stretch;
+  }
+
+  .subHeader .createBtn {
     flex-shrink: 0;
+    box-sizing: border-box;
+    height: auto;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    align-self: stretch;
   }
 
   /* Галочка только на «Организую» — тогда переносим actions на вторую строку */
@@ -305,5 +317,7 @@
 
   .subHeaderWithCancelled .createBtn {
     margin-left: auto;
+    align-self: center;
+    height: 33px;
   }
 }
