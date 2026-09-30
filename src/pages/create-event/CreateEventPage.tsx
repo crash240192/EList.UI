@@ -1097,9 +1097,14 @@ export default function CreateEventPage() {
     const raw = e.target.value;
     const prev = nameValueRef.current;
     if (raw.length > EVENT_NAME_MAX_LENGTH) {
+      const extra = raw.length - prev.length;
+      const caretNow = e.target.selectionStart ?? nameSelectionRef.current?.start ?? prev.length;
+      const restoreAt = extra > 0
+        ? Math.max(0, Math.min(caretNow - extra, prev.length))
+        : Math.min(caretNow, prev.length);
       const kept = prev.length >= EVENT_NAME_MAX_LENGTH ? prev : raw.slice(0, EVENT_NAME_MAX_LENGTH);
       e.target.value = kept;
-      commitNameValue(kept, e.target, nameSelectionRef.current?.start);
+      commitNameValue(kept, e.target, restoreAt);
       bumpNameOverflow();
       clearNameFieldError();
       restoreNameSelection();
