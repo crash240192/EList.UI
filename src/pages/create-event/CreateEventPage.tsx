@@ -157,6 +157,21 @@ function nextNameLength(current: string, input: HTMLInputElement, inserted: stri
   return current.length - (end - start) + inserted.length;
 }
 
+function isEntireNameSelected(current: string, input: HTMLInputElement): boolean {
+  if (!current) return false;
+  return (input.selectionStart ?? 0) === 0 && (input.selectionEnd ?? 0) === current.length;
+}
+
+/** next получен из old удалением одного непрерывного фрагмента (Backspace / Delete / выделение). */
+function isContiguousDeletion(oldValue: string, next: string): boolean {
+  if (next.length >= oldValue.length) return false;
+  const removed = oldValue.length - next.length;
+  for (let i = 0; i <= next.length; i++) {
+    if (oldValue.slice(0, i) + oldValue.slice(i + removed) === next) return true;
+  }
+  return false;
+}
+
 function parseEventCost(raw: string): number {
   const n = Number.parseFloat(String(raw).replace(',', '.'));
   return Number.isFinite(n) ? n : Number.NaN;
@@ -1120,6 +1135,21 @@ export default function CreateEventPage() {
       restoreNameSelectionSoon();
       return;
     }
+    // Select-all + один символ на лимите выглядит как «поле обнулилось».
+    if (
+      prev.length >= EVENT_NAME_MAX_LENGTH
+      && raw.length > 0
+      && raw.length <= 3
+      && prev.length - raw.length >= 10
+      && !isContiguousDeletion(prev, raw)
+    ) {
+      e.target.value = prev;
+      commitNameValue(prev, e.target, prev.length);
+      bumpNameOverflow();
+      clearNameFieldError();
+      restoreNameSelectionSoon();
+      return;
+    }
     saveNameSelection(e.target);
     if (raw.length < EVENT_NAME_MAX_LENGTH) resetNameOverflow();
     commitNameValue(raw, e.target);
@@ -1129,6 +1159,7 @@ export default function CreateEventPage() {
   const onNameBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
     const native = e.nativeEvent as InputEvent;
     if (native.inputType?.startsWith('delete') || native.inputType === 'insertFromPaste') return;
+    if (native.inputType === 'insertCompositionText') return;
     if (native.inputType && !native.inputType.startsWith('insert')) return;
     const input = e.currentTarget;
     const prev = nameValueRef.current;
@@ -1136,11 +1167,20 @@ export default function CreateEventPage() {
     const start = input.selectionStart ?? prev.length;
     const end = input.selectionEnd ?? prev.length;
     saveNameSelection(input, start, end);
+    const replacingEntireAtMax = prev.length >= EVENT_NAME_MAX_LENGTH
+      && isEntireNameSelected(prev, input)
+      && inserted.length < prev.length;
     const nextLen = inserted
       ? nextNameLength(prev, input, inserted)
       : prev.length - (end - start) + 1;
-    if (nextLen <= EVENT_NAME_MAX_LENGTH) return;
+    if (!replacingEntireAtMax && nextLen <= EVENT_NAME_MAX_LENGTH) return;
     e.preventDefault();
+    if (replacingEntireAtMax) {
+      nameSelectionRef.current = { start: prev.length, end: prev.length };
+      bumpNameOverflow();
+      restoreNameSelectionSoon();
+      return;
+    }
     const room = EVENT_NAME_MAX_LENGTH - (prev.length - (end - start));
     if (inserted && room > 0) {
       const piece = inserted.slice(0, room);
@@ -2084,6 +2124,7 @@ export default function CreateEventPage() {
               <input ref={nameRef}
                 className={`${styles.input} ${nameHasProfanity || hasErr('name') || nameOverflowHintVisible ? styles.inputError : ''}`}
                 placeholder="Название мероприятия"
+                maxLength={EVENT_NAME_MAX_LENGTH}
                 value={form.name.slice(0, EVENT_NAME_MAX_LENGTH)}
                 onChange={onNameChange}
                 onBeforeInput={onNameBeforeInput}
