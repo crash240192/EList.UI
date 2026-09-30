@@ -276,6 +276,7 @@ export default function CreateEventPage() {
   const nameOverflowTimerRef = useRef<number | null>(null);
   const nameValueRef = useRef('');
   const nameSelectionRef = useRef<{ start: number; end: number } | null>(null);
+  const suppressNameSelectRef = useRef(false);
 
   const [lat,          setLat]          = useState<number | null>(null);
   const [lng,          setLng]          = useState<number | null>(null);
@@ -1068,6 +1069,15 @@ export default function CreateEventPage() {
     }
   };
 
+  const restoreNameSelectionSoon = () => {
+    restoreNameSelection();
+    suppressNameSelectRef.current = true;
+    requestAnimationFrame(() => {
+      restoreNameSelection();
+      suppressNameSelectRef.current = false;
+    });
+  };
+
   const commitNameValue = (next: string, input?: HTMLInputElement, caret?: number) => {
     const clamped = next.slice(0, EVENT_NAME_MAX_LENGTH);
     nameValueRef.current = clamped;
@@ -1107,7 +1117,7 @@ export default function CreateEventPage() {
       commitNameValue(kept, e.target, restoreAt);
       bumpNameOverflow();
       clearNameFieldError();
-      restoreNameSelection();
+      restoreNameSelectionSoon();
       return;
     }
     saveNameSelection(e.target);
@@ -1137,7 +1147,7 @@ export default function CreateEventPage() {
       commitNameValue(prev.slice(0, start) + piece + prev.slice(end), input, start + piece.length);
     }
     bumpNameOverflow();
-    restoreNameSelection();
+    restoreNameSelectionSoon();
   };
 
   const onNamePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -1152,7 +1162,7 @@ export default function CreateEventPage() {
     const room = EVENT_NAME_MAX_LENGTH - (prev.length - (end - start));
     if (room <= 0) {
       bumpNameOverflow();
-      restoreNameSelection();
+      restoreNameSelectionSoon();
       return;
     }
     const insert = text.slice(0, room);
@@ -1163,6 +1173,7 @@ export default function CreateEventPage() {
   };
 
   const onNameSelect = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    if (suppressNameSelectRef.current) return;
     saveNameSelection(e.currentTarget);
   };
 
