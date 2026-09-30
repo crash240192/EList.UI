@@ -9,7 +9,7 @@
 /* Внутренняя сетка — центрируется и ограничивается по ширине */
 .pageInner {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: minmax(0, 1fr) 280px;
   gap: 20px;
   align-items: start;
   max-width: var(--page-card-max-width);
@@ -18,7 +18,7 @@
   box-sizing: border-box;
 }
 @media (max-width: 639px) {
-  .pageInner { grid-template-columns: 1fr; padding: 0; gap: 0; }
+  .pageInner { grid-template-columns: minmax(0, 1fr); padding: 0; gap: 0; }
   .card { border-radius: 0; border-left: none; border-right: none; }
   /* Отступ между основной формой и боковой панелью */
   .sidePanel { margin-top: 12px; gap: 0; }
@@ -31,6 +31,7 @@
 
 /* ── Карточка формы ── */
 .card {
+  min-width: 0;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 16px; overflow: hidden;
   box-shadow: 0 2px 20px rgba(0,0,0,0.12);
@@ -71,12 +72,12 @@
 .sectionError { font-size: 11px; color: var(--danger); font-weight: 500; }
 
 /* ── Поля ── */
-.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; min-width: 0; }
 .field:last-child { margin-bottom: 0; }
 .label { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
 
 .input, .textarea, .select {
-  width: 100%; background: var(--surface-2);
+  width: 100%; min-width: 0; background: var(--surface-2);
   border: 1px solid var(--border); border-radius: 8px;
   padding: 9px 12px; font-size: 13px; color: var(--text-primary);
   outline: none; font-family: inherit;
@@ -171,7 +172,7 @@
 .fieldHint  { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 .fieldHintWarn { font-size: 11px; color: #b45309; margin-top: 3px; }
 
-.nameFieldWrap { position: relative; }
+.nameFieldWrap { position: relative; min-width: 0; max-width: 100%; }
 .nameFieldWrapHint { z-index: 3; }
 .nameOverflowHint {
   position: absolute;
