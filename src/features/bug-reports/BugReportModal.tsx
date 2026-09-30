@@ -18,6 +18,8 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const PARTNERSHIP_EXTS = ['.docx', '.xlsx', '.pdf'];
 const BUG_REPORT_THANKS =
   'Спасибо за ваше участие! Мы пошевелим модератора, чтобы быстрее разобрался с вашим запросом :)';
+const SUGGESTION_THANKS =
+  'Спасибо за ваше участие! Мы пошевелим модератора, чтобы быстрее занялся вашим предложением :)';
 
 type SupportTopic = 'bug' | 'suggestion' | 'partnership';
 
@@ -185,7 +187,7 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
   };
 
   const handleSubmit = async () => {
-    if (topic !== 'bug') return;
+    if (topic !== 'bug' && topic !== 'suggestion') return;
 
     const text = description.trim();
     if (!categoryId) {
@@ -193,7 +195,7 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
       return;
     }
     if (!text) {
-      setError('Опишите ошибку');
+      setError(topic === 'suggestion' ? 'Опишите предложение' : 'Опишите ошибку');
       return;
     }
     if (saving || uploading) return;
@@ -204,7 +206,7 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
       await createBugReport({
         categoryId,
         description: text,
-        fileIds: shots.map(s => s.fileId),
+        fileIds: topic === 'bug' ? shots.map(s => s.fileId) : [],
       });
       setDone(true);
     } catch (e) {
@@ -216,7 +218,8 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
 
   const sendDisabled =
     !topic
-    || (topic === 'bug' && (saving || uploading || loadingCats || !categories.length));
+    || ((topic === 'bug' || topic === 'suggestion')
+      && (saving || uploading || loadingCats || !categories.length));
 
   const descriptionPlaceholder =
     topic === 'suggestion'
@@ -233,10 +236,10 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
           className={styles.thanksModal}
           role="dialog"
           aria-modal
-          aria-labelledby="bug-report-thanks-title"
+          aria-labelledby="support-thanks-title"
         >
-          <p id="bug-report-thanks-title" className={styles.thanksText}>
-            {BUG_REPORT_THANKS}
+          <p id="support-thanks-title" className={styles.thanksText}>
+            {topic === 'suggestion' ? SUGGESTION_THANKS : BUG_REPORT_THANKS}
           </p>
           <div className={styles.thanksActions}>
             <button type="button" className={styles.thanksCloseBtn} onClick={onClose}>
