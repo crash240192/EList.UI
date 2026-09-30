@@ -11,6 +11,9 @@ import type { INotification, NotificationWsStatus } from '@/entities/notificatio
 
 const MAX_ITEMS = 80;
 
+/** Инвалидирует in-flight loadHistory после mark-read / mark-all. */
+let historyEpoch = 0;
+
 interface NotificationsState {
   items: INotification[];
   unreadCount: number;
@@ -26,7 +29,8 @@ interface NotificationsState {
   applyMarkRead: (id: string, readAt?: string) => void;
   applyMarkAllRead: (readAt?: string) => void;
   markRead: (id: string) => Promise<void>;
-  clearAll: () => Promise<void>;
+  /** true — сервер подтвердил; false — откатили локальное состояние */
+  clearAll: () => Promise<boolean>;
   loadHistory: () => Promise<void>;
   refreshUnreadCount: () => Promise<void>;
   reset: () => void;
@@ -49,11 +53,19 @@ function mergeNotifications(
   for (const item of incoming) {
     const prev = byId.get(item.id);
     // Prefer payload that still has usable deep-link scalars (WS Newtonsoft vs broken REST history).
-    if (prev && notificationDataHasMessageRef(prev.data) && !notificationDataHasMessageRef(item.data)) {
-      byId.set(item.id, { ...item, data: prev.data });
-    } else {
-      byId.set(item.id, item);
+    let next: INotification = prev
+      && notificationDataHasMessageRef(prev.data)
+      && !notificationDataHasMessageRef(item.data)
+      ? { ...item, data: prev.data }
+      : item;
+
+    // Не откатываем локально прочитанное: stale history / WS replay с readAt=null
+    // иначе после «прочитать все» уведомления снова всплывают как новые.
+    if (prev?.readAt && !next.readAt) {
+      next = { ...next, readAt: prev.readAt };
     }
+
+    byId.set(item.id, next);
   }
   return sortByDate(Array.from(byId.values())).slice(0, MAX_ITEMS);
 }
@@ -83,11 +95,14 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
 
   pushNotification: n => {
     set(s => {
+      const prev = s.items.find(i => i.id === n.id);
       const items = mergeNotifications(s.items, [n]);
-      const wasUnread = s.items.find(i => i.id === n.id)?.readAt == null;
-      const isUnread = n.readAt == null;
+      const merged = items.find(i => i.id === n.id);
+      const wasUnread = prev ? prev.readAt == null : false;
+      const isUnread = merged?.readAt == null;
       let unreadCount = s.unreadCount;
       if (isUnread && !wasUnread) unreadCount += 1;
+      if (!isUnread && wasUnread) unreadCount = Math.max(0, unreadCount - 1);
       return { items, unreadCount };
     });
   },
@@ -118,36 +133,45 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
 
     const prev = get().items;
     const prevUnread = get().unreadCount;
+    historyEpoch += 1;
     get().applyMarkRead(id);
     try {
       await markNotificationRead(id);
+      await get().refreshUnreadCount();
     } catch {
       set({ items: prev, unreadCount: prevUnread });
     }
   },
 
   clearAll: async () => {
-    if (!get().items.some(i => !i.readAt)) return;
+    if (!get().items.some(i => !i.readAt)) return true;
 
     const prev = get().items;
     const prevUnread = get().unreadCount;
+    historyEpoch += 1;
     get().applyMarkAllRead();
     try {
       await markAllNotificationsRead();
+      await get().refreshUnreadCount();
+      return true;
     } catch {
       set({ items: prev, unreadCount: prevUnread });
+      return false;
     }
   },
 
   loadHistory: async () => {
     if (get().historyLoading) return;
+    const epoch = historyEpoch;
     set({ historyLoading: true });
     try {
       const page = await fetchMyNotifications({ pageIndex: 0, pageSize: 50 });
+      if (epoch !== historyEpoch) return;
       set(s => ({
         items: mergeNotifications(s.items, page.result),
         historyLoaded: true,
       }));
+      if (epoch !== historyEpoch) return;
       await get().refreshUnreadCount();
     } catch (err) {
       console.error('[notifications] load history failed', err);
@@ -165,13 +189,16 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
     }
   },
 
-  reset: () => set({
-    items: [],
-    unreadCount: 0,
-    historyLoaded: false,
-    historyLoading: false,
-    wsStatus: 'idle',
-    wsError: null,
-    panelOpen: false,
-  }),
+  reset: () => {
+    historyEpoch += 1;
+    set({
+      items: [],
+      unreadCount: 0,
+      historyLoaded: false,
+      historyLoading: false,
+      wsStatus: 'idle',
+      wsError: null,
+      panelOpen: false,
+    });
+  },
 }));
