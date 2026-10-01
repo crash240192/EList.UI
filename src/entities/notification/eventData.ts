@@ -57,6 +57,8 @@ const EVENT_PAGE_TYPE_NAMES = new Set([
   ...RATING_TYPE_NAMES,
   'MessageReplied',
   'NewMessage',
+  'CommentLiked',
+  'CommentLikedDigest',
 ]);
 
 export function isNewInvitationNotification(type: string | number | null | undefined): boolean {
@@ -171,6 +173,11 @@ export function getNotificationEventId(
   if (n.ratingData?.eventId) return n.ratingData.eventId;
   if (isRatingNotificationType(n.type) && n.data != null) {
     return parseRatingNotificationData(n.data)?.eventId ?? null;
+  }
+  if (n.data && typeof n.data === 'object') {
+    const o = n.data as Record<string, unknown>;
+    const fromData = o.eventId ?? o.EventId;
+    if (fromData != null && fromData !== '') return String(fromData);
   }
   return null;
 }

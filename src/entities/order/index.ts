@@ -3,13 +3,16 @@
 export type {
   OrderStatus,
   TicketStatus,
+  RefundStatus,
   ITicket,
   IOrder,
+  IRefund,
   ICreateOrderRequest,
   ICreateOrderResponse,
   ICompletePaymentRequest,
   ITransferTicketRequest,
   ICreateRefundRequest,
+  ICancelRefundRequest,
   ITicketCheckInRequest,
 } from './types';
 
@@ -22,6 +25,8 @@ export {
   fetchTicketByCode,
   transferTicket,
   createRefund,
+  cancelRefund,
+  fetchRefundsByOrder,
   validateTicket,
   checkInTicket,
 } from './api';

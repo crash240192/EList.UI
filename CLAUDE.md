@@ -29,7 +29,7 @@ The Vite dev server proxies three backends:
 
 ## Architecture
 
-**EList** is a Russian-language event discovery platform (search, create, map-based browsing). It follows **Feature-Sliced Design (FSD)**:
+**Твой Спот** (`tvoy-spot.ru`) — российский агрегатор городских мероприятий (поиск, создание, карта). Кодовая база исторически называется EList (namespaces, path `/eList`). Следуем **Feature-Sliced Design (FSD)**:
 
 ```
 src/

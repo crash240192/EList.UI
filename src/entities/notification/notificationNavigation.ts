@@ -60,7 +60,7 @@ const USER_PROFILE_TYPE_NAMES = new Set([
 
 export type NotificationNavTarget =
   | { kind: 'invitations' }
-  | { kind: 'event'; eventId: string }
+  | { kind: 'event'; eventId: string; conversationId?: string; messageId?: string }
   | { kind: 'user'; accountId: string }
   | { kind: 'my-reports'; reportId?: string }
   | { kind: 'reports-against-me'; reportId?: string }
@@ -70,6 +70,27 @@ export type NotificationNavTarget =
   | { kind: 'settings-organizations'; organizationId?: string }
   | { kind: 'settings-moderation' }
   | { kind: 'agreements-recheck' };
+
+/** Message / digest payload с ссылкой на комментарий */
+export function parseNotificationMessageRef(
+  data: unknown,
+): { id: string; conversationId?: string } | null {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const o = data as Record<string, unknown>;
+  const id = unwrapScalar(o.id ?? o.Id ?? o.messageId ?? o.MessageId);
+  if (!id) return null;
+  const conversationId = unwrapScalar(o.conversationId ?? o.ConversationId) || undefined;
+  return { id, conversationId };
+}
+
+/** STJ historically serialized Newtonsoft JValues as []; treat those as missing. */
+function unwrapScalar(raw: unknown): string {
+  if (raw == null) return '';
+  if (Array.isArray(raw)) return '';
+  if (typeof raw === 'object') return '';
+  const s = String(raw).trim();
+  return s === '' || s === '[]' ? '' : s;
+}
 
 export function notificationTypeLabel(type: INotification['type']): string {
   const fromRegistry = userNotificationTypeLabel(type);
@@ -183,6 +204,28 @@ export function getNotificationNavigationTarget(
     if (n.relatedAccountId) {
       return { kind: 'user', accountId: n.relatedAccountId };
     }
+  }
+
+  if (
+    isUserNotificationTypeName(n.type, 'MessageReplied', 'CommentLiked', 'CommentLikedDigest')
+    || typeNum === 31
+    || typeNum === 33
+    || typeNum === 34
+    || typeKey === 'MessageReplied'
+    || typeKey === 'CommentLiked'
+    || typeKey === 'CommentLikedDigest'
+  ) {
+    const eventId = getNotificationEventId(n);
+    const msg = parseNotificationMessageRef(n.data);
+    if (eventId && msg?.id) {
+      return {
+        kind: 'event',
+        eventId,
+        conversationId: msg.conversationId,
+        messageId: msg.id,
+      };
+    }
+    if (eventId) return { kind: 'event', eventId };
   }
 
   if (

@@ -26,6 +26,8 @@ export const ApiErrorCode = {
   PersonNotExists: 4000,
   InvalidFirstName: 4001,
   InvalidLastName: 4002,
+  /** Возраст меньше минимально допустимого для сервиса (14 лет). */
+  UserUnderMinimumAge: 4003,
 
   SubscriptionAlreadyExists: 5000,
   SubscriptionNotExists: 5001,
@@ -49,6 +51,7 @@ export const ApiErrorCode = {
   TariffNotAssigned: 10004,
   PaymentValueMustBeOverZero: 10005,
   AccountWalletAlreadyExists: 10006,
+  DefaultFreeTariffAlreadyExists: 10007,
 
   OrganizationNotFound: 11001,
   OrganizationPaymentRequired: 11006,

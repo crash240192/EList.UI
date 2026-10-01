@@ -119,14 +119,19 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     try {
       const result = await fetchEvents({
         ...ownerParams(ownerFilter, accountId),
-        // Активные: startTime = сейчас (события, которые начнутся или уже идут)
-        // Прошедшие: endTime = сейчас (события, которые уже закончились)
-        ...(tab === 'active'  ? { startTime: new Date().toISOString() } : {}),
-        ...(tab === 'archive' ? { endTime:   new Date().toISOString() } : {}),
+        // Активные: startTime = сейчас (ещё идут или впереди) — ближайшие сверху
+        // Прошедшие: endTime = сейчас — только что закончившиеся сверху (EndTime DESC)
+        ...(tab === 'active'
+          ? { startTime: new Date().toISOString(), orderBy: 'StartTime' }
+          : {}),
+        ...(tab === 'archive'
+          ? { endTime: new Date().toISOString(), orderBy: 'EndTime DESC' }
+          : {}),
         name:       extraParams.name       || undefined,
         categories: extraParams.categories || undefined,
         types:      extraParams.types      || undefined,
         price:      extraParams.price      || undefined,
+        ...(extraParams.active === false ? { active: false } : {}),
         pageIndex:  page,
         pageSize:   PAGE_SIZE,
       });

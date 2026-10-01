@@ -1,11 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { IMessage } from '@/entities/conversation';
-import { updateMessage, deleteMessage, fetchMessageReplies } from '@/entities/conversation';
+import type { IMessage, IMessagePathNode, MessageVoteValue } from '@/entities/conversation';
+import {
+  updateMessage,
+  deleteMessage,
+  fetchMessageReplies,
+  likeMessage,
+  dislikeMessage,
+} from '@/entities/conversation';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { clampText, textLengthError } from '@/shared/lib/clampText';
 import { TextLengthHint } from '@/shared/ui/TextLengthHint/TextLengthHint';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { ImageLightbox } from '@/shared/ui/ImageLightbox';
 import { ContentReportModal } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import {
@@ -17,17 +25,22 @@ import {
   isLongMessageText,
   canDeleteMessage,
   messageHasReplies,
+  scheduleDiscussionMessageFocusScroll,
 } from './messageUtils';
-import { DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
+import { DISCUSSION_MESSAGE_MAX_FILES, DISCUSSION_MESSAGE_MAX_LENGTH } from './discussionUiConstants';
 import { MessageReplies } from './MessageReplies';
 import type { DiscussionViewMode } from './discussionViewMode';
 import { useDiscussionRefresh } from './discussionRefreshContext';
+import { uploadFile } from '@/shared/api/fileStorageClient';
+import { filesFromClipboard, filterImageFiles } from '@/shared/lib/imageFile';
 import styles from './MessageRow.module.css';
 
 interface MessageRowProps {
   message: IMessage;
   depth: number;
   highlighted?: boolean;
+  /** Подсветка deep-link (уведомление) */
+  focusTarget?: boolean;
   activeReplyId?: string | null;
   conversationId: string;
   currentAccountId: string | null;
@@ -36,6 +49,19 @@ interface MessageRowProps {
   threadRootId?: string;
   /** Подпись «в ответ …» в режиме ленты */
   replyToAuthor?: string | null;
+  /**
+   * Дерево: родитель имеет ровно одного ребёнка с продолжением —
+   * раскрываем цепочку сразу (до развилки).
+   */
+  autoExpandChain?: boolean;
+  /** Оставшийся путь focus ниже этого узла (дети → … → цель) */
+  focusPathTail?: IMessagePathNode[];
+  /** Id предков цели — всегда раскрыты на время deep-link */
+  focusExpandIds?: string[];
+  focusTargetId?: string | null;
+  /** Сообщение с пульс-подсветкой (~3 с) */
+  focusHighlightId?: string | null;
+  onFocusHandled?: () => void;
   onReply?: (message: IMessage, threadRootId: string) => void;
   onDeleted?: (messageId: string) => void;
 }
@@ -75,6 +101,24 @@ function FlagIcon() {
   );
 }
 
+function LikeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+      <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+    </svg>
+  );
+}
+
+function DislikeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+      <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+    </svg>
+  );
+}
+
 function ChevronUpIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
@@ -95,17 +139,38 @@ export function MessageRow({
   message,
   depth,
   highlighted = false,
+  focusTarget = false,
   activeReplyId = null,
   conversationId,
   currentAccountId,
   viewMode = 'tree',
   threadRootId,
   replyToAuthor = null,
+  autoExpandChain = false,
+  focusPathTail,
+  focusExpandIds,
+  focusTargetId = null,
+  focusHighlightId = null,
+  onFocusHandled,
   onReply,
   onDeleted,
 }: MessageRowProps) {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(message.replied);
+  const expandFromFocus =
+    Boolean(focusPathTail && focusPathTail.length > 0)
+    || Boolean(focusExpandIds?.includes(message.id));
+  /**
+   * Корень ветки: сразу превью прямых ответов.
+   * Автоцепочка: единственный ребёнок с продолжением — раскрыт.
+   * Deep-link: раскрываем предков цели.
+   * Иначе вложенное свёрнуто до клика.
+   */
+  const [expanded, setExpanded] = useState(() => {
+    if (expandFromFocus) return true;
+    if (!message.replied) return false;
+    if (autoExpandChain) return true;
+    return depth === 0;
+  });
   const [textExpanded, setTextExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.messageText);
@@ -118,8 +183,29 @@ export function MessageRow({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [alreadyReported, setAlreadyReported] = useState(false);
+  const [likesCount, setLikesCount] = useState(() => message.likesCount ?? 0);
+  const [dislikesCount, setDislikesCount] = useState(() => message.dislikesCount ?? 0);
+  const [userVote, setUserVote] = useState<MessageVoteValue | null>(
+    () => message.currentUserVote ?? null,
+  );
+  const [voting, setVoting] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [editFileIds, setEditFileIds] = useState<string[]>(() => message.fileIds ?? []);
+  const [editUploads, setEditUploads] = useState<Array<{
+    localId: string;
+    previewUrl: string;
+    error?: string;
+  }>>([]);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+  const editUploadsRef = useRef(editUploads);
+  editUploadsRef.current = editUploads;
 
   const replyBump = useDiscussionRefresh(message.id);
+  const fileIds = message.fileIds ?? [];
+  const [displayFileIds, setDisplayFileIds] = useState(fileIds);
+  const uploadingEdit = editUploads.some(u => !u.error);
+  const editSlotCount = editFileIds.length + editUploads.length;
+  const hasEditPhotos = editSlotCount > 0;
   const prevReplyBump = useRef(replyBump);
   const isMine = !!currentAccountId && message.accountId === currentAccountId;
   const isHidden = Boolean(message.hidden);
@@ -133,16 +219,47 @@ export function MessageRow({
   const canNestReplies = viewMode === 'tree' || message.id === rootId;
 
   useEffect(() => {
+    if (expandFromFocus) setExpanded(true);
+  }, [expandFromFocus]);
+
+  /** Скролл к цели deep-link — только у целевого сообщения, с проверкой видимости */
+  useEffect(() => {
+    if (focusTargetId !== message.id) return;
+    return scheduleDiscussionMessageFocusScroll(message.id, {
+      onDone: () => onFocusHandled?.(),
+    });
+  }, [focusTargetId, message.id, onFocusHandled]);
+
+  useEffect(() => {
+    setLikesCount(message.likesCount ?? 0);
+    setDislikesCount(message.dislikesCount ?? 0);
+    setUserVote(message.currentUserVote ?? null);
+  }, [message.id, message.likesCount, message.dislikesCount, message.currentUserVote]);
+
+  useEffect(() => {
     setDisplayText(message.messageText);
     setEditText(clampText(message.messageText, DISCUSSION_MESSAGE_MAX_LENGTH));
+    setDisplayFileIds(message.fileIds ?? []);
+    setEditFileIds(message.fileIds ?? []);
+    setEditUploads(prev => {
+      prev.forEach(u => URL.revokeObjectURL(u.previewUrl));
+      return [];
+    });
     setTextExpanded(false);
     setEditError(null);
-  }, [message.id, message.messageText]);
+  }, [message.id, message.messageText, message.fileIds?.join(',')]);
 
+  useEffect(() => () => {
+    editUploadsRef.current.forEach(u => URL.revokeObjectURL(u.previewUrl));
+  }, []);
   useEffect(() => {
     if (replyBump > prevReplyBump.current) setExpanded(true);
     prevReplyBump.current = replyBump;
   }, [replyBump]);
+
+  useEffect(() => {
+    if (autoExpandChain && message.replied) setExpanded(true);
+  }, [autoExpandChain, message.replied, message.id]);
 
   useEffect(() => {
     if (!hasReplies || expanded) return;
@@ -161,25 +278,106 @@ export function MessageRow({
 
   const startEdit = () => {
     setEditText(displayText);
+    setEditFileIds(displayFileIds);
+    setEditUploads(prev => {
+      prev.forEach(u => URL.revokeObjectURL(u.previewUrl));
+      return [];
+    });
     setEditError(null);
     setEditing(true);
   };
 
   const cancelEdit = () => {
     setEditText(displayText);
+    setEditFileIds(displayFileIds);
+    setEditUploads(prev => {
+      prev.forEach(u => URL.revokeObjectURL(u.previewUrl));
+      return [];
+    });
     setEditError(null);
     setEditing(false);
+  };
+
+  const removeEditFile = (fileId: string) => {
+    setEditFileIds(prev => prev.filter(id => id !== fileId));
+  };
+
+  const removeEditUpload = (localId: string) => {
+    setEditUploads(prev => {
+      const target = prev.find(u => u.localId === localId);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter(u => u.localId !== localId);
+    });
+  };
+
+  const handleEditFiles = (list: FileList | File[] | null) => {
+    if (!list?.length || savingEdit) return;
+    const remaining = DISCUSSION_MESSAGE_MAX_FILES - editSlotCount;
+    if (remaining <= 0) {
+      setEditError(`Не больше ${DISCUSSION_MESSAGE_MAX_FILES} фото`);
+      return;
+    }
+    const images = filterImageFiles(list).slice(0, remaining);
+    if (!images.length) {
+      setEditError('Можно прикладывать только изображения');
+      return;
+    }
+    setEditError(null);
+    const placeholders = images.map(file => ({
+      localId: `edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      previewUrl: URL.createObjectURL(file),
+      file,
+    }));
+    setEditUploads(prev => [
+      ...prev,
+      ...placeholders.map(({ localId, previewUrl }) => ({ localId, previewUrl })),
+    ]);
+
+    for (const placeholder of placeholders) {
+      void uploadFile(placeholder.file)
+        .then(result => {
+          setEditUploads(prev => {
+            const target = prev.find(u => u.localId === placeholder.localId);
+            if (target) URL.revokeObjectURL(target.previewUrl);
+            return prev.filter(u => u.localId !== placeholder.localId);
+          });
+          setEditFileIds(prev => [...prev, result.id].slice(0, DISCUSSION_MESSAGE_MAX_FILES));
+        })
+        .catch(e => {
+          const message = e instanceof Error ? e.message : 'Не удалось загрузить фото';
+          setEditError(message);
+          setEditUploads(prev => prev.map(u => (
+            u.localId === placeholder.localId && !u.error
+              ? { ...u, error: message }
+              : u
+          )));
+        });
+    }
+
+    if (editFileInputRef.current) editFileInputRef.current.value = '';
+  };
+
+  const handleEditPasteImages = (e: React.ClipboardEvent) => {
+    if (savingEdit || uploadingEdit) return;
+    const images = filesFromClipboard(e.clipboardData);
+    if (!images.length) return;
+    e.preventDefault();
+    handleEditFiles(images);
   };
 
   const saveEdit = async () => {
     const trimmed = editText.trim();
     const lengthErr = textLengthError(trimmed.length, DISCUSSION_MESSAGE_MAX_LENGTH);
-    if (!trimmed || !currentAccountId || savingEdit) return;
+    if ((!trimmed && editFileIds.length === 0) || !currentAccountId || savingEdit || uploadingEdit) return;
     if (lengthErr) {
       setEditError(lengthErr);
       return;
     }
-    if (trimmed === displayText) {
+    const textSame = trimmed === displayText;
+    const filesSame =
+      editFileIds.length === displayFileIds.length
+      && editFileIds.every((id, i) => id === displayFileIds[i]);
+    if (textSame && filesSame) {
       setEditing(false);
       return;
     }
@@ -192,8 +390,14 @@ export function MessageRow({
         messageText: trimmed,
         accountId: currentAccountId,
         replyTo: message.replyTo ?? null,
+        fileIds: editFileIds,
       });
       setDisplayText(trimmed);
+      setDisplayFileIds(editFileIds);
+      setEditUploads(prev => {
+        prev.forEach(u => URL.revokeObjectURL(u.previewUrl));
+        return [];
+      });
       setEditing(false);
     } catch (e) {
       setEditError(e instanceof Error ? e.message : 'Не удалось сохранить');
@@ -218,6 +422,8 @@ export function MessageRow({
     }
   };
 
+  const expandForFocus = expandFromFocus;
+  const showNestedReplies = canNestReplies && (hasReplies || expandForFocus);
   const collapsedRepliesLabel = replyTotal != null && replyTotal > 0
     ? formatReplyCount(replyTotal)
     : 'Есть ответы';
@@ -228,11 +434,45 @@ export function MessageRow({
     navigate(isMine ? '/user/me' : `/user/${accountId}`);
   };
 
+  const applyVoteResult = (result: {
+    likesCount: number;
+    dislikesCount: number;
+    currentUserVote: MessageVoteValue | null;
+  }) => {
+    setLikesCount(result.likesCount);
+    setDislikesCount(result.dislikesCount);
+    setUserVote(result.currentUserVote);
+  };
+
+  const handleLike = async () => {
+    if (!currentAccountId || voting || isHidden) return;
+    setVoting(true);
+    try {
+      applyVoteResult(await likeMessage(message.id));
+    } catch {
+      /* toast via apiClient */
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const handleDislike = async () => {
+    if (!currentAccountId || voting || isHidden) return;
+    setVoting(true);
+    try {
+      applyVoteResult(await dislikeMessage(message.id));
+    } catch {
+      /* toast via apiClient */
+    } finally {
+      setVoting(false);
+    }
+  };
+
   return (
     <div className={styles.wrap}>
       <article
         id={discussionMessageDomId(message.id)}
-        className={`${styles.card} ${isMine ? styles.cardMine : ''} ${highlighted ? styles.cardHighlight : ''} ${highlighted ? styles.cardReplyTarget : ''}`}
+        className={`${styles.card} ${isMine ? styles.cardMine : ''} ${highlighted ? styles.cardHighlight : ''} ${highlighted ? styles.cardReplyTarget : ''} ${focusTarget ? styles.cardFocusTarget : ''}`}
       >
         <div className={styles.cardInner}>
           {accountId ? (
@@ -246,7 +486,7 @@ export function MessageRow({
                 accountId={accountId}
                 avatarId={message.account?.avatarId ?? null}
                 initials={initials}
-                size={36}
+                size={28}
                 className={styles.avatar}
               />
             </button>
@@ -277,12 +517,13 @@ export function MessageRow({
             ) : editing ? (
               <div className={styles.editBlock}>
                 <textarea
-                  className={styles.editInput}
-                  rows={3}
+                  className={`${styles.editInput} ${hasEditPhotos ? styles.editInputExpanded : ''}`}
+                  rows={hasEditPhotos ? 3 : 2}
                   value={editText}
-                  disabled={savingEdit}
+                  disabled={savingEdit || uploadingEdit}
                   maxLength={DISCUSSION_MESSAGE_MAX_LENGTH}
                   onChange={(e) => setEditText(clampText(e.target.value, DISCUSSION_MESSAGE_MAX_LENGTH))}
+                  onPaste={handleEditPasteImages}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();
@@ -290,22 +531,100 @@ export function MessageRow({
                     }
                   }}
                 />
+                {hasEditPhotos && (
+                  <div className={styles.gallery}>
+                    {editFileIds.map(fileId => (
+                      <div key={fileId} className={styles.editShot}>
+                        <AuthImage fileId={fileId} alt="" className={styles.galleryImg} />
+                        <button
+                          type="button"
+                          className={styles.editShotRemove}
+                          aria-label="Убрать фото"
+                          disabled={savingEdit || uploadingEdit}
+                          onClick={() => removeEditFile(fileId)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {editUploads.map(item => (
+                      <div
+                        key={item.localId}
+                        className={`${styles.editShot} ${!item.error ? styles.editShotUploading : ''}`}
+                        aria-busy={!item.error}
+                        aria-label={item.error ? 'Ошибка загрузки' : 'Загрузка фото'}
+                      >
+                        <img
+                          src={item.previewUrl}
+                          alt=""
+                          className={`${styles.galleryImg} ${styles.editShotImgDim}`}
+                        />
+                        {item.error ? (
+                          <button
+                            type="button"
+                            className={styles.editShotError}
+                            title={item.error}
+                            onClick={() => removeEditUpload(item.localId)}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <div className={styles.editShotOverlay}>
+                            <div className={styles.editShotSpinner} aria-hidden />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {editError && <p className={styles.editError}>{editError}</p>}
-                <div className={styles.editActions}>
-                  <button type="button" className={styles.actionBtn} disabled={savingEdit} onClick={cancelEdit}>
+                <div className={styles.editBar}>
+                  <input
+                    ref={editFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    className={styles.fileInputHidden}
+                    disabled={savingEdit || editSlotCount >= DISCUSSION_MESSAGE_MAX_FILES}
+                    onChange={(e) => handleEditFiles(e.target.files)}
+                  />
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    disabled={savingEdit || editSlotCount >= DISCUSSION_MESSAGE_MAX_FILES}
+                    onClick={() => editFileInputRef.current?.click()}
+                  >
+                    {uploadingEdit
+                      ? `Загрузка… (${editUploads.filter(u => !u.error).length})`
+                      : 'Фото'}
+                  </button>
+                  {hasEditPhotos && (
+                    <span className={styles.editAttachCount}>
+                      {editFileIds.length}/{DISCUSSION_MESSAGE_MAX_FILES}
+                    </span>
+                  )}
+                  <span className={styles.editBarSpacer} />
+                  <TextLengthHint length={editText.length} maxLength={DISCUSSION_MESSAGE_MAX_LENGTH} />
+                  <button type="button" className={styles.actionBtn} disabled={savingEdit || uploadingEdit} onClick={cancelEdit}>
                     Отмена
                   </button>
-                  <div className={styles.saveRow}>
-                    <TextLengthHint length={editText.length} maxLength={DISCUSSION_MESSAGE_MAX_LENGTH} />
-                    <button
+                  <button
                     type="button"
                     className={styles.saveBtn}
-                    disabled={savingEdit || !editText.trim() || editText.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH}
+                    disabled={
+                      savingEdit
+                      || uploadingEdit
+                      || (!editText.trim() && editFileIds.length === 0)
+                      || editText.trim().length > DISCUSSION_MESSAGE_MAX_LENGTH
+                    }
                     onClick={() => void saveEdit()}
                   >
                     {savingEdit ? 'Сохранение…' : 'Сохранить'}
                   </button>
-                  </div>
                 </div>
               </div>
             ) : (
@@ -315,9 +634,11 @@ export function MessageRow({
                     в ответ <span className={styles.replyToName}>{replyToAuthor}</span>
                   </div>
                 )}
-                <p className={`${styles.text} ${isLongText && !textExpanded ? styles.textClamped : ''}`}>
-                  {displayText}
-                </p>
+                {displayText.trim() && (
+                  <p className={`${styles.text} ${isLongText && !textExpanded ? styles.textClamped : ''}`}>
+                    {displayText}
+                  </p>
+                )}
                 {isLongText && (
                   <button
                     type="button"
@@ -337,11 +658,59 @@ export function MessageRow({
                     {textExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
                   </button>
                 )}
+                {displayFileIds.length > 0 && (
+                  <div className={styles.gallery} role="list">
+                    {displayFileIds.map((fileId, index) => (
+                      <button
+                        key={fileId}
+                        type="button"
+                        className={styles.galleryItem}
+                        role="listitem"
+                        aria-label={`Фото ${index + 1}`}
+                        onClick={() => setLightboxIdx(index)}
+                      >
+                        <AuthImage fileId={fileId} alt="" className={styles.galleryImg} />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </>
             )}
 
             {!editing && !isHidden && (
               <footer className={styles.foot}>
+                {currentAccountId && (
+                  <>
+                    <button
+                      type="button"
+                      className={`${styles.actionBtn} ${userVote === 'like' ? styles.actionBtnActive : ''}`}
+                      disabled={voting}
+                      aria-pressed={userVote === 'like'}
+                      aria-label="Нравится"
+                      onClick={() => void handleLike()}
+                    >
+                      <LikeIcon />
+                      {likesCount > 0 ? likesCount : null}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.actionBtn} ${userVote === 'dislike' ? styles.actionBtnActive : ''}`}
+                      disabled={voting}
+                      aria-pressed={userVote === 'dislike'}
+                      aria-label="Не нравится"
+                      onClick={() => void handleDislike()}
+                    >
+                      <DislikeIcon />
+                      {dislikesCount > 0 ? dislikesCount : null}
+                    </button>
+                  </>
+                )}
+                {!currentAccountId && (likesCount > 0 || dislikesCount > 0) && (
+                  <span className={styles.voteReadonly} aria-label="Оценки комментария">
+                    {likesCount > 0 && <span>▲ {likesCount}</span>}
+                    {dislikesCount > 0 && <span>▼ {dislikesCount}</span>}
+                  </span>
+                )}
                 {currentAccountId && onReply && (
                   <button type="button" className={styles.actionBtn} onClick={() => onReply?.(message, rootId)}>
                     <ReplyIcon />
@@ -378,7 +747,7 @@ export function MessageRow({
                     {alreadyReported ? 'Жалоба уже отправлена' : 'Пожаловаться'}
                   </button>
                 )}
-                {canNestReplies && hasReplies && expanded && (
+                {showNestedReplies && expanded && (
                   <button
                     type="button"
                     className={`${styles.actionBtn} ${styles.actionBtnMuted}`}
@@ -415,23 +784,18 @@ export function MessageRow({
         />
       )}
 
-      {canNestReplies && hasReplies && !expanded && (
+      {showNestedReplies && !expanded && (
         <button
           type="button"
-          className={styles.collapsedReplies}
+          className={styles.moreBtn}
           onClick={() => setExpanded(true)}
           aria-expanded={false}
         >
-          <span className={styles.collapsedRepliesLine} aria-hidden />
-          <span className={styles.collapsedRepliesBody}>
-            <span className={styles.collapsedRepliesCount}>{collapsedRepliesLabel}</span>
-            <span className={styles.collapsedRepliesHint}>Показать цепочку</span>
-          </span>
-          <ChevronDownIcon />
+          {collapsedRepliesLabel}
         </button>
       )}
 
-      {canNestReplies && hasReplies && expanded && (
+      {showNestedReplies && expanded && (
         <MessageReplies
           parent={message}
           depth={depth}
@@ -441,9 +805,23 @@ export function MessageRow({
           currentAccountId={currentAccountId}
           viewMode={viewMode}
           threadRootId={rootId}
+          focusPathTail={focusPathTail}
+          focusExpandIds={focusExpandIds}
+          focusTargetId={focusTargetId}
+          focusHighlightId={focusHighlightId}
+          onFocusHandled={onFocusHandled}
           onReply={onReply}
           onDeleted={onDeleted}
           onTotalLoaded={setReplyTotal}
+        />
+      )}
+
+      {lightboxIdx != null && displayFileIds.length > 0 && (
+        <ImageLightbox
+          fileIds={displayFileIds}
+          startIndex={lightboxIdx}
+          alt="Фото из комментария"
+          onClose={() => setLightboxIdx(null)}
         />
       )}
     </div>

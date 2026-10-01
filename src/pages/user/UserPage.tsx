@@ -13,7 +13,7 @@ import { useSafeBack } from '@/shared/lib/useSafeBack';
 import {
   fetchSubscriptionsCount,
   fetchSubscribersCount,
-  fetchSubscriptions,
+  fetchIsSubscribed,
   subscribe,
   unsubscribe,
   type INotifySettings,
@@ -49,7 +49,6 @@ import {
   getContactIconKind,
   getUpcomingPreview,
   isContactLink,
-  splitEventsByPhase,
   type ContactIconKind,
   type UserEventsPhase,
   type UserEventsScope,
@@ -204,20 +203,9 @@ function UserEventsPanel({
   onPhaseChange: (phase: UserEventsPhase) => void;
   onOpen: (eventId: string) => void;
 }) {
-  const filtered = useMemo(() => splitEventsByPhase(events, phase), [events, phase]);
-
   const sentinelRef = useInfiniteScroll(onLoadMore, {
     enabled: !isLoading && !isLoadingMore && hasMore,
   });
-
-  // Первая страница может целиком попасть в другую фазу — подгружаем дальше,
-  // пока не появятся карточки или не кончатся данные.
-  useEffect(() => {
-    if (isLoading || isLoadingMore || !hasMore) return;
-    if (filtered.length > 0) return;
-    if (events.length === 0) return;
-    onLoadMore();
-  }, [isLoading, isLoadingMore, hasMore, filtered.length, events.length, onLoadMore]);
 
   return (
     <div className={styles.tabContent}>
@@ -240,7 +228,7 @@ function UserEventsPanel({
         </div>
       )}
 
-      {!isLoading && filtered.length === 0 && !hasMore && (
+      {!isLoading && events.length === 0 && (
         <p className={styles.placeholder}>
           {scope === 'all'
             ? (phase === 'upcoming' ? 'Нет предстоящих мероприятий' : 'Нет прошедших мероприятий')
@@ -250,13 +238,9 @@ function UserEventsPanel({
         </p>
       )}
 
-      {!isLoading && filtered.length === 0 && hasMore && (
-        <p className={styles.placeholder}>Загрузка…</p>
-      )}
-
-      {!isLoading && filtered.length > 0 && (
+      {!isLoading && events.length > 0 && (
         <EventList className={styles.eventsList}>
-          {filtered.map(event => (
+          {events.map(event => (
             <EventListItem
               key={event.id}
               event={event}
@@ -273,7 +257,7 @@ function UserEventsPanel({
         </div>
       )}
 
-      {!isLoading && !hasMore && total > events.length && filtered.length > 0 && (
+      {!isLoading && !hasMore && total > events.length && events.length > 0 && (
         <p className={styles.moreHint}>Показано {events.length} из {total}</p>
       )}
     </div>
@@ -328,7 +312,10 @@ export default function UserPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
 
-  const { scopes: eventScopes } = useUserProfileEvents(profileAccountId || null);
+  const { scopes: eventScopes, upcomingScopes, scopeTotals } = useUserProfileEvents(
+    profileAccountId || null,
+    eventsPhase,
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -393,11 +380,15 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!profileAccountId || !myAccountId || isOwnProfile) return;
-    fetchSubscriptions(myAccountId, { pageSize: 200 })
-      .then(page => {
-        setIsSubscribed(page.items.some((s: { account: { id: string } }) => s.account.id === profileAccountId));
+    let cancelled = false;
+    fetchIsSubscribed(profileAccountId)
+      .then(subscribed => {
+        if (!cancelled) setIsSubscribed(subscribed);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setIsSubscribed(false);
+      });
+    return () => { cancelled = true; };
   }, [profileAccountId, myAccountId, isOwnProfile]);
 
   const handleSubscribe = useCallback(async (settings: INotifySettings) => {
@@ -444,19 +435,19 @@ export default function UserPage() {
         };
 
   const tabCounts: Record<MainTab, number> = {
-    all: eventScopes.all.total || eventScopes.all.events.length,
-    created: eventScopes.created.total || eventScopes.created.events.length,
-    participating: eventScopes.participating.total || eventScopes.participating.events.length,
+    all: scopeTotals.all,
+    created: scopeTotals.created,
+    participating: scopeTotals.participating,
     albums: albumsCount,
   };
 
   const upcomingPreview = useMemo(() => {
-    const created = getUpcomingPreview(eventScopes.created.events, 'created', 2);
-    const participating = getUpcomingPreview(eventScopes.participating.events, 'participating', 2);
+    const created = getUpcomingPreview(upcomingScopes.created.events, 'created', 2);
+    const participating = getUpcomingPreview(upcomingScopes.participating.events, 'participating', 2);
     return [...created, ...participating]
       .sort((a, b) => new Date(a.event.startTime).getTime() - new Date(b.event.startTime).getTime())
       .slice(0, 3);
-  }, [eventScopes.created.events, eventScopes.participating.events]);
+  }, [upcomingScopes.created.events, upcomingScopes.participating.events]);
 
   const pageTitle = profile
     ? ([profile.person?.lastName, profile.person?.firstName].filter(Boolean).join(' ')
@@ -502,6 +493,17 @@ export default function UserPage() {
               >
                 <ShareIcon />
               </button>
+              {isOwnProfile && (
+                <button
+                  type="button"
+                  className={`${heroStyles.heroBtn} noHoverGlow`}
+                  onClick={() => navigate('/settings')}
+                  aria-label="Настройки"
+                  title="Настройки"
+                >
+                  <SettingsIcon />
+                </button>
+              )}
               {!isOwnProfile && authenticated && (
                 <>
                   <button
@@ -540,7 +542,7 @@ export default function UserPage() {
         <div className={styles.profileHeader}>
           <button
             type="button"
-            className={styles.avatarWrap}
+            className={`noHoverGlow ${styles.avatarWrap}`}
             onClick={async () => {
               const history = await getAvatarHistory(profileAccountId);
               setLightboxFileIds(
@@ -556,6 +558,7 @@ export default function UserPage() {
               avatarId={account.avatarId ?? null}
               initials={initials}
               size={88}
+              onlineDotSize={22}
               className={styles.avatar}
             />
           </button>
@@ -590,19 +593,6 @@ export default function UserPage() {
         </div>
 
         <div className={styles.statsBar}>
-          <div className={styles.statGroup}>
-            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{eventScopes.created.total || eventScopes.created.events.length}</span>
-              <span className={styles.statLabel}>организовал</span>
-            </div>
-            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{eventScopes.participating.total || eventScopes.participating.events.length}</span>
-              <span className={styles.statLabel}>посетил</span>
-            </div>
-          </div>
-
-          <div className={styles.statGroupDivider} aria-hidden />
-
           <div className={styles.statGroup}>
             <button
               type="button"
@@ -872,6 +862,15 @@ function ShareIcon() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
       <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }

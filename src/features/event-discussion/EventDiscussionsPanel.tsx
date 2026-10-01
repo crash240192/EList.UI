@@ -1,9 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { IConversation } from '@/entities/conversation';
 import { fetchEventConversations } from '@/entities/conversation';
 import { MessageThread } from './MessageThread';
 import { DiscussionFormModal } from './DiscussionFormModal';
 import { DiscussionsManageModal } from './DiscussionsManageModal';
+import { DiscussionViewModeToggle } from './DiscussionViewModeToggle';
+import {
+  DISCUSSION_VIEW_MODE_STORAGE_KEY,
+  isDiscussionViewMode,
+  type DiscussionViewMode,
+} from './discussionViewMode';
+import { useLocalStorage } from '@/shared/hooks';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { EventDiscussionsPanelSkeleton } from './EventDiscussionsPanelSkeleton';
@@ -22,6 +30,13 @@ export function EventDiscussionsPanel({
   currentAccountId,
   canManage = false,
 }: EventDiscussionsPanelProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusConversationId = searchParams.get('conversation');
+  const focusMessageId = searchParams.get('message');
+  /** Не кладём focusConversationId в deps loadConversations — иначе очистка query после deep-link перезагружает всю панель. */
+  const focusConversationIdRef = useRef(focusConversationId);
+  focusConversationIdRef.current = focusConversationId;
+
   const [conversations, setConversations] = useState<IConversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,9 +46,38 @@ export function EventDiscussionsPanel({
   const [manageOpen, setManageOpen] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [fadeRight, setFadeRight] = useState(false);
+  const [viewMode, setViewMode] = useLocalStorage<DiscussionViewMode>(
+    DISCUSSION_VIEW_MODE_STORAGE_KEY,
+    'tree',
+  );
+  const safeViewMode: DiscussionViewMode = isDiscussionViewMode(viewMode) ? viewMode : 'tree';
+  /** Пока идёт deep-link — держим дерево, чтобы не сбросить раскладку после очистки query */
+  const [focusTreeLock, setFocusTreeLock] = useState(false);
+  useEffect(() => {
+    if (focusMessageId) setFocusTreeLock(true);
+  }, [focusMessageId]);
+  const threadViewMode: DiscussionViewMode = focusTreeLock ? 'tree' : safeViewMode;
+  const handleViewModeChange = useCallback((next: DiscussionViewMode) => {
+    setFocusTreeLock(false);
+    setViewMode(next);
+  }, [setViewMode]);
   const layoutBoundsRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
+
+  /**
+   * Стабильный колбэк: не зависит от searchParams, чтобы не перезапускать
+   * scroll-retry эффекты в MessageThread/MessageRow при каждом replace URL.
+   */
+  const clearFocusParams = useCallback(() => {
+    setSearchParams((prev) => {
+      if (!prev.get('message') && !prev.get('conversation')) return prev;
+      const next = new URLSearchParams(prev);
+      next.delete('message');
+      next.delete('conversation');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const updateTabFades = useCallback(() => {
     const el = tabsRef.current;
@@ -56,6 +100,10 @@ export function EventDiscussionsPanel({
       const list = await fetchEventConversations(eventId);
       setConversations(list);
       setActiveId((prev) => {
+        const focusId = focusConversationIdRef.current;
+        if (focusId && list.some((c) => c.id === focusId)) {
+          return focusId;
+        }
         if (prev && list.some((c) => c.id === prev)) return prev;
         return list[0]?.id ?? null;
       });
@@ -76,6 +124,13 @@ export function EventDiscussionsPanel({
   useEffect(() => {
     void loadConversations();
   }, [loadConversations]);
+
+  useEffect(() => {
+    if (!focusConversationId || conversations.length === 0) return;
+    if (conversations.some((c) => c.id === focusConversationId)) {
+      setActiveId(focusConversationId);
+    }
+  }, [focusConversationId, conversations]);
 
   useEffect(() => {
     const el = tabsRef.current;
@@ -141,6 +196,10 @@ export function EventDiscussionsPanel({
   }
 
   const active = conversations.find((c) => c.id === activeId) ?? conversations[0] ?? null;
+  const threadFocusMessageId =
+    active && focusMessageId && (!focusConversationId || focusConversationId === active.id)
+      ? focusMessageId
+      : null;
 
   return (
     <div className={styles.panel}>
@@ -178,30 +237,36 @@ export function EventDiscussionsPanel({
           {fadeLeft && <div className={`${styles.tabsFade} ${styles.tabsFadeLeft}`} aria-hidden />}
           {fadeRight && <div className={`${styles.tabsFade} ${styles.tabsFadeRight}`} aria-hidden />}
         </div>
-        {canManage && conversations.length > 0 && (
-          <button
-            type="button"
-            className={styles.editTabsBtn}
-            onClick={() => setManageOpen(true)}
-            aria-label="Редактировать обсуждения"
-            title="Редактировать обсуждения"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
-        )}
+        <div className={styles.tabsTools}>
+          <DiscussionViewModeToggle value={threadViewMode} onChange={handleViewModeChange} />
+          {canManage && conversations.length > 0 && (
+            <button
+              type="button"
+              className={styles.editTabsBtn}
+              onClick={() => setManageOpen(true)}
+              aria-label="Редактировать обсуждения"
+              title="Редактировать обсуждения"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {active ? (
         <div ref={layoutBoundsRef} className={styles.body} role="tabpanel">
           <MessageThread
-            key={active.id}
+            key={`${active.id}:${threadViewMode}`}
             conversationId={active.id}
             currentAccountId={currentAccountId}
             layoutBoundsRef={layoutBoundsRef}
             canComment={!active.participantsReadonly || canManage}
+            viewMode={threadViewMode}
+            focusMessageId={threadFocusMessageId}
+            onFocusHandled={clearFocusParams}
           />
         </div>
       ) : (

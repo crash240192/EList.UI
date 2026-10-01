@@ -1,20 +1,24 @@
 // pages/event/EventAlbums.tsx
 // Блок альбомов на странице мероприятия
 
-import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import {
   getEventAlbums,
   getAlbumFiles,
+  getAlbumCoverFileIds,
   assignAlbumToEvent,
   deleteAlbum,
   type IAlbum,
 } from '@/entities/media/albumApi';
+import { canManageAlbum } from '@/entities/media/albumPermissions';
 import { AlbumFormModal } from '@/features/media/AlbumFormModal';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
+import { media } from '@/shared/lib/breakpoints';
+import { useMediaQuery } from '@/shared/hooks';
 import styles from './EventAlbums.module.css';
 
 // ── Изображение со спиннером ─────────────────────────────────────────────────
@@ -91,47 +95,101 @@ interface AlbumCardProps {
   album: IAlbum;
   canManage: boolean;
   coverVersion?: number;
+  hideMeta?: boolean;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-function AlbumCard({ album, canManage, coverVersion = 0, onOpen, onEdit, onDelete }: AlbumCardProps) {
-  const [cover, setCover] = useState<string | null>(null);
+function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpen, onEdit, onDelete }: AlbumCardProps) {
+  const [coverIds, setCoverIds] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const menuElRef = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({ visibility: 'hidden' });
+
+  // Свёрнутые thumbs — одно фото; развёрнутая карточка — до 4 для мозаики.
+  const previewLimit = hideMeta ? 1 : 4;
 
   useEffect(() => {
     let cancelled = false;
-    getAlbumFiles(album.id, 1, 1).then(files => {
-      if (!cancelled && files.length > 0) setCover(files[0].fileId);
+    setCoverIds([]);
+    getAlbumCoverFileIds(album.id, previewLimit).then(ids => {
+      if (!cancelled) setCoverIds(ids);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [album.id, coverVersion]);
+  }, [album.id, coverVersion, previewLimit]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+  useLayoutEffect(() => {
+    if (!menuOpen) {
+      setMenuStyle({ visibility: 'hidden' });
+      return;
+    }
+
+    const place = () => {
+      const btn = menuBtnRef.current;
+      const menu = menuElRef.current;
+      if (!btn || !menu) return;
+      const pad = 8;
+      const gap = 4;
+      const rect = btn.getBoundingClientRect();
+      const mw = menu.offsetWidth;
+      const mh = menu.offsetHeight;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      let left = rect.right - mw;
+      if (left < pad) left = pad;
+      if (left + mw > vw - pad) left = Math.max(pad, vw - pad - mw);
+
+      let top = rect.bottom + gap;
+      if (top + mh > vh - pad) {
+        const above = rect.top - gap - mh;
+        top = above >= pad ? above : Math.max(pad, vh - pad - mh);
+      }
+
+      setMenuStyle({ top, left, visibility: 'visible' });
     };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
   }, [menuOpen]);
 
+  const coverCount = coverIds.length;
+  const showMosaic = !hideMeta && coverCount > 1;
+
   return (
-    <div className={styles.albumCard}>
+    <div className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : ''}`}>
       <div className={styles.albumCardBody} onClick={onOpen} role="button" tabIndex={0}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}>
         <div className={styles.albumCover}>
-          {cover
-            ? <SpinnerImage fileId={cover} alt={album.name} className={styles.albumCoverImg} />
-            : <div className={styles.albumCoverEmpty}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>
-                  <circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/>
-                </svg>
-              </div>
-          }
+          {showMosaic ? (
+            <div
+              className={styles.albumCoverMosaic}
+              data-count={Math.min(coverCount, 4)}
+              aria-hidden
+            >
+              {coverIds.slice(0, 4).map((fileId, i) => (
+                <div key={`${fileId}-${i}`} className={styles.albumCoverMosaicCell}>
+                  <SpinnerImage fileId={fileId} alt="" className={styles.albumCoverImg} />
+                </div>
+              ))}
+            </div>
+          ) : coverCount > 0 ? (
+            <SpinnerImage fileId={coverIds[0]} alt={album.name} className={styles.albumCoverImg} />
+          ) : (
+            <div className={styles.albumCoverEmpty}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>
+                <circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/>
+              </svg>
+            </div>
+          )}
           {album.parameters?.private && (
             <div className={styles.privateBadge}>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -140,34 +198,48 @@ function AlbumCard({ album, canManage, coverVersion = 0, onOpen, onEdit, onDelet
             </div>
           )}
         </div>
-        <div className={styles.albumMeta}>
-          <div className={styles.albumName}>{album.name}</div>
-          {album.description && <div className={styles.albumDesc}>{album.description}</div>}
-        </div>
+        {!hideMeta && (
+          <div className={styles.albumMeta}>
+            <div className={styles.albumName}>{album.name}</div>
+            {album.description && <div className={styles.albumDesc}>{album.description}</div>}
+          </div>
+        )}
       </div>
 
       {canManage && (
-        <div className={styles.albumMenuWrap} ref={menuRef}>
+        <div className={styles.albumMenuWrap}>
           <button
+            ref={menuBtnRef}
             type="button"
             className={styles.albumMenuBtn}
             aria-label="Меню альбома"
+            aria-expanded={menuOpen}
             onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
             </svg>
           </button>
-          {menuOpen && (
-            <div className={styles.albumMenu}>
-              <button type="button" className={styles.albumMenuItem} onClick={e => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}>
-                Редактировать
-              </button>
-              <button type="button" className={`${styles.albumMenuItem} ${styles.albumMenuItemDanger}`}
-                onClick={e => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}>
-                Удалить
-              </button>
-            </div>
+          {menuOpen && createPortal(
+            <>
+              <div className={styles.albumMenuBackdrop} onClick={() => setMenuOpen(false)} aria-hidden />
+              <div
+                ref={menuElRef}
+                className={styles.albumMenu}
+                style={menuStyle}
+                role="menu"
+              >
+                <button type="button" className={styles.albumMenuItem} role="menuitem"
+                  onClick={e => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}>
+                  Редактировать
+                </button>
+                <button type="button" className={`${styles.albumMenuItem} ${styles.albumMenuItemDanger}`} role="menuitem"
+                  onClick={e => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}>
+                  Удалить
+                </button>
+              </div>
+            </>,
+            document.body,
           )}
         </div>
       )}
@@ -218,6 +290,10 @@ export function EventAlbums({
   const [checkingPhotos, setCheckingPhotos] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [coverVersionByAlbumId, setCoverVersionByAlbumId] = useState<Record<string, number>>({});
+  const [albumsExpanded, setAlbumsExpanded] = useState(false);
+  const isMobile = useMediaQuery(media.mobile);
+  // Свёртка ряда альбомов — только на мобилке; на tablet/desktop всегда развёрнуто.
+  const showExpandedAlbums = !isMobile || albumsExpanded;
 
   const bumpAlbumCover = useCallback((albumId: string) => {
     setCoverVersionByAlbumId(prev => ({
@@ -247,8 +323,10 @@ export function EventAlbums({
   };
 
   const handleAlbumSaved = async (album: IAlbum) => {
+    // Assign для новых альбомов делает AlbumFormModal (до загрузки фото).
+    // Здесь — только если модалка создала альбом без eventId (legacy / другие экраны).
     const isNew = !albums.some(a => a.id === album.id);
-    if (isNew) {
+    if (isNew && !album.eventId) {
       try { await assignAlbumToEvent(eventId, album.id); } catch { /* ignore */ }
     }
     setAlbums(prev => {
@@ -302,7 +380,7 @@ export function EventAlbums({
         <AlbumCard
           key={a.id}
           album={a}
-          canManage={canManage}
+          canManage={canManageAlbum(a, { isOrganizer: canManage })}
           coverVersion={coverVersionByAlbumId[a.id] ?? 0}
           onOpen={() => openAlbum(a)}
           onEdit={() => setFormAlbum(a)}
@@ -320,7 +398,7 @@ export function EventAlbums({
       <AlbumGridModal
         open={gridAlbum !== null}
         album={gridAlbum}
-        canManage={canManage}
+        canManage={gridAlbum ? canManageAlbum(gridAlbum, { isOrganizer: canManage }) : false}
         isParticipating={isParticipating}
         onClose={handleCloseGrid}
         onChanged={bumpAlbumCover}
@@ -329,6 +407,7 @@ export function EventAlbums({
         <AlbumFormModal
           album={formAlbum}
           accountId={accountId}
+          eventId={eventId}
           onClose={() => setFormAlbum(undefined)}
           onSaved={handleAlbumSaved}
         />
@@ -389,13 +468,56 @@ export function EventAlbums({
   if (!albums.length && !canManage) return null;
 
   if (compact) {
+    const hasAlbums = albums.length > 0;
     return (
       <div className={styles.albumsSection}>
         <div className={styles.header}>
           <div className={styles.title}>Фотоальбомы</div>
-          {albums.length > 0 && <span className={styles.count}>{albums.length}</span>}
+          {hasAlbums && isMobile && (
+            <button
+              type="button"
+              className={styles.count}
+              aria-expanded={albumsExpanded}
+              onClick={() => setAlbumsExpanded(v => !v)}
+            >
+              {albums.length}
+              <svg
+                className={`${styles.countChevron} ${albumsExpanded ? styles.countChevronOpen : ''}`}
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                aria-hidden
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          )}
+          {hasAlbums && !isMobile && (
+            <span className={styles.count}>{albums.length}</span>
+          )}
         </div>
-        {renderGrid(albums.slice(0, canManage ? albums.length : 4), true)}
+        {hasAlbums && !showExpandedAlbums && (
+          <div className={styles.gridCollapsed}>
+            {albums.map(a => (
+              <AlbumCard
+                key={a.id}
+                album={a}
+                canManage={canManageAlbum(a, { isOrganizer: canManage })}
+                hideMeta
+                coverVersion={coverVersionByAlbumId[a.id] ?? 0}
+                onOpen={() => openAlbum(a)}
+                onEdit={() => setFormAlbum(a)}
+                onDelete={() => setDeleteTarget(a)}
+              />
+            ))}
+          </div>
+        )}
+        {(showExpandedAlbums || (!hasAlbums && canManage)) && (
+          renderGrid(albums, true)
+        )}
         {modals}
       </div>
     );

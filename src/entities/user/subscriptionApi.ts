@@ -75,6 +75,16 @@ export async function fetchSubscribersCount(accountId?: string): Promise<number>
   } catch { return 0; }
 }
 
+/** GET /api/subscriptions/isSubscribed/{accountId} — подписан ли текущий пользователь */
+export async function fetchIsSubscribed(accountId: string): Promise<boolean> {
+  try {
+    const r = await apiClient.get<boolean>(`/api/subscriptions/isSubscribed/${accountId}`);
+    return Boolean(r.result);
+  } catch {
+    return false;
+  }
+}
+
 /** POST /api/subscriptions/getSubscriptions */
 export async function fetchSubscriptions(
   accountId: string,

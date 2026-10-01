@@ -1,6 +1,6 @@
 // features/notifications/NotificationsPanel.tsx
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccountId } from '@/features/auth/useAccountId';
 import type { INotification } from '@/entities/notification/types';
@@ -9,7 +9,7 @@ import {
   getNotificationNavigationTarget,
   notificationTypeLabel,
 } from '@/entities/notification/notificationNavigation';
-import { fetchConnectionStats, sendTestNotification } from '@/entities/notification/api';
+import { sendTestNotification } from '@/entities/notification/api';
 import { useNotificationsStore } from './notificationsStore';
 import { useDebouncedWsStatus } from './useDebouncedWsStatus';
 import { NotificationRatingPreview } from './NotificationRatingPreview';
@@ -19,6 +19,9 @@ import styles from './NotificationsPanel.module.css';
 interface NotificationsPanelProps {
   onClose: () => void;
 }
+
+/** Keep in sync with `.panel` close transition in NotificationsPanel.module.css */
+const READ_ALL_FADE_MS = 400;
 
 function formatEventStart(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -54,9 +57,17 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const historyLoaded = useNotificationsStore(s => s.historyLoaded);
   const historyLoading = useNotificationsStore(s => s.historyLoading);
 
+  const [tab, setTab] = useState<'new' | 'read'>('new');
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
-  const [stats, setStats] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
+  const closeAfterReadAllRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (closeAfterReadAllRef.current != null) {
+      clearTimeout(closeAfterReadAllRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!historyLoaded && !historyLoading) {
@@ -74,9 +85,14 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       case 'invitations':
         navigate('/invitations');
         break;
-      case 'event':
-        navigate(`/event/${target.eventId}`);
+      case 'event': {
+        const q = new URLSearchParams();
+        if (target.conversationId) q.set('conversation', target.conversationId);
+        if (target.messageId) q.set('message', target.messageId);
+        const qs = q.toString();
+        navigate(`/event/${target.eventId}${qs ? `?${qs}` : ''}`);
         break;
+      }
       case 'user':
         navigate(`/user/${target.accountId}`);
         break;
@@ -124,7 +140,43 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     void markRead(n.id);
   }, [markRead]);
 
-  const visibleItems = items.filter(i => !i.readAt);
+  const openActorProfile = useCallback((e: React.MouseEvent, actorId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+    const self = accountId && actorId.toLowerCase() === accountId.toLowerCase();
+    navigate(self ? '/user/me' : `/user/${actorId}`);
+  }, [accountId, navigate, onClose]);
+
+  const unreadItems = items.filter(i => !i.readAt);
+  const readItems = items
+    .filter((i): i is INotification & { readAt: string } => !!i.readAt)
+    .slice()
+    .sort((a, b) => new Date(b.readAt).getTime() - new Date(a.readAt).getTime());
+  const visibleItems = tab === 'new' ? unreadItems : readItems;
+  const emptyText = tab === 'new'
+    ? 'Пока нет уведомлений. Новые появятся здесь по WebSocket.'
+    : 'Нет прочитанных уведомлений';
+
+  const handleReadAll = useCallback(() => {
+    if (closing) return;
+    if (closeAfterReadAllRef.current != null) {
+      clearTimeout(closeAfterReadAllRef.current);
+      closeAfterReadAllRef.current = null;
+    }
+    setClosing(true);
+    void (async () => {
+      const ok = await clearAll();
+      if (!ok) {
+        setClosing(false);
+        return;
+      }
+      closeAfterReadAllRef.current = setTimeout(() => {
+        closeAfterReadAllRef.current = null;
+        onClose();
+      }, READ_ALL_FADE_MS);
+    })();
+  }, [clearAll, closing, onClose]);
 
   const handleTestSend = async () => {
     if (!accountId || !testMsg.trim()) return;
@@ -143,21 +195,23 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     }
   };
 
-  const loadStats = async () => {
-    try {
-      const s = await fetchConnectionStats();
-      setStats(
-        `подключений: ${s.totalConnectionsCount ?? '—'}, аккаунтов: ${s.connectedAccountCounts ?? '—'}`,
-      );
-    } catch {
-      setStats('не удалось загрузить stats');
-    }
-  };
-
   return (
-    <div className={styles.panel} role="dialog" aria-label="Уведомления">
+    <div
+      className={`${styles.panel} ${closing ? styles.panelClosing : ''}`}
+      role="dialog"
+      aria-label="Уведомления"
+    >
       <div className={styles.head}>
-        <h2 className={styles.title}>Уведомления</h2>
+        <div className={styles.titleRow}>
+          <h2 className={styles.title}>Уведомления</h2>
+          <span className={`${styles.wsPill} ${styles[`ws_${wsStatus}`]}`}>
+            {wsStatus === 'open' && 'Онлайн'}
+            {wsStatus === 'connecting' && 'Подключение…'}
+            {wsStatus === 'closed' && 'Переподключение…'}
+            {wsStatus === 'error' && (wsError || 'Ошибка')}
+            {wsStatus === 'idle' && '—'}
+          </span>
+        </div>
         <div className={styles.headActions}>
           <button type="button" className={styles.iconClose} onClick={onClose} aria-label="Закрыть">
             ×
@@ -165,27 +219,33 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         </div>
       </div>
 
-      <div className={styles.statusRow}>
-        <span className={`${styles.wsPill} ${styles[`ws_${wsStatus}`]}`}>
-          {wsStatus === 'open' && 'Онлайн'}
-          {wsStatus === 'connecting' && 'Подключение…'}
-          {wsStatus === 'closed' && 'Переподключение…'}
-          {wsStatus === 'error' && (wsError || 'Ошибка')}
-          {wsStatus === 'idle' && '—'}
-        </span>
-        <button type="button" className={styles.linkBtn} onClick={loadStats}>
-          Stats
+      <div className={styles.tabsBar} role="tablist" aria-label="Фильтр уведомлений">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'new'}
+          className={`${styles.tabBtn} ${tab === 'new' ? styles.tabBtnActive : ''}`}
+          onClick={() => setTab('new')}
+        >
+          Новые
+          {unreadItems.length > 0 && <span className={styles.tabCnt}>{unreadItems.length}</span>}
         </button>
-        {stats && <span className={styles.statsText}>{stats}</span>}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'read'}
+          className={`${styles.tabBtn} ${tab === 'read' ? styles.tabBtnActive : ''}`}
+          onClick={() => setTab('read')}
+        >
+          Прочитанные
+        </button>
       </div>
 
       <ul className={styles.list}>
         {historyLoading && visibleItems.length === 0 ? (
           <li className={styles.empty}>Загрузка…</li>
         ) : visibleItems.length === 0 ? (
-          <li className={styles.empty}>
-            Пока нет уведомлений. Новые появятся здесь по WebSocket.
-          </li>
+          <li className={styles.empty}>{emptyText}</li>
         ) : (
           visibleItems.map(n => {
             const hasTitle = !!n.title;
@@ -201,7 +261,15 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
               <div className={`${styles.item} ${!n.readAt ? styles.itemUnread : ''}`}>
                 {actorAccountId && (
                   <div className={styles.itemAvatarCol}>
-                    <UserAvatar accountId={actorAccountId} initials="?" size={32} />
+                    <button
+                      type="button"
+                      className={`noHoverGlow ${styles.itemAvatarBtn}`}
+                      onClick={e => openActorProfile(e, actorAccountId)}
+                      aria-label="Открыть профиль"
+                      title="Открыть профиль"
+                    >
+                      <UserAvatar accountId={actorAccountId} initials="?" size={32} />
+                    </button>
                   </div>
                 )}
                 <button
@@ -263,15 +331,17 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                   )}
                   <span className={styles.itemMeta}>{formatWhen(n.createdAt)}</span>
                 </button>
-                <button
-                  type="button"
-                  className={styles.itemDismiss}
-                  onClick={e => closeNotification(e, n)}
-                  aria-label="Скрыть уведомление"
-                  title="Отметить прочитанным"
-                >
-                  ×
-                </button>
+                {!n.readAt && (
+                  <button
+                    type="button"
+                    className={styles.itemDismiss}
+                    onClick={e => closeNotification(e, n)}
+                    aria-label="Скрыть уведомление"
+                    title="Отметить прочитанным"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             </li>
           );
@@ -298,8 +368,8 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         </div>
       )}
 
-      {visibleItems.length > 0 && (
-        <button type="button" className={styles.clearBtn} onClick={() => { void clearAll(); }}>
+      {tab === 'new' && unreadItems.length > 0 && (
+        <button type="button" className={styles.clearBtn} onClick={handleReadAll}>
           Прочитать все
         </button>
       )}

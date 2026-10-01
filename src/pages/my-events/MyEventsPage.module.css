@@ -149,6 +149,23 @@
   gap: 14px;
 }
 
+.eventListSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 639px) {
+  .list {
+    padding: 10px 12px 28px;
+  }
+
+  .skeleton {
+    height: 120px;
+    border-radius: 14px;
+  }
+}
+
 /* ---- Card wrap: единый контейнер для всех карточек ---- */
 .cardWrap {
   position: relative;
@@ -171,6 +188,17 @@
   background: var(--accent);
   border-radius: 20px; padding: 2px 8px;
   pointer-events: none;
+}
+
+.organizerTagInline {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 20px;
+  padding: 2px 8px;
 }
 
 /* ---- States ---- */
@@ -197,8 +225,105 @@
 
 /* Строка под FilterBar: вкладки + кнопка создать */
 .subHeader {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  min-width: 0;
+}
+
+.subHeaderActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.showCancelled {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.showCancelled input {
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .subHeader {
+    flex-wrap: nowrap;
+    padding: 10px 12px;
+    background-color: rgba(0, 0, 0, 0.25);
+    align-items: center;
+  }
+
+  .archiveTabs {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .archiveTabs button {
+    padding-top: 6.5px;
+    padding-bottom: 6.5px;
+  }
+
+  .subHeaderActions {
+    flex: 0 0 auto;
+    align-self: stretch;
+  }
+
+  .subHeader .createBtn {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    height: auto;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    align-self: stretch;
+  }
+
+  /* Галочка только на «Организую» — тогда переносим actions на вторую строку */
+  .subHeaderWithCancelled {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .subHeaderWithCancelled .archiveTabs {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .subHeaderWithCancelled .subHeaderActions {
+    flex: 1 1 100%;
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .subHeaderWithCancelled .showCancelled {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .subHeaderWithCancelled .createBtn {
+    margin-left: auto;
+    align-self: center;
+    height: 33px;
+  }
+}
+
+:global(body.light-theme) .subHeader {
+  background-color: transparent;
 }

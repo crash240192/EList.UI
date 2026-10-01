@@ -1,6 +1,7 @@
 // pages/create-event/CreateEventPage.tsx
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import {
@@ -12,12 +13,14 @@ import {
   assignEventTypes,
   fetchEventParameters,
   fetchEventOrganizators,
+  checkIsEventOrganizator,
   createEventTemplate,
   updateEventTemplate,
   searchEventTemplates,
   type ICreateEventPayload,
   type IEventTemplate,
 } from '@/entities/event';
+import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import type { IEvent, IEventType } from '@/entities/event';
 import {
   fetchEventTypesByEvent,
@@ -29,7 +32,7 @@ import {
   type IBWListUser,
 } from '@/entities/event/participationApi';
 import { apiClient } from '@/shared/api/client';
-import { fetchAccountById, getOrFetchAccountId } from '@/entities/user/api';
+import { fetchAccountById, getOrFetchAccountId, getStoredAccountId } from '@/entities/user/api';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { getWalletByAccount, getWalletByOrganization } from '@/entities/user/walletApi';
 import { tariffApi, tariffValidatorApi, type ITariffValidator, type ITariff } from '@/entities/admin/adminApi';
@@ -43,6 +46,7 @@ import { CategoryTypePicker } from '@/features/event-filters/CategoryTypePicker'
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { isFileStorageDownloadUrl } from '@/shared/api/fileStorageClient';
 import { saveCoverFocusToFile, loadCoverFocusFromFile } from '@/entities/event/coverFocusApi';
 import {
   DEFAULT_COVER_FOCUS,
@@ -75,14 +79,32 @@ import {
 import type { Gender } from '@/shared/api/types';
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
+import {
+  CENSORSHIP_FIELD_ERROR,
+  CENSORSHIP_TOAST,
+  hasProfanity,
+} from '@/shared/lib/profanity';
 import { WhitelistModal } from './WhitelistModal';
 import type { IWhitelistUser } from './WhitelistModal';
 import {
   CreateEventHostChooser,
   type CreateEventHost,
 } from './CreateEventHostChooser';
+import {
+  allowCreateEventDraftPersist,
+  clearCreateEventDraft,
+  loadCreateEventDraft,
+  persistableCoverUrl,
+  saveCreateEventDraft,
+  type CreateEventDraft,
+  type CreateEventDraftSnapshot,
+} from './createEventDraft';
+import { CreateEventLeaveModal } from './CreateEventLeaveModal';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
+  EVENT_AGE_LIMIT_OPTIONS,
+  formatAgeLimitLabel,
+  getAvailableAgeLimitOptions,
   getMaxEventAgeForTariff,
   isEventAgeAllowed,
   resolveAgeLimitBadge,
@@ -117,6 +139,38 @@ const EMPTY: FormState = {
   maxPersons: '', allowUsersToInvite: true, allowedGender: '',
   ticketsEnabled: false,
 };
+
+/** Абсолютный потолок стоимости (₽), согласован с API / лимитом пополнения кошелька. */
+const MAX_EVENT_COST = 1_000_000;
+const EVENT_NAME_MAX_LENGTH = 80;
+const NAME_OVERFLOW_HINT_MS = 2500;
+
+function eventNameOverflowHint(attempts: number): string {
+  if (attempts >= 7) return 'Угомонись, чорт!';
+  if (attempts >= 4) return 'Слишком длинное название';
+  return 'Краткость сестра таланта';
+}
+
+function nextNameLength(current: string, input: HTMLInputElement, inserted: string): number {
+  const start = input.selectionStart ?? current.length;
+  const end = input.selectionEnd ?? current.length;
+  return current.length - (end - start) + inserted.length;
+}
+
+/** next получен из old удалением одного непрерывного фрагмента (Backspace / Delete / выделение). */
+function isContiguousDeletion(oldValue: string, next: string): boolean {
+  if (next.length >= oldValue.length) return false;
+  const removed = oldValue.length - next.length;
+  for (let i = 0; i <= next.length; i++) {
+    if (oldValue.slice(0, i) + oldValue.slice(i + removed) === next) return true;
+  }
+  return false;
+}
+
+function parseEventCost(raw: string): number {
+  const n = Number.parseFloat(String(raw).replace(',', '.'));
+  return Number.isFinite(n) ? n : Number.NaN;
+}
 
 async function resolveAccountIdsToUsers(ids: string[]): Promise<IWhitelistUser[]> {
   const unique = [...new Set(ids.filter(Boolean))];
@@ -217,11 +271,22 @@ export default function CreateEventPage() {
   const [eventHost, setEventHost] = useState<CreateEventHost | null>(null);
   const [canChooseHost, setCanChooseHost] = useState(false);
   const skipHostGateEffectRef = useRef(false);
+  const draftHydratedRef = useRef(false);
 
   const [form,        setForm]        = useState<FormState>(EMPTY);
   const [loading,     setLoading]     = useState(isEditing);
+  /** Редактирование: только организатор может открыть форму по ссылке */
+  const [editAccess,  setEditAccess]  = useState<'idle' | 'checking' | 'allowed' | 'denied'>(
+    isEditing ? 'checking' : 'idle',
+  );
   const [saving,      setSaving]      = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Set<FieldError>>(new Set());
+  const [nameOverflowAttempts, setNameOverflowAttempts] = useState(0);
+  const [nameOverflowHintVisible, setNameOverflowHintVisible] = useState(false);
+  const nameOverflowTimerRef = useRef<number | null>(null);
+  const nameValueRef = useRef('');
+  const nameSelectionRef = useRef<{ start: number; end: number } | null>(null);
+  const suppressNameSelectRef = useRef(false);
 
   const [lat,          setLat]          = useState<number | null>(null);
   const [lng,          setLng]          = useState<number | null>(null);
@@ -246,6 +311,7 @@ export default function CreateEventPage() {
   const [listModalOpen, setListModalOpen] = useState(false);
   const [invitePickerOpen, setInvitePickerOpen] = useState(false);
   const [inviteUserIds, setInviteUserIds] = useState<string[]>([]);
+  const pickInviteBtnRef = useRef<HTMLButtonElement>(null);
   const [autoInviteEnabled, setAutoInviteEnabled] = useState(false);
   const [autoInviteMode, setAutoInviteMode] = useState<'all' | 'select'>('select');
 
@@ -282,6 +348,7 @@ export default function CreateEventPage() {
 
   // Refs
   const nameRef          = useRef<HTMLInputElement>(null);
+  const descriptionRef   = useRef<HTMLTextAreaElement>(null);
   const typeRef          = useRef<HTMLDivElement>(null);
   const locationRef      = useRef<HTMLDivElement>(null);
   const startDateRef     = useRef<HTMLInputElement>(null);
@@ -304,6 +371,32 @@ export default function CreateEventPage() {
       setHostGate('form');
       setCanChooseHost(false);
       return;
+    }
+
+    if (!hostParam && !orgIdParam) {
+      const restoredHost = loadCreateEventDraft(getStoredAccountId())?.host ?? null;
+      if (restoredHost) {
+        let cancelled = false;
+        setEventHost(restoredHost);
+        setHostGate('form');
+        fetchMyOrganizations()
+          .then(list => filterOrganizationsEligibleToHostEvents(list))
+          .then(eligible => {
+            if (cancelled) return;
+            setCanChooseHost(eligible.length > 0);
+            if (restoredHost.kind === 'organization') {
+              const stillAllowed = eligible.some(o => o.id === restoredHost.organizationId);
+              if (!stillAllowed) {
+                setEventHost(null);
+                setHostGate('chooser');
+              }
+            }
+          })
+          .catch(() => {
+            if (!cancelled) setCanChooseHost(false);
+          });
+        return () => { cancelled = true; };
+      }
     }
 
     if (hostParam === 'user') {
@@ -457,14 +550,19 @@ export default function CreateEventPage() {
     allTypesRef.current = allTypes;
   }, [allTypes]);
 
-  // Сброс формы при переходе из редактирования в создание (тот же компонент, React не размонтирует)
-  useEffect(() => {
-    if (isEditing) return;
-
+  const resetCreateForm = useCallback(() => {
+    nameValueRef.current = '';
+    nameSelectionRef.current = null;
     setForm(EMPTY);
     setLoading(false);
     setSaving(false);
     setFieldErrors(new Set());
+    setNameOverflowAttempts(0);
+    setNameOverflowHintVisible(false);
+    if (nameOverflowTimerRef.current != null) {
+      window.clearTimeout(nameOverflowTimerRef.current);
+      nameOverflowTimerRef.current = null;
+    }
     setLat(null);
     setLng(null);
     setCoverUrl(null);
@@ -482,12 +580,110 @@ export default function CreateEventPage() {
     setInviteUserIds([]);
     setAutoInviteEnabled(false);
     setAutoInviteMode('select');
+    setPendingTemplate(null);
     setSourceTemplate(null);
     loadedBWListsRef.current = new Set();
     initialEventTypeIdsRef.current = null;
     initialTypesAppliedRef.current = false;
     templateAppliedRef.current = false;
-  }, [isEditing, id]);
+  }, []);
+
+  // Сброс формы при переходе из редактирования в создание + восстановление локального черновика
+  useEffect(() => {
+    if (isEditing) {
+      draftHydratedRef.current = false;
+      return;
+    }
+
+    const applyDraft = (draft: CreateEventDraft) => {
+      setForm({ ...EMPTY, ...draft.form });
+      setLoading(false);
+      setSaving(false);
+      setFieldErrors(new Set());
+      setLat(draft.lat);
+      setLng(draft.lng);
+      setCoverUrl(draft.coverUrl);
+      setCoverImageId(draft.coverImageId);
+      setCoverFocus(draft.coverFocus);
+      setSelectedCategories(draft.selectedCategories);
+      setSelectedTypes(draft.selectedTypes);
+      setPickerOpen(false);
+      setEndMode(draft.endMode);
+      setDurationH(draft.durationH);
+      setDurationM(draft.durationM);
+      setWhitelist(draft.whitelist);
+      setBlacklist(draft.blacklist);
+      setListModalOpen(false);
+      setInviteUserIds(draft.inviteUserIds);
+      setAutoInviteEnabled(draft.autoInviteEnabled);
+      setAutoInviteMode(draft.autoInviteMode);
+      setSourceTemplate(null);
+      loadedBWListsRef.current = new Set();
+      initialEventTypeIdsRef.current = null;
+      initialTypesAppliedRef.current = false;
+      templateAppliedRef.current = false;
+    };
+
+    if (draftHydratedRef.current) return;
+
+    const aid = getStoredAccountId() ?? accountId;
+    // Новая сессия формы — снимаем suppress после publish/discard.
+    allowCreateEventDraftPersist(aid);
+    if (!aid) {
+      resetCreateForm();
+      return;
+    }
+
+    const draft = loadCreateEventDraft(aid);
+    if (draft) applyDraft(draft);
+    else resetCreateForm();
+    draftHydratedRef.current = true;
+  }, [isEditing, id, accountId, resetCreateForm]);
+
+  const draftSnapshotRef = useRef<CreateEventDraftSnapshot | null>(null);
+  const discardCreateDraftRef = useRef(false);
+  if (!isEditing && eventHost && hostGate === 'form' && !discardCreateDraftRef.current) {
+    draftSnapshotRef.current = {
+      host: eventHost,
+      form,
+      lat,
+      lng,
+      coverImageId,
+      coverUrl: persistableCoverUrl(coverUrl),
+      coverFocus,
+      selectedCategories,
+      selectedTypes,
+      endMode,
+      durationH,
+      durationM,
+      whitelist,
+      blacklist,
+      inviteUserIds,
+      autoInviteEnabled,
+      autoInviteMode,
+    };
+  }
+
+  useEffect(() => {
+    if (isEditing || hostGate !== 'form' || !eventHost) return;
+    const aid = getStoredAccountId() ?? accountId;
+    if (!aid) return;
+    const persist = () => {
+      if (discardCreateDraftRef.current) return;
+      const snap = draftSnapshotRef.current;
+      if (snap) saveCreateEventDraft(aid, snap);
+    };
+    const timer = window.setTimeout(persist, 400);
+    return () => {
+      window.clearTimeout(timer);
+      persist();
+    };
+  }, [
+    isEditing, hostGate, eventHost, accountId,
+    form, lat, lng, coverImageId, coverUrl, coverFocus,
+    selectedCategories, selectedTypes, endMode, durationH, durationM,
+    whitelist, blacklist, inviteUserIds, autoInviteEnabled, autoInviteMode,
+  ]);
 
   // Применение шаблона с chooser (включая даты, приглашения и ч/б списки)
   useEffect(() => {
@@ -608,9 +804,31 @@ export default function CreateEventPage() {
     return () => { cancelled = true; };
   }, [isEditing, hostGate, pendingTemplate, showToast]);
 
+  // Редактирование: проверка, что текущий пользователь — организатор
+  useEffect(() => {
+    if (!isEditing || !id) {
+      setEditAccess('idle');
+      return;
+    }
+    let cancelled = false;
+    setEditAccess('checking');
+    setLoading(true);
+    (async () => {
+      if (USE_MOCK) {
+        if (!cancelled) setEditAccess('allowed');
+        return;
+      }
+      const allowed = await checkIsEventOrganizator(id);
+      if (cancelled) return;
+      setEditAccess(allowed ? 'allowed' : 'denied');
+      if (!allowed) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [isEditing, id]);
+
   // Загрузка события для редактирования
   useEffect(() => {
-    if (!isEditing) return;
+    if (!isEditing || editAccess !== 'allowed') return;
     initialTypesAppliedRef.current = false;
     initialEventTypeIdsRef.current = null;
     setLoading(true);
@@ -725,11 +943,11 @@ export default function CreateEventPage() {
         setSelectedTypes([]);
       }
     }).finally(() => setLoading(false));
-  }, [id, isEditing]);
+  }, [id, isEditing, editAccess]);
 
   // Редактирование: хост события (организация / пользователь) и тариф организации
   useEffect(() => {
-    if (!isEditing || !id) {
+    if (!isEditing || !id || editAccess !== 'allowed') {
       setEditTicketsCapability('unknown');
       return;
     }
@@ -767,7 +985,7 @@ export default function CreateEventPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isEditing, id]);
+  }, [isEditing, id, editAccess]);
 
   // Сброс флага билетов, если продажа недоступна или стоимость 0
   useEffect(() => {
@@ -807,6 +1025,194 @@ export default function CreateEventPage() {
       };
       if (errMap[key]) setFieldErrors(p => { const n = new Set(p); n.delete(errMap[key]!); return n; });
     };
+
+  const clearNameFieldError = () => {
+    setFieldErrors(p => {
+      if (!p.has('name')) return p;
+      const n = new Set(p);
+      n.delete('name');
+      return n;
+    });
+  };
+
+  const hideNameOverflowHint = () => {
+    if (nameOverflowTimerRef.current != null) {
+      window.clearTimeout(nameOverflowTimerRef.current);
+      nameOverflowTimerRef.current = null;
+    }
+    setNameOverflowHintVisible(false);
+  };
+
+  const bumpNameOverflow = () => {
+    setNameOverflowAttempts(n => n + 1);
+    setNameOverflowHintVisible(true);
+    if (nameOverflowTimerRef.current != null) {
+      window.clearTimeout(nameOverflowTimerRef.current);
+    }
+    nameOverflowTimerRef.current = window.setTimeout(() => {
+      setNameOverflowHintVisible(false);
+      nameOverflowTimerRef.current = null;
+    }, NAME_OVERFLOW_HINT_MS);
+  };
+
+  const resetNameOverflow = () => {
+    setNameOverflowAttempts(0);
+    hideNameOverflowHint();
+  };
+
+  const saveNameSelection = (input: HTMLInputElement, start?: number, end?: number) => {
+    const len = input.value.length;
+    const s = Math.max(0, Math.min(start ?? input.selectionStart ?? len, len));
+    const e = Math.max(0, Math.min(end ?? input.selectionEnd ?? s, len));
+    nameSelectionRef.current = { start: s, end: e };
+  };
+
+  const restoreNameSelection = () => {
+    const el = nameRef.current;
+    const sel = nameSelectionRef.current;
+    if (!el || !sel || document.activeElement !== el) return;
+    const len = el.value.length;
+    const start = Math.max(0, Math.min(sel.start, len));
+    const end = Math.max(0, Math.min(sel.end, len));
+    if (el.selectionStart !== start || el.selectionEnd !== end) {
+      el.setSelectionRange(start, end);
+    }
+  };
+
+  const restoreNameSelectionSoon = () => {
+    restoreNameSelection();
+    suppressNameSelectRef.current = true;
+    requestAnimationFrame(() => {
+      restoreNameSelection();
+      suppressNameSelectRef.current = false;
+    });
+  };
+
+  const commitNameValue = (next: string, input?: HTMLInputElement, caret?: number) => {
+    const clamped = next.slice(0, EVENT_NAME_MAX_LENGTH);
+    nameValueRef.current = clamped;
+    if (input && input.value !== clamped) input.value = clamped;
+    if (caret != null) {
+      const pos = Math.max(0, Math.min(caret, clamped.length));
+      nameSelectionRef.current = { start: pos, end: pos };
+    } else if (input) {
+      saveNameSelection(input);
+    }
+    setForm(f => (f.name === clamped ? f : { ...f, name: clamped }));
+    return clamped;
+  };
+
+  useLayoutEffect(() => {
+    if (form.name.length > EVENT_NAME_MAX_LENGTH) {
+      const next = form.name.slice(0, EVENT_NAME_MAX_LENGTH);
+      nameValueRef.current = next;
+      setForm(f => (f.name === next ? f : { ...f, name: next }));
+      return;
+    }
+    nameValueRef.current = form.name;
+    restoreNameSelection();
+  }, [form.name, nameOverflowHintVisible]);
+
+  const onNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const prev = nameValueRef.current;
+    if (raw.length > EVENT_NAME_MAX_LENGTH) {
+      const extra = raw.length - prev.length;
+      const caretNow = e.target.selectionStart ?? nameSelectionRef.current?.start ?? prev.length;
+      const restoreAt = extra > 0
+        ? Math.max(0, Math.min(caretNow - extra, prev.length))
+        : Math.min(caretNow, prev.length);
+      const kept = prev.length >= EVENT_NAME_MAX_LENGTH ? prev : raw.slice(0, EVENT_NAME_MAX_LENGTH);
+      e.target.value = kept;
+      commitNameValue(kept, e.target, restoreAt);
+      bumpNameOverflow();
+      clearNameFieldError();
+      restoreNameSelectionSoon();
+      return;
+    }
+    // На лимите лишние клавиши не должны съедать выделенный хвост названия.
+    if (
+      prev.length >= EVENT_NAME_MAX_LENGTH
+      && raw !== prev
+      && !isContiguousDeletion(prev, raw)
+    ) {
+      e.target.value = prev;
+      nameValueRef.current = prev;
+      setForm(f => (f.name === prev ? f : { ...f, name: prev }));
+      bumpNameOverflow();
+      clearNameFieldError();
+      restoreNameSelectionSoon();
+      return;
+    }
+    saveNameSelection(e.target);
+    if (raw.length < EVENT_NAME_MAX_LENGTH) resetNameOverflow();
+    commitNameValue(raw, e.target);
+    clearNameFieldError();
+  };
+
+  const onNameBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const native = e.nativeEvent as InputEvent;
+    if (native.inputType?.startsWith('delete') || native.inputType === 'insertFromPaste') return;
+    if (native.inputType === 'insertCompositionText') return;
+    if (native.inputType && !native.inputType.startsWith('insert')) return;
+    const input = e.currentTarget;
+    const prev = nameValueRef.current;
+    const inserted = native.data ?? '';
+    const start = input.selectionStart ?? prev.length;
+    const end = input.selectionEnd ?? prev.length;
+    saveNameSelection(input, start, end);
+    if (prev.length >= EVENT_NAME_MAX_LENGTH) {
+      e.preventDefault();
+      bumpNameOverflow();
+      restoreNameSelectionSoon();
+      return;
+    }
+    const nextLen = inserted
+      ? nextNameLength(prev, input, inserted)
+      : prev.length - (end - start) + 1;
+    if (nextLen <= EVENT_NAME_MAX_LENGTH) return;
+    e.preventDefault();
+    const room = EVENT_NAME_MAX_LENGTH - (prev.length - (end - start));
+    if (inserted && room > 0) {
+      const piece = inserted.slice(0, room);
+      commitNameValue(prev.slice(0, start) + piece + prev.slice(end), input, start + piece.length);
+    }
+    bumpNameOverflow();
+    restoreNameSelectionSoon();
+  };
+
+  const onNamePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text');
+    if (!text) return;
+    const prev = nameValueRef.current;
+    const input = e.currentTarget;
+    const start = input.selectionStart ?? prev.length;
+    const end = input.selectionEnd ?? prev.length;
+    saveNameSelection(input, start, end);
+    const room = EVENT_NAME_MAX_LENGTH - (prev.length - (end - start));
+    if (room <= 0) {
+      bumpNameOverflow();
+      restoreNameSelectionSoon();
+      return;
+    }
+    const insert = text.slice(0, room);
+    const next = commitNameValue(prev.slice(0, start) + insert + prev.slice(end), input, start + insert.length);
+    if (insert.length < text.length) bumpNameOverflow();
+    else if (next.length < EVENT_NAME_MAX_LENGTH) resetNameOverflow();
+    clearNameFieldError();
+  };
+
+  const onNameSelect = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    if (suppressNameSelectRef.current) return;
+    saveNameSelection(e.currentTarget);
+  };
+
+  useEffect(() => () => {
+    if (nameOverflowTimerRef.current != null) {
+      window.clearTimeout(nameOverflowTimerRef.current);
+    }
+  }, []);
 
   const hasErr = (f: FieldError) => fieldErrors.has(f);
   const typeCount = selectedCategories.length + selectedTypes.length;
@@ -959,6 +1365,23 @@ export default function CreateEventPage() {
   /** Нет тарифа или в тарифе только 0+ — поле возраста фиксируем */
   const ageFixedToZero   = tariffReady && maxEventAge === 0;
   const canSetAge        = tariffReady && (maxEventAge === null || maxEventAge > 0);
+  const ageLimitOptions = useMemo(() => {
+    const allowed = !tariffReady
+      ? [...EVENT_AGE_LIMIT_OPTIONS]
+      : getAvailableAgeLimitOptions(maxEventAge, hasTariff);
+    const opts = allowed.map(age => ({
+      value: String(age),
+      label: formatAgeLimitLabel(age),
+    }));
+    const current = ageFixedToZero ? '0' : form.ageLimit;
+    if (current && !opts.some(o => o.value === current)) {
+      const n = parseInt(current, 10);
+      if (!Number.isNaN(n) && n >= 0) {
+        opts.unshift({ value: current, label: formatAgeLimitLabel(n) });
+      }
+    }
+    return opts;
+  }, [tariffReady, maxEventAge, hasTariff, ageFixedToZero, form.ageLimit]);
   const canSetPrivate    = hasTariff ? !!tv!.allowPrivate : false;
   const canSetGender     = hasTariff ? !!tv!.allowGenderSegregation : false;
   const hasTariffWarning = hasWallet && (!canSetPrivate || !canSetGender);
@@ -1019,13 +1442,18 @@ export default function CreateEventPage() {
         ? 'По тарифу доступен только рейтинг 0+'
         : `Возрастной рейтинг превышает лимит тарифа (макс. ${maxEventAge}+)`;
 
-  const costToastMessage = parseFloat(form.cost) < 0
+  const parsedCost = parseEventCost(form.cost || '0');
+  const costToastMessage = !Number.isFinite(parsedCost) || parsedCost < 0
     ? 'Стоимость не может быть отрицательной'
-    : effectiveMaxCost === 0
-      ? (hasTariff
-        ? 'По тарифу доступны только бесплатные мероприятия'
-        : 'Без тарифа стоимость может быть только 0 ₽')
-      : `Стоимость превышает лимит тарифа (до ${effectiveMaxCost?.toLocaleString()} ₽)`;
+    : parsedCost > MAX_EVENT_COST
+      ? `Слишком большая стоимость (макс. ${MAX_EVENT_COST.toLocaleString('ru-RU')} ₽)`
+      : effectiveMaxCost === 0
+        ? (hasTariff
+          ? 'По тарифу доступны только бесплатные мероприятия'
+          : 'Без тарифа стоимость может быть только 0 ₽')
+        : effectiveMaxCost != null && parsedCost > effectiveMaxCost
+          ? `Стоимость превышает лимит тарифа (до ${effectiveMaxCost.toLocaleString('ru-RU')} ₽)`
+          : `Слишком большая стоимость (макс. ${MAX_EVENT_COST.toLocaleString('ru-RU')} ₽)`;
 
   // Validation
   const validate = (): FieldError | null => {
@@ -1062,8 +1490,9 @@ export default function CreateEventPage() {
         }
       }
     }
-    // Проверяем отрицательные значения
-    if (form.cost && parseFloat(form.cost) < 0)                                           errs.add('cost');
+    // Стоимость: конечное число, ≥ 0, абсолютный потолок и лимит тарифа
+    const costValue = parseEventCost(form.cost || '0');
+    if (!Number.isFinite(costValue) || costValue < 0 || costValue > MAX_EVENT_COST)        errs.add('cost');
     if (form.maxPersons && parseInt(form.maxPersons) < 0)                                 errs.add('maxPersons');
     // Возраст: если зафиксирован 0+ — не требуем ручного выбора
     if (hasWallet && tariffReady && !ageFixedToZero) {
@@ -1077,7 +1506,7 @@ export default function CreateEventPage() {
       }
     }
     // Ограничения тарифа / отсутствие тарифа (effectiveMaxCost = 0 без тарифа)
-    if (effectiveMaxCost != null && parseFloat(form.cost || '0') > effectiveMaxCost)      errs.add('cost');
+    if (effectiveMaxCost != null && Number.isFinite(costValue) && costValue > effectiveMaxCost) errs.add('cost');
     if (maxPersons != null && form.maxPersons && parseInt(form.maxPersons) > maxPersons)  errs.add('maxPersons');
 
     setFieldErrors(errs);
@@ -1129,7 +1558,30 @@ export default function CreateEventPage() {
     if (!autoInviteEnabled) setInviteUserIds([]);
   }, [autoInviteEnabled]);
 
+  useEffect(() => {
+    if (isEditing || !autoInviteEnabled || autoInviteMode !== 'select' || !accountId) return;
+    const btn = pickInviteBtnRef.current;
+    if (!btn) return;
+    const id = window.requestAnimationFrame(() => {
+      btn.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [isEditing, autoInviteEnabled, autoInviteMode, accountId]);
+
+  const nameHasProfanity = hasProfanity(form.name);
+  const descriptionHasProfanity = hasProfanity(form.description);
+  const hasCensoredSpeech = nameHasProfanity || descriptionHasProfanity;
+
+  const rejectCensoredSpeech = (): boolean => {
+    if (!hasCensoredSpeech) return false;
+    showToast(CENSORSHIP_TOAST);
+    const el = nameHasProfanity ? nameRef.current : descriptionRef.current;
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return true;
+  };
+
   const handleSubmit = async () => {
+    if (rejectCensoredSpeech()) return;
     const firstErr = validate();
     if (firstErr) {
       showToast({ name:'Укажите название', type:'Выберите тип мероприятия',
@@ -1163,7 +1615,12 @@ export default function CreateEventPage() {
         if (coverImageId) {
           try { await saveCoverFocusToFile(coverImageId, coverFocus); } catch { /* optional persistence channel */ }
         }
-        const editCost = parseFloat(form.cost) || 0;
+        const editCost = parseEventCost(form.cost);
+        if (!Number.isFinite(editCost) || editCost < 0 || editCost > MAX_EVENT_COST) {
+          showToast(costToastMessage);
+          setSaving(false);
+          return;
+        }
         await assignEventParameters(id!, {
           cost:               editCost,
           private:            form.isPrivate,
@@ -1186,6 +1643,12 @@ export default function CreateEventPage() {
 
         const createResult = await apiClient.post<string>('/api/events/create', createPayload);
         const newEventId = createResult?.result ?? createResult as unknown as string;
+        // Сразу глушим persist (cleanup эффекта / таймер), иначе черновик перезапишется после clear.
+        discardCreateDraftRef.current = true;
+        draftSnapshotRef.current = null;
+        const draftAccountId = getStoredAccountId() ?? accountId;
+        clearCreateEventDraft(draftAccountId);
+        if (draftAccountId !== accountId) clearCreateEventDraft(accountId);
         if (coverImageId) {
           try { await saveCoverFocusToFile(coverImageId, coverFocus); } catch { /* optional persistence channel */ }
         }
@@ -1194,6 +1657,9 @@ export default function CreateEventPage() {
         } catch {
           /* не блокируем публикацию, если обсуждение не создалось */
         }
+        // Повторный clear перед уходом со страницы — на случай гонки с persist.
+        clearCreateEventDraft(draftAccountId);
+        if (draftAccountId !== accountId) clearCreateEventDraft(accountId);
         navigate('/my-events');
       }
     } catch (err) {
@@ -1209,7 +1675,8 @@ export default function CreateEventPage() {
     includeInvites?: boolean;
   } = {}): Promise<ICreateEventPayload> => {
     const accountId = opts.accountId ?? await getOrFetchAccountId();
-    const createCost = parseFloat(form.cost) || 0;
+    const parsedCreateCost = parseEventCost(form.cost);
+    const createCost = Number.isFinite(parsedCreateCost) ? Math.min(Math.max(parsedCreateCost, 0), MAX_EVENT_COST) : 0;
     const startTime = opts.startTime
       ?? (form.startDate && form.startTime
         ? localPartsToApiIso(form.startDate, form.startTime)
@@ -1392,6 +1859,8 @@ export default function CreateEventPage() {
   };
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const wantsTicketsEnabled = canEnableTickets
     && (parseFloat(form.cost) || 0) > 0
@@ -1434,6 +1903,7 @@ export default function CreateEventPage() {
 
   const handlePublishClick = () => {
     void (async () => {
+      if (rejectCensoredSpeech()) return;
       if (!isEditing) {
         const firstErr = validate();
         if (firstErr) {
@@ -1567,7 +2037,25 @@ export default function CreateEventPage() {
     );
   }
 
-  if (loading) return (
+  if (isEditing && editAccess === 'denied') {
+    return (
+      <div className={styles.page}>
+        <div className={styles.pageInner}>
+          <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
+            <div className={styles.header}>
+              <HeroBackButton onClick={goBack} />
+              <h1 className={styles.title}>Редактировать мероприятие</h1>
+            </div>
+            <AccessDeniedGate denied variant="page">
+              <div className={styles.editDeniedPlaceholder} aria-hidden />
+            </AccessDeniedGate>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || (isEditing && editAccess === 'checking')) return (
     <div className={styles.page}>
       <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
         <div className={styles.header}><div className={styles.backBtn} /><div style={{width:180,height:20,borderRadius:8,background:'rgba(255,255,255,0.2)'}} /></div>
@@ -1622,14 +2110,26 @@ export default function CreateEventPage() {
 
         {/* Основное */}
         <Section title="Основное">
-          <Field label="Название *" error={hasErr('name') ? 'Обязательное поле' : undefined}>
-            <input ref={nameRef}
-              className={`${styles.input} ${hasErr('name') ? styles.inputError : ''}`}
-              placeholder="Название мероприятия" value={form.name} onChange={set('name')} 
-                  onFocus={e => (e.target as HTMLInputElement).select()} />
+          <Field label="Название *" error={nameHasProfanity ? CENSORSHIP_FIELD_ERROR : hasErr('name') ? 'Обязательное поле' : undefined}>
+            <div className={`${styles.nameFieldWrap} ${nameOverflowHintVisible ? styles.nameFieldWrapHint : ''}`}>
+              <input ref={nameRef}
+                className={`${styles.input} ${nameHasProfanity || hasErr('name') || nameOverflowHintVisible ? styles.inputError : ''}`}
+                placeholder="Название мероприятия"
+                maxLength={EVENT_NAME_MAX_LENGTH}
+                value={form.name.slice(0, EVENT_NAME_MAX_LENGTH)}
+                onChange={onNameChange}
+                onBeforeInput={onNameBeforeInput}
+                onPaste={onNamePaste}
+                onSelect={onNameSelect} />
+              {nameOverflowHintVisible && (
+                <div className={styles.nameOverflowHint} role="tooltip">
+                  {eventNameOverflowHint(nameOverflowAttempts)}
+                </div>
+              )}
+            </div>
           </Field>
-          <Field label="Описание">
-            <textarea className={`${styles.input} ${styles.textarea}`} rows={3}
+          <Field label="Описание" error={descriptionHasProfanity ? CENSORSHIP_FIELD_ERROR : undefined}>
+            <textarea ref={descriptionRef} className={`${styles.input} ${styles.textarea} ${descriptionHasProfanity ? styles.inputError : ''}`} rows={3}
               placeholder="Расскажите о мероприятии..." value={form.description} onChange={set('description')} />
           </Field>
         </Section>
@@ -1799,20 +2299,21 @@ export default function CreateEventPage() {
                 <LockedInput
                   locked={!canSetCost}
                   value={form.cost}
-                  onChange={e => { const v = e.target.value.replace(/[^0-9.,]/g, ''); setForm(f => ({ ...f, cost: v })); }}
-                  type="number" min="0"
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^0-9.,]/g, '');
+                    const digits = v.replace(/[.,]/g, '');
+                    if (digits.length > 9) return;
+                    setForm(f => ({ ...f, cost: v }));
+                  }}
+                  type="number"
+                  min="0"
+                  max={MAX_EVENT_COST}
                   hasError={hasErr('cost')}
                   hint={hasErr('cost')
-                    ? (effectiveMaxCost === 0
-                      ? (hasTariff
-                        ? 'По тарифу доступны только бесплатные мероприятия'
-                        : 'Без тарифа стоимость может быть только 0 ₽')
-                      : `Превышает лимит тарифа (до ${effectiveMaxCost?.toLocaleString()} ₽)`)
-                    : canSetCost && effectiveMaxCost != null
-                    ? `до ${effectiveMaxCost.toLocaleString()} ₽`
-                    : !canSetCost
-                    ? (hasTariff ? 'Недоступно в тарифе' : 'Без тарифа — только бесплатные')
-                    : undefined}
+                    ? costToastMessage
+                    : canSetCost
+                      ? `до ${(effectiveMaxCost ?? MAX_EVENT_COST).toLocaleString('ru-RU')} ₽`
+                      : (hasTariff ? 'Недоступно в тарифе' : 'Без тарифа — только бесплатные')}
                 />
               </Field>
               <Field label="Макс. участников">
@@ -1835,28 +2336,23 @@ export default function CreateEventPage() {
               label={canSetAge ? 'Возрастной рейтинг *' : 'Возрастной рейтинг'}
               error={hasErr('ageLimit') ? (!form.ageLimit ? 'Обязательное поле' : 'Недопустимое значение') : undefined}
             >
-              <LockedInput
+              <LockedSelect
                 locked={!canSetAge}
                 value={ageFixedToZero ? '0' : form.ageLimit}
-                placeholder={ageFixedToZero ? '0' : 'например 18'}
-                onChange={e => {
-                  const v = e.target.value.replace(/[^0-9]/g, '');
+                placeholder="Выберите"
+                options={ageLimitOptions}
+                onChange={v => {
                   setForm(f => ({ ...f, ageLimit: v }));
                   setFieldErrors(p => { const n = new Set(p); n.delete('ageLimit'); return n; });
                 }}
-                type="number"
-                min="0"
-                max={maxEventAge != null ? String(maxEventAge) : undefined}
-                inputMode="numeric"
                 hasError={hasErr('ageLimit')}
-                suffix={(ageFixedToZero || form.ageLimit !== '') ? '+' : undefined}
                 hint={hasErr('ageLimit') ? ageLimitErrorHint : ageLimitHint}
               />
             </Field>
 
             <div className={styles.toggles}>
               <Toggle
-                label="Приватное мероприятие"
+                label="Закрытое мероприятие"
                 checked={form.isPrivate}
                 locked={!canSetPrivate}
                 onChange={v => {
@@ -1925,8 +2421,10 @@ export default function CreateEventPage() {
                 </div>
                 <p className={styles.whitelistHint}>
                   {form.isPrivate
-                    ? 'Только эти пользователи смогут записаться на мероприятие'
-                    : 'Эти пользователи не смогут записаться на мероприятие'}
+                    ? (draftWhiteListIds.length > 0
+                      ? 'Только люди из этого списка видят мероприятие и могут войти (по приглашению или сами). Остальным приглашения отправить нельзя.'
+                      : 'Список пуст: мероприятие видят и могут войти только по приглашению. Добавьте людей, чтобы ограничить доступ списком.')
+                    : 'Эти пользователи не смогут увидеть и записаться на мероприятие'}
                 </p>
 
                 {currentList.length > 0 && (
@@ -1971,15 +2469,15 @@ export default function CreateEventPage() {
             className={styles.previewCover}
             style={!coverUrl && !coverImageId ? { background: previewCoverBg } : undefined}
           >
-            {coverUrl ? (
-              <img src={coverUrl} alt="Обложка" style={{ width: '100%', height: '100%', ...coverFocusImgStyle(coverFocus), display: 'block' }} />
-            ) : coverImageId ? (
+            {coverImageId ? (
               <AuthImage
                 fileId={coverImageId}
                 alt="Обложка"
                 imageFit="cover"
                 style={{ width: '100%', height: '100%', ...coverFocusImgStyle(coverFocus), display: 'block' }}
               />
+            ) : coverUrl && !isFileStorageDownloadUrl(coverUrl) ? (
+              <img src={coverUrl} alt="Обложка" style={{ width: '100%', height: '100%', ...coverFocusImgStyle(coverFocus), display: 'block' }} />
             ) : (
               <span className={styles.previewCoverEmpty}>нет обложки</span>
             )}
@@ -2055,12 +2553,21 @@ export default function CreateEventPage() {
 
         {/* Кнопки */}
         <div className={styles.actions}>
-          <button type="button" className={styles.cancelBtn} onClick={goBack}>Отмена</button>
+          {isEditing ? (
+            <button type="button" className={styles.leaveBtn} onClick={() => setLeaveConfirmOpen(true)}>
+              Отмена
+            </button>
+          ) : (
+            <button type="button" className={styles.leaveBtn} onClick={() => setResetConfirmOpen(true)}>
+              Сбросить
+            </button>
+          )}
           <button
             type="button"
-            className={styles.saveBtn}
+            className={`${styles.saveBtn} ${hasCensoredSpeech ? styles.saveBtnInactive : ''}`}
             onClick={handlePublishClick}
             disabled={saving || checkingOrgAgreements}
+            aria-disabled={hasCensoredSpeech || saving || checkingOrgAgreements}
           >
             {saving || checkingOrgAgreements
               ? (checkingOrgAgreements ? 'Проверка...' : 'Сохранение...')
@@ -2083,7 +2590,7 @@ export default function CreateEventPage() {
                 checked={autoInviteEnabled}
                 onChange={(e) => setAutoInviteEnabled(e.target.checked)}
               />
-              <span>Автоприглашение</span>
+              <span>Отправить приглашение</span>
             </label>
             <div className={`${styles.autoInviteModes} ${!autoInviteEnabled ? styles.autoInviteModesDisabled : ''}`}>
               <label
@@ -2116,6 +2623,7 @@ export default function CreateEventPage() {
             </div>
             {autoInviteEnabled && autoInviteMode === 'select' && accountId && (
               <button
+                ref={pickInviteBtnRef}
                 type="button"
                 className={styles.pickInviteBtn}
                 onClick={() => setInvitePickerOpen(true)}
@@ -2129,6 +2637,43 @@ export default function CreateEventPage() {
         )}
       </div>{/* end sidePanel */}
       </div>{/* end pageInner */}
+
+      {leaveConfirmOpen && (
+        <CreateEventLeaveModal
+          onReset={() => {
+            if (!isEditing) {
+              discardCreateDraftRef.current = true;
+              draftSnapshotRef.current = null;
+              clearCreateEventDraft(getStoredAccountId() ?? accountId);
+            }
+            const idx = (window.history.state as { idx?: unknown } | null)?.idx;
+            if (typeof idx === 'number' && idx > 0) navigate(-2);
+            else navigate('/', { replace: true });
+          }}
+          onStay={() => setLeaveConfirmOpen(false)}
+        />
+      )}
+
+      {resetConfirmOpen && (
+        <CreateEventLeaveModal
+          title="Сбросить все поля?"
+          resetLabel="Сбросить"
+          stayLabel="Вернуться"
+          titleId="create-event-reset-title"
+          onReset={() => {
+            discardCreateDraftRef.current = true;
+            draftSnapshotRef.current = null;
+            const aid = getStoredAccountId() ?? accountId;
+            clearCreateEventDraft(aid);
+            resetCreateForm();
+            // Остаёмся на форме — снова разрешаем писать черновик при новых правках.
+            allowCreateEventDraftPersist(aid);
+            discardCreateDraftRef.current = false;
+            setResetConfirmOpen(false);
+          }}
+          onStay={() => setResetConfirmOpen(false)}
+        />
+      )}
 
       {/* Диалог подтверждения публикации */}
       {confirmOpen && (
@@ -2409,24 +2954,93 @@ function LockedSelect({ locked, hint, hasError, value, onChange, options, placeh
   options: { value: string; label: string }[];
   placeholder?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const [dropStyle, setDropStyle] = useState<CSSProperties>({});
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value);
+
+  const computePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    const dropH = Math.min(options.length * 38 + 12, 260);
+    const spaceBelow = window.innerHeight - r.bottom;
+    const showAbove = spaceBelow < dropH && r.top > spaceBelow;
+    setDropStyle({
+      position: 'fixed',
+      left: r.left,
+      width: r.width,
+      zIndex: 600,
+      ...(showAbove
+        ? { bottom: window.innerHeight - r.top + 6 }
+        : { top: r.bottom + 6 }),
+    });
+  }, [options.length]);
+
+  useEffect(() => {
+    if (locked) {
+      setOpen(false);
+      return;
+    }
+    if (!open) return;
+    computePos();
+    const close = (e: MouseEvent) => {
+      if (!btnRef.current?.contains(e.target as Node) &&
+          !dropRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onScrollOrResize = () => setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [open, locked, computePos]);
+
   return (
     <div>
       <div className={`${styles.inputShell} ${locked ? styles.inputShellLocked : ''}`}>
-        <select
-          className={`${styles.input} ${styles.inputInShell} ${styles.select} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''} ${!value ? styles.selectPlaceholder : ''}`}
+        <button
+          ref={btnRef}
+          type="button"
           disabled={locked}
-          value={value}
-          onChange={e => onChange(e.target.value)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className={`noHoverGlow ${styles.input} ${styles.inputInShell} ${styles.select} ${styles.selectBtn} ${open ? styles.selectOpen : ''} ${locked ? styles.inputLocked : ''} ${hasError ? styles.inputError : ''} ${!value ? styles.selectPlaceholder : ''}`}
+          onClick={() => !locked && setOpen(v => !v)}
         >
-          {placeholder && (
-            <option value="" disabled={value !== ''}>{placeholder}</option>
-          )}
-          {options.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+          {selected ? selected.label : (placeholder ?? '')}
+        </button>
         {locked && <span className={styles.lockBadge}>тариф</span>}
       </div>
+      {open && !locked && createPortal(
+        <div
+          ref={dropRef}
+          style={dropStyle}
+          className={styles.selectMenu}
+          role="listbox"
+        >
+          {options.map(opt => (
+            <div
+              key={opt.value}
+              role="option"
+              aria-selected={opt.value === value}
+              className={`${styles.selectMenuItem} ${opt.value === value ? styles.selectMenuItemActive : ''}`}
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>,
+        document.body,
+      )}
       {hint && <div className={`${styles.fieldHint} ${hasError ? styles.fieldHintErr : locked ? styles.fieldHintWarn : ''}`}>{hint}</div>}
     </div>
   );

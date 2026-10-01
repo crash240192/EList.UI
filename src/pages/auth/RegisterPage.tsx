@@ -1,24 +1,27 @@
 // pages/auth/RegisterPage.tsx
 // Двухшаговая регистрация:
-//   Шаг 1 — логин, пароль, контакт, город + согласия (Consent / Agreement)
-//   Шаг 2 — ФИО, пол, дата рождения (обязательна, возраст ≥ 14)
-//   Финал — createAccount(acceptConsent/Agreement) → login → agree fallback → setPersonInfo → /activate или /
+//   Шаг 1 — логин, пароль, контакт, город + согласия (Consent / Agreement); Policy — ссылка без галочки
+//   Шаг 2 — ФИО (имя+фамилия обязательны), пол, дата рождения (обязательна, возраст ≥ 14)
+//   Финал — createAccount(acceptConsent/Agreement + person) → login → agree fallback → /activate или /
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   fetchContactTypes,
   createAccount,
-  setPersonInfo,
   type IContactType,
 } from '@/features/auth/registrationApi';
 import { login } from '@/features/auth/api';
 import { storeActivationNotice } from '@/features/auth/activationNotice';
-import { useAuthStore, useToastStore } from '@/app/store';
+import { useAuthStore } from '@/app/store';
 import { useGeoCity, type ICity } from '@/features/auth/useGeoCity';
-import { savePendingPersonData } from '@/features/auth/pendingPersonData';
 import { cookies } from '@/shared/lib/cookies';
-import { validateContactValue, isRegexMask, resolveContactMaskTemplate, composeContactValue } from '@/shared/lib/contactMask';
+import {
+  validateContactValue,
+  isRegexMask,
+  resolveContactMaskTemplate,
+  canonicalizeContactValue,
+} from '@/shared/lib/contactMask';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
 import { usePageTitle } from '@/shared/hooks';
 import { ContactMaskField } from '@/shared/ui/ContactMaskField/ContactMaskField';
@@ -27,6 +30,8 @@ import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { birthDateToApiIso, getAge, todayLocalDateString } from '@/shared/lib/datetime';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import type { Gender } from '@/shared/api/types';
+import { ApiErrorCode } from '@/shared/api/errorCodes';
+import { ApiError } from '@/shared/api/client';
 import {
   DocumentType,
   agreeDocument,
@@ -38,6 +43,8 @@ import { AgreementDocumentModal } from '@/features/agreements';
 import { AuthBrand } from './AuthBrand';
 import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
+
+const MIN_REGISTRATION_AGE = 14;
 
 interface Step1Form {
   login: string;
@@ -81,17 +88,13 @@ function contactTypeLabel(ct: IContactType | undefined): string {
 }
 
 function contactSubmitValue(ct: IContactType | undefined, raw: string): string {
-  const template = resolveContactMaskTemplate(ct?.mask ?? null, contactTypeLabel(ct));
-  const trimmed = raw.trim();
-  if (!template) return trimmed;
-  return composeContactValue(template, trimmed);
+  return canonicalizeContactValue(raw, ct?.mask ?? null, contactTypeLabel(ct));
 }
 
 export default function RegisterPage() {
   usePageTitle('Регистрация');
   const navigate    = useNavigate();
   const { setAuth } = useAuthStore();
-  const toast = useToastStore(s => s.add);
 
   const [step, setStep]         = useState<1 | 2>(1);
   const [loading, setLoading]   = useState(false);
@@ -156,6 +159,9 @@ export default function RegisterPage() {
 
   const selectedContactType = contactTypes.find(ct => ct.id === form1.contactTypeId);
   const canProceedStep1 = consentAccepted && agreementAccepted;
+  const canFinishStep2 = Boolean(
+    form2.firstName.trim() && form2.lastName.trim() && form2.birthDate,
+  );
 
   const set1 = (key: keyof Step1Form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -185,8 +191,10 @@ export default function RegisterPage() {
   }
 
   function validateStep2(): string | null {
+    if (!form2.lastName.trim()) return 'Укажите фамилию';
+    if (!form2.firstName.trim()) return 'Укажите имя';
     if (!form2.birthDate) return 'Укажите дату рождения';
-    if (getAge(form2.birthDate) < 14) {
+    if (getAge(form2.birthDate) < MIN_REGISTRATION_AGE) {
       return 'Регистрация доступна только по достижению 14 лет';
     }
     return null;
@@ -224,14 +232,20 @@ export default function RegisterPage() {
     setStep(2);
   };
 
-  // ---- Финал: createAccount → login → agree → setPersonInfo ----
+  // ---- Финал: createAccount(+person) → login → agree fallback ----
   const finishRegistration = async () => {
     const step2Err = validateStep2();
     if (step2Err) {
       setError(step2Err);
-      if (form2.birthDate && getAge(form2.birthDate) < 14) {
+      if (form2.birthDate && getAge(form2.birthDate) < MIN_REGISTRATION_AGE) {
         setAgeBlocked(true);
       }
+      return;
+    }
+
+    const birthDateIso = birthDateToApiIso(form2.birthDate);
+    if (!birthDateIso) {
+      setError('Укажите корректную дату рождения');
       return;
     }
 
@@ -247,9 +261,13 @@ export default function RegisterPage() {
         showContact:               true,
         latitude:  finalCoords?.lat ?? undefined,
         longitude: finalCoords?.lng ?? undefined,
-        // Backend сохраняет Consent/Agreement в той же TX create — флаги обязательны.
         acceptConsent:             true,
         acceptAgreement:           true,
+        firstName:                 form2.firstName.trim(),
+        lastName:                  form2.lastName.trim(),
+        patronymic:                form2.patronymic.trim() || undefined,
+        gender:                    form2.gender || undefined,
+        birthDate:                 birthDateIso,
       });
 
       const authResult = await login(savedCreds.login
@@ -261,23 +279,7 @@ export default function RegisterPage() {
       await agreeDocument(DocumentType.Consent).catch(() => undefined);
       await agreeDocument(DocumentType.Agreement).catch(() => undefined);
 
-      const personPayload = {
-        firstName:  form2.firstName.trim()  || undefined,
-        lastName:   form2.lastName.trim()   || undefined,
-        patronymic: form2.patronymic.trim() || undefined,
-        gender:     form2.gender            || undefined,
-        birthDate:  birthDateToApiIso(form2.birthDate),
-      };
-
-      const hasPersonData = Boolean(
-        personPayload.firstName || personPayload.lastName ||
-        personPayload.patronymic || personPayload.gender || personPayload.birthDate,
-      );
-
       if (authResult.activationRequired) {
-        if (hasPersonData) {
-          savePendingPersonData(personPayload);
-        }
         if (authResult.message) {
           storeActivationNotice(authResult.message);
         }
@@ -285,22 +287,13 @@ export default function RegisterPage() {
         return;
       }
 
-      if (hasPersonData) {
-        try {
-          await setPersonInfo(personPayload);
-        } catch (personErr) {
-          // Аккаунт уже создан — не откатываем регистрацию, но не скрываем сбой профиля.
-          toast(
-            personErr instanceof Error
-              ? `Аккаунт создан, но профиль не сохранён: ${personErr.message}`
-              : 'Аккаунт создан, но профиль не сохранён. Заполните данные в настройках.',
-            'error',
-          );
-        }
-      }
-
       navigate('/', { replace: true });
     } catch (e) {
+      if (e instanceof ApiError && e.code === ApiErrorCode.UserUnderMinimumAge) {
+        setAgeBlocked(true);
+        setError(e.message);
+        return;
+      }
       setError(e instanceof Error ? e.message : 'Ошибка при регистрации');
     } finally {
       setLoading(false);
@@ -406,19 +399,19 @@ export default function RegisterPage() {
               </Field>
 
               <Field label={selectedContactType?.name || selectedContactType?.localizedName || 'Контакт'}>
-                <div className={`${styles.input} ${regStyles.contactMaskWrap} ${contactError ? styles.inputError : ''}`}>
-                  <ContactMaskField
-                    mask={selectedContactType?.mask ?? null}
-                    typeName={selectedContactType?.name || selectedContactType?.localizedName || ''}
-                    value={form1.contactValue}
-                    onChange={raw => {
-                      setForm1(f => ({ ...f, contactValue: raw }));
-                      if (contactError) setContactError(null);
-                    }}
-                    onBlur={handleContactBlur}
-                    ariaLabel={getContactPlaceholder(selectedContactType)}
-                  />
-                </div>
+                <ContactMaskField
+                  mask={selectedContactType?.mask ?? null}
+                  typeName={selectedContactType?.name || selectedContactType?.localizedName || ''}
+                  value={form1.contactValue}
+                  onChange={raw => {
+                    setForm1(f => ({ ...f, contactValue: raw }));
+                    if (contactError) setContactError(null);
+                  }}
+                  onBlur={handleContactBlur}
+                  placeholder={getContactPlaceholder(selectedContactType)}
+                  ariaLabel={getContactPlaceholder(selectedContactType)}
+                  error={Boolean(contactError)}
+                />
                 {contactError && (
                   <p style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3 }}>{contactError}</p>
                 )}
@@ -469,6 +462,16 @@ export default function RegisterPage() {
                     </button>
                   </span>
                 </label>
+                <p className={regStyles.policyHint}>
+                  Ознакомьтесь с{' '}
+                  <button
+                    type="button"
+                    className={regStyles.docLink}
+                    onClick={() => { void openDocument(DocumentType.Policy); }}
+                  >
+                    политикой обработки персональных данных
+                  </button>
+                </p>
               </div>
             </div>
 
@@ -528,7 +531,7 @@ export default function RegisterPage() {
               className={styles.submitBtn}
               style={{ marginTop: 14 }}
               onClick={() => { void finishRegistration(); }}
-              disabled={loading || !form2.birthDate}
+              disabled={loading || !canFinishStep2}
             >
               {loading ? <span className={styles.spinner} /> : 'Сохранить и войти'}
             </button>

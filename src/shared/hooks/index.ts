@@ -1,6 +1,7 @@
 // shared/hooks/index.ts
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { BRAND_NAME, SITE_TITLE } from '@/shared/config/brand';
 
 // ---- useDebounce ----
 
@@ -15,12 +16,12 @@ export function useDebounce<T>(value: T, delay = 300): T {
 
 // ---- usePageTitle ----
 
-const BASE_TITLE = 'EList — События города';
+const BASE_TITLE = SITE_TITLE;
 
-/** Заголовок вкладки: «{title} — EList». Без аргумента / с пустым — базовый. */
+/** Заголовок вкладки: «{title} — Твой Спот». Без аргумента / с пустым — «События твоего города». */
 export function usePageTitle(title?: string | null) {
   useEffect(() => {
-    document.title = title ? `${title} — EList` : BASE_TITLE;
+    document.title = title ? `${title} — ${BRAND_NAME}` : BASE_TITLE;
     return () => { document.title = BASE_TITLE; };
   }, [title]);
 }
