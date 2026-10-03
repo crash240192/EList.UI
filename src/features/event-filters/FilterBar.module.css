@@ -3,7 +3,6 @@
 .bar {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0 0 14px 14px;
   overflow: visible;
   position: relative;
   z-index: 10;
@@ -287,7 +286,6 @@
   display: none;
   background: var(--surface);
   border: 1px solid var(--border); border-top: none;
-  border-radius: 0 0 14px 14px;
   overflow: hidden;
   box-sizing: border-box;
   padding: 4px 10px 8px;
