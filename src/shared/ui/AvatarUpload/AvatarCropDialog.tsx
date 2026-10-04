@@ -187,7 +187,6 @@ export function AvatarCropDialog({ src, fileName, saving, onCancel, onConfirm }:
             />
           )}
           <div className={styles.shade} />
-          <div className={styles.ring} />
         </div>
 
         <label className={styles.zoom}>

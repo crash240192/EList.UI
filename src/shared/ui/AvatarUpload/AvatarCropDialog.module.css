@@ -69,22 +69,16 @@
 
 .shade {
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: rgba(8, 9, 14, 0.72);
-  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 39.5%, #000 40.2%);
-  mask: radial-gradient(circle at 50% 50%, transparent 0 39.5%, #000 40.2%);
-}
-
-.ring {
-  position: absolute;
   left: 10%;
   top: 10%;
   width: 80%;
   height: 80%;
   border-radius: 50%;
+  box-sizing: border-box;
   border: 2px solid rgba(255, 255, 255, 0.92);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 0 999px rgba(8, 9, 14, 0.72);
   pointer-events: none;
 }
 
