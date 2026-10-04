@@ -19,15 +19,29 @@ import styles from './AvatarCropDialog.module.css';
 
 const CIRCLE_RATIO = 0.8;
 
+export type AvatarCropShape = 'circle' | 'rounded-square';
+
 interface AvatarCropDialogProps {
   src: string;
   fileName: string;
   saving: boolean;
   onCancel: () => void;
   onConfirm: (file: File) => void;
+  title?: string;
+  lead?: string;
+  shape?: AvatarCropShape;
 }
 
-export function AvatarCropDialog({ src, fileName, saving, onCancel, onConfirm }: AvatarCropDialogProps) {
+export function AvatarCropDialog({
+  src,
+  fileName,
+  saving,
+  onCancel,
+  onConfirm,
+  title = 'Кадр аватара',
+  lead = 'Перетащите фото и подгоните масштаб. В круг попадёт то, что видно в окне.',
+  shape = 'circle',
+}: AvatarCropDialogProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
@@ -143,10 +157,10 @@ export function AvatarCropDialog({ src, fileName, saving, onCancel, onConfirm }:
         className={styles.modal}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="avatar-crop-title"
+        aria-labelledby="image-crop-title"
       >
-        <h2 id="avatar-crop-title" className={styles.title}>Кадр аватара</h2>
-        <p className={styles.lead}>Перетащите фото и подгоните масштаб. В круг попадёт то, что видно в окне.</p>
+        <h2 id="image-crop-title" className={styles.title}>{title}</h2>
+        <p className={styles.lead}>{lead}</p>
 
         <div
           ref={stageRef}
@@ -186,7 +200,7 @@ export function AvatarCropDialog({ src, fileName, saving, onCancel, onConfirm }:
               onError={() => setError('Не удалось открыть это изображение')}
             />
           )}
-          <div className={styles.shade} />
+          <div className={`${styles.shade} ${shape === 'rounded-square' ? styles.shadeSquare : styles.shadeCircle}`} />
         </div>
 
         <label className={styles.zoom}>
