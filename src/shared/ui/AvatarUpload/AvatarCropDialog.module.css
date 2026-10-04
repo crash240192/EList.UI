@@ -1,0 +1,124 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 600;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100svh - 32px);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px 22px 18px;
+  z-index: 601;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.lead {
+  margin: 6px 0 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.stage {
+  width: 100%;
+  aspect-ratio: 1;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #111218;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.stageDragging {
+  cursor: grabbing;
+}
+
+.photo {
+  position: absolute;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.probe {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(8, 9, 14, 0.72);
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 39.5%, #000 40.2%);
+  mask: radial-gradient(circle at 50% 50%, transparent 0 39.5%, #000 40.2%);
+}
+
+.ring {
+  position: absolute;
+  left: 10%;
+  top: 10%;
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  pointer-events: none;
+}
+
+.zoom {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.zoom span {
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.zoom input[type='range'] {
+  flex: 1;
+  width: 100%;
+  accent-color: var(--accent);
+  height: 4px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}
