@@ -405,19 +405,23 @@ export default function UserPage() {
     setInviteChecking(false);
   }, [profileAccountId, myAccountId, isOwnProfile]);
 
-  const handleInviteClick = useCallback(async () => {
+  const handleInviteClick = useCallback(() => {
     if (!profileAccountId || inviteChecking) return;
     setInviteChecking(true);
-    try {
-      const check = await checkCanInviteOrReason(profileAccountId);
-      if (check.ok) {
+    void (async () => {
+      try {
+        const check = await checkCanInviteOrReason(profileAccountId);
+        if (!check.ok) {
+          setInviteBlockedReason(check.reason);
+          return;
+        }
         setInviteEventsOpen(true);
-        return;
+      } catch (e) {
+        setInviteBlockedReason(e instanceof Error ? e.message : 'Не удалось проверить приглашение');
+      } finally {
+        setInviteChecking(false);
       }
-      setInviteBlockedReason(check.reason);
-    } finally {
-      setInviteChecking(false);
-    }
+    })();
   }, [profileAccountId, inviteChecking]);
 
   const handleSubscribe = useCallback(async (settings: INotifySettings) => {
@@ -618,7 +622,7 @@ export default function UserPage() {
                 <button
                   type="button"
                   className={styles.btnInvite}
-                  onClick={() => void handleInviteClick()}
+                  onClick={handleInviteClick}
                   disabled={inviteChecking}
                 >
                   {inviteChecking ? '…' : 'Пригласить'}
