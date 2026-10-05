@@ -10,9 +10,28 @@ import {
 import type { INotification, NotificationWsStatus } from '@/entities/notification/types';
 
 const MAX_ITEMS = 80;
+/** Пауза, чтобы пачка replay при подключении сокета схлопнулась в один запрос счётчика. */
+const UNREAD_REFRESH_DEBOUNCE_MS = 300;
 
 /** Инвалидирует in-flight loadHistory после mark-read / mark-all. */
 let historyEpoch = 0;
+/** Инвалидирует устаревший ответ /my/count, если запрос счётчика ушёл ещё раз. */
+let unreadCountEpoch = 0;
+let unreadRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleUnreadCountRefresh(): void {
+  if (unreadRefreshTimer) clearTimeout(unreadRefreshTimer);
+  unreadRefreshTimer = setTimeout(() => {
+    unreadRefreshTimer = null;
+    void useNotificationsStore.getState().refreshUnreadCount();
+  }, UNREAD_REFRESH_DEBOUNCE_MS);
+}
+
+function clearUnreadCountRefresh(): void {
+  if (!unreadRefreshTimer) return;
+  clearTimeout(unreadRefreshTimer);
+  unreadRefreshTimer = null;
+}
 
 interface NotificationsState {
   items: INotification[];
@@ -94,6 +113,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   togglePanel: () => set(s => ({ panelOpen: !s.panelOpen })),
 
   pushNotification: n => {
+    let refreshUnread = false;
     set(s => {
       const prev = s.items.find(i => i.id === n.id);
       const items = mergeNotifications(s.items, [n]);
@@ -101,10 +121,19 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       const wasUnread = prev ? prev.readAt == null : false;
       const isUnread = merged?.readAt == null;
       let unreadCount = s.unreadCount;
-      if (isUnread && !wasUnread) unreadCount += 1;
-      if (!isUnread && wasUnread) unreadCount = Math.max(0, unreadCount - 1);
+      // Неизвестное уведомление уже входит в ответ /my/count (replay при подключении)
+      // либо появилось после него. Локальный +1 удваивает бейдж после обновления страницы.
+      // Актуальное число подтянет refreshUnreadCount.
+      if (!prev) {
+        refreshUnread = isUnread;
+      } else if (isUnread && !wasUnread) {
+        unreadCount += 1;
+      } else if (!isUnread && wasUnread) {
+        unreadCount = Math.max(0, unreadCount - 1);
+      }
       return { items, unreadCount };
     });
+    if (refreshUnread) scheduleUnreadCountRefresh();
   },
 
   applyMarkRead: (id, readAt) => {
@@ -181,8 +210,10 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   },
 
   refreshUnreadCount: async () => {
+    const epoch = ++unreadCountEpoch;
     try {
       const count = await fetchMyNotificationsUnreadCount();
+      if (epoch !== unreadCountEpoch) return;
       set({ unreadCount: count });
     } catch (err) {
       console.error('[notifications] unread count failed', err);
@@ -191,6 +222,8 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
 
   reset: () => {
     historyEpoch += 1;
+    unreadCountEpoch += 1;
+    clearUnreadCountRefresh();
     set({
       items: [],
       unreadCount: 0,
