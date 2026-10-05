@@ -9,7 +9,6 @@ import {
   isAuthenticated as clientIsAuthenticated,
 } from '@/shared/api/client';
 import { getActivationRequired, setActivationRequired, logout as apiLogout } from '@/features/auth/api';
-import { agentDebugLog } from '@/shared/debug/agentLog';
 import { clearLocationSession } from '@/features/auth/locationSession';
 import { useInvitationsStore } from '@/features/invitations/invitationsStore';
 import { useNotificationsStore } from '@/features/notifications/notificationsStore';
@@ -110,17 +109,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   logout: () => {
-    // #region agent log
-    agentDebugLog({
-      hypothesisId: 'H2',
-      location: 'store/index.ts:logout',
-      message: 'useAuthStore.logout',
-      data: {
-        hadToken: Boolean(get().token),
-        pathname: typeof window !== 'undefined' ? window.location.pathname : null,
-      },
-    });
-    // #endregion
     apiLogout();
     clearLocationSession();
     useFiltersStore.getState().setMapCenter(null);

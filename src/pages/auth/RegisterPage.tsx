@@ -2,7 +2,7 @@
 // Двухшаговая регистрация:
 //   Шаг 1 — логин, пароль, контакт, город + согласия (Consent / Agreement); Policy — ссылка без галочки
 //   Шаг 2 — ФИО (имя+фамилия обязательны), пол, дата рождения (обязательна, возраст ≥ 14)
-//   Финал — createAccount(acceptConsent/Agreement + person) → login → agree fallback → /activate или /
+//   Финал — createAccount(acceptConsent/Agreement + person) → login → /activate или /
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -31,11 +31,9 @@ import { birthDateToApiIso, getAge, todayLocalDateString } from '@/shared/lib/da
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import type { Gender } from '@/shared/api/types';
 import { ApiErrorCode } from '@/shared/api/errorCodes';
-import { ApiError, getAuthToken } from '@/shared/api/client';
-import { agentDebugLog } from '@/shared/debug/agentLog';
+import { ApiError } from '@/shared/api/client';
 import {
   DocumentType,
-  agreeDocument,
   fetchLastDocument,
   type DocumentTypeValue,
   type IAgreementDocument,
@@ -233,7 +231,7 @@ export default function RegisterPage() {
     setStep(2);
   };
 
-  // ---- Финал: createAccount(+person) → login → agree fallback ----
+  // ---- Финал: createAccount(+person) → login → /activate или / ----
   const finishRegistration = async () => {
     const step2Err = validateStep2();
     if (step2Err) {
@@ -253,14 +251,6 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      // #region agent log
-      agentDebugLog({
-        hypothesisId: 'H3',
-        location: 'RegisterPage.tsx:finishRegistration',
-        message: 'finishRegistration started',
-        data: { cookieAuthPresent: Boolean(getAuthToken()) },
-      });
-      // #endregion
       await createAccount({
         login:                     form1.login.trim(),
         password:                  form1.password,
@@ -279,87 +269,10 @@ export default function RegisterPage() {
         birthDate:                 birthDateIso,
       });
 
-      // #region agent log
-      agentDebugLog({
-        hypothesisId: 'H1',
-        location: 'RegisterPage.tsx:finishRegistration',
-        message: 'createAccount completed, before login',
-        data: { cookieAuthPresent: Boolean(getAuthToken()) },
-      });
-      // #endregion
-
       const authResult = await login(savedCreds.login
         ? savedCreds
         : { login: form1.login.trim(), password: form1.password });
-
-      // #region agent log
-      agentDebugLog({
-        hypothesisId: 'H1',
-        location: 'RegisterPage.tsx:finishRegistration',
-        message: 'login completed, before setAuth',
-        data: {
-          activationRequired: authResult.activationRequired,
-          cookieAuthPresent: Boolean(getAuthToken()),
-          tokenPrefix: authResult.token?.slice(0, 8),
-        },
-      });
-      // #endregion
-
       setAuth(authResult.token, authResult.activationRequired);
-
-      // #region agent log
-      agentDebugLog({
-        hypothesisId: 'H1',
-        location: 'RegisterPage.tsx:finishRegistration',
-        message: 'setAuth completed, before agreeDocument fallback',
-        data: {
-          activationRequired: authResult.activationRequired,
-          cookieAuthPresent: Boolean(getAuthToken()),
-        },
-      });
-      // #endregion
-
-      // Согласия уже пишутся в create; повторный agree — мягкий fallback (не валим регистрацию).
-      await agreeDocument(DocumentType.Consent).catch((e) => {
-        // #region agent log
-        agentDebugLog({
-          hypothesisId: 'H1',
-          location: 'RegisterPage.tsx:finishRegistration',
-          message: 'agreeDocument Consent failed (swallowed)',
-          data: {
-            error: e instanceof Error ? e.message : String(e),
-            cookieAuthPresent: Boolean(getAuthToken()),
-          },
-        });
-        // #endregion
-        return undefined;
-      });
-      await agreeDocument(DocumentType.Agreement).catch((e) => {
-        // #region agent log
-        agentDebugLog({
-          hypothesisId: 'H1',
-          location: 'RegisterPage.tsx:finishRegistration',
-          message: 'agreeDocument Agreement failed (swallowed)',
-          data: {
-            error: e instanceof Error ? e.message : String(e),
-            cookieAuthPresent: Boolean(getAuthToken()),
-          },
-        });
-        // #endregion
-        return undefined;
-      });
-
-      // #region agent log
-      agentDebugLog({
-        hypothesisId: 'H3',
-        location: 'RegisterPage.tsx:finishRegistration',
-        message: 'after agreeDocument fallback, before navigate',
-        data: {
-          activationRequired: authResult.activationRequired,
-          cookieAuthPresent: Boolean(getAuthToken()),
-        },
-      });
-      // #endregion
 
       if (authResult.activationRequired) {
         if (authResult.message) {

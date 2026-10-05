@@ -1,10 +1,12 @@
 // shared/auth/unauthorized.ts
 
 import { ApiErrorCode } from '@/shared/api/errorCodes';
-import { agentDebugLog } from '@/shared/debug/agentLog';
+import { cookies } from '@/shared/lib/cookies';
 import { isPublicAppRoute, isPublicAuthRoute } from './routes';
 
 export { PUBLIC_AUTH_ROUTES, isPublicAuthRoute, isPublicAppRoute } from './routes';
+
+const COOKIE_ACTIVATION_REQUIRED = 'elist_activation_required';
 
 /** API активации и восстановления пароля — без принудительного выхода */
 export function isActivationApiPath(path: string): boolean {
@@ -22,30 +24,14 @@ export function isActivationApiPath(path: string): boolean {
 
 /** Нужно ли при 401 / ошибке авторизации сбрасывать сессию */
 export function shouldForceLogoutForApi(path: string, hasAuthToken = false): boolean {
-  let result: boolean;
-  if (isActivationApiPath(path)) result = false;
-  else if (hasAuthToken) result = true;
-  else if (isPublicAppRoute()) result = false;
-  else result = true;
-
-  if (path.toLowerCase().includes('/agreements/') || path.toLowerCase().includes('/authorization/activate')) {
-    // #region agent log
-    agentDebugLog({
-      hypothesisId: 'H2',
-      location: 'unauthorized.ts:shouldForceLogoutForApi',
-      message: 'shouldForceLogoutForApi evaluated',
-      data: {
-        path,
-        hasAuthToken,
-        result,
-        isActivationApi: isActivationApiPath(path),
-        isPublicAppRoute: isPublicAppRoute(),
-      },
-    });
-    // #endregion
-  }
-
-  return result;
+  if (isActivationApiPath(path)) return false;
+  // Неактивная сессия (ожидание кода активации) — сохраняем токен до activate
+  if (cookies.get(COOKIE_ACTIVATION_REQUIRED) === 'true') return false;
+  // Была активная сессия — любая ошибка авторизации завершает её (в т.ч. на гостевых страницах)
+  if (hasAuthToken) return true;
+  // Гость на публичных страницах — не редиректим
+  if (isPublicAppRoute()) return false;
+  return true;
 }
 
 /** CommandResult.errorCode — истёкший/невалидный токен (HTTP может быть 200) */
