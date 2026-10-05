@@ -26,7 +26,10 @@ interface InviteEventRow {
   name: string;
   startTime: string;
   status: EventRowStatus;
+  /** Бейдж справа: блок / уже … / «Нужен билет» */
   statusLabel?: string;
+  /** Информативно: приглашение не даёт бесплатный вход */
+  ticketsRequired?: boolean;
 }
 
 function formatWhen(iso: string): string {
@@ -40,44 +43,42 @@ function formatWhen(iso: string): string {
   });
 }
 
+function statusFromDenyReason(reason: string): Pick<InviteEventRow, 'status' | 'statusLabel'> {
+  if (reason === 'Уже приглашён') {
+    return { status: 'alreadyInvited', statusLabel: 'Уже приглашён' };
+  }
+  if (reason === 'Уже участвует') {
+    return { status: 'alreadyParticipating', statusLabel: 'Уже участвует' };
+  }
+  return { status: 'blocked', statusLabel: reason || 'Недоступно' };
+}
+
 function rowFromEligibility(
   event: { id: string; name: string; startTime: string },
   el: IInviteToEventEligibility | undefined,
 ): InviteEventRow {
+  const ticketsRequired = el?.ticketsRequired === true;
+
   if (!el || el.allowed) {
     return {
       id: event.id,
       name: event.name,
       startTime: event.startTime,
       status: 'ok',
+      // C.7: tickets — информативный статус, выбор не блокируем
+      statusLabel: ticketsRequired ? 'Нужен билет' : undefined,
+      ticketsRequired,
     };
   }
 
-  const reason = el.reason || 'Недоступно';
-  if (reason === 'Уже приглашён') {
-    return {
-      id: event.id,
-      name: event.name,
-      startTime: event.startTime,
-      status: 'alreadyInvited',
-      statusLabel: 'Уже приглашён',
-    };
-  }
-  if (reason === 'Уже участвует') {
-    return {
-      id: event.id,
-      name: event.name,
-      startTime: event.startTime,
-      status: 'alreadyParticipating',
-      statusLabel: 'Уже участвует',
-    };
-  }
+  const denied = statusFromDenyReason(el.reason || 'Недоступно');
   return {
     id: event.id,
     name: event.name,
     startTime: event.startTime,
-    status: 'blocked',
-    statusLabel: reason,
+    status: denied.status,
+    statusLabel: denied.statusLabel,
+    ticketsRequired,
   };
 }
 
@@ -247,17 +248,16 @@ export function ProfileEventInviteModal({
 
       setEvents(prev => prev.map(row => {
         if (succeeded.has(row.id)) {
-          return { ...row, status: 'alreadyInvited', statusLabel: 'Уже приглашён' };
+          return {
+            ...row,
+            status: 'alreadyInvited',
+            statusLabel: 'Уже приглашён',
+          };
         }
         const fail = failureByEvent.get(row.id);
         if (!fail) return row;
-        if (fail.message === 'Уже приглашён') {
-          return { ...row, status: 'alreadyInvited', statusLabel: 'Уже приглашён' };
-        }
-        if (fail.message === 'Уже участвует') {
-          return { ...row, status: 'alreadyParticipating', statusLabel: 'Уже участвует' };
-        }
-        return { ...row, status: 'blocked', statusLabel: fail.message || 'Недоступно' };
+        const denied = statusFromDenyReason(fail.message || 'Недоступно');
+        return { ...row, status: denied.status, statusLabel: denied.statusLabel };
       }));
       setSelected(new Set());
 
@@ -267,10 +267,26 @@ export function ProfileEventInviteModal({
         onClose();
         return;
       }
+
+      const uniqueReasons = [...new Set(
+        result.failures
+          .map(f => f.message?.trim())
+          .filter((m): m is string => !!m),
+      )];
+      const reasonsSuffix = uniqueReasons.length > 0
+        ? ` (${uniqueReasons.slice(0, 3).join('; ')}${uniqueReasons.length > 3 ? '…' : ''})`
+        : '';
+
       if (okCount > 0) {
-        setSendSummary(`Отправлено: ${okCount}. Не удалось: ${failCount}.`);
+        setSendSummary(`Отправлено: ${okCount}. Не удалось: ${failCount}${reasonsSuffix}.`);
       } else if (failCount > 0) {
-        setSendError(result.failures[0]?.message || 'Не удалось отправить приглашения');
+        setSendError(
+          uniqueReasons[0]
+            ? (uniqueReasons.length === 1
+              ? uniqueReasons[0]
+              : `Не удалось отправить: ${uniqueReasons.slice(0, 3).join('; ')}`)
+            : 'Не удалось отправить приглашения',
+        );
       } else {
         setSendError('Не удалось отправить приглашения');
       }
@@ -340,6 +356,11 @@ export function ProfileEventInviteModal({
           {!loading && !loadError && events.map(event => {
             const disabled = event.status !== 'ok';
             const on = selected.has(event.id);
+            const badgeClass = event.status === 'ok' && event.ticketsRequired
+              ? `${styles.role} ${styles.roleInfo}`
+              : disabled
+                ? `${styles.role} ${styles.roleBlocked}`
+                : styles.role;
             return (
               <button
                 key={event.id}
@@ -348,6 +369,7 @@ export function ProfileEventInviteModal({
                 aria-checked={on}
                 aria-disabled={disabled}
                 disabled={disabled}
+                title={event.statusLabel}
                 className={`${styles.item} ${on ? styles.itemOn : ''} ${disabled ? styles.itemDisabled : ''}`}
                 onClick={() => toggle(event.id)}
               >
@@ -363,7 +385,7 @@ export function ProfileEventInviteModal({
                   <span className={styles.itemWhen}>{formatWhen(event.startTime)}</span>
                 </span>
                 {event.statusLabel ? (
-                  <span className={styles.role}>{event.statusLabel}</span>
+                  <span className={badgeClass}>{event.statusLabel}</span>
                 ) : null}
               </button>
             );
