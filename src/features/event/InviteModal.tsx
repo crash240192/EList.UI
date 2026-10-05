@@ -3,7 +3,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { fetchSubscribers } from '@/entities/user/subscriptionApi';
 import type { ISubscriptionItem } from '@/entities/user/subscriptionApi';
-import { createInvitations } from '@/entities/invitation/invitationsApi';
+import {
+  createInvitations,
+  fetchCanInviteToEventByEvent,
+  type IInviteToEventEligibility,
+} from '@/entities/invitation/invitationsApi';
 import {
   getBWListShortIds,
   canInviteSubscriber,
@@ -46,6 +50,15 @@ function getInitials(p: ISubscriptionItem): string {
   return p.account.login[0].toUpperCase();
 }
 
+function mergeEligibility(
+  prev: Map<string, IInviteToEventEligibility>,
+  rows: IInviteToEventEligibility[],
+): Map<string, IInviteToEventEligibility> {
+  const next = new Map(prev);
+  for (const row of rows) next.set(row.accountId, row);
+  return next;
+}
+
 export function InviteModal({
   eventId,
   currentAccountId,
@@ -61,6 +74,9 @@ export function InviteModal({
 }: InviteModalProps) {
   useModalBackButton(onClose);
 
+  /** Полная eligibility с сервера (age/gender/privacy/BL/WL) — только когда событие уже есть */
+  const useEventEligibility = Boolean(eventId) && !pickMode;
+
   const [search, setSearch] = useState('');
   const [subscribers, setSubscribers] = useState<ISubscriptionItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -74,11 +90,20 @@ export function InviteModal({
   const [blackListIds, setBlackListIds] = useState<Set<string>>(new Set());
   const [whiteListIds, setWhiteListIds] = useState<Set<string>>(new Set());
   const [privacyById, setPrivacyById] = useState<Map<string, ICanInviteResult>>(() => new Map());
+  const [eligibilityById, setEligibilityById] = useState<Map<string, IInviteToEventEligibility>>(
+    () => new Map(),
+  );
   const searchRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useDebounce(search, 350);
 
   useEffect(() => {
+    // В режиме отправки eligibility уже включает BL/WL — локальные short-листы не нужны.
+    if (useEventEligibility) {
+      setBlackListIds(new Set());
+      setWhiteListIds(new Set());
+      return;
+    }
     if (draftBlackListIds !== undefined || draftWhiteListIds !== undefined) {
       setBlackListIds(new Set(draftBlackListIds ?? []));
       setWhiteListIds(new Set(draftWhiteListIds ?? []));
@@ -101,25 +126,58 @@ export function InviteModal({
     return () => {
       cancelled = true;
     };
-  }, [eventId, draftBlackListIds, draftWhiteListIds]);
+  }, [eventId, draftBlackListIds, draftWhiteListIds, useEventEligibility]);
 
   useEffect(() => {
     if (!pickMode || !initialSelectedIds?.length) return;
     setSelected(new Set(initialSelectedIds));
   }, [pickMode, initialSelectedIds]);
 
+  const loadEligibilityForIds = useCallback(
+    async (ids: string[]): Promise<Map<string, IInviteToEventEligibility>> => {
+      if (!useEventEligibility || !eventId || ids.length === 0) return new Map();
+      const rows = await fetchCanInviteToEventByEvent({
+        eventId,
+        accountIds: ids,
+        inviterOrganizationId,
+      }).catch(() => [] as IInviteToEventEligibility[]);
+      const map = new Map<string, IInviteToEventEligibility>();
+      for (const row of rows) map.set(row.accountId, row);
+      return map;
+    },
+    [useEventEligibility, eventId, inviterOrganizationId],
+  );
+
   const canInvite = useCallback(
     (accountId: string) => {
+      if (useEventEligibility) {
+        const el = eligibilityById.get(accountId);
+        if (el) return el.allowed;
+        // Пока нет ответа — не даём выбрать (избегаем ложного allow).
+        return false;
+      }
       if (!canInviteSubscriber(isPrivate, accountId, blackListIds, whiteListIds)) return false;
       const privacy = privacyById.get(accountId);
       if (privacy && privacy.allowed === false) return false;
       return true;
     },
-    [isPrivate, blackListIds, whiteListIds, privacyById],
+    [
+      useEventEligibility,
+      eligibilityById,
+      isPrivate,
+      blackListIds,
+      whiteListIds,
+      privacyById,
+    ],
   );
 
   const blockReasonFor = useCallback(
     (accountId: string): string | null => {
+      if (useEventEligibility) {
+        const el = eligibilityById.get(accountId);
+        if (el && !el.allowed) return el.reason || 'Нельзя пригласить';
+        return null;
+      }
       const bw = inviteBlockReason(isPrivate, accountId, blackListIds, whiteListIds);
       if (bw) return bw;
       const privacy = privacyById.get(accountId);
@@ -128,7 +186,14 @@ export function InviteModal({
       }
       return null;
     },
-    [isPrivate, blackListIds, whiteListIds, privacyById],
+    [
+      useEventEligibility,
+      eligibilityById,
+      isPrivate,
+      blackListIds,
+      whiteListIds,
+      privacyById,
+    ],
   );
 
   useEffect(() => {
@@ -146,14 +211,21 @@ export function InviteModal({
     setLoading(true);
     setErr(null);
     setPage(0);
+    setEligibilityById(new Map());
+    setPrivacyById(new Map());
     fetchSubscribers(currentAccountId, { name: debouncedSearch || undefined, pageIndex: 0, pageSize: PAGE_SIZE })
       .then(async data => {
         if (cancelled) return;
         setSubscribers(data.items);
         setTotal(data.total);
         const ids = data.items.map(s => s.account.id);
-        const privacy = await fetchCanInviteBatch(ids).catch(() => new Map<string, ICanInviteResult>());
-        if (!cancelled) setPrivacyById(privacy);
+        if (useEventEligibility) {
+          const map = await loadEligibilityForIds(ids);
+          if (!cancelled) setEligibilityById(map);
+        } else {
+          const privacy = await fetchCanInviteBatch(ids).catch(() => new Map<string, ICanInviteResult>());
+          if (!cancelled) setPrivacyById(privacy);
+        }
       })
       .catch(() => {
         if (!cancelled) setErr('Не удалось загрузить подписчиков');
@@ -164,7 +236,7 @@ export function InviteModal({
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, currentAccountId]);
+  }, [debouncedSearch, currentAccountId, useEventEligibility, loadEligibilityForIds]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || subscribers.length >= total) return;
@@ -179,16 +251,30 @@ export function InviteModal({
       setSubscribers(prev => [...prev, ...data.items]);
       setPage(nextPage);
       const ids = data.items.map(s => s.account.id);
-      const privacy = await fetchCanInviteBatch(ids).catch(() => new Map<string, ICanInviteResult>());
-      setPrivacyById(prev => {
-        const next = new Map(prev);
-        for (const [id, value] of privacy) next.set(id, value);
-        return next;
-      });
+      if (useEventEligibility) {
+        const map = await loadEligibilityForIds(ids);
+        setEligibilityById(prev => mergeEligibility(prev, [...map.values()]));
+      } else {
+        const privacy = await fetchCanInviteBatch(ids).catch(() => new Map<string, ICanInviteResult>());
+        setPrivacyById(prev => {
+          const next = new Map(prev);
+          for (const [id, value] of privacy) next.set(id, value);
+          return next;
+        });
+      }
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, subscribers.length, total, page, debouncedSearch, currentAccountId]);
+  }, [
+    loadingMore,
+    subscribers.length,
+    total,
+    page,
+    debouncedSearch,
+    currentAccountId,
+    useEventEligibility,
+    loadEligibilityForIds,
+  ]);
 
   const sentinelRef = useInfiniteScroll(loadMore);
 

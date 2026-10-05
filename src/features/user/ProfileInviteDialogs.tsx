@@ -6,7 +6,8 @@ import { createPortal } from 'react-dom';
 import { fetchEvents } from '@/entities/event';
 import {
   createInvitationsToAccount,
-  searchInvitations,
+  fetchCanInviteToEventByAccount,
+  type IInviteToEventEligibility,
 } from '@/entities/invitation/invitationsApi';
 import { fetchCanInvite } from '@/entities/user/privacyApi';
 import {
@@ -39,6 +40,47 @@ function formatWhen(iso: string): string {
   });
 }
 
+function rowFromEligibility(
+  event: { id: string; name: string; startTime: string },
+  el: IInviteToEventEligibility | undefined,
+): InviteEventRow {
+  if (!el || el.allowed) {
+    return {
+      id: event.id,
+      name: event.name,
+      startTime: event.startTime,
+      status: 'ok',
+    };
+  }
+
+  const reason = el.reason || 'Недоступно';
+  if (reason === 'Уже приглашён') {
+    return {
+      id: event.id,
+      name: event.name,
+      startTime: event.startTime,
+      status: 'alreadyInvited',
+      statusLabel: 'Уже приглашён',
+    };
+  }
+  if (reason === 'Уже участвует') {
+    return {
+      id: event.id,
+      name: event.name,
+      startTime: event.startTime,
+      status: 'alreadyParticipating',
+      statusLabel: 'Уже участвует',
+    };
+  }
+  return {
+    id: event.id,
+    name: event.name,
+    startTime: event.startTime,
+    status: 'blocked',
+    statusLabel: reason,
+  };
+}
+
 async function loadInviteEvents(params: {
   myAccountId: string;
   profileAccountId: string;
@@ -62,26 +104,16 @@ async function loadInviteEvents(params: {
   if (events.length === 0) return [];
 
   const eventIds = events.map(e => e.id);
-  const existing = await searchInvitations({
-    invitedAccountIds: [params.profileAccountId],
+  const eligibility = await fetchCanInviteToEventByAccount({
+    accountId: params.profileAccountId,
     eventIds,
-    pageIndex: 0,
-    pageSize: Math.max(50, eventIds.length),
-  }).catch(() => ({ result: [] as Awaited<ReturnType<typeof searchInvitations>>['result'], total: 0 }));
+    inviterOrganizationId: params.source === 'organization' ? params.organizationId : null,
+  }).catch(() => [] as IInviteToEventEligibility[]);
 
-  const invitedSet = new Set(existing.result.map(inv => inv.eventId));
+  const byEvent = new Map(eligibility.map(row => [row.eventId, row]));
 
   return events
-    .map(event => {
-      const alreadyInvited = invitedSet.has(event.id);
-      return {
-        id: event.id,
-        name: event.name,
-        startTime: event.startTime,
-        status: alreadyInvited ? 'alreadyInvited' as const : 'ok' as const,
-        statusLabel: alreadyInvited ? 'Уже приглашён' : undefined,
-      };
-    })
+    .map(event => rowFromEligibility(event, byEvent.get(event.id)))
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 }
 
