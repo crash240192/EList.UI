@@ -14,7 +14,9 @@ import {
   fetchMyPrivacySettings,
   updateMyPrivacySettings,
   WHO_CAN_INVITE_OPTIONS,
+  WHO_CAN_INVITE_HINTS,
   PRIVACY_AUDIENCE_OPTIONS,
+  PRIVACY_AUDIENCE_HINTS,
   type IAccountPrivacySettings,
   type PrivacyAudience,
 } from '@/entities/user/privacyApi';
@@ -600,6 +602,7 @@ function PrivacySection() {
               onChange={v => setAudience('whoCanInviteMe', v as PrivacyAudience)}
               options={WHO_CAN_INVITE_OPTIONS}
             />
+            <div className={styles.frowHint}>{WHO_CAN_INVITE_HINTS[settings.whoCanInviteMe]}</div>
           </div>
         </div>
         <div className={styles.frow}>
@@ -610,6 +613,7 @@ function PrivacySection() {
               onChange={v => setAudience('ageVisibility', v as PrivacyAudience)}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
+            <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.ageVisibility]}</div>
           </div>
         </div>
         <div className={styles.frow}>
@@ -620,6 +624,7 @@ function PrivacySection() {
               onChange={v => setAudience('genderVisibility', v as PrivacyAudience)}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
+            <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.genderVisibility]}</div>
           </div>
         </div>
         <div className={styles.frow}>
@@ -630,6 +635,7 @@ function PrivacySection() {
               onChange={v => setAudience('locationVisibility', v as PrivacyAudience)}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
+            <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.locationVisibility]}</div>
           </div>
         </div>
         <div className={styles.frow}>
@@ -640,6 +646,7 @@ function PrivacySection() {
               onChange={v => setAudience('profilePhotosVisibility', v as PrivacyAudience)}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
+            <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.profilePhotosVisibility]}</div>
           </div>
         </div>
         <div className={styles.frow}>
