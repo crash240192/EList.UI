@@ -14,6 +14,7 @@ import {
   fetchSubscriptionsCount,
   fetchSubscribersCount,
   fetchIsSubscribed,
+  fetchIsMySubscriber,
   subscribe,
   unsubscribe,
   type INotifySettings,
@@ -33,6 +34,7 @@ import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { useAuthStore } from '@/app/store';
 import { UserShareMenu } from '@/features/user/UserShareMenu';
+import { InviteSpamDialog, ProfileEventInviteModal } from '@/features/user/ProfileInviteDialogs';
 import { ContentReportModal } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import {
@@ -299,6 +301,11 @@ export default function UserPage() {
   const [listModal, setListModal] = useState<ListModal>(null);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isMySubscriber, setIsMySubscriber] = useState<'loading' | 'yes' | 'no'>('loading');
+  const [inviteMisses, setInviteMisses] = useState(0);
+  const [inviteHint, setInviteHint] = useState(false);
+  const [inviteEventsOpen, setInviteEventsOpen] = useState(false);
+  const [inviteSpamOpen, setInviteSpamOpen] = useState(false);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
@@ -390,6 +397,40 @@ export default function UserPage() {
       });
     return () => { cancelled = true; };
   }, [profileAccountId, myAccountId, isOwnProfile]);
+
+  useEffect(() => {
+    setIsMySubscriber('loading');
+    setInviteMisses(0);
+    setInviteHint(false);
+    setInviteEventsOpen(false);
+    setInviteSpamOpen(false);
+    if (!profileAccountId || !myAccountId || isOwnProfile) {
+      setIsMySubscriber('no');
+      return;
+    }
+    let cancelled = false;
+    fetchIsMySubscriber(myAccountId, profileAccountId).then(yes => {
+      if (!cancelled) setIsMySubscriber(yes ? 'yes' : 'no');
+    });
+    return () => { cancelled = true; };
+  }, [profileAccountId, myAccountId, isOwnProfile]);
+
+  const handleInviteClick = useCallback(() => {
+    if (isMySubscriber === 'loading') return;
+    if (isMySubscriber === 'yes') {
+      setInviteHint(false);
+      setInviteEventsOpen(true);
+      return;
+    }
+    const next = inviteMisses + 1;
+    setInviteMisses(next);
+    if (next >= 3) {
+      setInviteHint(false);
+      setInviteSpamOpen(true);
+    } else {
+      setInviteHint(true);
+    }
+  }, [isMySubscriber, inviteMisses]);
 
   const handleSubscribe = useCallback(async (settings: INotifySettings) => {
     if (!profileAccountId) return;
@@ -579,12 +620,22 @@ export default function UserPage() {
 
           {!isOwnProfile && authenticated && (
             <div className={styles.profileActions}>
+              <div className={styles.inviteSlot}>
+                <button type="button" className={styles.btnInvite} onClick={handleInviteClick}>
+                  Пригласить
+                </button>
+                {inviteHint && (
+                  <div className={styles.inviteHint} role="status">
+                    Пользователь не подписан на вас
+                  </div>
+                )}
+              </div>
               {isSubscribed ? (
                 <button type="button" className={`${styles.btnJoin} ${styles.btnLeave}`} onClick={() => void handleUnsubscribe()}>
                   Отписаться
                 </button>
               ) : (
-                <button type="button" className={styles.btnJoin} onClick={() => setShowSubscribe(true)}>
+                <button type="button" className={`${styles.btnJoin} ${styles.btnSubscribe}`} onClick={() => setShowSubscribe(true)}>
                   Подписаться
                 </button>
               )}
@@ -775,6 +826,17 @@ export default function UserPage() {
           </section>
         </div>
       </div>
+
+      {inviteEventsOpen && myAccountId && (
+        <ProfileEventInviteModal
+          myAccountId={myAccountId}
+          profileAccountId={profileAccountId}
+          onClose={() => setInviteEventsOpen(false)}
+        />
+      )}
+      {inviteSpamOpen && (
+        <InviteSpamDialog onClose={() => setInviteSpamOpen(false)} />
+      )}
 
       {showSubscribe && (
         <SubscribeModal
