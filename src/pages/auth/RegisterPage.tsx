@@ -2,7 +2,7 @@
 // Двухшаговая регистрация:
 //   Шаг 1 — логин, пароль, контакт, город + согласия (Consent / Agreement); Policy — ссылка без галочки
 //   Шаг 2 — ФИО (имя+фамилия обязательны), пол, дата рождения (обязательна, возраст ≥ 14)
-//   Финал — createAccount(acceptConsent/Agreement + person) → login → agree fallback → /activate или /
+//   Финал — createAccount(acceptConsent/Agreement + person) → login → /activate или /
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -34,7 +34,6 @@ import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { ApiError } from '@/shared/api/client';
 import {
   DocumentType,
-  agreeDocument,
   fetchLastDocument,
   type DocumentTypeValue,
   type IAgreementDocument,
@@ -232,7 +231,7 @@ export default function RegisterPage() {
     setStep(2);
   };
 
-  // ---- Финал: createAccount(+person) → login → agree fallback ----
+  // ---- Финал: createAccount(+person) → login → /activate или / ----
   const finishRegistration = async () => {
     const step2Err = validateStep2();
     if (step2Err) {
@@ -274,10 +273,6 @@ export default function RegisterPage() {
         ? savedCreds
         : { login: form1.login.trim(), password: form1.password });
       setAuth(authResult.token, authResult.activationRequired);
-
-      // Согласия уже пишутся в create; повторный agree — мягкий fallback (не валим регистрацию).
-      await agreeDocument(DocumentType.Consent).catch(() => undefined);
-      await agreeDocument(DocumentType.Agreement).catch(() => undefined);
 
       if (authResult.activationRequired) {
         if (authResult.message) {

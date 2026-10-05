@@ -1,9 +1,12 @@
 // shared/auth/unauthorized.ts
 
 import { ApiErrorCode } from '@/shared/api/errorCodes';
+import { cookies } from '@/shared/lib/cookies';
 import { isPublicAppRoute, isPublicAuthRoute } from './routes';
 
 export { PUBLIC_AUTH_ROUTES, isPublicAuthRoute, isPublicAppRoute } from './routes';
+
+const COOKIE_ACTIVATION_REQUIRED = 'elist_activation_required';
 
 /** API активации и восстановления пароля — без принудительного выхода */
 export function isActivationApiPath(path: string): boolean {
@@ -22,6 +25,8 @@ export function isActivationApiPath(path: string): boolean {
 /** Нужно ли при 401 / ошибке авторизации сбрасывать сессию */
 export function shouldForceLogoutForApi(path: string, hasAuthToken = false): boolean {
   if (isActivationApiPath(path)) return false;
+  // Неактивная сессия (ожидание кода активации) — сохраняем токен до activate
+  if (cookies.get(COOKIE_ACTIVATION_REQUIRED) === 'true') return false;
   // Была активная сессия — любая ошибка авторизации завершает её (в т.ч. на гостевых страницах)
   if (hasAuthToken) return true;
   // Гость на публичных страницах — не редиректим
