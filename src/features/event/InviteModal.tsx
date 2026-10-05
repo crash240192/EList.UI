@@ -9,6 +9,7 @@ import {
   canInviteSubscriber,
   inviteBlockReason,
 } from '@/entities/event/participationApi';
+import { fetchCanInviteBatch, type ICanInviteResult } from '@/entities/user/privacyApi';
 import { useDebounce, useInfiniteScroll } from '@/shared/hooks';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -72,6 +73,7 @@ export function InviteModal({
   const [sent, setSent] = useState(false);
   const [blackListIds, setBlackListIds] = useState<Set<string>>(new Set());
   const [whiteListIds, setWhiteListIds] = useState<Set<string>>(new Set());
+  const [privacyById, setPrivacyById] = useState<Map<string, ICanInviteResult>>(() => new Map());
   const searchRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useDebounce(search, 350);
@@ -107,8 +109,26 @@ export function InviteModal({
   }, [pickMode, initialSelectedIds]);
 
   const canInvite = useCallback(
-    (accountId: string) => canInviteSubscriber(isPrivate, accountId, blackListIds, whiteListIds),
-    [isPrivate, blackListIds, whiteListIds],
+    (accountId: string) => {
+      if (!canInviteSubscriber(isPrivate, accountId, blackListIds, whiteListIds)) return false;
+      const privacy = privacyById.get(accountId);
+      if (privacy && privacy.allowed === false) return false;
+      return true;
+    },
+    [isPrivate, blackListIds, whiteListIds, privacyById],
+  );
+
+  const blockReasonFor = useCallback(
+    (accountId: string): string | null => {
+      const bw = inviteBlockReason(isPrivate, accountId, blackListIds, whiteListIds);
+      if (bw) return bw;
+      const privacy = privacyById.get(accountId);
+      if (privacy && privacy.allowed === false) {
+        return privacy.reason || 'Пользователь ограничил приглашения';
+      }
+      return null;
+    },
+    [isPrivate, blackListIds, whiteListIds, privacyById],
   );
 
   useEffect(() => {
@@ -127,10 +147,13 @@ export function InviteModal({
     setErr(null);
     setPage(0);
     fetchSubscribers(currentAccountId, { name: debouncedSearch || undefined, pageIndex: 0, pageSize: PAGE_SIZE })
-      .then(data => {
+      .then(async data => {
         if (cancelled) return;
         setSubscribers(data.items);
         setTotal(data.total);
+        const ids = data.items.map(s => s.account.id);
+        const privacy = await fetchCanInviteBatch(ids).catch(() => new Map<string, ICanInviteResult>());
+        if (!cancelled) setPrivacyById(privacy);
       })
       .catch(() => {
         if (!cancelled) setErr('Не удалось загрузить подписчиков');
@@ -155,6 +178,13 @@ export function InviteModal({
       });
       setSubscribers(prev => [...prev, ...data.items]);
       setPage(nextPage);
+      const ids = data.items.map(s => s.account.id);
+      const privacy = await fetchCanInviteBatch(ids).catch(() => new Map<string, ICanInviteResult>());
+      setPrivacyById(prev => {
+        const next = new Map(prev);
+        for (const [id, value] of privacy) next.set(id, value);
+        return next;
+      });
     } finally {
       setLoadingMore(false);
     }
@@ -304,7 +334,7 @@ export function InviteModal({
               {subscribers.map(s => {
                 const id = s.account.id;
                 const allowed = canInvite(id);
-                const blockedReason = inviteBlockReason(isPrivate, id, blackListIds, whiteListIds);
+                const blockedReason = blockReasonFor(id);
                 const isSelected = selected.has(id);
 
                 return (
@@ -338,7 +368,9 @@ export function InviteModal({
                           ? `${s.personInfo.firstName} ${s.personInfo.lastName ?? ''}`.trim()
                           : s.account.login}
                       </div>
-                      <div className={styles.login}>@{s.account.login}</div>
+                      <div className={styles.login}>
+                        {blockedReason ? blockedReason : `@${s.account.login}`}
+                      </div>
                     </div>
                   </div>
                 );
