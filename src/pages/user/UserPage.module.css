@@ -153,6 +153,16 @@
   margin-top: 2px;
 }
 
+.profileCity {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.avatarWrap:disabled {
+  cursor: default;
+}
+
 .profileMeta {
   font-size: 12px;
   color: var(--text-secondary);

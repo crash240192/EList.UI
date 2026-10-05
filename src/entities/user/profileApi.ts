@@ -8,6 +8,8 @@ export interface IAccountData {
   id: string;
   login: string;
   avatarId?: string | null;
+  /** Город по координатам аккаунта (если разрешено locationVisibility) */
+  profileCity?: string | null;
 }
 
 export interface IContactType {
@@ -52,6 +54,20 @@ export interface IFullProfile {
 }
 
 // ---- Helpers ----
+
+function normalizeAccount(raw: IAccountData | null | undefined): IAccountData {
+  if (!raw || typeof raw !== 'object') {
+    return { id: '', login: '' };
+  }
+  const r = raw as IAccountData & Record<string, unknown>;
+  const city = r.profileCity ?? (r as Record<string, unknown>).ProfileCity;
+  return {
+    id: String(r.id ?? ''),
+    login: String(r.login ?? ''),
+    avatarId: (r.avatarId ?? null) as string | null,
+    profileCity: typeof city === 'string' && city.trim() ? city.trim() : null,
+  };
+}
 
 async function safeContacts(path: string): Promise<{ data: IContactDataItem[]; error: string | null }> {
   try {
@@ -105,7 +121,7 @@ export async function fetchFullProfile(
     ]);
 
     return {
-      account:       accountRes.result,
+      account:       normalizeAccount(accountRes.result),
       contacts:      contactsRes.data,
       contactsError: contactsRes.error,
       person,
@@ -120,7 +136,7 @@ export async function fetchFullProfile(
   ]);
 
   return {
-    account:       accountRes.result,
+    account:       normalizeAccount(accountRes.result),
     contacts:      contactsRes.data,
     contactsError: contactsRes.error,
     person,
