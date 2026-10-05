@@ -9,6 +9,7 @@ import {
 import { cookies } from '@/shared/lib/cookies';
 import type { CommandResult } from './types';
 import { isAccessDeniedApiCode, isAgreementNotFoundCode } from './errorCodes';
+import { agentDebugLog } from '@/shared/debug/agentLog';
 
 export const COOKIE_CLIENT_HASH = 'elist_client_hash';
 export const COOKIE_AUTH_TOKEN  = 'elist_auth_token';
@@ -82,6 +83,14 @@ export function isAuthenticated(): boolean { return !!getAuthToken(); }
 
 /** Сброс сессии и редирект на /login (кроме публичных auth-страниц) */
 export function notifyUnauthorized(): void {
+  // #region agent log
+  agentDebugLog({
+    hypothesisId: 'H2',
+    location: 'client.ts:notifyUnauthorized',
+    message: 'notifyUnauthorized invoked',
+    data: { pathname: typeof window !== 'undefined' ? window.location.pathname : null },
+  });
+  // #endregion
   handleSessionUnauthorized();
 }
 
@@ -114,7 +123,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
   const fetchPromise = fetch(`${BASE_URL}${path}`, { ...options, headers }).then(async response => {
     if (response.status === 401) {
       const hadAuthToken = Boolean(authToken);
-      if (shouldForceLogoutForApi(path, hadAuthToken)) notifyUnauthorized();
+      const forceLogout = shouldForceLogoutForApi(path, hadAuthToken);
+      // #region agent log
+      agentDebugLog({
+        hypothesisId: 'H2',
+        location: 'client.ts:request',
+        message: 'HTTP 401',
+        data: { path, hadAuthToken, forceLogout, willNotifyUnauthorized: forceLogout },
+      });
+      // #endregion
+      if (forceLogout) notifyUnauthorized();
       throw new ApiError(401, 'Необходима авторизация');
     }
     if (!response.ok) {
@@ -156,9 +174,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
       const code = data.errorCode ?? 0;
       const correlationId = readCorrelationId(data, response);
       const msg = withCorrelationId(data.message || 'Ошибка API', correlationId);
-      if (shouldForceLogoutForApi(path, Boolean(authToken)) && isUnauthorizedApiErrorCode(code)) {
-        notifyUnauthorized();
+      const forceLogout =
+        shouldForceLogoutForApi(path, Boolean(authToken)) && isUnauthorizedApiErrorCode(code);
+      // #region agent log
+      if (forceLogout || isUnauthorizedApiErrorCode(code)) {
+        agentDebugLog({
+          hypothesisId: 'H2',
+          location: 'client.ts:request',
+          message: 'CommandResult unauthorized error',
+          data: { path, errorCode: code, hadAuthToken: Boolean(authToken), forceLogout },
+        });
       }
+      // #endregion
+      if (forceLogout) notifyUnauthorized();
       // Ошибки доступа показываем в UI блока/страницы, без тоста
       if (data.message && !isAccessDeniedApiCode(code) && !isAgreementNotFoundCode(code)) {
         onApiError?.(msg);

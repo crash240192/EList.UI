@@ -1,7 +1,8 @@
 // features/auth/api.ts
 // Методы авторизации и активации аккаунта
 
-import { apiClient, setAuthToken, clearAuthToken } from '@/shared/api/client';
+import { apiClient, setAuthToken, clearAuthToken, getAuthToken } from '@/shared/api/client';
+import { agentDebugLog } from '@/shared/debug/agentLog';
 import { cookies } from '@/shared/lib/cookies';
 import { clearAccountId } from '@/entities/user/api';
 
@@ -64,6 +65,17 @@ export async function login(payload: LoginPayload): Promise<LoginResult> {
 // GET /api/authorization/activate?activationKey={key}
 
 export async function activateAccount(activationKey: string): Promise<void> {
+  // #region agent log
+  agentDebugLog({
+    hypothesisId: 'H4',
+    location: 'features/auth/api.ts:activateAccount',
+    message: 'activateAccount before GET',
+    data: {
+      cookieAuthPresent: Boolean(getAuthToken()),
+      keyLength: activationKey.length,
+    },
+  });
+  // #endregion
   await apiClient.get(`/api/authorization/activate?activationKey=${encodeURIComponent(activationKey)}`);
   setActivationRequired(false);
 }

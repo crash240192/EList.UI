@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { activateAccount } from '@/features/auth/api';
-import { apiClient, ApiError } from '@/shared/api/client';
+import { apiClient, ApiError, getAuthToken } from '@/shared/api/client';
+import { agentDebugLog } from '@/shared/debug/agentLog';
 import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { clearPendingPersonData } from '@/features/auth/pendingPersonData';
 import { takeActivationNotice } from '@/features/auth/activationNotice';
@@ -77,6 +78,17 @@ export default function ActivationPage() {
     if (code.length < CODE_LENGTH) { setError(`Введите все ${CODE_LENGTH} символов`); return; }
     setLoading(true); setError(null);
     try {
+      // #region agent log
+      agentDebugLog({
+        hypothesisId: 'H4',
+        location: 'ActivationPage.tsx:handleSubmit',
+        message: 'handleSubmit before activateAccount',
+        data: {
+          cookieAuthPresent: Boolean(getAuthToken()),
+          codeLength: code.length,
+        },
+      });
+      // #endregion
       await activateAccount(code);
       confirmActivation();
       // Профиль уже создан в TX регистрации; чистим legacy pending на всякий случай.

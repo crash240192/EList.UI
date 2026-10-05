@@ -1,7 +1,8 @@
 // vite.config.ts
+import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Socket } from 'node:net';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import type { ProxyOptions } from 'vite';
 import { fileURLToPath, URL } from 'node:url';
@@ -39,8 +40,42 @@ function withQuietProxyErrors(options: ProxyOptions): ProxyOptions {
   };
 }
 
+const AGENT_DEBUG_LOG_PATH = '/opt/cursor/logs/debug.log';
+
+/** Browser → NDJSON file for Cloud Agent debug sessions (Register → activate flow). */
+function agentDebugLogPlugin(): Plugin {
+  return {
+    name: 'agent-debug-log',
+    configureServer(server) {
+      server.middlewares.use('/__agent_debug_log', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next();
+          return;
+        }
+        let body = '';
+        req.on('data', (chunk: Buffer | string) => {
+          body += chunk;
+        });
+        req.on('end', () => {
+          try {
+            const parsed = JSON.parse(body) as Record<string, unknown>;
+            fs.mkdirSync('/opt/cursor/logs', { recursive: true });
+            const line = `${JSON.stringify({ ...parsed, timestamp: parsed.timestamp ?? Date.now() })}\n`;
+            fs.appendFileSync(AGENT_DEBUG_LOG_PATH, line);
+            res.statusCode = 204;
+            res.end();
+          } catch {
+            res.statusCode = 400;
+            res.end('bad payload');
+          }
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), agentDebugLogPlugin()],
   build: {
     // Один CSS-бандл: lazy-роуты не тянут отдельные *.css после деплоя
     cssCodeSplit: false,
