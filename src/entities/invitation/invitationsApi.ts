@@ -183,6 +183,56 @@ export async function createInvitationsToAccount(
   return normalizeToAccountResult(r.result);
 }
 
+export interface IInviteToEventEligibility {
+  eventId: string;
+  accountId: string;
+  allowed: boolean;
+  reason: string | null;
+  errorCode: number;
+  ticketsRequired: boolean;
+}
+
+function normalizeEligibility(row: Record<string, unknown>): IInviteToEventEligibility {
+  return {
+    eventId: String(row.eventId ?? row.EventId ?? ''),
+    accountId: String(row.accountId ?? row.AccountId ?? ''),
+    allowed: Boolean(row.allowed ?? row.Allowed),
+    reason: (row.reason ?? row.Reason ?? null) as string | null,
+    errorCode: Number(row.errorCode ?? row.ErrorCode ?? 0),
+    ticketsRequired: Boolean(row.ticketsRequired ?? row.TicketsRequired),
+  };
+}
+
+/** POST /api/invitations/canInviteToEvent — eligibility для списка аккаунтов на одно событие */
+export async function fetchCanInviteToEventByEvent(params: {
+  eventId: string;
+  accountIds: string[];
+  inviterOrganizationId?: string | null;
+}): Promise<IInviteToEventEligibility[]> {
+  const r = await apiClient.post<unknown>('/api/invitations/canInviteToEvent', {
+    eventId: params.eventId,
+    accountIds: params.accountIds,
+    inviterOrganizationId: params.inviterOrganizationId ?? null,
+  });
+  const list = Array.isArray(r.result) ? r.result : [];
+  return list.map(row => normalizeEligibility((row ?? {}) as Record<string, unknown>));
+}
+
+/** POST /api/invitations/canInviteToEvents — eligibility для одного аккаунта на список событий */
+export async function fetchCanInviteToEventByAccount(params: {
+  accountId: string;
+  eventIds: string[];
+  inviterOrganizationId?: string | null;
+}): Promise<IInviteToEventEligibility[]> {
+  const r = await apiClient.post<unknown>('/api/invitations/canInviteToEvents', {
+    accountId: params.accountId,
+    eventIds: params.eventIds,
+    inviterOrganizationId: params.inviterOrganizationId ?? null,
+  });
+  const list = Array.isArray(r.result) ? r.result : [];
+  return list.map(row => normalizeEligibility((row ?? {}) as Record<string, unknown>));
+}
+
 function parseInvitationPaged(
   payload: unknown,
 ): { result: IInvitation[]; total: number } {
