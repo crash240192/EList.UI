@@ -505,6 +505,8 @@ export default function UserPage() {
     : (typeof person?.ageYears === 'number' ? `${person.ageYears} ${pluralYears(person.ageYears)}` : null);
   const visibleContacts = contacts.filter(c => isOwnProfile || c.show);
   const initials = (fullName || account.login).slice(0, 2).toUpperCase();
+  const profileCity = account.profileCity?.trim() || null;
+  const canOpenProfilePhotos = isOwnProfile || Boolean(account.avatarId);
 
   return (
     <div className={styles.page}>
@@ -578,15 +580,17 @@ export default function UserPage() {
           <button
             type="button"
             className={`noHoverGlow ${styles.avatarWrap}`}
+            disabled={!canOpenProfilePhotos}
             onClick={async () => {
+              if (!canOpenProfilePhotos) return;
               const history = await getAvatarHistory(profileAccountId);
-              setLightboxFileIds(
-                history
-                  .map(h => (typeof h === 'string' ? h : (h as { fileId?: string; id?: string }).fileId ?? (h as { id?: string }).id))
-                  .filter(Boolean) as string[],
-              );
+              const ids = history
+                .map(h => (typeof h === 'string' ? h : (h as { fileId?: string; id?: string }).fileId ?? (h as { id?: string }).id))
+                .filter(Boolean) as string[];
+              if (ids.length === 0 && !account.avatarId) return;
+              setLightboxFileIds(ids.length > 0 ? ids : account.avatarId ? [account.avatarId] : []);
             }}
-            aria-label="Открыть фото профиля"
+            aria-label={canOpenProfilePhotos ? 'Открыть фото профиля' : 'Фото профиля скрыто'}
           >
             <UserAvatar
               accountId={profileAccountId}
@@ -603,6 +607,9 @@ export default function UserPage() {
               {fullName && <h1 className={styles.fullName}>{fullName}</h1>}
             </div>
             <div className={styles.loginLine}>@{account.login}</div>
+            {profileCity && (
+              <div className={styles.profileCity}>{profileCity}</div>
+            )}
             {(ageLabel || person?.gender || person?.isBirthdayToday) && (
               <div className={styles.profileMeta}>
                 {person?.isBirthdayToday && <span className={styles.birthdayAccent}>День рождения</span>}
