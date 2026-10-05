@@ -26,6 +26,14 @@
   transform: scale(1.07);
 }
 
+/* Глобальное правило снимает box-shadow с классов *avatar* при наведении. */
+button.avatarBtn:hover,
+button.avatarBtn:active {
+  box-shadow:
+    0 0 3px var(--accent),
+    0 0 8px color-mix(in srgb, var(--accent) 90%, transparent);
+}
+
 .avatarImg {
   width: 100%;
   height: 100%;
