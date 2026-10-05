@@ -22,10 +22,18 @@
   transition:border-color .12s, background .12s;
 }
 .badge:hover { border-color:var(--accent); background:var(--surface); }
+.badgePending {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.badgePending:hover { border-color: var(--warning); background: var(--surface-2); }
+.badgePending .badgeEmpty { color: var(--warning); }
 .badgeDisabled {
   opacity:.55; cursor:not-allowed;
 }
 .badgeDisabled:hover { border-color:var(--border); background:var(--surface-2); }
+.badgePending.badgeDisabled { opacity: 1; }
+.badgePending.badgeDisabled:hover { border-color: var(--warning); background: var(--surface-2); }
 
 .badgeScore { font-size:13px; font-weight:600; line-height:1; }
 .badgeCount { font-size:11px; color:var(--text-muted); }

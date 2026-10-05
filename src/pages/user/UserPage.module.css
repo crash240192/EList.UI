@@ -180,6 +180,17 @@
   composes: btnSecondary from '../../shared/styles/actionButtons.module.css';
 }
 
+.profileActions .btnLeave {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.profileActions .btnLeave:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-2));
+}
+
 .phaseTabs {
   padding: 0 !important;
   margin-bottom: 12px;

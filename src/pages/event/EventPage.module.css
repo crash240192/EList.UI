@@ -259,9 +259,9 @@
   height: var(--control-height);
   padding: 0 var(--control-padding-x);
   border-radius: var(--control-radius);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-secondary);
+  border: none;
+  background: var(--accent);
+  color: #fff;
   font-size: var(--control-font-size);
   font-weight: var(--control-font-weight);
   font-family: inherit;
@@ -271,8 +271,8 @@
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .btnInvite:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--accent-hover);
+  color: #fff;
 }
 
 .btnTicket {
