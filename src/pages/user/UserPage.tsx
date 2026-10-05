@@ -33,6 +33,11 @@ import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { useAuthStore } from '@/app/store';
 import { UserShareMenu } from '@/features/user/UserShareMenu';
+import {
+  InviteBlockedDialog,
+  ProfileEventInviteModal,
+  checkCanInviteOrReason,
+} from '@/features/user/ProfileInviteDialogs';
 import { ContentReportModal } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import {
@@ -53,7 +58,7 @@ import {
   type UserEventsPhase,
   type UserEventsScope,
 } from './userPageUtils';
-import { formatAge } from '@/shared/lib/datetime';
+import { formatAge, pluralYears } from '@/shared/lib/datetime';
 import styles from './UserPage.module.css';
 
 type MainTab = UserEventsScope | 'albums';
@@ -299,6 +304,9 @@ export default function UserPage() {
   const [listModal, setListModal] = useState<ListModal>(null);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [inviteChecking, setInviteChecking] = useState(false);
+  const [inviteEventsOpen, setInviteEventsOpen] = useState(false);
+  const [inviteBlockedReason, setInviteBlockedReason] = useState<string | null>(null);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
@@ -391,6 +399,27 @@ export default function UserPage() {
     return () => { cancelled = true; };
   }, [profileAccountId, myAccountId, isOwnProfile]);
 
+  useEffect(() => {
+    setInviteEventsOpen(false);
+    setInviteBlockedReason(null);
+    setInviteChecking(false);
+  }, [profileAccountId, myAccountId, isOwnProfile]);
+
+  const handleInviteClick = useCallback(async () => {
+    if (!profileAccountId || inviteChecking) return;
+    setInviteChecking(true);
+    try {
+      const check = await checkCanInviteOrReason(profileAccountId);
+      if (check.ok) {
+        setInviteEventsOpen(true);
+        return;
+      }
+      setInviteBlockedReason(check.reason);
+    } finally {
+      setInviteChecking(false);
+    }
+  }, [profileAccountId, inviteChecking]);
+
   const handleSubscribe = useCallback(async (settings: INotifySettings) => {
     if (!profileAccountId) return;
     await subscribe(profileAccountId, settings);
@@ -467,7 +496,9 @@ export default function UserPage() {
 
   const { account, contacts, person } = profile;
   const fullName = [person?.lastName, person?.firstName].filter(Boolean).join(' ');
-  const ageLabel = person?.birthDate ? formatAge(person.birthDate) : null;
+  const ageLabel = person?.birthDate
+    ? formatAge(person.birthDate)
+    : (typeof person?.ageYears === 'number' ? `${person.ageYears} ${pluralYears(person.ageYears)}` : null);
   const visibleContacts = contacts.filter(c => isOwnProfile || c.show);
   const initials = (fullName || account.login).slice(0, 2).toUpperCase();
 
@@ -568,8 +599,12 @@ export default function UserPage() {
               {fullName && <h1 className={styles.fullName}>{fullName}</h1>}
             </div>
             <div className={styles.loginLine}>@{account.login}</div>
-            {(ageLabel || person?.gender) && (
+            {(ageLabel || person?.gender || person?.isBirthdayToday) && (
               <div className={styles.profileMeta}>
+                {person?.isBirthdayToday && <span className={styles.birthdayAccent}>День рождения</span>}
+                {person?.isBirthdayToday && (ageLabel || person?.gender) && (
+                  <span className={styles.profileMetaDot} aria-hidden>·</span>
+                )}
                 {ageLabel && <span>{ageLabel}</span>}
                 {ageLabel && person?.gender && <span className={styles.profileMetaDot} aria-hidden>·</span>}
                 {person?.gender && <span>{person.gender === 'Male' ? 'Мужской' : 'Женский'}</span>}
@@ -579,12 +614,22 @@ export default function UserPage() {
 
           {!isOwnProfile && authenticated && (
             <div className={styles.profileActions}>
+              <div className={styles.inviteSlot}>
+                <button
+                  type="button"
+                  className={styles.btnInvite}
+                  onClick={() => void handleInviteClick()}
+                  disabled={inviteChecking}
+                >
+                  {inviteChecking ? '…' : 'Пригласить'}
+                </button>
+              </div>
               {isSubscribed ? (
                 <button type="button" className={`${styles.btnJoin} ${styles.btnLeave}`} onClick={() => void handleUnsubscribe()}>
                   Отписаться
                 </button>
               ) : (
-                <button type="button" className={styles.btnJoin} onClick={() => setShowSubscribe(true)}>
+                <button type="button" className={`${styles.btnJoin} ${styles.btnSubscribe}`} onClick={() => setShowSubscribe(true)}>
                   Подписаться
                 </button>
               )}
@@ -775,6 +820,20 @@ export default function UserPage() {
           </section>
         </div>
       </div>
+
+      {inviteEventsOpen && myAccountId && (
+        <ProfileEventInviteModal
+          myAccountId={myAccountId}
+          profileAccountId={profileAccountId}
+          onClose={() => setInviteEventsOpen(false)}
+        />
+      )}
+      {inviteBlockedReason && (
+        <InviteBlockedDialog
+          reason={inviteBlockedReason}
+          onClose={() => setInviteBlockedReason(null)}
+        />
+      )}
 
       {showSubscribe && (
         <SubscribeModal

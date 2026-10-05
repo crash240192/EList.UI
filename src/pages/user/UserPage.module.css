@@ -164,16 +164,44 @@
   margin: 0 4px;
 }
 
+.birthdayAccent {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .profileActions {
   display: flex;
   align-items: center;
   flex-shrink: 0;
   margin-left: auto;
   align-self: flex-end;
+  gap: 8px;
+}
+
+.inviteSlot {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.btnInvite {
+  composes: btnPrimary from '../../shared/styles/actionButtons.module.css';
 }
 
 .btnJoin {
   composes: btnPrimary from '../../shared/styles/actionButtons.module.css';
+}
+
+.profileActions .btnSubscribe {
+  background: var(--success);
+  color: #fff;
+  border: none;
+}
+
+.profileActions .btnSubscribe:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--success) 82%, #000);
+  color: #fff;
+  border: none;
 }
 
 .btnLeave {
@@ -183,12 +211,34 @@
 .profileActions .btnLeave {
   color: var(--danger);
   border-color: var(--danger);
+  background: var(--surface-2);
 }
 
 .profileActions .btnLeave:hover:not(:disabled) {
   color: var(--danger);
   border-color: var(--danger);
   background: color-mix(in srgb, var(--danger) 8%, var(--surface-2));
+}
+
+.inviteHint {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  max-width: 240px;
+  white-space: normal;
 }
 
 .phaseTabs {

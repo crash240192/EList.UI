@@ -38,6 +38,10 @@ export interface IPersonInfo {
   patronymic: string | null;
   gender: Gender | null;
   birthDate: string | null;
+  /** Возраст без даты — приходит с бэка по политике приватности */
+  ageYears?: number | null;
+  /** Акцент «день рождения сегодня» */
+  isBirthdayToday?: boolean | null;
 }
 
 export interface IFullProfile {
@@ -60,8 +64,23 @@ async function safeContacts(path: string): Promise<{ data: IContactDataItem[]; e
 
 async function safePerson(path: string): Promise<IPersonInfo | null> {
   try {
-    const res = await apiClient.get<IPersonInfo>(path);
-    return res.result ?? null;
+    const res = await apiClient.get<Record<string, unknown>>(path);
+    const raw = res.result;
+    if (!raw || typeof raw !== 'object') return null;
+    const p = raw as Record<string, unknown>;
+    const ageRaw = p.ageYears ?? p.AgeYears;
+    const bdayRaw = p.isBirthdayToday ?? p.IsBirthdayToday;
+    return {
+      id: String(p.id ?? p.Id ?? ''),
+      accountId: String(p.accountId ?? p.AccountId ?? ''),
+      firstName: (p.firstName ?? p.FirstName ?? null) as string | null,
+      lastName: (p.lastName ?? p.LastName ?? null) as string | null,
+      patronymic: (p.patronymic ?? p.Patronymic ?? null) as string | null,
+      gender: (p.gender ?? p.Gender ?? null) as IPersonInfo['gender'],
+      birthDate: (p.birthDate ?? p.BirthDate ?? null) as string | null,
+      ageYears: typeof ageRaw === 'number' ? ageRaw : null,
+      isBirthdayToday: typeof bdayRaw === 'boolean' ? bdayRaw : null,
+    };
   } catch {
     return null;
   }

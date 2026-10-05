@@ -134,6 +134,55 @@ export async function createInvitations(req: ICreateInvitationRequest): Promise<
   await apiClient.post('/api/invitations/create', req);
 }
 
+export interface ICreateInvitationsToAccountRequest {
+  invitedAccountId: string;
+  eventIds: string[];
+  inviterOrganizationId?: string | null;
+}
+
+export interface IInvitationToAccountFailure {
+  eventId: string;
+  errorCode: number;
+  message: string;
+}
+
+export interface ICreateInvitationsToAccountResult {
+  succeededEventIds: string[];
+  failures: IInvitationToAccountFailure[];
+}
+
+function normalizeToAccountResult(raw: unknown): ICreateInvitationsToAccountResult {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const succeededRaw = r.succeededEventIds ?? r.SucceededEventIds;
+  const failuresRaw = r.failures ?? r.Failures;
+  const succeededEventIds = Array.isArray(succeededRaw)
+    ? succeededRaw.map(id => String(id))
+    : [];
+  const failures: IInvitationToAccountFailure[] = Array.isArray(failuresRaw)
+    ? failuresRaw.map(row => {
+        const f = (row ?? {}) as Record<string, unknown>;
+        return {
+          eventId: String(f.eventId ?? f.EventId ?? ''),
+          errorCode: Number(f.errorCode ?? f.ErrorCode ?? 0),
+          message: String(f.message ?? f.Message ?? ''),
+        };
+      })
+    : [];
+  return { succeededEventIds, failures };
+}
+
+/** POST /api/invitations/createToAccount — пригласить одного пользователя на несколько событий */
+export async function createInvitationsToAccount(
+  req: ICreateInvitationsToAccountRequest,
+): Promise<ICreateInvitationsToAccountResult> {
+  const r = await apiClient.post<unknown>('/api/invitations/createToAccount', {
+    invitedAccountId: req.invitedAccountId,
+    eventIds: req.eventIds,
+    inviterOrganizationId: req.inviterOrganizationId ?? null,
+  });
+  return normalizeToAccountResult(r.result);
+}
+
 function parseInvitationPaged(
   payload: unknown,
 ): { result: IInvitation[]; total: number } {

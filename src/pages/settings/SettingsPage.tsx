@@ -10,6 +10,14 @@ import {
   createContact, updateContact, getMyContacts,
   deleteMyAccount,
 } from '@/entities/user/settingsApi';
+import {
+  fetchMyPrivacySettings,
+  updateMyPrivacySettings,
+  WHO_CAN_INVITE_OPTIONS,
+  PRIVACY_AUDIENCE_OPTIONS,
+  type IAccountPrivacySettings,
+  type PrivacyAudience,
+} from '@/entities/user/privacyApi';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { POPULAR_CITIES, useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { cookies } from '@/shared/lib/cookies';
@@ -29,7 +37,7 @@ import { OrganizationsSettingsPanel } from '@/features/organizations';
 import { ModerationSettingsPanel } from '@/features/content-reports';
 import styles from './SettingsPage.module.css';
 
-type SettingsTab = 'profile' | 'contacts' | 'location' | 'security' | 'organizations' | 'moderation';
+type SettingsTab = 'profile' | 'privacy' | 'security' | 'organizations' | 'moderation';
 
 const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: ReactNode }[] = [
   {
@@ -44,23 +52,12 @@ const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: React
     ),
   },
   {
-    key: 'contacts',
+    key: 'privacy',
     section: 'Аккаунт',
-    label: 'Контакты',
+    label: 'Контакты и приватность',
     icon: (
       <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.56 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'location',
-    section: 'Аккаунт',
-    label: 'Местоположение',
-    icon: (
-      <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-        <circle cx="12" cy="10" r="3" />
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     ),
   },
@@ -100,42 +97,34 @@ const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: React
   },
 ];
 
+function resolveSettingsTab(tabParam: string | null, orgParam: string | null): SettingsTab {
+  if (orgParam) return 'organizations';
+  if (tabParam === 'location') return 'profile';
+  if (tabParam === 'contacts' || tabParam === 'privacy') return 'privacy';
+  if (
+    tabParam === 'security'
+    || tabParam === 'organizations'
+    || tabParam === 'moderation'
+    || tabParam === 'profile'
+  ) {
+    return tabParam;
+  }
+  return 'profile';
+}
+
 export default function SettingsPage() {
   usePageTitle('Настройки');
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const orgParam = searchParams.get('org');
 
-  const initialTab: SettingsTab =
-    orgParam
-      ? 'organizations'
-      : tabParam === 'contacts'
-        || tabParam === 'location'
-        || tabParam === 'security'
-        || tabParam === 'organizations'
-        || tabParam === 'moderation'
-        || tabParam === 'profile'
-          ? tabParam
-          : 'profile';
+  const initialTab: SettingsTab = resolveSettingsTab(tabParam, orgParam);
 
   const [tab, setTab] = useState<SettingsTab>(initialTab);
   const sections = [...new Set(NAV_ITEMS.map(i => i.section))];
 
   useEffect(() => {
-    if (orgParam) {
-      setTab('organizations');
-      return;
-    }
-    if (
-      tabParam === 'contacts'
-      || tabParam === 'location'
-      || tabParam === 'security'
-      || tabParam === 'organizations'
-      || tabParam === 'moderation'
-      || tabParam === 'profile'
-    ) {
-      setTab(tabParam);
-    }
+    setTab(resolveSettingsTab(tabParam, orgParam));
   }, [tabParam, orgParam]);
 
   const selectTab = (next: SettingsTab) => {
@@ -184,16 +173,13 @@ export default function SettingsPage() {
           {tab === 'profile' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <ProfileTab />
+              <CitySection />
             </div>
           )}
-          {tab === 'contacts' && (
+          {tab === 'privacy' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <ContactsSection />
-            </div>
-          )}
-          {tab === 'location' && (
-            <div className={`${styles.stab} ${styles.stabActive}`}>
-              <CitySection />
+              <PrivacySection />
             </div>
           )}
           {tab === 'organizations' && (
@@ -532,6 +518,150 @@ function ContactsSection() {
           + Добавить контакт
         </Button>
         <span />
+      </div>
+    </div>
+  );
+}
+
+function PrivacySection() {
+  const [settings, setSettings] = useState<IAccountPrivacySettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyPrivacySettings()
+      .then(s => { if (!cancelled) setSettings(s); })
+      .catch(e => {
+        if (!cancelled) {
+          setMsg({ text: e instanceof Error ? e.message : 'Не удалось загрузить настройки', ok: false });
+        }
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const setAudience = (key: keyof IAccountPrivacySettings, value: PrivacyAudience) => {
+    setSettings(prev => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const handleSave = async () => {
+    if (!settings) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      const saved = await updateMyPrivacySettings({
+        whoCanInviteMe: settings.whoCanInviteMe,
+        ageVisibility: settings.ageVisibility,
+        genderVisibility: settings.genderVisibility,
+        showBirthdayToday: settings.showBirthdayToday,
+        locationVisibility: settings.locationVisibility,
+        profilePhotosVisibility: settings.profilePhotosVisibility,
+      });
+      setSettings(saved);
+      setMsg({ text: 'Настройки приватности сохранены', ok: true });
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Ошибка сохранения', ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className={styles.sectionLoader}>Загрузка...</div>;
+  }
+
+  if (!settings) {
+    return (
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Приватность</div>
+          <div className={styles.scardDesc}>
+            {msg?.text ?? 'Не удалось загрузить настройки приватности'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.scard}>
+      <div className={styles.scardHead}>
+        <div className={styles.scardTitle}>Приватность</div>
+        <div className={styles.scardDesc}>Кто может приглашать вас и какие данные видны на профиле</div>
+      </div>
+      <div className={`${styles.scardBody} ${styles.scardBodyPad0}`}>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто может приглашать</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={settings.whoCanInviteMe}
+              onChange={v => setAudience('whoCanInviteMe', v as PrivacyAudience)}
+              options={WHO_CAN_INVITE_OPTIONS}
+            />
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто видит возраст</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={settings.ageVisibility}
+              onChange={v => setAudience('ageVisibility', v as PrivacyAudience)}
+              options={PRIVACY_AUDIENCE_OPTIONS}
+            />
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто видит пол</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={settings.genderVisibility}
+              onChange={v => setAudience('genderVisibility', v as PrivacyAudience)}
+              options={PRIVACY_AUDIENCE_OPTIONS}
+            />
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто видит город</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={settings.locationVisibility}
+              onChange={v => setAudience('locationVisibility', v as PrivacyAudience)}
+              options={PRIVACY_AUDIENCE_OPTIONS}
+            />
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто видит фото профиля</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={settings.profilePhotosVisibility}
+              onChange={v => setAudience('profilePhotosVisibility', v as PrivacyAudience)}
+              options={PRIVACY_AUDIENCE_OPTIONS}
+            />
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>День рождения</label>
+          <div className={styles.frowControl}>
+            <label className={styles.checkLabel}>
+              <input
+                type="checkbox"
+                checked={settings.showBirthdayToday}
+                onChange={e => setSettings(prev => (prev
+                  ? { ...prev, showBirthdayToday: e.target.checked }
+                  : prev))}
+              />
+              Показывать акцент в день рождения
+            </label>
+          </div>
+        </div>
+      </div>
+      <div className={styles.scardFooter}>
+        {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
+        {!msg && <span />}
+        <Button onClick={() => void handleSave()} loading={saving}>Сохранить</Button>
       </div>
     </div>
   );
