@@ -9,6 +9,7 @@ import {
   fetchCanInviteToEventByAccount,
   type IInviteToEventEligibility,
 } from '@/entities/invitation/invitationsApi';
+import { formatInviteEligibilityReason } from '@/entities/invitation/inviteEligibilityLabels';
 import { fetchCanInvite } from '@/entities/user/privacyApi';
 import {
   fetchMyOrganizations,
@@ -43,14 +44,18 @@ function formatWhen(iso: string): string {
   });
 }
 
-function statusFromDenyReason(reason: string): Pick<InviteEventRow, 'status' | 'statusLabel'> {
-  if (reason === 'Уже приглашён') {
+function statusFromDenyReason(
+  reason: string,
+  errorCode?: number,
+): Pick<InviteEventRow, 'status' | 'statusLabel'> {
+  const label = formatInviteEligibilityReason(reason, errorCode) || reason || 'Недоступно';
+  if (label === 'Уже приглашён') {
     return { status: 'alreadyInvited', statusLabel: 'Уже приглашён' };
   }
-  if (reason === 'Уже участвует') {
+  if (label === 'Уже участвует') {
     return { status: 'alreadyParticipating', statusLabel: 'Уже участвует' };
   }
-  return { status: 'blocked', statusLabel: reason || 'Недоступно' };
+  return { status: 'blocked', statusLabel: label };
 }
 
 function rowFromEligibility(
@@ -65,13 +70,13 @@ function rowFromEligibility(
       name: event.name,
       startTime: event.startTime,
       status: 'ok',
-      // C.7: tickets — информативный статус, выбор не блокируем
+      // Модель A: tickets — информативный статус, выбор не блокируем
       statusLabel: ticketsRequired ? 'Нужен билет' : undefined,
       ticketsRequired,
     };
   }
 
-  const denied = statusFromDenyReason(el.reason || 'Недоступно');
+  const denied = statusFromDenyReason(el.reason || 'Недоступно', el.errorCode);
   return {
     id: event.id,
     name: event.name,
@@ -256,7 +261,7 @@ export function ProfileEventInviteModal({
         }
         const fail = failureByEvent.get(row.id);
         if (!fail) return row;
-        const denied = statusFromDenyReason(fail.message || 'Недоступно');
+        const denied = statusFromDenyReason(fail.message || 'Недоступно', fail.errorCode);
         return { ...row, status: denied.status, statusLabel: denied.statusLabel };
       }));
       setSelected(new Set());

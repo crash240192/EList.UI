@@ -22,6 +22,7 @@ export interface IInvitationEvent {
     ageLimit?: number | null;
     maxPersonsCount?: number | null;
     private?: boolean;
+    ticketsEnabled?: boolean;
   } | null;
   participantsCount?: number | null;
   colors?: string[];
@@ -88,6 +89,12 @@ function normalizeEvent(raw: unknown): IInvitationEvent {
       ? {
           ...base.parameters,
           private: !!(rawParams?.private ?? rawParams?.Private),
+          ticketsEnabled: Boolean(
+            base.parameters.ticketsEnabled
+              ?? rawParams?.ticketsEnabled
+              ?? rawParams?.TicketsEnabled
+              ?? false,
+          ),
         }
       : null,
   };

@@ -8,6 +8,7 @@ import {
   fetchCanInviteToEventByEvent,
   type IInviteToEventEligibility,
 } from '@/entities/invitation/invitationsApi';
+import { eligibilitySubtitle } from '@/entities/invitation/inviteEligibilityLabels';
 import {
   getBWListShortIds,
   canInviteSubscriber,
@@ -174,9 +175,7 @@ export function InviteModal({
   const blockReasonFor = useCallback(
     (accountId: string): string | null => {
       if (useEventEligibility) {
-        const el = eligibilityById.get(accountId);
-        if (el && !el.allowed) return el.reason || 'Нельзя пригласить';
-        return null;
+        return eligibilitySubtitle(eligibilityById.get(accountId));
       }
       const bw = inviteBlockReason(isPrivate, accountId, blackListIds, whiteListIds);
       if (bw) return bw;
@@ -455,7 +454,9 @@ export function InviteModal({
                           : s.account.login}
                       </div>
                       <div className={styles.login}>
-                        {blockedReason ? blockedReason : `@${s.account.login}`}
+                        {blockedReason
+                          ? blockedReason
+                          : `@${s.account.login}`}
                       </div>
                     </div>
                   </div>
