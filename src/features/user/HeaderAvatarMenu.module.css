@@ -7,14 +7,16 @@
   height: 38px;
   border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  border: 2px solid var(--border);
+  border: 2px solid transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  box-shadow: 0 0 4px rgba(139, 92, 246, 0.95);
-  transition: transform var(--transition), border-color var(--transition);
+  box-shadow:
+    0 0 3px var(--accent),
+    0 0 8px color-mix(in srgb, var(--accent) 90%, transparent);
+  transition: transform var(--transition);
   flex-shrink: 0;
   padding: 0;
   font-family: inherit;
@@ -22,7 +24,14 @@
 
 .avatarBtn:hover {
   transform: scale(1.07);
-  border-color: var(--accent);
+}
+
+/* Глобальное правило снимает box-shadow с классов *avatar* при наведении. */
+button.avatarBtn:hover,
+button.avatarBtn:active {
+  box-shadow:
+    0 0 3px var(--accent),
+    0 0 8px color-mix(in srgb, var(--accent) 90%, transparent);
 }
 
 .avatarImg {
