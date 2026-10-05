@@ -104,3 +104,31 @@ export async function fetchCanInvite(accountId: string): Promise<ICanInviteResul
     reason: (res.reason ?? res.Reason ?? null) as string | null,
   };
 }
+
+/** POST /api/accounts/canInvite/batch — до 100 id */
+export async function fetchCanInviteBatch(
+  accountIds: string[],
+): Promise<Map<string, ICanInviteResult>> {
+  const unique = [...new Set(accountIds.filter(Boolean))];
+  const map = new Map<string, ICanInviteResult>();
+  if (unique.length === 0) return map;
+
+  const r = await apiClient.post<Array<{
+    accountId?: string;
+    AccountId?: string;
+    allowed?: boolean;
+    Allowed?: boolean;
+    reason?: string | null;
+    Reason?: string | null;
+  }>>('/api/accounts/canInvite/batch', { accountIds: unique });
+
+  for (const item of r.result ?? []) {
+    const id = String(item.accountId ?? item.AccountId ?? '');
+    if (!id) continue;
+    map.set(id, {
+      allowed: Boolean(item.allowed ?? item.Allowed),
+      reason: (item.reason ?? item.Reason ?? null) as string | null,
+    });
+  }
+  return map;
+}
