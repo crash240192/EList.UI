@@ -18,6 +18,15 @@ export const PRIVACY_AUDIENCE_OPTIONS: { value: PrivacyAudience; label: string }
   { value: 'Nobody', label: 'Никто' },
 ];
 
+/** Короткая подсказка под селектом аудитории (видимость данных). */
+export const PRIVACY_AUDIENCE_HINTS: Record<PrivacyAudience, string> = {
+  Everyone: 'Видно всем авторизованным пользователям',
+  Subscriptions: 'Видно только тем, на кого вы подписаны',
+  Subscribers: 'Видно только вашим подписчикам',
+  Mutual: 'Видно только при взаимной подписке',
+  Nobody: 'Скрыто от всех',
+};
+
 export const WHO_CAN_INVITE_OPTIONS: { value: PrivacyAudience; label: string }[] = [
   { value: 'Everyone', label: 'Все' },
   { value: 'Subscriptions', label: 'Только те, на кого я подписан' },
@@ -25,6 +34,15 @@ export const WHO_CAN_INVITE_OPTIONS: { value: PrivacyAudience; label: string }[]
   { value: 'Mutual', label: 'Только взаимные подписки' },
   { value: 'Nobody', label: 'Никто' },
 ];
+
+/** Подсказка под «Кто может приглашать». */
+export const WHO_CAN_INVITE_HINTS: Record<PrivacyAudience, string> = {
+  Everyone: 'Пригласить вас сможет любой пользователь',
+  Subscriptions: 'Приглашать могут только те, на кого вы подписаны',
+  Subscribers: 'Приглашать могут только ваши подписчики',
+  Mutual: 'Приглашать можно только при взаимной подписке',
+  Nobody: 'Вас никто не сможет пригласить',
+};
 
 export interface IAccountPrivacySettings {
   accountId: string;
