@@ -304,7 +304,7 @@ function ProfileTab() {
           />
           <div className={styles.avInfo}>
             <h4>{displayName}</h4>
-            <p>JPG, PNG или GIF · до 5 МБ<br />Нажмите на аватар, чтобы загрузить фото</p>
+            <p>JPG, PNG или GIF · до 5 МБ<br />Нажмите на аватар, чтобы выбрать кадр</p>
           </div>
         </div>
       </div>

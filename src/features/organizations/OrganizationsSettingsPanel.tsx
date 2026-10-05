@@ -745,7 +745,10 @@ function OrganizationProfileSection({
           )}
           <div>
             <div className={styles.logoTitle}>Логотип</div>
-            <div className={styles.scardDesc}>JPG, PNG · до 5 МБ</div>
+            <div className={styles.scardDesc}>
+              JPG, PNG · до 5 МБ
+              {canEdit && <><br />Нажмите на логотип, чтобы выбрать кадр</>}
+            </div>
           </div>
         </div>
 
