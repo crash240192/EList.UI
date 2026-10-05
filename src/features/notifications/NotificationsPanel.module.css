@@ -11,10 +11,7 @@
   background: var(--surface);
   border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--border));
   border-radius: 12px;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent),
-    0 12px 40px rgba(0, 0, 0, 0.35),
-    0 0 18px 2px color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 0 28px rgba(139, 92, 246, 0.75);
   overflow: hidden;
   opacity: 1;
   transform: translateY(0);

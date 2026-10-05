@@ -46,9 +46,9 @@
   min-width: 0;
   max-width: calc(100vw - 16px);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--border));
   border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 0 28px rgba(139, 92, 246, 0.75);
   overflow: hidden;
   padding: 4px;
   display: flex;
