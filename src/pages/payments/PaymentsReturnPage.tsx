@@ -1,10 +1,11 @@
 // pages/payments/PaymentsReturnPage.tsx
-// Возврат из платёжного виджета (confirmationUrl / stub returnUrl).
-// Query: orderId | depositId + paymentId, stub=1, purpose=wallet
+// Возврат после оплаты:
+//   stub (?stub=1) → completePayment / completeWalletDeposit
+//   T-Bank / внешний провайдер → ждём webhook на бэке, UI поллит статус заказа
 
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { completePayment } from '@/entities/order';
+import { completePayment, fetchOrderById, type OrderStatus } from '@/entities/order';
 import { completeWalletDeposit } from '@/entities/user/walletApi';
 import { usePageTitle } from '@/shared/hooks';
 import { useToastStore } from '@/app/store';
@@ -13,6 +14,34 @@ import styles from './PaymentsReturnPage.module.css';
 
 const PENDING_ORDER_KEY = 'elist_pending_payment';
 const PENDING_WALLET_KEY = 'elist_pending_wallet_deposit';
+
+const ORDER_POLL_MS = 1500;
+const ORDER_POLL_TIMEOUT_MS = 90_000;
+
+const ORDER_SUCCESS: OrderStatus[] = ['Paid'];
+const ORDER_FAILURE: OrderStatus[] = ['Canceled', 'Failed', 'Refunded'];
+
+function sleep(ms: number) {
+  return new Promise<void>(resolve => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function waitForOrderTerminal(
+  orderId: string,
+  onTick?: (status: OrderStatus | null) => void,
+): Promise<'ok' | 'fail' | 'timeout'> {
+  const deadline = Date.now() + ORDER_POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const order = await fetchOrderById(orderId);
+    const status = order?.status ?? null;
+    onTick?.(status);
+    if (status && ORDER_SUCCESS.includes(status)) return 'ok';
+    if (status && ORDER_FAILURE.includes(status)) return 'fail';
+    await sleep(ORDER_POLL_MS);
+  }
+  return 'timeout';
+}
 
 export default function PaymentsReturnPage() {
   usePageTitle('Оплата');
@@ -31,6 +60,7 @@ export default function PaymentsReturnPage() {
 
     void (async () => {
       const purpose = params.get('purpose');
+      const isStub = params.get('stub') === '1';
       let depositId = params.get('depositId') || undefined;
       let orderId = params.get('orderId') || undefined;
       let providerPaymentId = params.get('paymentId') || params.get('providerPaymentId') || undefined;
@@ -56,6 +86,16 @@ export default function PaymentsReturnPage() {
         if (!depositId && !providerPaymentId) {
           setPhase('error');
           setMessage('Не найдено пополнение для подтверждения оплаты');
+          return;
+        }
+
+        // Реальный T-Bank: ручной complete недоступен; wallet webhook ещё не готов.
+        if (!isStub) {
+          setPhase('error');
+          setMessage(
+            'Пополнение через платёжную форму пока подтверждается только на стороне банка. '
+            + 'Если деньги списались, обновите кошелёк чуть позже или обратитесь в поддержку.',
+          );
           return;
         }
 
@@ -92,16 +132,54 @@ export default function PaymentsReturnPage() {
         return;
       }
 
-      try {
-        await completePayment({ orderId, providerPaymentId });
+      // Stub ЮKassa: фронт сам завершает оплату.
+      if (isStub) {
+        try {
+          await completePayment({ orderId, providerPaymentId });
+          try { sessionStorage.removeItem(PENDING_ORDER_KEY); } catch { /* ignore */ }
+          setPhase('ok');
+          setMessage('Оплата прошла успешно. Билет уже в разделе «Мои билеты».');
+          toast('Оплата подтверждена', 'success');
+        } catch (e) {
+          setPhase('error');
+          setMessage(e instanceof Error ? e.message : 'Не удалось подтвердить оплату');
+        }
+        return;
+      }
+
+      // T-Bank / внешний провайдер: билеты выдаёт webhook; UI ждёт Paid.
+      if (!orderId) {
+        setPhase('error');
+        setMessage('Не найден orderId для проверки статуса оплаты');
+        return;
+      }
+
+      setMessage('Ожидаем подтверждение оплаты от банка…');
+      const result = await waitForOrderTerminal(orderId, status => {
+        if (status === 'Pending' || status === 'Authorized') {
+          setMessage('Ожидаем подтверждение оплаты от банка…');
+        }
+      });
+
+      if (result === 'ok') {
         try { sessionStorage.removeItem(PENDING_ORDER_KEY); } catch { /* ignore */ }
         setPhase('ok');
         setMessage('Оплата прошла успешно. Билет уже в разделе «Мои билеты».');
         toast('Оплата подтверждена', 'success');
-      } catch (e) {
-        setPhase('error');
-        setMessage(e instanceof Error ? e.message : 'Не удалось подтвердить оплату');
+        return;
       }
+
+      if (result === 'fail') {
+        setPhase('error');
+        setMessage('Оплата не прошла или была отменена.');
+        return;
+      }
+
+      setPhase('error');
+      setMessage(
+        'Не дождались подтверждения оплаты. Если списание прошло, билет появится в «Мои билеты» '
+        + 'после уведомления от банка — обновите страницу чуть позже.',
+      );
     })();
   }, [params, toast]);
 
