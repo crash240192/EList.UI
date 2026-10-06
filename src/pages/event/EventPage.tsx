@@ -881,6 +881,8 @@ export default function EventPage() {
               <div className={styles.heroTagsLeft}>
                 <EventTypeChipsOverflow
                   event={event}
+                  fitWidth
+                  maxFitLines={3}
                   variant="overlay"
                   invert
                   iconSize={10}
