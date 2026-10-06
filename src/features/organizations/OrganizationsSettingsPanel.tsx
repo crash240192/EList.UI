@@ -1343,6 +1343,7 @@ function OrganizationWalletSection({
       try {
         sessionStorage.setItem('elist_pending_wallet_deposit', JSON.stringify({
           depositId: result.deposit.id,
+          walletId: w.id,
           providerPaymentId: result.providerPaymentId,
           amount,
         }));
