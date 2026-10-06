@@ -11,6 +11,7 @@ import {
 } from '@/entities/event/lib/eventListItemUtils';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
 import styles from './EventListItem.module.css';
 
 export type EventListUrgencyKind = 'hot' | 'soon' | 'ok';
@@ -176,6 +177,8 @@ export function EventListItem({
               {params.isPrivate ? 'Закрытое' : 'Открытое'}
             </span>
           </div>
+
+          <GenderLimitBadge gender={params.allowedGender} />
 
           {/* 4 — типы (сколько влезет) + «ещё» */}
           {hasTypes && (

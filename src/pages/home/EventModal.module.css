@@ -154,7 +154,6 @@
 .limitAge     { background: rgba(239,68,68,0.08); color: #dc2626; border: 0.5px solid rgba(239,68,68,0.2); }
 .limitPrivate { background: rgba(99,102,241,0.08); color: var(--accent); border: 0.5px solid rgba(99,102,241,0.2); }
 .limitPersons { background: rgba(16,185,129,0.08); color: #065f46; border: 0.5px solid rgba(16,185,129,0.2); }
-.limitGender  { background: rgba(245,158,11,0.08); color: #b45309; border: 0.5px solid rgba(245,158,11,0.2); }
 
 /* Описание — 3 строки */
 .description {

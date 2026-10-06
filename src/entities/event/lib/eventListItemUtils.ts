@@ -1,4 +1,5 @@
 import type { IEventType } from '@/entities/event/types';
+import type { Gender } from '@/shared/api/types';
 import { getEventCoverBackground, buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 
 /** Максимум чипов типов на странице события, превью и в списке */
@@ -21,6 +22,7 @@ export interface EventListItemData {
     maxPersonsCount?: number | null;
     ticketsEnabled?: boolean;
     private?: boolean;
+    allowedGender?: Gender | null;
   } | null;
   participantsCount?: number | null;
   colors?: string[];
@@ -40,6 +42,14 @@ export function getEventListTypes(
   return getEventTypes(event).slice(0, limit);
 }
 
+export function readAllowedGender(source: {
+  allowedGender?: unknown;
+  AllowedGender?: unknown;
+} | null | undefined): Gender | null {
+  const value = source?.allowedGender ?? source?.AllowedGender;
+  return value === 'Female' || value === 'Male' ? value : null;
+}
+
 export function getEventListParams(event: EventListItemData) {
   const p = event.parameters;
   return {
@@ -48,6 +58,7 @@ export function getEventListParams(event: EventListItemData) {
     maxPersonsCount: p?.maxPersonsCount ?? null,
     participantsCount: event.participantsCount ?? null,
     isPrivate: Boolean(p?.private),
+    allowedGender: readAllowedGender(p),
   };
 }
 
