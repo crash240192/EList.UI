@@ -1,7 +1,8 @@
 // pages/payments/PaymentsReturnPage.tsx
 // Возврат после оплаты:
 //   stub (?stub=1) → completePayment / completeWalletDeposit
-//   T-Bank / внешний провайдер → ждём webhook на бэке, UI поллит статус
+//   T-Bank / внешний провайдер → UI поллит статус; бэкенд на GET
+//   дополнительно дергает GetState (P4), если webhook ещё не пришёл
 
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
