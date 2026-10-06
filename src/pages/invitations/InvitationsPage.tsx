@@ -26,7 +26,9 @@ import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { TabBar } from '@/shared/ui/TabBar';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { EventListItem } from '@/entities/event/ui/EventListItem';
-import { EVENT_TYPE_CHIPS_MAX } from '@/entities/event/lib/eventListItemUtils';
+import { EVENT_TYPE_CHIPS_MAX, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
+import { OppositeGenderDialog } from '@/features/event/OppositeGenderDialog';
+import { myGenderConflictsWith } from '@/features/event/oppositeGender';
 import listItemStyles from '@/entities/event/ui/EventListItem/EventListItem.module.css';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -191,6 +193,7 @@ export default function InvitationsPage() {
   const [sentErr, setSentErr] = useState<string | null>(null);
   const [sentLoaded, setSentLoaded] = useState(false);
   const [previewInv, setPreviewInv] = useState<IInvitation | null>(null);
+  const [genderConfirmInv, setGenderConfirmInv] = useState<IInvitation | null>(null);
   const [confirmDecl, setConfirmDecl] = useState<IInvitation | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<IInvitation | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
@@ -285,6 +288,19 @@ export default function InvitationsPage() {
   const openPreview = (inv: IInvitation) => {
     void markViewedIfNeeded(inv);
     setPreviewInv(inv);
+  };
+
+  const requestAccept = async (inv: IInvitation) => {
+    try {
+      const conflict = await myGenderConflictsWith(readAllowedGender(inv.event.parameters));
+      if (conflict) {
+        setGenderConfirmInv(inv);
+        return;
+      }
+    } catch {
+      /* профиль недоступен — не блокируем принятие */
+    }
+    void doAccept(inv);
   };
 
   const doAccept = async (inv: IInvitation) => {
@@ -459,7 +475,18 @@ export default function InvitationsPage() {
           inv={previewInv}
           orgById={orgById}
           onClose={() => setPreviewInv(null)}
-          onAccept={() => doAccept(previewInv)}
+          onAccept={() => requestAccept(previewInv)}
+        />
+      )}
+
+      {genderConfirmInv && (
+        <OppositeGenderDialog
+          onParticipate={() => {
+            const inv = genderConfirmInv;
+            setGenderConfirmInv(null);
+            void doAccept(inv);
+          }}
+          onDecline={() => setGenderConfirmInv(null)}
         />
       )}
 

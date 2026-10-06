@@ -22,6 +22,7 @@ export interface IInvitationEvent {
     ageLimit?: number | null;
     maxPersonsCount?: number | null;
     private?: boolean;
+    allowedGender?: 'Female' | 'Male' | null;
   } | null;
   participantsCount?: number | null;
   colors?: string[];

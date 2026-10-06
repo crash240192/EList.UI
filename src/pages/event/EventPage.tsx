@@ -34,6 +34,8 @@ import { formatEventHeroDate, formatEventHeroTime, isSameCalendarDay } from '@/s
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
 import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
+import { OppositeGenderDialog } from '@/features/event/OppositeGenderDialog';
+import { myGenderConflictsWith } from '@/features/event/oppositeGender';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
@@ -237,6 +239,7 @@ export default function EventPage() {
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [buyTicketOpen, setBuyTicketOpen] = useState(false);
+  const [genderJoinKind, setGenderJoinKind] = useState<'join' | 'ticket' | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   usePageTitle(event?.name ?? null);
@@ -652,6 +655,24 @@ export default function EventPage() {
     (authenticated && isParticipantLimitFull);
   const fillPct = maxPersons ? Math.round((participants.length / maxPersons) * 100) : null;
 
+  const confirmJoinOrAsk = async (kind: 'join' | 'ticket') => {
+    setActionLoading(true);
+    let conflict = false;
+    try {
+      conflict = await myGenderConflictsWith(allowedGender);
+    } catch {
+      conflict = false;
+    } finally {
+      setActionLoading(false);
+    }
+    if (conflict) {
+      setGenderJoinKind(kind);
+      return;
+    }
+    if (kind === 'ticket') setBuyTicketOpen(true);
+    else void handleParticipate();
+  };
+
   const onJoinClick = () => {
     if (!authenticated) {
       setAuthDialogOpen(true);
@@ -661,7 +682,11 @@ export default function EventPage() {
       triggerParticipantLimitFeedback();
       return;
     }
-    void handleParticipate();
+    if (isParticipating) {
+      void handleParticipate();
+      return;
+    }
+    void confirmJoinOrAsk('join');
   };
 
   const scrollToTop = () => {
@@ -998,7 +1023,7 @@ export default function EventPage() {
                           triggerParticipantLimitFeedback();
                           return;
                         }
-                        setBuyTicketOpen(true);
+                        void confirmJoinOrAsk('ticket');
                       }}
                     >
                       {cost <= 0 ? 'Получить билет' : 'Купить билет'}
@@ -1305,6 +1330,17 @@ export default function EventPage() {
           inviterOrganizationId={inviterOrganizationId}
           isPrivate={!!event.parameters?.private}
           onClose={() => setInviteModalOpen(false)}
+        />
+      )}
+      {genderJoinKind && (
+        <OppositeGenderDialog
+          onParticipate={() => {
+            const kind = genderJoinKind;
+            setGenderJoinKind(null);
+            if (kind === 'ticket') setBuyTicketOpen(true);
+            else void handleParticipate();
+          }}
+          onDecline={() => setGenderJoinKind(null)}
         />
       )}
       {buyTicketOpen && event?.id && (
