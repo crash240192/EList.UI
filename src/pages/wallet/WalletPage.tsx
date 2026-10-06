@@ -271,6 +271,7 @@ export default function WalletPage() {
 
       const pending = {
         depositId: result.deposit.id,
+        walletId: wallet.id,
         providerPaymentId: result.providerPaymentId,
         amount,
       };

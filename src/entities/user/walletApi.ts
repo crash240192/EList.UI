@@ -242,6 +242,50 @@ export async function fetchWalletDeposits(walletId: string): Promise<IWalletDepo
   return (r.result ?? []).map(row => normalizeDeposit(row as Record<string, unknown>));
 }
 
+/**
+ * Найти пополнение в списке кошелька (для poll после T-Bank return).
+ * Предпочтительно по depositId, иначе по providerPaymentId.
+ */
+export async function fetchWalletDeposit(params: {
+  walletId?: string;
+  depositId?: string;
+  providerPaymentId?: string;
+}): Promise<IWalletDeposit | null> {
+  if (params.depositId) {
+    try {
+      const byId = await fetchWalletDepositById(params.depositId);
+      if (byId) return byId;
+    } catch {
+      // fallback to list if walletId known
+    }
+  }
+
+  if (!params.walletId) return null;
+
+  const list = await fetchWalletDeposits(params.walletId);
+  if (params.depositId) {
+    const byId = list.find(d => d.id === params.depositId);
+    if (byId) return byId;
+  }
+  if (params.providerPaymentId) {
+    const payId = params.providerPaymentId.trim();
+    return list.find(d => d.providerPaymentId === payId) ?? null;
+  }
+  return null;
+}
+
+/** GET /api/Wallets/deposits/{depositId} — одно пополнение (return poll без walletId). */
+export async function fetchWalletDepositById(depositId: string): Promise<IWalletDeposit | null> {
+  try {
+    const r = await apiClient.get<Record<string, unknown>>(
+      `/api/Wallets/deposits/${encodeURIComponent(depositId)}`,
+    );
+    return r.result ? normalizeDeposit(r.result as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** GET /api/Wallets/{walletId}/tariffCharges — ledger списаний тарифа */
 export async function fetchWalletTariffCharges(walletId: string): Promise<IWalletTariffCharge[]> {
   const r = await apiClient.get<Record<string, unknown>[]>(`/api/Wallets/${walletId}/tariffCharges`);
