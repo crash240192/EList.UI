@@ -295,6 +295,10 @@ export default function UserPage() {
   const [profile, setProfile] = useState<IFullProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Пока грузится новый профиль, не оставлять карточку предыдущего: иначе его
+  // avatarId записывается в кэш уже нового accountId и остаётся, если у того нет фото.
+  const profileRouteKey = targetId ?? 'me';
+  const [loadedRouteKey, setLoadedRouteKey] = useState(profileRouteKey);
   const [mainTab, setMainTab] = useState<MainTab>('all');
   const [albumsCount, setAlbumsCount] = useState(0);
   const [organizerRating, setOrganizerRating] = useState<number | null>(null);
@@ -326,12 +330,23 @@ export default function UserPage() {
   );
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     fetchFullProfile(targetId)
-      .then(setProfile)
-      .catch(e => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
-      .finally(() => setLoading(false));
+      .then(data => {
+        if (cancelled) return;
+        setProfile(data);
+        const accountId = data.account?.id;
+        if (accountId) seedAvatarCache(accountId, data.account.avatarId ?? null);
+      })
+      .catch(e => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [targetId]);
 
   useEffect(() => {
@@ -487,6 +502,13 @@ export default function UserPage() {
         || `@${profile.account.login}`)
     : null;
   usePageTitle(pageTitle);
+
+  if (loadedRouteKey !== profileRouteKey) {
+    setLoadedRouteKey(profileRouteKey);
+    setProfile(null);
+    setLoading(true);
+    setError(null);
+  }
 
   if (loading) return <Skeleton />;
   if (error || !profile) {
