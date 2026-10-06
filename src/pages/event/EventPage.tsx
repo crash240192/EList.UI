@@ -32,6 +32,8 @@ import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { formatEventHeroDate, formatEventHeroTime, isSameCalendarDay } from '@/shared/lib/datetime';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
+import { readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
+import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
@@ -621,6 +623,7 @@ export default function EventPage() {
   );
 
   const cost = event.parameters?.cost ?? 0;
+  const allowedGender = readAllowedGender(event.parameters);
   const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled);
   const maxPersons = event.parameters?.maxPersonsCount ?? null;
   const participantCap = maxPersons != null && maxPersons > 0 ? maxPersons : null;
@@ -1105,6 +1108,12 @@ export default function EventPage() {
                 </span>
                 {descExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
               </button>
+            )}
+            {allowedGender && (
+              <div className={styles.genderLimit}>
+                <div className={styles.secLabel}>Ограничение по полу</div>
+                <GenderLimitBadge gender={allowedGender} />
+              </div>
             )}
           </div>
 

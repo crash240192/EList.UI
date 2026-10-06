@@ -576,6 +576,8 @@
 }
 .descClamped { display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
 
+.genderLimit { margin-top: 16px; }
+
 .descToggle {
   display:flex; align-items:center; gap:10px;
   width:100%; margin-top:8px;
