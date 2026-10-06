@@ -247,10 +247,21 @@ export async function fetchWalletDeposits(walletId: string): Promise<IWalletDepo
  * Предпочтительно по depositId, иначе по providerPaymentId.
  */
 export async function fetchWalletDeposit(params: {
-  walletId: string;
+  walletId?: string;
   depositId?: string;
   providerPaymentId?: string;
 }): Promise<IWalletDeposit | null> {
+  if (params.depositId) {
+    try {
+      const byId = await fetchWalletDepositById(params.depositId);
+      if (byId) return byId;
+    } catch {
+      // fallback to list if walletId known
+    }
+  }
+
+  if (!params.walletId) return null;
+
   const list = await fetchWalletDeposits(params.walletId);
   if (params.depositId) {
     const byId = list.find(d => d.id === params.depositId);
@@ -261,6 +272,18 @@ export async function fetchWalletDeposit(params: {
     return list.find(d => d.providerPaymentId === payId) ?? null;
   }
   return null;
+}
+
+/** GET /api/Wallets/deposits/{depositId} — одно пополнение (return poll без walletId). */
+export async function fetchWalletDepositById(depositId: string): Promise<IWalletDeposit | null> {
+  try {
+    const r = await apiClient.get<Record<string, unknown>>(
+      `/api/Wallets/deposits/${encodeURIComponent(depositId)}`,
+    );
+    return r.result ? normalizeDeposit(r.result as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** GET /api/Wallets/{walletId}/tariffCharges — ledger списаний тарифа */

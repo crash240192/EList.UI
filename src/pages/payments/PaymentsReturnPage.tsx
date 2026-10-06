@@ -72,7 +72,7 @@ async function waitForOrderTerminal(
 }
 
 async function waitForWalletDepositTerminal(
-  params: { walletId: string; depositId?: string; providerPaymentId?: string },
+  params: { walletId?: string; depositId?: string; providerPaymentId?: string },
   onTick?: (status: WalletDepositStatus | null) => void,
 ): Promise<'ok' | 'fail' | 'timeout'> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
@@ -114,6 +114,7 @@ export default function PaymentsReturnPage() {
       const pendingOrder = readPending<PendingOrder>(PENDING_ORDER_KEY);
 
       // T-Bank SuccessURL часто без query — восстанавливаем из sessionStorage.
+      // P3: SuccessURL уже несёт depositId/orderId/purpose — sessionStorage остаётся fallback.
       if (!depositId && pendingWallet?.depositId) depositId = pendingWallet.depositId;
       if (!walletId && pendingWallet?.walletId) walletId = pendingWallet.walletId;
       if (!providerPaymentId && pendingWallet?.providerPaymentId) {
@@ -153,10 +154,11 @@ export default function PaymentsReturnPage() {
         }
 
         // T-Bank: webhook зачисляет баланс; UI ждёт Succeeded.
-        if (!walletId) {
+        // depositId из SuccessURL достаточно (GET /deposits/{id}); walletId — опциональный fallback.
+        if (!depositId && !walletId) {
           setPhase('error');
           setMessage(
-            'Не найден walletId для проверки статуса пополнения. '
+            'Не найден depositId для проверки статуса пополнения. '
             + 'Если списание прошло, обновите кошелёк чуть позже.',
           );
           return;
