@@ -7,15 +7,13 @@
   height: 38px;
   border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  border: 2px solid transparent;
+  border: 1px solid var(--border);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  box-shadow:
-    0 0 3px var(--accent),
-    0 0 8px color-mix(in srgb, var(--accent) 90%, transparent);
+  box-shadow: none;
   transition: transform var(--transition);
   flex-shrink: 0;
   padding: 0;
@@ -26,12 +24,10 @@
   transform: scale(1.07);
 }
 
-/* Глобальное правило снимает box-shadow с классов *avatar* при наведении. */
+/* Глобальное правило и hover-glow не должны возвращать свечение. */
 button.avatarBtn:hover,
 button.avatarBtn:active {
-  box-shadow:
-    0 0 3px var(--accent),
-    0 0 8px color-mix(in srgb, var(--accent) 90%, transparent);
+  box-shadow: none;
 }
 
 .avatarImg {
