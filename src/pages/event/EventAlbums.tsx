@@ -96,12 +96,14 @@ interface AlbumCardProps {
   canManage: boolean;
   coverVersion?: number;
   hideMeta?: boolean;
+  /** Правый край растворяется, если за плиткой ещё есть альбомы. */
+  fadeRight?: boolean;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpen, onEdit, onDelete }: AlbumCardProps) {
+function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeRight = false, onOpen, onEdit, onDelete }: AlbumCardProps) {
   const [coverIds, setCoverIds] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
@@ -164,7 +166,8 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpe
   const showMosaic = !hideMeta && coverCount > 1;
 
   return (
-    <div className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : ''}`}>
+    <div className={styles.albumTile}>
+      <div className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : ''} ${fadeRight ? styles.albumCardFadeRight : ''}`}>
       <div className={styles.albumCardBody} onClick={onOpen} role="button" tabIndex={0}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}>
         <div className={styles.albumCover}>
@@ -205,6 +208,7 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpe
           </div>
         )}
       </div>
+      </div>
 
       {canManage && (
         <div className={styles.albumMenuWrap}>
@@ -244,6 +248,18 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, onOpe
         </div>
       )}
     </div>
+  );
+}
+
+function AddAlbumThumb({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className={styles.addAlbumThumb} onClick={onClick} aria-label="Добавить альбом">
+      <span className={styles.addAlbumThumbIcon}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </span>
+    </button>
   );
 }
 
@@ -469,20 +485,33 @@ export function EventAlbums({
 
   if (compact) {
     const hasAlbums = albums.length > 0;
+    const collapsedAlbums = albums.slice(0, 3);
+    const hiddenAlbumCount = Math.max(0, albums.length - collapsedAlbums.length);
     return (
       <div className={styles.albumsSection}>
         <div className={styles.header}>
           <div className={styles.title}>Фотоальбомы</div>
-          {hasAlbums && isMobile && (
+          {hasAlbums && isMobile && !showExpandedAlbums && hiddenAlbumCount > 0 && (
+            <button
+              type="button"
+              className={`${styles.count} ${styles.countOverflow}`}
+              aria-expanded={false}
+              aria-label={`Ещё альбомы: ${hiddenAlbumCount}`}
+              onClick={() => setAlbumsExpanded(true)}
+            >
+              +{hiddenAlbumCount}
+            </button>
+          )}
+          {hasAlbums && isMobile && (showExpandedAlbums || hiddenAlbumCount === 0) && (
             <button
               type="button"
               className={styles.count}
-              aria-expanded={albumsExpanded}
+              aria-expanded={showExpandedAlbums}
               onClick={() => setAlbumsExpanded(v => !v)}
             >
               {albums.length}
               <svg
-                className={`${styles.countChevron} ${albumsExpanded ? styles.countChevronOpen : ''}`}
+                className={`${styles.countChevron} ${showExpandedAlbums ? styles.countChevronOpen : ''}`}
                 width="10"
                 height="10"
                 viewBox="0 0 24 24"
@@ -501,18 +530,20 @@ export function EventAlbums({
         </div>
         {hasAlbums && !showExpandedAlbums && (
           <div className={styles.gridCollapsed}>
-            {albums.map(a => (
+            {collapsedAlbums.map((a, index) => (
               <AlbumCard
                 key={a.id}
                 album={a}
                 canManage={canManageAlbum(a, { isOrganizer: canManage })}
                 hideMeta
+                fadeRight={hiddenAlbumCount > 0 && index === collapsedAlbums.length - 1}
                 coverVersion={coverVersionByAlbumId[a.id] ?? 0}
                 onOpen={() => openAlbum(a)}
                 onEdit={() => setFormAlbum(a)}
                 onDelete={() => setDeleteTarget(a)}
               />
             ))}
+            {canManage && <AddAlbumThumb onClick={() => setFormAlbum(null)} />}
           </div>
         )}
         {(showExpandedAlbums || (!hasAlbums && canManage)) && (
