@@ -338,13 +338,24 @@ export default function CreateEventPage() {
   const [orgAgreementQueue, setOrgAgreementQueue] = useState<PendingOrgAgreement[]>([]);
   const [orgAgreementResume, setOrgAgreementResume] = useState<'publish' | 'enableTickets' | null>(null);
   const [checkingOrgAgreements, setCheckingOrgAgreements] = useState(false);
+  const [globalTicketSales, setGlobalTicketSales] = useState(false);
 
   const { toast, show: showToast } = useToast();
 
+  useEffect(() => {
+    let cancelled = false;
+    import('@/shared/api/featuresApi')
+      .then(m => m.fetchAppFeatures())
+      .then(f => { if (!cancelled) setGlobalTicketSales(f.ticketSalesEnabled); })
+      .catch(() => { if (!cancelled) setGlobalTicketSales(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const canEnableTickets = useMemo(() => {
+    if (!globalTicketSales) return false;
     if (isEditing) return editTicketsCapability === 'yes';
     return eventHost?.kind === 'organization' && eventHost.canSellTickets;
-  }, [isEditing, editTicketsCapability, eventHost]);
+  }, [globalTicketSales, isEditing, editTicketsCapability, eventHost]);
 
   // Refs
   const nameRef          = useRef<HTMLInputElement>(null);

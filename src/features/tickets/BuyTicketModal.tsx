@@ -19,6 +19,8 @@ interface BuyTicketModalProps {
   unitPrice: number;
   /** Сколько ещё можно купить с учётом лимита мест; null = без лимита */
   remainingSeats: number | null;
+  /** Покупатель уже участник — билеты для подарка/докупки */
+  giftMode?: boolean;
   onClose: () => void;
   onPurchased: (order: IOrder) => void;
 }
@@ -29,6 +31,7 @@ export function BuyTicketModal({
   eventName,
   unitPrice,
   remainingSeats,
+  giftMode = false,
   onClose,
   onPurchased,
 }: BuyTicketModalProps) {
@@ -118,8 +121,15 @@ export function BuyTicketModal({
             aria-modal="true"
             aria-labelledby="buy-ticket-title"
           >
-            <p id="buy-ticket-title" className={styles.title}>Купить билет</p>
+            <p id="buy-ticket-title" className={styles.title}>
+              {giftMode ? 'Купить билет в подарок' : 'Купить билет'}
+            </p>
             <p className={styles.eventName}>{eventName}</p>
+            {giftMode && (
+              <p className={styles.eventName} style={{ opacity: 0.85, fontSize: 13 }}>
+                Билеты появятся в «Мои билеты» — передайте получателю через «Подарить».
+              </p>
+            )}
 
             <div className={styles.row}>
               <span className={styles.rowLabel}>Билет</span>
