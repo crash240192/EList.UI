@@ -49,7 +49,7 @@ function isFetchFailure(error: unknown): boolean {
 }
 
 const PHOTO_FETCH_FAILURE_TEXT = 'При создании альбома возникла ошибка. Вероятно, данная ошибка появилась на этапе загрузки фотографий';
-const NAME_TAKEN_TEXT = 'Альбом с таким названием уже есть';
+const NAME_TAKEN_TEXT = 'Альбом с таким названием уже существует';
 
 function sameAlbumName(a: string, b: string): boolean {
   return a.trim().toLocaleLowerCase('ru-RU') === b.trim().toLocaleLowerCase('ru-RU');

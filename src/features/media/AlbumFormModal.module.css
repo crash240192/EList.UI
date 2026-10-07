@@ -34,8 +34,11 @@
   transition: border-color .15s;
 }
 .input:focus, .textarea:focus { border-color: var(--accent); }
-.inputInvalid,
-.inputInvalid:focus { border-color: var(--danger); }
+.input.inputInvalid,
+.input.inputInvalid:focus {
+  border-color: var(--danger);
+  transition: none;
+}
 .nameTakenHint { font-size: 12px; line-height: 1.35; color: var(--danger); }
 .textarea { resize: vertical; min-height: 60px; }
 
