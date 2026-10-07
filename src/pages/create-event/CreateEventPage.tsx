@@ -998,20 +998,15 @@ export default function CreateEventPage() {
     return () => { cancelled = true; };
   }, [isEditing, id, editAccess]);
 
-  // Сброс флага билетов, если продажа недоступна или стоимость 0
+  // Сброс флага билетов, если продажа глобально/для org недоступна (Cost=0 + tickets = бесплатные билеты — ок)
   useEffect(() => {
     if (!form.ticketsEnabled) return;
-    const cost = parseFloat(form.cost) || 0;
-    if (cost <= 0) {
-      setForm(f => (f.ticketsEnabled ? { ...f, ticketsEnabled: false } : f));
-      return;
-    }
     // В edit не сбрасываем, пока не узнали capability (иначе гасим значение с сервера)
     if (isEditing && editTicketsCapability === 'unknown') return;
     if (!canEnableTickets) {
       setForm(f => (f.ticketsEnabled ? { ...f, ticketsEnabled: false } : f));
     }
-  }, [canEnableTickets, editTicketsCapability, form.cost, form.ticketsEnabled, isEditing]);
+  }, [canEnableTickets, editTicketsCapability, form.ticketsEnabled, isEditing]);
 
   // Если типы мероприятия загрузились раньше справочника — применить выбор после allTypes
   useEffect(() => {
@@ -1639,7 +1634,7 @@ export default function CreateEventPage() {
           ageLimit:           parseAgeLimit(),
           allowedGender:      form.allowedGender || null,
           allowUsersToInvite: form.allowUsersToInvite,
-          ticketsEnabled:     canEnableTickets && editCost > 0 && form.ticketsEnabled,
+          ticketsEnabled:     canEnableTickets && form.ticketsEnabled,
         });
         await assignEventTypes(id!, resolvedTypeIds);
         navigate(`/event/${id}`);
@@ -1721,7 +1716,7 @@ export default function CreateEventPage() {
         ageLimit: parseAgeLimit() ?? undefined,
         allowedGender: form.allowedGender || undefined,
         allowUsersToInvite: form.allowUsersToInvite,
-        ticketsEnabled: canEnableTickets && createCost > 0 && form.ticketsEnabled,
+        ticketsEnabled: canEnableTickets && form.ticketsEnabled,
       },
       eventTypes: resolvedTypeIds,
       organizatorAccountIds:
@@ -1873,9 +1868,7 @@ export default function CreateEventPage() {
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
-  const wantsTicketsEnabled = canEnableTickets
-    && (parseFloat(form.cost) || 0) > 0
-    && form.ticketsEnabled;
+  const wantsTicketsEnabled = canEnableTickets && form.ticketsEnabled;
 
   /** Проверка актуальности оферты / соглашения на билеты перед действием */
   const ensureOrgAgreements = useCallback(async (
@@ -2400,20 +2393,21 @@ export default function CreateEventPage() {
               />
               {canEnableTickets && (
                 <Toggle
-                  label="Продажа билетов"
+                  label="Билеты (онлайн)"
                   checked={form.ticketsEnabled}
-                  locked={(parseFloat(form.cost) || 0) <= 0 || checkingOrgAgreements}
+                  locked={checkingOrgAgreements}
                   onChange={handleTicketsToggle}
-                  lockedHint={
-                    (parseFloat(form.cost) || 0) <= 0
-                      ? 'Укажите стоимость больше 0 ₽'
-                      : 'Проверка соглашений...'
-                  }
+                  lockedHint="Проверка соглашений..."
                 />
+              )}
+              {canEnableTickets && form.ticketsEnabled && (parseFloat(form.cost) || 0) <= 0 && (
+                <p className={styles.fieldHint}>
+                  Стоимость 0 ₽ — бесплатные билеты: выдаются сразу при «покупке», без оплаты.
+                </p>
               )}
               {(parseFloat(form.cost) || 0) > 0 && !form.ticketsEnabled && (
                 <p className={styles.fieldHint}>
-                  Без продажи билетов стоимость показывается как «на месте» — запись свободная, оплата у организатора.
+                  Без онлайн-билетов стоимость показывается как «на месте» — запись свободная, оплата у организатора.
                 </p>
               )}
             </div>
