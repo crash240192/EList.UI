@@ -339,7 +339,7 @@ export function EventAlbums({
   };
 
   const handleAlbumSaved = async (album: IAlbum) => {
-    // Assign для новых альбомов делает AlbumFormModal (до загрузки фото).
+    // Assign для новых альбомов делает AlbumFormModal (до привязки файлов).
     // Здесь — только если модалка создала альбом без eventId (legacy / другие экраны).
     const isNew = !albums.some(a => a.id === album.id);
     if (isNew && !album.eventId) {
@@ -424,6 +424,7 @@ export function EventAlbums({
           album={formAlbum}
           accountId={accountId}
           eventId={eventId}
+          existingAlbums={albums}
           onClose={() => setFormAlbum(undefined)}
           onSaved={handleAlbumSaved}
         />
