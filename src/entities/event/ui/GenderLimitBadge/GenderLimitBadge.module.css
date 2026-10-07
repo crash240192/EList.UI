@@ -33,3 +33,18 @@
   border-color: rgba(62, 203, 255, 0.8);
   box-shadow: 0 0 10px rgba(62, 203, 255, 0.4);
 }
+
+/* На белой карточке неоновые цвета теряются — в светлой теме чип чуть плотнее. */
+:global(body.light-theme) .female {
+  color: #e11d9a;
+  background: rgba(225, 29, 154, 0.14);
+  border-color: rgba(200, 20, 140, 0.85);
+  box-shadow: 0 0 10px rgba(225, 29, 154, 0.4);
+}
+
+:global(body.light-theme) .male {
+  color: #0284c7;
+  background: rgba(2, 132, 199, 0.13);
+  border-color: rgba(2, 120, 186, 0.85);
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.38);
+}
