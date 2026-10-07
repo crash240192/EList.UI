@@ -492,7 +492,9 @@ export function EventAlbums({
 
   if (compact) {
     const hasAlbums = albums.length > 0;
-    const collapsedAlbums = albums.slice(0, 3);
+    // Организатор видит 3 обложки и кнопку «добавить». Остальные — 4 обложки.
+    const collapsedLimit = canManage ? 3 : 4;
+    const collapsedAlbums = albums.slice(0, collapsedLimit);
     const hiddenAlbumCount = Math.max(0, albums.length - collapsedAlbums.length);
     return (
       <div className={styles.albumsSection}>
