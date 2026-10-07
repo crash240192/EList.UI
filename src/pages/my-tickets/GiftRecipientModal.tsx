@@ -1,8 +1,13 @@
-// Выбор одного получателя подарка из подписчиков текущего пользователя.
+// Выбор получателя подарка: подписчики + подписки + lookup по логину/id.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { fetchSubscribers, type ISubscriptionItem } from '@/entities/user/subscriptionApi';
+import {
+  fetchSubscribers,
+  fetchSubscriptions,
+  type ISubscriptionItem,
+} from '@/entities/user/subscriptionApi';
+import { lookupAccount, type IAccountLookup } from '@/entities/user/accountLookupApi';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { useDebounce, useInfiniteScroll } from '@/shared/hooks';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -11,15 +16,45 @@ import styles from '@/features/event/InviteModal.module.css';
 
 const PAGE_SIZE = 20;
 
-function getInitials(p: ISubscriptionItem): string {
-  const pi = p.personInfo;
-  if (pi?.firstName) return `${pi.firstName[0]}${pi.lastName?.[0] ?? ''}`.toUpperCase();
-  return p.account.login[0]?.toUpperCase() ?? '?';
+type RecipientRow = {
+  accountId: string;
+  login: string;
+  avatarId: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  source: 'subscriber' | 'subscription' | 'lookup';
+};
+
+function toRow(item: ISubscriptionItem, source: RecipientRow['source']): RecipientRow {
+  return {
+    accountId: item.account.id,
+    login: item.account.login,
+    avatarId: item.account.avatarId ?? null,
+    firstName: item.personInfo?.firstName ?? null,
+    lastName: item.personInfo?.lastName ?? null,
+    source,
+  };
 }
 
-function displayName(p: ISubscriptionItem): string {
-  const name = `${p.personInfo?.firstName ?? ''} ${p.personInfo?.lastName ?? ''}`.trim();
-  return name || p.account.login;
+function fromLookup(a: IAccountLookup): RecipientRow {
+  return {
+    accountId: a.id,
+    login: a.login,
+    avatarId: a.avatarId,
+    firstName: a.firstName,
+    lastName: a.lastName,
+    source: 'lookup',
+  };
+}
+
+function getInitials(r: RecipientRow): string {
+  if (r.firstName) return `${r.firstName[0]}${r.lastName?.[0] ?? ''}`.toUpperCase();
+  return r.login[0]?.toUpperCase() ?? '?';
+}
+
+function displayName(r: RecipientRow): string {
+  const name = `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim();
+  return name || r.login;
 }
 
 interface GiftRecipientModalProps {
@@ -38,34 +73,57 @@ export function GiftRecipientModal({
   useModalBackButton(onClose);
 
   const [search, setSearch] = useState('');
-  const [subscribers, setSubscribers] = useState<ISubscriptionItem[]>([]);
+  const [rows, setRows] = useState<RecipientRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [lookupBusy, setLookupBusy] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useDebounce(search, 350);
 
+  const mergeUnique = useCallback((lists: RecipientRow[][]) => {
+    const map = new Map<string, RecipientRow>();
+    for (const list of lists) {
+      for (const row of list) {
+        if (!row.accountId || row.accountId === currentAccountId) continue;
+        if (!map.has(row.accountId)) map.set(row.accountId, row);
+      }
+    }
+    return [...map.values()];
+  }, [currentAccountId]);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setErr(null);
     setPage(0);
-    fetchSubscribers(currentAccountId, {
-      name: debouncedSearch || undefined,
-      pageIndex: 0,
-      pageSize: PAGE_SIZE,
-    })
-      .then(data => {
+    Promise.all([
+      fetchSubscribers(currentAccountId, {
+        name: debouncedSearch || undefined,
+        pageIndex: 0,
+        pageSize: PAGE_SIZE,
+      }),
+      fetchSubscriptions(currentAccountId, {
+        name: debouncedSearch || undefined,
+        pageIndex: 0,
+        pageSize: PAGE_SIZE,
+      }),
+    ])
+      .then(([subs, following]) => {
         if (cancelled) return;
-        setSubscribers(data.items);
-        setTotal(data.total);
+        const merged = mergeUnique([
+          subs.items.map(i => toRow(i, 'subscriber')),
+          following.items.map(i => toRow(i, 'subscription')),
+        ]);
+        setRows(merged);
+        setTotal(Math.max(subs.total, following.total, merged.length));
       })
       .catch(() => {
-        if (!cancelled) setErr('Не удалось загрузить подписчиков');
+        if (!cancelled) setErr('Не удалось загрузить список');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -73,37 +131,71 @@ export function GiftRecipientModal({
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, currentAccountId]);
+  }, [debouncedSearch, currentAccountId, mergeUnique]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || subscribers.length >= total) return;
+    if (loadingMore || rows.length >= total) return;
     const nextPage = page + 1;
     setLoadingMore(true);
     try {
-      const data = await fetchSubscribers(currentAccountId, {
-        name: debouncedSearch || undefined,
-        pageIndex: nextPage,
-        pageSize: PAGE_SIZE,
-      });
-      setSubscribers(prev => [...prev, ...data.items]);
+      const [subs, following] = await Promise.all([
+        fetchSubscribers(currentAccountId, {
+          name: debouncedSearch || undefined,
+          pageIndex: nextPage,
+          pageSize: PAGE_SIZE,
+        }),
+        fetchSubscriptions(currentAccountId, {
+          name: debouncedSearch || undefined,
+          pageIndex: nextPage,
+          pageSize: PAGE_SIZE,
+        }),
+      ]);
+      setRows(prev => mergeUnique([
+        prev,
+        subs.items.map(i => toRow(i, 'subscriber')),
+        following.items.map(i => toRow(i, 'subscription')),
+      ]));
       setPage(nextPage);
-      setTotal(data.total);
+      setTotal(Math.max(subs.total, following.total));
     } catch {
-      setErr('Не удалось догрузить подписчиков');
+      setErr('Не удалось догрузить список');
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, subscribers.length, total, page, debouncedSearch, currentAccountId]);
+  }, [
+    loadingMore, rows.length, total, page, debouncedSearch,
+    currentAccountId, mergeUnique,
+  ]);
 
   const sentinelRef = useInfiniteScroll(loadMore, {
-    enabled: !loading && !loadingMore && subscribers.length < total,
+    enabled: !loading && !loadingMore && rows.length < total,
   });
 
-  const selected = subscribers.find(s => s.account.id === selectedId) ?? null;
+  const selected = useMemo(
+    () => rows.find(r => r.accountId === selectedId) ?? null,
+    [rows, selectedId],
+  );
+
+  const handleLookup = async () => {
+    const q = search.trim();
+    if (!q || lookupBusy || busy) return;
+    setLookupBusy(true);
+    setErr(null);
+    try {
+      const found = await lookupAccount(q);
+      const row = fromLookup(found);
+      setRows(prev => mergeUnique([[row], prev]));
+      setSelectedId(row.accountId);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Аккаунт не найден');
+    } finally {
+      setLookupBusy(false);
+    }
+  };
 
   const handleConfirm = () => {
     if (!selected || busy) return;
-    onConfirm(selected.account.id, displayName(selected));
+    onConfirm(selected.accountId, displayName(selected));
   };
 
   return createPortal(
@@ -119,7 +211,7 @@ export function GiftRecipientModal({
           <div className={styles.headerLeft}>
             <h2 className={styles.title}>Подарить билет</h2>
             {!loading && (
-              <span className={styles.count}>{formatSubscribersCount(total)}</span>
+              <span className={styles.count}>{formatSubscribersCount(rows.length)}</span>
             )}
           </div>
           <button
@@ -134,7 +226,8 @@ export function GiftRecipientModal({
         </div>
 
         <p className={styles.empty} style={{ padding: '8px 16px 0', textAlign: 'left' }}>
-          Выберите получателя из ваших подписчиков. Владелец билета сменится, покупатель заказа останется прежним.
+          Подписчики, подписки или поиск по логину / id. Владелец билета сменится,
+          покупатель заказа останется прежним.
         </p>
 
         <div className={styles.searchWrap}>
@@ -154,9 +247,15 @@ export function GiftRecipientModal({
             ref={searchRef}
             className={styles.searchInput}
             onFocus={e => e.currentTarget.select()}
-            placeholder="Поиск по имени или логину..."
+            placeholder="Имя, логин или id…"
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void handleLookup();
+              }
+            }}
             disabled={busy}
           />
           {search && (
@@ -166,31 +265,44 @@ export function GiftRecipientModal({
           )}
         </div>
 
+        <div style={{ padding: '0 16px 8px' }}>
+          <button
+            type="button"
+            className={styles.cancelBtn}
+            style={{ width: '100%' }}
+            disabled={!search.trim() || lookupBusy || busy}
+            onClick={() => { void handleLookup(); }}
+          >
+            {lookupBusy ? 'Поиск…' : 'Найти по логину / id'}
+          </button>
+        </div>
+
         <div className={styles.list}>
           {loading ? (
             <div className={styles.empty}>Загрузка...</div>
-          ) : err && subscribers.length === 0 ? (
+          ) : err && rows.length === 0 ? (
             <div className={styles.empty} style={{ color: 'var(--danger)' }}>
               {err}
             </div>
-          ) : subscribers.length === 0 ? (
-            <div className={styles.empty}>{search ? 'Никого не найдено' : 'Нет подписчиков'}</div>
+          ) : rows.length === 0 ? (
+            <div className={styles.empty}>
+              {search ? 'Никого не найдено — попробуйте «Найти по логину / id»' : 'Нет контактов'}
+            </div>
           ) : (
             <>
-              {subscribers.map(s => {
-                const id = s.account.id;
-                const isSelected = selectedId === id;
+              {rows.map(r => {
+                const isSelected = selectedId === r.accountId;
                 return (
                   <div
-                    key={id}
+                    key={r.accountId}
                     role="button"
                     tabIndex={0}
                     className={`${styles.item} ${isSelected ? styles.itemSelected : ''}`}
-                    onClick={() => setSelectedId(id)}
+                    onClick={() => setSelectedId(r.accountId)}
                     onKeyDown={e => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        setSelectedId(id);
+                        setSelectedId(r.accountId);
                       }
                     }}
                   >
@@ -202,18 +314,23 @@ export function GiftRecipientModal({
                       )}
                     </div>
                     <div className={styles.ava}>
-                      <UserAvatar accountId={id} avatarId={s.account.avatarId ?? null} initials={getInitials(s)} size={34} />
+                      <UserAvatar
+                        accountId={r.accountId}
+                        avatarId={r.avatarId}
+                        initials={getInitials(r)}
+                        size={34}
+                      />
                     </div>
                     <div className={styles.info}>
-                      <div className={styles.name}>{displayName(s)}</div>
-                      <div className={styles.login}>@{s.account.login}</div>
+                      <div className={styles.name}>{displayName(r)}</div>
+                      <div className={styles.login}>@{r.login}</div>
                     </div>
                   </div>
                 );
               })}
-              {subscribers.length < total && (
+              {rows.length < total && (
                 <div ref={sentinelRef} className={styles.loadMore}>
-                  {loadingMore ? 'Загрузка...' : `Ещё ${total - subscribers.length}`}
+                  {loadingMore ? 'Загрузка...' : `Ещё ${Math.max(0, total - rows.length)}`}
                 </div>
               )}
             </>
@@ -221,7 +338,7 @@ export function GiftRecipientModal({
         </div>
 
         <div className={styles.footer}>
-          {err && !loading && subscribers.length > 0 && (
+          {err && !loading && rows.length > 0 && (
             <span className={styles.footerErr}>{err}</span>
           )}
           <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={busy}>
