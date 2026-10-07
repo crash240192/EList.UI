@@ -408,6 +408,7 @@ export function EventAlbums({
           album={formAlbum}
           accountId={accountId}
           eventId={eventId}
+          existingAlbums={albums}
           onClose={() => setFormAlbum(undefined)}
           onSaved={handleAlbumSaved}
         />

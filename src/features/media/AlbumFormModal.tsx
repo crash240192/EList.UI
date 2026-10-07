@@ -24,6 +24,8 @@ interface AlbumFormModalProps {
   organizationId?: string | null;
   /** Если задан — после create сразу assign, затем загрузка фото (нужно для RO-альбомов). */
   eventId?: string | null;
+  /** Альбомы этой карточки мероприятия — проверка названия до загрузки фото. */
+  existingAlbums?: IAlbum[];
   album?: IAlbum | null;
 }
 
@@ -47,6 +49,11 @@ function isFetchFailure(error: unknown): boolean {
 }
 
 const PHOTO_FETCH_FAILURE_TEXT = 'При создании альбома возникла ошибка. Вероятно, данная ошибка появилась на этапе загрузки фотографий';
+const NAME_TAKEN_TEXT = 'Альбом с таким названием уже есть';
+
+function sameAlbumName(a: string, b: string): boolean {
+  return a.trim().toLocaleLowerCase('ru-RU') === b.trim().toLocaleLowerCase('ru-RU');
+}
 
 export function AlbumFormModal({
   onClose,
@@ -54,6 +61,7 @@ export function AlbumFormModal({
   accountId,
   organizationId,
   eventId = null,
+  existingAlbums = [],
   album,
 }: AlbumFormModalProps) {
   const isEdit = !!album;
@@ -68,6 +76,7 @@ export function AlbumFormModal({
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
   const [photoFetchFailed, setPhotoFetchFailed] = useState(false);
+  const [nameTaken, setNameTaken] = useState(false);
   const pendingRef = useRef<PendingPhoto[]>([]);
 
   const revokePendingPreviews = useCallback((items: PendingPhoto[]) => {
@@ -102,7 +111,17 @@ export function AlbumFormModal({
   const uploadingPhotos = uploadingPhotoIds.size > 0;
 
   const handleSave = async () => {
-    if (!name.trim()) { setError('Укажите название альбома'); return; }
+    if (!name.trim()) {
+      setNameTaken(false);
+      setError('Укажите название альбома');
+      return;
+    }
+    if (!isEdit && existingAlbums.some(item => sameAlbumName(item.name, name))) {
+      setError(null);
+      setNameTaken(true);
+      return;
+    }
+    setNameTaken(false);
     setSaving(true);
     setError(null);
     try {
@@ -216,9 +235,22 @@ export function AlbumFormModal({
         <div className={styles.modalBody}>
           <div className={styles.field}>
             <label className={styles.label}>Название *</label>
-            <input className={styles.input} value={name} onChange={e => setName(e.target.value)}
+            <input
+              className={`${styles.input} ${nameTaken ? styles.inputInvalid : ''}`}
+              value={name}
+              onChange={e => {
+                setName(e.target.value);
+                setNameTaken(false);
+              }}
               placeholder="Например: Фото с выступления"
-              onFocus={e => e.target.select()} autoFocus />
+              aria-invalid={nameTaken || undefined}
+              aria-describedby={nameTaken ? 'album-name-taken' : undefined}
+              onFocus={e => e.target.select()}
+              autoFocus
+            />
+            {nameTaken && (
+              <div id="album-name-taken" className={styles.nameTakenHint}>{NAME_TAKEN_TEXT}</div>
+            )}
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Описание</label>
