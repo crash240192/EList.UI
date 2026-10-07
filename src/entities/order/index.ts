@@ -21,6 +21,7 @@ export {
   completePayment,
   fetchMyOrders,
   fetchOrderById,
+  cancelOrder,
   fetchMyTickets,
   fetchTicketByCode,
   transferTicket,

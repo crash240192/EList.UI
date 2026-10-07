@@ -130,6 +130,15 @@ export async function fetchOrderById(orderId: string): Promise<IOrder | null> {
   }
 }
 
+/** POST /api/orders/{orderId}/cancel — неоплаченный Pending/Authorized */
+export async function cancelOrder(orderId: string): Promise<IOrder> {
+  const r = await apiClient.post<Record<string, unknown>>(
+    `/api/orders/${orderId}/cancel`,
+    {},
+  );
+  return normalizeOrder((r.result ?? {}) as Record<string, unknown>);
+}
+
 /** GET /api/orders/tickets/my?eventId= */
 export async function fetchMyTickets(eventId?: string): Promise<ITicket[]> {
   const qs = eventId ? `?eventId=${encodeURIComponent(eventId)}` : '';

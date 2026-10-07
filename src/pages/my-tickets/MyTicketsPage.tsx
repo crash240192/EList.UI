@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  cancelOrder,
   cancelRefund,
   createRefund,
+  fetchMyOrders,
   fetchMyTickets,
   fetchRefundsByOrder,
+  formatMoney,
   transferTicket,
+  ORDER_STATUS_LABELS,
   TICKET_STATUS_LABELS,
+  type IOrder,
   type ITicket,
   type TicketStatus,
 } from '@/entities/order';
@@ -22,6 +27,10 @@ import { GiftRecipientModal } from './GiftRecipientModal';
 import styles from './MyTicketsPage.module.css';
 
 interface TicketRow extends ITicket {
+  eventName: string | null;
+}
+
+interface PendingOrderRow extends IOrder {
   eventName: string | null;
 }
 
@@ -40,10 +49,12 @@ export default function MyTicketsPage() {
   const { accountId } = useAccountId();
 
   const [tickets, setTickets] = useState<TicketRow[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refundTicket, setRefundTicket] = useState<TicketRow | null>(null);
   const [cancelTicket, setCancelTicket] = useState<TicketRow | null>(null);
+  const [cancelPendingOrder, setCancelPendingOrder] = useState<PendingOrderRow | null>(null);
   const [giftTicket, setGiftTicket] = useState<TicketRow | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -51,8 +62,15 @@ export default function MyTicketsPage() {
     setLoading(true);
     setError(null);
     try {
-      const list = await fetchMyTickets();
-      const eventIds = [...new Set(list.map(t => t.eventId).filter(Boolean))];
+      const [list, orders] = await Promise.all([
+        fetchMyTickets(),
+        fetchMyOrders().catch(() => [] as IOrder[]),
+      ]);
+      const unpaid = orders.filter(o => o.status === 'Pending' || o.status === 'Authorized');
+      const eventIds = [...new Set([
+        ...list.map(t => t.eventId),
+        ...unpaid.map(o => o.eventId),
+      ].filter(Boolean))];
       const nameById = new Map<string, string>();
       await Promise.all(eventIds.map(async (eventId) => {
         try {
@@ -65,6 +83,10 @@ export default function MyTicketsPage() {
       setTickets(list.map(t => ({
         ...t,
         eventName: nameById.get(t.eventId) ?? null,
+      })));
+      setPendingOrders(unpaid.map(o => ({
+        ...o,
+        eventName: nameById.get(o.eventId) ?? null,
       })));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось загрузить билеты');
@@ -147,24 +169,83 @@ export default function MyTicketsPage() {
     }
   };
 
+  const confirmCancelPending = async () => {
+    if (!cancelPendingOrder || busy) return;
+    setBusy(true);
+    try {
+      await cancelOrder(cancelPendingOrder.id);
+      toast('Заказ отменён, места освобождены', 'success');
+      setCancelPendingOrder(null);
+      await load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось отменить заказ', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.head}>
           <h1 className={styles.title}>Мои билеты</h1>
-          <p className={styles.subtitle}>Купленные билеты, статус и действия</p>
+          <p className={styles.subtitle}>Купленные билеты, неоплаченные заказы и действия</p>
         </div>
 
         <div className={styles.body}>
           {loading && <div className={styles.state}>Загрузка…</div>}
           {!loading && error && <div className={styles.error}>{error}</div>}
-          {!loading && !error && sorted.length === 0 && (
+
+          {!loading && !error && pendingOrders.length > 0 && (
+            <section className={styles.section}>
+              <h2 className={styles.sectionTitle}>Ожидают оплаты</h2>
+              <ul className={styles.list}>
+                {pendingOrders.map(order => (
+                  <li key={order.id} className={styles.item}>
+                    <div className={styles.itemMain}>
+                      <button
+                        type="button"
+                        className={styles.eventBtn}
+                        onClick={() => navigate(`/event/${order.eventId}`)}
+                      >
+                        {order.eventName || 'Мероприятие'}
+                      </button>
+                      <div className={styles.meta}>
+                        <span className={`${styles.status} ${styles.statusPending}`}>
+                          {ORDER_STATUS_LABELS[order.status] ?? order.status}
+                        </span>
+                        <span className={styles.metaText}>
+                          {order.quantity} шт. · {formatMoney(order.amountTotal, order.currency)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.actions}>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busy}
+                        onClick={() => setCancelPendingOrder(order)}
+                      >
+                        Отменить заказ
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {!loading && !error && sorted.length === 0 && pendingOrders.length === 0 && (
             <div className={styles.state}>
               Пока нет билетов. Купите билет на странице мероприятия.
             </div>
           )}
 
           {!loading && !error && sorted.length > 0 && (
+            <section className={styles.section}>
+              {pendingOrders.length > 0 && (
+                <h2 className={styles.sectionTitle}>Активные билеты</h2>
+              )}
             <ul className={styles.list}>
               {sorted.map(ticket => {
                 const canAct = ticket.status === 'Issued';
@@ -237,9 +318,22 @@ export default function MyTicketsPage() {
                 );
               })}
             </ul>
+            </section>
           )}
         </div>
       </div>
+
+      {cancelPendingOrder && (
+        <ConfirmDialog
+          title="Отменить заказ?"
+          message="Оплата ещё не завершена. Заказ будет отменён, зарезервированные места освободятся."
+          confirmLabel={busy ? '…' : 'Отменить заказ'}
+          cancelLabel="Закрыть"
+          variant="danger"
+          onConfirm={() => { void confirmCancelPending(); }}
+          onCancel={() => { if (!busy) setCancelPendingOrder(null); }}
+        />
+      )}
 
       {refundTicket && (
         <ConfirmDialog
