@@ -7,7 +7,8 @@ import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
+import { getEventTypes, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
+import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
 import styles from './EventCard.module.css';
 
 interface EventCardContextValue { event: IEvent; }
@@ -164,6 +165,7 @@ function Preset({ event, onClick, className }: PresetProps) {
         <Footer>
           <div className={styles.footerLeft}><Price /><Rating /><Participants /></div>
         </Footer>
+        <GenderLimitBadge gender={readAllowedGender(event.parameters)} />
       </Body>
     </EventCard>
   );

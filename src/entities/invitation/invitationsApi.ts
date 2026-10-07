@@ -23,6 +23,7 @@ export interface IInvitationEvent {
     maxPersonsCount?: number | null;
     private?: boolean;
     ticketsEnabled?: boolean;
+    allowedGender?: 'Female' | 'Male' | null;
   } | null;
   participantsCount?: number | null;
   colors?: string[];
