@@ -5,11 +5,13 @@ import { createPortal } from 'react-dom';
 import {
   assignAlbumToEvent,
   createAlbum,
+  deleteAlbum,
   updateAlbum,
   type IAlbum,
   type ICreateAlbumPayload,
 } from '@/entities/media/albumApi';
-import { uploadPhotoToAlbum } from '@/entities/media/albumFileApi';
+import { linkFilesToAlbum } from '@/entities/media/albumFileApi';
+import { uploadFile } from '@/shared/api/fileStorageClient';
 import { filterImageFiles } from '@/shared/lib/imageFile';
 import { AlbumPhotoUploadZone } from './AlbumPhotoUploadZone';
 import { AlbumPhotoPreviewGrid, type PhotoPreviewItem } from './AlbumPhotoPreviewGrid';
@@ -35,6 +37,17 @@ function nextLocalId(): string {
   return `pending-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/** Chrome: «Failed to fetch». Firefox и Safari пишут то же обрывом сети другими словами. */
+function isFetchFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('load failed');
+}
+
+const PHOTO_FETCH_FAILURE_TEXT = 'При создании альбома возникла ошибка. Вероятно, данная ошибка появилась на этапе загрузки фотографий';
+
 export function AlbumFormModal({
   onClose,
   onSaved,
@@ -54,6 +67,7 @@ export function AlbumFormModal({
   const [uploadingPhotoIds, setUploadingPhotoIds] = useState<Set<string>>(() => new Set());
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
+  const [photoFetchFailed, setPhotoFetchFailed] = useState(false);
   const pendingRef = useRef<PendingPhoto[]>([]);
 
   const revokePendingPreviews = useCallback((items: PendingPhoto[]) => {
@@ -114,17 +128,14 @@ export function AlbumFormModal({
           organizationId: organizationId ?? undefined,
           parameters,
         };
-        const newId = await createAlbum(payload);
-        // Сначала привязка к событию: ParticipantsReadonly иначе блокирует AddFiles
-        // на ещё личном альбоме (флаг про участников мероприятия, не владельца).
-        if (eventId) {
-          await assignAlbumToEvent(eventId, newId);
-        }
+        // Фото уходят в хранилище до создания альбома: обрыв сети не должен оставлять пустой альбом.
+        let uploadedIds: string[] = [];
         if (pendingPhotos.length > 0) {
           setUploadingPhotoIds(new Set(pendingPhotos.map(p => p.localId)));
-          await Promise.all(pendingPhotos.map(async photo => {
+          uploadedIds = await Promise.all(pendingPhotos.map(async photo => {
             try {
-              await uploadPhotoToAlbum(newId, photo.file);
+              const uploaded = await uploadFile(photo.file);
+              return uploaded.id;
             } finally {
               setUploadingPhotoIds(prev => {
                 const next = new Set(prev);
@@ -133,6 +144,22 @@ export function AlbumFormModal({
               });
             }
           }));
+        }
+        const newId = await createAlbum(payload);
+        try {
+          // Сначала привязка к событию: ParticipantsReadonly иначе блокирует AddFiles
+          // на ещё личном альбоме (флаг про участников мероприятия, не владельца).
+          if (eventId) {
+            await assignAlbumToEvent(eventId, newId);
+          }
+          if (uploadedIds.length > 0) {
+            await linkFilesToAlbum(newId, uploadedIds);
+          }
+        } catch (e: unknown) {
+          if (isFetchFailure(e)) {
+            try { await deleteAlbum(newId); } catch { /* альбом не должен остаться */ }
+          }
+          throw e;
         }
         revokePendingPreviews(pendingPhotos);
         setPendingPhotos([]);
@@ -146,6 +173,10 @@ export function AlbumFormModal({
       }
       onClose();
     } catch (e: unknown) {
+      if (!isEdit && pendingPhotos.length > 0 && isFetchFailure(e)) {
+        setPhotoFetchFailed(true);
+        return;
+      }
       setError(e instanceof Error ? e.message : 'Ошибка при сохранении альбома');
     } finally {
       setSaving(false);
@@ -156,8 +187,14 @@ export function AlbumFormModal({
   return createPortal(
     <>
       <div className={styles.backdrop} onClick={onClose} />
-      <div className={styles.modal} role="dialog" aria-modal aria-labelledby="album-form-title">
-        <div className={styles.modalHeader}>
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal
+        aria-labelledby={photoFetchFailed ? undefined : 'album-form-title'}
+        aria-label={photoFetchFailed ? PHOTO_FETCH_FAILURE_TEXT : undefined}
+      >
+        {!photoFetchFailed && <div className={styles.modalHeader}>
           <span id="album-form-title" className={styles.modalTitle}>
             {isEdit ? 'Редактировать альбом' : 'Новый альбом'}
           </span>
@@ -166,8 +203,16 @@ export function AlbumFormModal({
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
-        </div>
+        </div>}
 
+        {photoFetchFailed ? (
+          <div className={styles.fetchFailure}>
+            <p className={styles.fetchFailureText}>{PHOTO_FETCH_FAILURE_TEXT}</p>
+            <button type="button" className={styles.fetchFailureClose} onClick={onClose}>
+              Закрыть
+            </button>
+          </div>
+        ) : (
         <div className={styles.modalBody}>
           <div className={styles.field}>
             <label className={styles.label}>Название *</label>
@@ -232,13 +277,14 @@ export function AlbumFormModal({
 
           {error && <div className={styles.error}>{error}</div>}
         </div>
+        )}
 
-        <div className={styles.modalFooter}>
+        {!photoFetchFailed && <div className={styles.modalFooter}>
           <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={saving}>Отмена</button>
           <button type="button" className={styles.saveBtn} onClick={() => void handleSave()} disabled={saving || uploadingPhotos || !name.trim()}>
             {saving ? (uploadingPhotos ? 'Загрузка фото…' : 'Сохранение...') : isEdit ? 'Сохранить' : 'Создать альбом'}
           </button>
-        </div>
+        </div>}
       </div>
     </>,
     document.body,
