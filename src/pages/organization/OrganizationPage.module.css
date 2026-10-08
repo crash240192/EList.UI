@@ -159,6 +159,11 @@
   word-break: break-word;
 }
 
+/* Название стоит на тёмной шапке. В светлой теме обычный текст там пропадает. */
+:global(body.light-theme) .fullName {
+  color: #f0f1f7;
+}
+
 .profileMeta {
   font-size: 12px;
   color: var(--text-secondary);
