@@ -100,6 +100,7 @@ import {
   type CreateEventDraftSnapshot,
 } from './createEventDraft';
 import { CreateEventLeaveModal } from './CreateEventLeaveModal';
+import { consumeSimilarEventSeed } from './similarEventSeed';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
   EVENT_AGE_LIMIT_OPTIONS,
@@ -634,11 +635,86 @@ export default function CreateEventPage() {
       return;
     }
 
+    if (searchParams.get('similar') === '1') {
+      const seed = consumeSimilarEventSeed();
+      if (seed) {
+        setForm({
+          ...EMPTY,
+          ...seed.form,
+          startDate: '',
+          startTime: '',
+          endDate: '',
+          endTime: '',
+        });
+        setLoading(false);
+        setSaving(false);
+        setFieldErrors(new Set());
+        setLat(seed.lat);
+        setLng(seed.lng);
+        setCoverUrl(seed.coverUrl);
+        setCoverImageId(seed.coverImageId);
+        setCoverFocus(seed.coverFocus);
+        setPickerOpen(false);
+        setEndMode('duration');
+        setDurationH('2');
+        setDurationM('0');
+        setWhitelist(seed.whitelist);
+        setBlacklist(seed.blacklist);
+        setListModalOpen(false);
+        setInviteUserIds([]);
+        setAutoInviteEnabled(false);
+        setAutoInviteMode('select');
+        setSourceTemplate(null);
+        loadedBWListsRef.current = new Set();
+        templateAppliedRef.current = false;
+        if (seed.selectedTypes.length > 0) {
+          initialEventTypeIdsRef.current = seed.selectedTypes;
+          initialTypesAppliedRef.current = false;
+          const catalog = allTypesRef.current;
+          if (catalog.length > 0) {
+            const selection = deriveCategoryTypeSelection(seed.selectedTypes, catalog);
+            setSelectedCategories(selection.selectedCategories);
+            setSelectedTypes(selection.selectedTypes);
+            initialTypesAppliedRef.current = true;
+          } else {
+            setSelectedCategories([]);
+            setSelectedTypes(seed.selectedTypes);
+          }
+        } else {
+          setSelectedCategories([]);
+          setSelectedTypes([]);
+          initialEventTypeIdsRef.current = null;
+          initialTypesAppliedRef.current = false;
+        }
+        saveCreateEventDraft(aid, {
+          ...seed,
+          form: {
+            ...seed.form,
+            startDate: '',
+            startTime: '',
+            endDate: '',
+            endTime: '',
+          },
+          endMode: 'duration',
+          durationH: '2',
+          durationM: '0',
+          inviteUserIds: [],
+          autoInviteEnabled: false,
+          autoInviteMode: 'select',
+        });
+        draftHydratedRef.current = true;
+        const next = new URLSearchParams(searchParams);
+        next.delete('similar');
+        setSearchParams(next, { replace: true });
+        return;
+      }
+    }
+
     const draft = loadCreateEventDraft(aid);
     if (draft) applyDraft(draft);
     else resetCreateForm();
     draftHydratedRef.current = true;
-  }, [isEditing, id, accountId, resetCreateForm]);
+  }, [isEditing, id, accountId, resetCreateForm, searchParams, setSearchParams]);
 
   const draftSnapshotRef = useRef<CreateEventDraftSnapshot | null>(null);
   const discardCreateDraftRef = useRef(false);
@@ -1004,7 +1080,7 @@ export default function CreateEventPage() {
 
   // Если типы мероприятия загрузились раньше справочника — применить выбор после allTypes
   useEffect(() => {
-    if (!isEditing || initialTypesAppliedRef.current) return;
+    if (initialTypesAppliedRef.current) return;
     const typeIds = initialEventTypeIdsRef.current;
     if (!typeIds?.length || !allTypes.length) return;
 
@@ -1012,7 +1088,7 @@ export default function CreateEventPage() {
     setSelectedCategories(selection.selectedCategories);
     setSelectedTypes(selection.selectedTypes);
     initialTypesAppliedRef.current = true;
-  }, [isEditing, allTypes]);
+  }, [allTypes]);
 
   // Вспомогательные
   const set = (key: keyof FormState) =>
