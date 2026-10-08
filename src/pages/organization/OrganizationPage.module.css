@@ -139,6 +139,11 @@
 }
 
 @media (max-width: 639px) {
+  .profileInfo {
+    /* Название целиком на тёмной шапке, адрес остаётся ниже, на белом. */
+    padding-bottom: 24px;
+  }
+
   .nameRowMobile {
     display: flex;
   }
