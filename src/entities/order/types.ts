@@ -19,10 +19,15 @@ export interface ITicket {
   eventId: string;
   ticketTypeId?: string | null;
   ticketTypeName?: string | null;
-  holderAccountId: string;
+  /** На desk может быть null при ticketDeskRevealHolder=false */
+  holderAccountId?: string | null;
+  holderLogin?: string | null;
+  holderDisplayName?: string | null;
   status: TicketStatus;
   code: string;
   issuedAt: string | null;
+  checkedInAt?: string | null;
+  checkedInByAccountId?: string | null;
 }
 
 export interface IRefund {

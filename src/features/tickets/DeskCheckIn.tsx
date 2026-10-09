@@ -1,8 +1,9 @@
-// features/tickets/DeskCheckIn.tsx — desk: validate → карточка → confirm check-in
+// features/tickets/DeskCheckIn.tsx — desk: validate → карточка → confirm / undo
 
 import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import {
   checkInTicket,
+  undoCheckInTicket,
   validateTicket,
   TICKET_STATUS_LABELS,
   type ITicket,
@@ -20,17 +21,36 @@ const QrScanner = lazy(() =>
 interface DeskCheckInProps {
   eventId: string;
   canCheckIn?: boolean;
+  /** Owner/Manager only — TicketTaker не видит undo */
+  canUndoCheckIn?: boolean;
   onCheckedIn?: (ticket: ITicket) => void;
+  onUndone?: (ticket: ITicket) => void;
+}
+
+function formatCheckedIn(iso?: string | null): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
 }
 
 export function DeskCheckIn({
   eventId,
   canCheckIn = true,
+  canUndoCheckIn = false,
   onCheckedIn,
+  onUndone,
 }: DeskCheckInProps) {
   const toast = useToastStore(s => s.add);
   const [code, setCode] = useState('');
-  const [busy, setBusy] = useState<'validate' | 'checkin' | null>(null);
+  const [busy, setBusy] = useState<'validate' | 'checkin' | 'undo' | null>(null);
   const [card, setCard] = useState<ITicket | null>(null);
   const [scanning, setScanning] = useState(false);
   const busyRef = useRef(false);
@@ -76,6 +96,27 @@ export function DeskCheckIn({
     }
   }, [card, canCheckIn, eventId, onCheckedIn, toast]);
 
+  const confirmUndo = useCallback(async () => {
+    if (!card || !canUndoCheckIn || busyRef.current) return;
+    if (card.status !== 'Used') {
+      toast('Отменить можно только отмеченный вход', 'error');
+      return;
+    }
+    busyRef.current = true;
+    setBusy('undo');
+    try {
+      const ticket = await undoCheckInTicket({ eventId, code: card.code });
+      setCard(ticket);
+      toast('Вход отменён', 'success');
+      onUndone?.(ticket);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось отменить вход', 'error');
+    } finally {
+      busyRef.current = false;
+      setBusy(null);
+    }
+  }, [card, canUndoCheckIn, eventId, onUndone, toast]);
+
   const handleDetected = useCallback((value: string) => {
     setScanning(false);
     void openCard(value);
@@ -84,6 +125,8 @@ export function DeskCheckIn({
   const statusClass = card?.status === 'Used'
     ? styles.cardStatusUsed
     : (card?.status === 'Issued' ? styles.cardStatus : styles.cardStatusBad);
+
+  const checkedInLabel = formatCheckedIn(card?.checkedInAt);
 
   return (
     <div className={styles.wrap}>
@@ -144,6 +187,14 @@ export function DeskCheckIn({
           {card.ticketTypeName && (
             <div className={styles.cardType}>{card.ticketTypeName}</div>
           )}
+          {card.status === 'Used' && checkedInLabel && (
+            <div className={styles.cardMeta}>На площадке с {checkedInLabel}</div>
+          )}
+          {(card.holderDisplayName || card.holderLogin) && (
+            <div className={styles.cardMeta}>
+              Holder: {card.holderDisplayName || card.holderLogin}
+            </div>
+          )}
           <div className={styles.cardCode}>{card.code}</div>
           <div className={styles.cardActions}>
             {canCheckIn && card.status === 'Issued' && (
@@ -153,6 +204,16 @@ export function DeskCheckIn({
                 onClick={() => { void confirmCheckIn(); }}
               >
                 Отметить вход
+              </Button>
+            )}
+            {canUndoCheckIn && card.status === 'Used' && (
+              <Button
+                variant="secondary"
+                loading={busy === 'undo'}
+                disabled={busy != null}
+                onClick={() => { void confirmUndo(); }}
+              >
+                Отменить вход
               </Button>
             )}
             <Button

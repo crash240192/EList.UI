@@ -1,4 +1,4 @@
-// pages/tickets/TicketsDeskPage.tsx — desk контроля входа (W6c)
+// pages/tickets/TicketsDeskPage.tsx — desk контроля входа (W6c/W6e)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
@@ -13,6 +13,8 @@ import { DeskCheckIn } from '@/features/tickets';
 import { usePageTitle } from '@/shared/hooks';
 import { Button } from '@/shared/ui/Button';
 import styles from './TicketsDeskPage.module.css';
+
+const STATS_POLL_MS = 10_000;
 
 function formatWhen(iso: string): string {
   try {
@@ -38,44 +40,52 @@ export default function TicketsDeskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!eventId) return;
-    setLoading(true);
-    setError(null);
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const hub = await fetchTicketDeskHub(100);
       const item = hub.find(h => h.eventId === eventId) ?? null;
       setHubItem(item);
 
       if (!item) {
-        try {
-          const ev = await fetchEventById(eventId);
-          setEventName(ev?.name ?? null);
-        } catch {
-          setEventName(null);
+        if (!silent) {
+          try {
+            const ev = await fetchEventById(eventId);
+            setEventName(ev?.name ?? null);
+          } catch {
+            setEventName(null);
+          }
+          setStats(null);
+          setError('Нет доступа к контролю входа этого события');
         }
-        setStats(null);
-        setError('Нет доступа к контролю входа этого события');
         return;
       }
 
       setEventName(item.name);
+      setError(null);
       if (item.canViewStats) {
         try {
           const s = await fetchEventTicketStats(eventId);
           setStats(s);
         } catch {
-          setStats(null);
+          if (!silent) setStats(null);
         }
-      } else {
+      } else if (!silent) {
         setStats(null);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить desk');
-      setHubItem(null);
-      setStats(null);
+      if (!silent) {
+        setError(e instanceof Error ? e.message : 'Не удалось загрузить desk');
+        setHubItem(null);
+        setStats(null);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [eventId]);
 
@@ -83,9 +93,23 @@ export default function TicketsDeskPage() {
     void load();
   }, [load]);
 
+  // Live counters (UC-S4)
+  useEffect(() => {
+    if (!eventId || !hubItem?.canViewStats) return;
+    const id = window.setInterval(() => {
+      void load({ silent: true });
+    }, STATS_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [eventId, hubItem?.canViewStats, load]);
+
   const title = useMemo(
     () => eventName || hubItem?.name || 'Контроль входа',
     [eventName, hubItem?.name],
+  );
+
+  const canUndo = Boolean(
+    hubItem?.canUndoCheckIn
+    ?? (hubItem?.access === 'organizer'),
   );
 
   if (!eventId) {
@@ -167,8 +191,12 @@ export default function TicketsDeskPage() {
             <DeskCheckIn
               eventId={eventId}
               canCheckIn={hubItem.canCheckIn}
+              canUndoCheckIn={canUndo}
               onCheckedIn={() => {
-                if (hubItem.canViewStats) void load();
+                if (hubItem.canViewStats) void load({ silent: true });
+              }}
+              onUndone={() => {
+                if (hubItem.canViewStats) void load({ silent: true });
               }}
             />
           )}

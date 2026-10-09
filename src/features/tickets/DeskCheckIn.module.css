@@ -105,6 +105,11 @@
   color: var(--text-secondary);
 }
 
+.cardMeta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 .cardActions {
   display: flex;
   flex-wrap: wrap;
