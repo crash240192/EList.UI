@@ -682,8 +682,10 @@ export default function EventPage() {
     : priceMin === priceMax
       ? `${priceMin.toLocaleString('ru-RU')} ₽`
       : `${priceMin.toLocaleString('ru-RU')}–${priceMax.toLocaleString('ru-RU')} ₽`;
-  /** Событие с билетами И глобальный kill-switch API. */
-  const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled) && globalTicketSales;
+  /** Билеты включены на событии (для desk/staff; не зависит от kill-switch продаж). */
+  const eventTicketsOn = Boolean(event.parameters?.ticketsEnabled);
+  /** Покупка билетов: событие + глобальный kill-switch API. */
+  const ticketsEnabled = eventTicketsOn && globalTicketSales;
   const maxPersons = event.parameters?.maxPersonsCount ?? null;
   const participantCap = maxPersons != null && maxPersons > 0 ? maxPersons : null;
   const isParticipantLimitFull =
@@ -1274,7 +1276,7 @@ export default function EventPage() {
               </AccessDeniedGate>
             )}
 
-            {isOrganizer && ticketsEnabled && id && (
+            {isOrganizer && eventTicketsOn && id && (
               <>
                 <Link
                   className={styles.deskCta}
