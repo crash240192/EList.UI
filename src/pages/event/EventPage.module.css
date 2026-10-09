@@ -164,7 +164,8 @@
   text-decoration-thickness: 0.6px;
   text-decoration-color: rgba(255, 255, 255, 0.95);
 }
-.heroFinished {
+.heroFinished,
+.heroCancelled {
   display: inline-flex;
   align-items: center;
   margin-left: 8px;
@@ -178,12 +179,18 @@
   text-shadow: none;
   text-decoration: none;
   vertical-align: 1px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 0.5px solid rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(6px);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.45),
     0 3px 10px rgba(0, 0, 0, 0.3);
+}
+.heroFinished {
+  background: rgba(255, 255, 255, 0.16);
+  border: 0.5px solid rgba(255, 255, 255, 0.55);
+}
+.heroCancelled {
+  background: rgba(239, 68, 68, 0.75);
+  border: 0.5px solid rgba(239, 68, 68, 0.5);
 }
 .heroTagsRow {
   position: relative;
@@ -367,12 +374,6 @@
   72% { transform:translateX(4px); }
 }
 .btnJoinShake { animation:joinShake .45s ease; }
-
-.tagCancelled {
-  padding:3px 10px; border-radius:20px; font-size:10px; font-weight:600;
-  backdrop-filter:blur(6px); background:rgba(239,68,68,.75); color:#fff;
-  border:.5px solid rgba(239,68,68,.5);
-}
 
 .tagReports {
   padding:3px 10px; border-radius:20px; font-size:10px; font-weight:600;

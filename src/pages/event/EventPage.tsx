@@ -906,7 +906,7 @@ export default function EventPage() {
           <div className={styles.heroBottom}>
             <h1 className={styles.heroTitle}>{event.name}</h1>
             <div className={styles.heroDateTime}>
-              <span className={eventFinished ? styles.heroDateStrike : undefined}>
+              <span className={eventFinished || !isEventActive ? styles.heroDateStrike : undefined}>
                 {isSameCalendarDay(event.startTime, event.endTime) ? (
                   <>
                     {formatEventHeroDate(event.startTime, false)}
@@ -922,6 +922,11 @@ export default function EventPage() {
                 )}
               </span>
               {eventFinished && <span className={styles.heroFinished}>Завершено</span>}
+              {!isEventActive && (
+                <span className={styles.heroCancelled}>
+                  {event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено'}
+                </span>
+              )}
             </div>
             <div className={styles.heroTagsRow}>
               <div className={styles.heroTagsLeft}>
@@ -952,11 +957,6 @@ export default function EventPage() {
                       <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
                     </svg>
                     Закрытое
-                  </span>
-                )}
-                {!isEventActive && (
-                  <span className={styles.tagCancelled}>
-                    {event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено'}
                   </span>
                 )}
                 {showReportsHeroChip && (
