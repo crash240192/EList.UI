@@ -7,6 +7,11 @@ import {
   getBWList,
   type IBWListUser,
 } from '@/entities/event/participationApi';
+import {
+  fetchEventTicketTypes,
+  minActiveTicketTypePrice,
+  ticketTypeDraftCloneForSeed,
+} from '@/entities/event/ticketTypesApi';
 import type { IEvent } from '@/entities/event/types';
 import type { Gender } from '@/shared/api/types';
 import { DEFAULT_COVER_FOCUS, coverFocusFromEvent } from '@/shared/lib/coverFocus';
@@ -27,7 +32,7 @@ export const SIMILAR_EVENT_FIELDS = [
   { id: 'location', label: 'Местоположение', column: 'left' },
   { id: 'gender', label: 'Ограничение по полу', column: 'right' },
   { id: 'bwList', label: 'Черный/Белый список', column: 'right' },
-  { id: 'cost', label: 'Стоимость', column: 'right' },
+  { id: 'cost', label: 'Стоимость / билеты', column: 'right' },
   { id: 'age', label: 'Возрастной рейтинг', column: 'right' },
   { id: 'participants', label: 'Кол-во участников', column: 'right' },
 ] as const;
@@ -70,6 +75,7 @@ function blankSnapshot(host: CreateEventHost): CreateEventDraftSnapshot {
     inviteUserIds: [],
     autoInviteEnabled: false,
     autoInviteMode: 'select',
+    ticketTypes: [],
   };
 }
 
@@ -119,7 +125,25 @@ export async function buildSimilarEventSeed(input: {
     seed.coverFocus = coverFocusFromEvent(event) ?? { ...DEFAULT_COVER_FOCUS };
   }
 
-  if (selected.has('cost')) seed.form.cost = String(params?.cost ?? 0);
+  if (selected.has('cost')) {
+    const ticketsEnabled = Boolean(params?.ticketsEnabled);
+    seed.form.ticketsEnabled = ticketsEnabled;
+    if (ticketsEnabled) {
+      const types = await fetchEventTicketTypes(event.id, true).catch(() => []);
+      const activeOrAll = types.length > 0
+        ? types.filter(t => t.active).concat(types.filter(t => !t.active))
+        : types;
+      // В семя — активные типы без server id; если активных нет — все (как снимок).
+      const source = types.some(t => t.active) ? types.filter(t => t.active) : activeOrAll;
+      seed.ticketTypes = source.map(ticketTypeDraftCloneForSeed);
+      const minPrice = minActiveTicketTypePrice(seed.ticketTypes);
+      seed.form.cost = String(minPrice ?? params?.cost ?? 0);
+    } else {
+      seed.form.cost = String(params?.cost ?? 0);
+      seed.ticketTypes = [];
+    }
+  }
+
   if (selected.has('age')) seed.form.ageLimit = ageToForm(params?.ageLimit);
   if (selected.has('participants') && params?.maxPersonsCount != null) {
     seed.form.maxPersons = String(params.maxPersonsCount);
@@ -169,6 +193,7 @@ export function saveSimilarEventSeed(seed: CreateEventDraftSnapshot): void {
     endMode: 'duration',
     durationH: '2',
     durationM: '0',
+    ticketTypes: seed.ticketTypes ?? [],
   };
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
 }
@@ -190,6 +215,7 @@ export function consumeSimilarEventSeed(): CreateEventDraftSnapshot | null {
     parsed.endMode = 'duration';
     parsed.durationH = '2';
     parsed.durationM = '0';
+    parsed.ticketTypes = Array.isArray(parsed.ticketTypes) ? parsed.ticketTypes : [];
     return parsed;
   } catch {
     sessionStorage.removeItem(STORAGE_KEY);

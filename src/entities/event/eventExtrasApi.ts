@@ -3,6 +3,7 @@
 
 import { apiClient } from '@/shared/api/client';
 import type { Gender } from '@/shared/api/types';
+import type { IEventTicketTypeRequest } from './ticketTypesApi';
 
 // ---- EventParameters ----
 
@@ -26,6 +27,8 @@ export interface IAssignEventParametersRequest {
   allowedGender?: Gender | null;
   allowUsersToInvite: boolean;
   ticketsEnabled: boolean;
+  /** Типы билетов (replace). При ticketsEnabled — ≥1 active. */
+  ticketTypes?: IEventTicketTypeRequest[] | null;
 }
 
 /**

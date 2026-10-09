@@ -1,12 +1,16 @@
 // features/tickets/BuyTicketModal.tsx
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   createOrder,
   formatMoney,
   type IOrder,
 } from '@/entities/order';
+import {
+  fetchEventTicketTypes,
+  type IEventTicketType,
+} from '@/entities/event/ticketTypesApi';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { Button } from '@/shared/ui/Button';
 import { PaymentStubModal } from './PaymentStubModal';
@@ -16,6 +20,7 @@ interface BuyTicketModalProps {
   open: boolean;
   eventId: string;
   eventName: string;
+  /** Fallback цена, если типы ещё не загрузились / один тип без выбора. */
   unitPrice: number;
   /** Сколько ещё можно купить с учётом лимита мест; null = без лимита */
   remainingSeats: number | null;
@@ -35,9 +40,9 @@ export function BuyTicketModal({
   onClose,
   onPurchased,
 }: BuyTicketModalProps) {
-  const maxQty = remainingSeats == null
-    ? 10
-    : Math.max(0, Math.min(10, remainingSeats));
+  const [types, setTypes] = useState<IEventTicketType[]>([]);
+  const [typesLoading, setTypesLoading] = useState(false);
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,20 +57,72 @@ export function BuyTicketModal({
     if (!busy && !pendingPay) onClose();
   }, open && !pendingPay);
 
-  const total = useMemo(() => unitPrice * qty, [unitPrice, qty]);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setTypesLoading(true);
+    setError(null);
+    setQty(1);
+    setSelectedTypeId(null);
+    fetchEventTicketTypes(eventId, false)
+      .then(list => {
+        if (cancelled) return;
+        const active = list.filter(t => t.active).sort((a, b) => a.sortOrder - b.sortOrder);
+        setTypes(active);
+        if (active.length > 0) setSelectedTypeId(active[0].id);
+      })
+      .catch(() => {
+        if (!cancelled) setTypes([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTypesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [open, eventId]);
+
+  const selectedType = useMemo(
+    () => types.find(t => t.id === selectedTypeId) ?? null,
+    [types, selectedTypeId],
+  );
+
+  const effectiveUnitPrice = selectedType != null ? selectedType.price : unitPrice;
+
+  const typeRemaining = selectedType?.capacity != null && selectedType.capacity > 0
+    ? selectedType.capacity
+    : null;
+
+  const effectiveRemaining = (() => {
+    if (remainingSeats == null && typeRemaining == null) return null;
+    if (remainingSeats == null) return typeRemaining;
+    if (typeRemaining == null) return remainingSeats;
+    return Math.min(remainingSeats, typeRemaining);
+  })();
+
+  const maxQty = effectiveRemaining == null
+    ? 10
+    : Math.max(0, Math.min(10, effectiveRemaining));
+
+  const total = useMemo(() => effectiveUnitPrice * qty, [effectiveUnitPrice, qty]);
+
+  useEffect(() => {
+    if (qty > maxQty && maxQty > 0) setQty(maxQty);
+  }, [maxQty, qty]);
 
   if (!open) return null;
 
   const soldOut = maxQty <= 0;
+  const needsType = types.length > 1;
+  const typeMissing = types.length > 0 && !selectedTypeId;
 
   const handleSubmit = async () => {
-    if (soldOut || busy) return;
+    if (soldOut || busy || typeMissing) return;
     setBusy(true);
     setError(null);
     try {
       const result = await createOrder({
         eventId,
         quantity: qty,
+        ...(selectedTypeId ? { ticketTypeId: selectedTypeId } : {}),
       });
       if (result.paidImmediately) {
         onPurchased(result.order);
@@ -131,12 +188,53 @@ export function BuyTicketModal({
               </p>
             )}
 
-            <div className={styles.row}>
-              <span className={styles.rowLabel}>Билет</span>
-              <span className={styles.rowValue}>
-                {unitPrice <= 0 ? 'Бесплатно' : formatMoney(unitPrice)}
-              </span>
-            </div>
+            {typesLoading && (
+              <p className={styles.hint}>Загрузка типов билетов…</p>
+            )}
+
+            {!typesLoading && types.length > 1 && (
+              <div className={styles.typeList} role="radiogroup" aria-label="Тип билета">
+                {types.map(t => {
+                  const selected = t.id === selectedTypeId;
+                  return (
+                    <label
+                      key={t.id}
+                      className={`${styles.typeOption} ${selected ? styles.typeOptionActive : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="ticket-type"
+                        checked={selected}
+                        onChange={() => {
+                          setSelectedTypeId(t.id);
+                          setQty(1);
+                        }}
+                      />
+                      <span className={styles.typeMeta}>
+                        <span className={styles.typeName}>{t.name}</span>
+                        {t.capacity != null && (
+                          <span className={styles.typeCap}>до {t.capacity} мест</span>
+                        )}
+                      </span>
+                      <span className={styles.typePrice}>
+                        {t.price <= 0 ? 'Бесплатно' : formatMoney(t.price)}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {!typesLoading && types.length <= 1 && (
+              <div className={styles.row}>
+                <span className={styles.rowLabel}>
+                  {selectedType?.name || 'Билет'}
+                </span>
+                <span className={styles.rowValue}>
+                  {effectiveUnitPrice <= 0 ? 'Бесплатно' : formatMoney(effectiveUnitPrice)}
+                </span>
+              </div>
+            )}
 
             <div className={styles.row}>
               <span className={styles.rowLabel}>Количество</span>
@@ -163,17 +261,17 @@ export function BuyTicketModal({
               </div>
             </div>
 
-            {remainingSeats != null && (
+            {effectiveRemaining != null && (
               <p className={styles.hint}>
                 {soldOut
                   ? 'Мест больше нет'
-                  : `Доступно мест: ${remainingSeats}`}
+                  : `Доступно мест: ${effectiveRemaining}`}
               </p>
             )}
 
             <div className={styles.totalRow}>
               <span>Итого</span>
-              <strong>{unitPrice <= 0 ? 'Бесплатно' : formatMoney(total)}</strong>
+              <strong>{effectiveUnitPrice <= 0 ? 'Бесплатно' : formatMoney(total)}</strong>
             </div>
 
             {error && <p className={styles.error}>{error}</p>}
@@ -184,10 +282,10 @@ export function BuyTicketModal({
               </button>
               <Button
                 onClick={() => { void handleSubmit(); }}
-                loading={busy}
-                disabled={soldOut}
+                loading={busy || typesLoading}
+                disabled={soldOut || typeMissing || (needsType && !selectedTypeId)}
               >
-                {unitPrice <= 0 ? 'Получить билет' : 'Оформить покупку'}
+                {effectiveUnitPrice <= 0 ? 'Получить билет' : 'Оформить покупку'}
               </Button>
             </div>
           </div>
