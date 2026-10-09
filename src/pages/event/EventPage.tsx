@@ -54,7 +54,7 @@ import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialo
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
-import { BuyTicketModal, TicketCheckInPanel } from '@/features/tickets';
+import { BuyTicketModal, EventTicketStaffPanel, TicketCheckInPanel } from '@/features/tickets';
 import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import {
   ContentReportModal,
@@ -1275,7 +1275,10 @@ export default function EventPage() {
             )}
 
             {isOrganizer && ticketsEnabled && id && (
-              <TicketCheckInPanel eventId={id} />
+              <>
+                <TicketCheckInPanel eventId={id} />
+                <EventTicketStaffPanel eventId={id} />
+              </>
             )}
 
             <EventAlbums

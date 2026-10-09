@@ -65,6 +65,16 @@ export type {
 } from './eventExtrasApi';
 
 export {
+  fetchEventTicketStaff,
+  setEventTicketStaff,
+} from './ticketStaffApi';
+
+export type {
+  EventTicketStaffResponse,
+  EventTicketStaffItemRequest,
+} from './ticketStaffApi';
+
+export {
   fetchEventTicketTypes,
   createEmptyTicketTypeDraft,
   ticketTypeDraftFromApi,

@@ -9,6 +9,32 @@
   gap: 8px;
 }
 
+.staffList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.staffRow {
+  margin: 0;
+}
+
+.staffLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.staffLabel input {
+  margin: 0;
+}
+
 .label {
   font-size: 10px;
   font-weight: 600;
