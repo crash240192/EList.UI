@@ -21,6 +21,7 @@ import { UserAgreementsGate, UserAgreementsInfoButton } from '@/features/agreeme
 import { BugReportButton } from '@/features/bug-reports';
 import { usePlatformModerationCount } from '@/features/admin/usePlatformModerationCount';
 import { HeaderAvatarMenu } from '@/features/user/HeaderAvatarMenu';
+import { canShowTicketDeskNav } from '@/features/tickets';
 import { useMediaQuery } from '@/shared/hooks';
 import { media } from '@/shared/lib/breakpoints';
 import styles from './AppLayout.module.css';
@@ -28,10 +29,12 @@ import styles from './AppLayout.module.css';
 const MAIN_NAV_ITEMS = [
   { to: '/',             label: 'Поиск событий',    icon: <SearchIcon /> },
   { to: '/my-events',    label: 'Мои события',      icon: <CalendarIcon /> },
+  { to: '/tickets',      label: 'Билеты',           icon: <TicketsIcon /> },
   { to: '/invitations',  label: 'Приглашения',      icon: <InviteIcon /> },
   { to: '/event-albums', label: 'Альбомы мероприятий', icon: <AlbumsIcon /> },
   { to: '/create-event', label: 'Создать событие',  icon: <PlusIcon /> },
 ] as const;
+
 
 const STAFF_NAV_ITEMS = [
   { to: '/moderation',   label: 'Модерация',         icon: <ModerationIcon /> },
@@ -45,6 +48,7 @@ export function AppLayout() {
   const [sidebarExpanded, setSidebarExpanded] = useState(isWide);
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
   const [draftResumeOpen, setDraftResumeOpen] = useState(false);
+  const [showTicketsNav,  setShowTicketsNav]  = useState(false);
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout, accountId } = useAuthStore();
   const location = useLocation();
@@ -63,16 +67,24 @@ export function AppLayout() {
   useEffect(() => {
     if (!authenticated) {
       clearPlatformRole();
+      setShowTicketsNav(false);
       return;
     }
     void refreshPlatformRole();
-  }, [authenticated, refreshPlatformRole, clearPlatformRole]);
+    let cancelled = false;
+    void canShowTicketDeskNav().then((ok) => {
+      if (!cancelled) setShowTicketsNav(ok);
+    });
+    return () => { cancelled = true; };
+  }, [authenticated, refreshPlatformRole, clearPlatformRole, accountId]);
 
-  const visibleMainNavItems = authenticated
+  const visibleMainNavItems = (authenticated
     ? MAIN_NAV_ITEMS
-    : MAIN_NAV_ITEMS.filter(({ to }) => to === '/');
+    : MAIN_NAV_ITEMS.filter(({ to }) => to === '/')
+  ).filter(({ to }) => to !== '/tickets' || showTicketsNav);
 
   const visibleStaffNavItems = authenticated && hasPlatformAccess ? STAFF_NAV_ITEMS : [];
+
 
   useActivationRedirect();
 
@@ -307,3 +319,4 @@ function LoginIcon()    { return <svg width="18" height="18" viewBox="0 0 24 24"
 function HamburgerIcon(){ return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>; }
 function InviteIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/><line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/></svg>; }
 function AlbumsIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/></svg>; }
+function TicketsIcon()  { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1a2 2 0 0 0 0 4v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1a2 2 0 0 0 0-4V9z"/><path d="M9 7v10"/></svg>; }

@@ -25,7 +25,10 @@ const AdminPage       = lazyWithRetry(() => import('@/pages/admin/AdminPage'));
 const SettingsPage    = lazyWithRetry(() => import('@/pages/settings/SettingsPage'));
 const WalletPage      = lazyWithRetry(() => import('@/pages/wallet/WalletPage'));
 const MyTicketsPage   = lazyWithRetry(() => import('@/pages/my-tickets/MyTicketsPage'));
+const TicketsHubPage  = lazyWithRetry(() => import('@/pages/tickets/TicketsHubPage'));
+const TicketsDeskPage = lazyWithRetry(() => import('@/pages/tickets/TicketsDeskPage'));
 const PaymentsReturnPage = lazyWithRetry(() => import('@/pages/payments/PaymentsReturnPage'));
+
 const MyReportsPage   = lazyWithRetry(() => import('@/pages/my-reports/MyReportsPage'));
 const ReportsAgainstMePage = lazyWithRetry(() => import('@/pages/reports-against-me/ReportsAgainstMePage'));
 const CookiePolicyPage = lazyWithRetry(() => import('@/pages/legal/CookiePolicyPage'));
@@ -82,7 +85,10 @@ const router = createBrowserRouter([
       { path: 'settings',         element: <RequireAuth>{S(SettingsPage)}</RequireAuth> },
       { path: 'wallet',           element: <RequireAuth>{S(WalletPage)}</RequireAuth> },
       { path: 'my-tickets',       element: <RequireAuth>{S(MyTicketsPage)}</RequireAuth> },
+      { path: 'tickets',          element: <RequireAuth>{S(TicketsHubPage)}</RequireAuth> },
+      { path: 'tickets/desk',     element: <RequireAuth>{S(TicketsDeskPage)}</RequireAuth> },
       { path: 'payments/return',  element: <RequireAuth>{S(PaymentsReturnPage)}</RequireAuth> },
+
       { path: 'my-reports',       element: <RequireAuth>{S(MyReportsPage)}</RequireAuth> },
       { path: 'reports-against-me', element: <RequireAuth>{S(ReportsAgainstMePage)}</RequireAuth> },
       { path: 'cookies',          element: S(CookiePolicyPage) },
