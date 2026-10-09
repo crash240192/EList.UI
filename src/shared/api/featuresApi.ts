@@ -4,6 +4,8 @@ import { getAppVersion, getClientPlatform, getOrCreateClientHash } from '@/share
 
 export interface IAppFeatures {
   ticketSalesEnabled: boolean;
+  /** Desk: показывать login/ФИО holder (server flag) */
+  ticketDeskRevealHolder: boolean;
 }
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/eList';
@@ -31,10 +33,13 @@ export async function fetchAppFeatures(force = false): Promise<IAppFeatures> {
         ticketSalesEnabled: Boolean(
           raw.ticketSalesEnabled ?? raw.TicketSalesEnabled ?? false,
         ),
+        ticketDeskRevealHolder: Boolean(
+          raw.ticketDeskRevealHolder ?? raw.TicketDeskRevealHolder ?? false,
+        ),
       };
       return cached;
     } catch {
-      cached = { ticketSalesEnabled: false };
+      cached = { ticketSalesEnabled: false, ticketDeskRevealHolder: false };
       return cached;
     } finally {
       inflight = null;

@@ -25,6 +25,7 @@ import { useToastStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { Button } from '@/shared/ui/Button';
 import { QrCodeImage } from '@/shared/ui/QrCode/QrCodeImage';
+import { TicketPrintModal } from '@/features/tickets';
 import { GiftRecipientModal } from './GiftRecipientModal';
 import styles from './MyTicketsPage.module.css';
 
@@ -77,8 +78,21 @@ export default function MyTicketsPage() {
   const [cancelTicket, setCancelTicket] = useState<TicketRow | null>(null);
   const [cancelPendingOrder, setCancelPendingOrder] = useState<OrderRow | null>(null);
   const [giftTicket, setGiftTicket] = useState<TicketRow | null>(null);
+  const [printTicket, setPrintTicket] = useState<TicketRow | null>(null);
   const [qrTicketId, setQrTicketId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const orderPriceById = useMemo(() => {
+    const map = new Map<string, { price: number; currency: string }>();
+    for (const order of [...pendingOrders, ...historyOrders]) {
+      const qty = Math.max(1, order.quantity || 1);
+      map.set(order.id, {
+        price: order.amountTotal / qty,
+        currency: order.currency || 'RUB',
+      });
+    }
+    return map;
+  }, [pendingOrders, historyOrders]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -339,6 +353,15 @@ export default function MyTicketsPage() {
                             {qrOpen ? 'Скрыть QR' : 'Показать QR'}
                           </Button>
                         )}
+                        {ticket.code && (ticket.status === 'Issued' || ticket.status === 'Used') && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setPrintTicket(ticket)}
+                          >
+                            Печать
+                          </Button>
+                        )}
                         {canCancelRefund ? (
                           <Button
                             size="sm"
@@ -466,6 +489,16 @@ export default function MyTicketsPage() {
           busy={busy}
           onClose={() => { if (!busy) setGiftTicket(null); }}
           onConfirm={(id, label) => { void confirmGift(id, label); }}
+        />
+      )}
+
+      {printTicket && (
+        <TicketPrintModal
+          ticket={printTicket}
+          eventNameHint={printTicket.eventName}
+          price={orderPriceById.get(printTicket.orderId)?.price ?? null}
+          currency={orderPriceById.get(printTicket.orderId)?.currency ?? 'RUB'}
+          onClose={() => setPrintTicket(null)}
         />
       )}
     </div>

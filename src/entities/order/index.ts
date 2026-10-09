@@ -30,6 +30,7 @@ export {
   fetchRefundsByOrder,
   validateTicket,
   checkInTicket,
+  undoCheckInTicket,
 } from './api';
 
 export {

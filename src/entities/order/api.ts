@@ -38,12 +38,18 @@ function normalizeTicket(raw: Record<string, unknown>): ITicket {
     eventId: asStr(raw.eventId ?? raw.EventId),
     ticketTypeId: optionalStr(raw, 'ticketTypeId', 'TicketTypeId'),
     ticketTypeName: optionalStr(raw, 'ticketTypeName', 'TicketTypeName'),
-    holderAccountId: asStr(raw.holderAccountId ?? raw.HolderAccountId),
+    holderAccountId: optionalStr(raw, 'holderAccountId', 'HolderAccountId'),
+    holderLogin: optionalStr(raw, 'holderLogin', 'HolderLogin'),
+    holderDisplayName: optionalStr(raw, 'holderDisplayName', 'HolderDisplayName'),
     status: asStr(raw.status ?? raw.Status) as TicketStatus,
     code: asStr(raw.code ?? raw.Code),
     issuedAt: raw.issuedAt != null || raw.IssuedAt != null
       ? asStr(raw.issuedAt ?? raw.IssuedAt)
       : null,
+    checkedInAt: raw.checkedInAt != null || raw.CheckedInAt != null
+      ? asStr(raw.checkedInAt ?? raw.CheckedInAt)
+      : null,
+    checkedInByAccountId: optionalStr(raw, 'checkedInByAccountId', 'CheckedInByAccountId'),
   };
 }
 
@@ -231,6 +237,15 @@ export async function validateTicket(payload: ITicketCheckInRequest): Promise<IT
 export async function checkInTicket(payload: ITicketCheckInRequest): Promise<ITicket> {
   const r = await apiClient.post<Record<string, unknown>>(
     '/api/orders/tickets/check-in',
+    payload,
+  );
+  return normalizeTicket((r.result ?? {}) as Record<string, unknown>);
+}
+
+/** POST /api/orders/tickets/undo-check-in — Owner/Manager: Used→Issued */
+export async function undoCheckInTicket(payload: ITicketCheckInRequest): Promise<ITicket> {
+  const r = await apiClient.post<Record<string, unknown>>(
+    '/api/orders/tickets/undo-check-in',
     payload,
   );
   return normalizeTicket((r.result ?? {}) as Record<string, unknown>);

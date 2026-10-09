@@ -1,7 +1,7 @@
 // pages/event/EventPage.tsx
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { IEvent, IEventOrganizator, IParticipantView } from '@/entities/event';
 import {
   fetchEventById, participateEvent, leaveEvent,
@@ -54,7 +54,7 @@ import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialo
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
-import { BuyTicketModal, TicketCheckInPanel } from '@/features/tickets';
+import { BuyTicketModal, EventTicketStaffPanel } from '@/features/tickets';
 import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import {
   ContentReportModal,
@@ -682,8 +682,10 @@ export default function EventPage() {
     : priceMin === priceMax
       ? `${priceMin.toLocaleString('ru-RU')} ₽`
       : `${priceMin.toLocaleString('ru-RU')}–${priceMax.toLocaleString('ru-RU')} ₽`;
-  /** Событие с билетами И глобальный kill-switch API. */
-  const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled) && globalTicketSales;
+  /** Билеты включены на событии (для desk/staff; не зависит от kill-switch продаж). */
+  const eventTicketsOn = Boolean(event.parameters?.ticketsEnabled);
+  /** Покупка билетов: событие + глобальный kill-switch API. */
+  const ticketsEnabled = eventTicketsOn && globalTicketSales;
   const maxPersons = event.parameters?.maxPersonsCount ?? null;
   const participantCap = maxPersons != null && maxPersons > 0 ? maxPersons : null;
   const isParticipantLimitFull =
@@ -1274,8 +1276,19 @@ export default function EventPage() {
               </AccessDeniedGate>
             )}
 
-            {isOrganizer && ticketsEnabled && id && (
-              <TicketCheckInPanel eventId={id} />
+            {isOrganizer && eventTicketsOn && id && (
+              <>
+                <Link
+                  className={styles.deskCta}
+                  to={`/tickets/desk?eventId=${encodeURIComponent(id)}`}
+                >
+                  <span className={styles.deskCtaTitle}>Рабочее место на входе</span>
+                  <span className={styles.deskCtaHint}>
+                    Скан QR, подтверждение и счётчики — на desk
+                  </span>
+                </Link>
+                <EventTicketStaffPanel eventId={id} />
+              </>
             )}
 
             <EventAlbums
