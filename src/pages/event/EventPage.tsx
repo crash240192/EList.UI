@@ -836,6 +836,7 @@ export default function EventPage() {
                     open={mobileMenuOpen}
                     onClose={() => setMobileMenuOpen(false)}
                     anchorRef={organizerMenuRef}
+                    accent
                   >
                     <HeroContextMenuItem onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>
                       Редактировать
