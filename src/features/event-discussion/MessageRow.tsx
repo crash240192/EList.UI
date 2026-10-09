@@ -20,6 +20,7 @@ import {
   messageAuthorName,
   messageInitials,
   formatMessageDate,
+  messageEditedAt,
   formatReplyCount,
   discussionMessageDomId,
   isLongMessageText,
@@ -175,6 +176,7 @@ export function MessageRow({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.messageText);
   const [displayText, setDisplayText] = useState(message.messageText);
+  const [savedEditAt, setSavedEditAt] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [replyTotal, setReplyTotal] = useState<number | null>(null);
@@ -394,6 +396,7 @@ export function MessageRow({
       });
       setDisplayText(trimmed);
       setDisplayFileIds(editFileIds);
+      setSavedEditAt(new Date().toISOString());
       setEditUploads(prev => {
         prev.forEach(u => URL.revokeObjectURL(u.previewUrl));
         return [];
@@ -428,6 +431,8 @@ export function MessageRow({
     ? formatReplyCount(replyTotal)
     : 'Есть ответы';
   const isLongText = isLongMessageText(displayText);
+  const editedAt = savedEditAt ?? messageEditedAt(message);
+  const shownAt = editedAt ?? message.createDate;
 
   const openAuthorProfile = () => {
     if (!accountId) return;
@@ -509,7 +514,10 @@ export function MessageRow({
                 <span className={styles.author}>{messageAuthorName(message)}</span>
               )}
               {isMine && <span className={styles.you}>вы</span>}
-              <time className={styles.time}>{formatMessageDate(message.createDate)}</time>
+              <span className={styles.timeGroup}>
+                <time className={styles.time} dateTime={shownAt}>{formatMessageDate(shownAt)}</time>
+                {editedAt && <span className={styles.edited}>(ред.)</span>}
+              </span>
             </header>
 
             {isHidden ? (

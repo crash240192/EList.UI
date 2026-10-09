@@ -126,6 +126,8 @@ function normalizeMessage(raw: unknown): IMessage {
     dislikesCount: Number(r.dislikesCount ?? r.DislikesCount ?? msg.dislikesCount ?? 0) || 0,
     currentUserVote: normalizeMessageVote(r.currentUserVote ?? r.CurrentUserVote ?? msg.currentUserVote),
     fileIds: normalizeFileIds(r.fileIds ?? r.FileIds ?? msg.fileIds),
+    createDate: String(r.createDate ?? r.CreateDate ?? msg.createDate ?? ''),
+    updateDate: String(r.updateDate ?? r.UpdateDate ?? msg.updateDate ?? ''),
   };
 }
 

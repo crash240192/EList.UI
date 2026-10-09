@@ -357,6 +357,18 @@ export function messageAuthorName(msg: IMessage): string {
   return msg.account?.login?.trim() || 'Участник';
 }
 
+/** Создание и правка пишутся двумя вызовами часов, поэтому доли секунды — не правка. */
+const MESSAGE_EDIT_GAP_MS = 1000;
+
+/** Время последней правки, если комментарий меняли после публикации. */
+export function messageEditedAt(message: Pick<IMessage, 'createDate' | 'updateDate'>): string | null {
+  const created = Date.parse(message.createDate);
+  const updated = Date.parse(message.updateDate);
+  if (!Number.isFinite(created) || !Number.isFinite(updated)) return null;
+  if (updated - created < MESSAGE_EDIT_GAP_MS) return null;
+  return message.updateDate;
+}
+
 export function formatMessageDate(iso: string): string {
   try {
     return new Date(iso).toLocaleString('ru-RU', {
