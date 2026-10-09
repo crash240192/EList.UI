@@ -90,6 +90,56 @@ export function ticketTypeDraftCloneForSeed(item: IEventTicketType): ITicketType
   };
 }
 
+/**
+ * Черновик из payload шаблона / CreateEventRequest (без server id).
+ * Принимает camelCase и PascalCase поля.
+ */
+export function ticketTypeDraftFromRequest(raw: unknown, sortOrder = 0): ITicketTypeDraft | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const nameRaw = o.name ?? o.Name;
+  const priceRaw = o.price ?? o.Price;
+  const capacityRaw = o.capacity ?? o.Capacity;
+  const descRaw = o.description ?? o.Description;
+  const activeRaw = o.active ?? o.Active;
+  const sortRaw = o.sortOrder ?? o.SortOrder;
+
+  const priceNum = asNum(priceRaw, 0);
+  const capacity =
+    capacityRaw == null || capacityRaw === ''
+      ? ''
+      : String(Math.max(1, Math.trunc(asNum(capacityRaw, 0)) || 1));
+
+  return {
+    clientKey: newClientKey(),
+    id: null,
+    name: asStr(nameRaw, 'Стандарт') || 'Стандарт',
+    description: descRaw == null || descRaw === '' ? '' : String(descRaw),
+    price: String(priceNum >= 0 ? priceNum : 0),
+    capacity,
+    sortOrder: typeof sortRaw === 'number' && Number.isFinite(sortRaw) ? sortRaw : sortOrder,
+    active: activeRaw === undefined || activeRaw === null ? true : Boolean(activeRaw),
+  };
+}
+
+/** Список черновиков из массива ticketTypes в шаблоне (только активные по умолчанию). */
+export function ticketTypeDraftsFromTemplateParams(
+  ticketTypesRaw: unknown,
+  opts?: { includeInactive?: boolean },
+): ITicketTypeDraft[] {
+  if (!Array.isArray(ticketTypesRaw)) return [];
+  const includeInactive = opts?.includeInactive === true;
+  const drafts: ITicketTypeDraft[] = [];
+  for (const item of ticketTypesRaw) {
+    const draft = ticketTypeDraftFromRequest(item, drafts.length);
+    if (!draft) continue;
+    if (!includeInactive && !draft.active) continue;
+    draft.sortOrder = drafts.length;
+    drafts.push(draft);
+  }
+  return drafts;
+}
+
 export function parseTicketTypePrice(raw: string): number {
   const n = Number.parseFloat(String(raw).replace(',', '.'));
   return Number.isFinite(n) ? n : Number.NaN;

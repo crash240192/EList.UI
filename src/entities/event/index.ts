@@ -69,6 +69,8 @@ export {
   createEmptyTicketTypeDraft,
   ticketTypeDraftFromApi,
   ticketTypeDraftCloneForSeed,
+  ticketTypeDraftFromRequest,
+  ticketTypeDraftsFromTemplateParams,
   toTicketTypeRequests,
   minActiveTicketTypePrice,
   parseTicketTypePrice,

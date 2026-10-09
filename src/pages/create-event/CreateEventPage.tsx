@@ -20,6 +20,7 @@ import {
   fetchEventTicketTypes,
   createEmptyTicketTypeDraft,
   ticketTypeDraftFromApi,
+  ticketTypeDraftsFromTemplateParams,
   toTicketTypeRequests,
   minActiveTicketTypePrice,
   parseTicketTypePrice,
@@ -783,6 +784,7 @@ export default function CreateEventPage() {
     form, lat, lng, coverImageId, coverUrl, coverFocus,
     selectedCategories, selectedTypes, endMode, durationH, durationM,
     whitelist, blacklist, inviteUserIds, autoInviteEnabled, autoInviteMode,
+    ticketTypes,
   ]);
 
   // Применение шаблона с chooser (включая даты, приглашения и ч/б списки)
@@ -803,12 +805,26 @@ export default function CreateEventPage() {
     const startParts = ev.startTime ? apiIsoToLocalParts(String(ev.startTime)) : { date: '', time: '' };
     const endParts = ev.endTime ? apiIsoToLocalParts(String(ev.endTime)) : { date: '', time: '' };
 
+    // Типы билетов из snapshot шаблона (без server id — как similar-event).
+    const ticketsEnabled = Boolean(params.ticketsEnabled);
+    let restoredTicketTypes: ITicketTypeDraft[] = [];
+    if (ticketsEnabled) {
+      restoredTicketTypes = ticketTypeDraftsFromTemplateParams(params.ticketTypes);
+      if (restoredTicketTypes.length === 0) {
+        restoredTicketTypes = [createEmptyTicketTypeDraft(0)];
+      }
+    }
+    setTicketTypes(restoredTicketTypes);
+    const templateMinPrice = ticketsEnabled
+      ? minActiveTicketTypePrice(restoredTicketTypes)
+      : null;
+
     setForm(f => ({
       ...f,
       name: ev.name ?? '',
       description: (ev.description as string | null | undefined) ?? '',
       address: (ev.address as string | null | undefined) ?? '',
-      cost: String(params.cost ?? 0),
+      cost: String(templateMinPrice ?? params.cost ?? 0),
       ageLimit: params.ageLimit == null || Number.isNaN(Number(params.ageLimit))
         ? ''
         : String(Math.max(0, Math.trunc(Number(params.ageLimit)))),
@@ -816,7 +832,7 @@ export default function CreateEventPage() {
       maxPersons: params.maxPersonsCount != null ? String(params.maxPersonsCount) : '',
       allowUsersToInvite: params.allowUsersToInvite ?? true,
       allowedGender: (params.allowedGender as Gender | '' | null | undefined) ?? '',
-      ticketsEnabled: Boolean(params.ticketsEnabled),
+      ticketsEnabled,
       startDate: startParts.date,
       startTime: startParts.time,
       endDate: endParts.date,
