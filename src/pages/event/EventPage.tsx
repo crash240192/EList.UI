@@ -863,18 +863,25 @@ export default function EventPage() {
           <div className={styles.heroBottom}>
             <h1 className={styles.heroTitle}>{event.name}</h1>
             <div className={styles.heroDateTime}>
-              {isSameCalendarDay(event.startTime, event.endTime) ? (
-                <>
-                  {formatEventHeroDate(event.startTime, false)}
-                  <span className={styles.heroDateDot}>·</span>
-                  {formatEventHeroTime(event.startTime)}
-                  {event.endTime ? ` — ${formatEventHeroTime(event.endTime)}` : ''}
-                </>
-              ) : (
-                <>
-                  {formatEventHeroDate(event.startTime, true)}, {formatEventHeroTime(event.startTime)}
-                  {event.endTime ? ` → ${formatEventHeroDate(event.endTime, true)}, ${formatEventHeroTime(event.endTime)}` : ''}
-                </>
+              <span className={!isEventActive ? styles.heroDateStrike : undefined}>
+                {isSameCalendarDay(event.startTime, event.endTime) ? (
+                  <>
+                    {formatEventHeroDate(event.startTime, false)}
+                    <span className={styles.heroDateDot}>·</span>
+                    {formatEventHeroTime(event.startTime)}
+                    {event.endTime ? ` — ${formatEventHeroTime(event.endTime)}` : ''}
+                  </>
+                ) : (
+                  <>
+                    {formatEventHeroDate(event.startTime, true)}, {formatEventHeroTime(event.startTime)}
+                    {event.endTime ? ` → ${formatEventHeroDate(event.endTime, true)}, ${formatEventHeroTime(event.endTime)}` : ''}
+                  </>
+                )}
+              </span>
+              {!isEventActive && (
+                <span className={styles.heroCancelled}>
+                  {event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено'}
+                </span>
               )}
             </div>
             <div className={styles.heroTagsRow}>
@@ -906,11 +913,6 @@ export default function EventPage() {
                       <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
                     </svg>
                     Закрытое
-                  </span>
-                )}
-                {!isEventActive && (
-                  <span className={styles.tagCancelled}>
-                    {event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено'}
                   </span>
                 )}
                 {showReportsHeroChip && (
