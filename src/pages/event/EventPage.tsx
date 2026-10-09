@@ -25,6 +25,12 @@ import { EventMapModal } from '@/features/event-map/EventMapModal';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
+import { SimilarEventDialog } from './SimilarEventDialog';
+import {
+  buildSimilarEventSeed,
+  saveSimilarEventSeed,
+  type SimilarEventField,
+} from '@/pages/create-event/similarEventSeed';
 import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isApiError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
@@ -206,6 +212,7 @@ export default function EventPage() {
   const [descExpanded,  setDescExpanded]  = useState(false);
   const [descTogglePressed, setDescTogglePressed] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [similarOpen, setSimilarOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -307,6 +314,33 @@ export default function EventPage() {
 
   /** Организация-организатор — приглашения от её имени */
   const inviterOrganizationId = orgOrganizers[0]?.organizationId ?? null;
+
+  const handleCreateSimilar = useCallback(async (fields: SimilarEventField[]) => {
+    if (!event) return;
+    const org = orgOrganizers.find(o => o.organizationId);
+    const host = org?.organizationId
+      ? {
+          kind: 'organization' as const,
+          organizationId: org.organizationId,
+          organizationName: org.organizationName?.trim() || 'Организация',
+          canSellTickets: false,
+        }
+      : { kind: 'user' as const };
+    const seed = await buildSimilarEventSeed({
+      event,
+      selected: new Set(fields),
+      host,
+    });
+    saveSimilarEventSeed(seed);
+    const q = new URLSearchParams({ similar: '1' });
+    if (host.kind === 'organization') {
+      q.set('host', 'org');
+      q.set('organizationId', host.organizationId);
+    } else {
+      q.set('host', 'user');
+    }
+    navigate(`/create-event?${q.toString()}`);
+  }, [event, navigate, orgOrganizers]);
 
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
 
@@ -838,12 +872,20 @@ export default function EventPage() {
                     anchorRef={organizerMenuRef}
                     accent
                   >
-                    <HeroContextMenuItem onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>
-                      Редактировать
-                    </HeroContextMenuItem>
-                    <HeroContextMenuItem onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>
-                      Добавить организатора
-                    </HeroContextMenuItem>
+                    {eventFinished ? (
+                      <HeroContextMenuItem onClick={() => { setSimilarOpen(true); setMobileMenuOpen(false); }}>
+                        Создать аналогичное
+                      </HeroContextMenuItem>
+                    ) : (
+                      <>
+                        <HeroContextMenuItem onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>
+                          Редактировать
+                        </HeroContextMenuItem>
+                        <HeroContextMenuItem onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>
+                          Добавить организатора
+                        </HeroContextMenuItem>
+                      </>
+                    )}
                     <HeroContextMenuItem onClick={() => { setBwListOpen(true); setMobileMenuOpen(false); }}>
                       {event.parameters?.private ? 'Белый список' : 'Черный список'}
                     </HeroContextMenuItem>
@@ -852,7 +894,7 @@ export default function EventPage() {
                     </HeroContextMenuItem>
                     {event.active && (
                       <HeroContextMenuItem danger onClick={() => { setCancelConfirm(true); setMobileMenuOpen(false); }}>
-                        Отменить мероприятие
+                        {eventFinished ? 'Удалить' : 'Отменить мероприятие'}
                       </HeroContextMenuItem>
                     )}
                   </HeroContextMenu>
@@ -1287,6 +1329,12 @@ export default function EventPage() {
       {cancelConfirm && (
         <CancelConfirmDialog eventName={event.name} loading={actionLoading}
           onConfirm={handleCancelEvent} onClose={() => setCancelConfirm(false)} />
+      )}
+      {similarOpen && (
+        <SimilarEventDialog
+          onClose={() => setSimilarOpen(false)}
+          onConfirm={handleCreateSimilar}
+        />
       )}
       {reportModalOpen && reportTarget && (
         <ContentReportModal
