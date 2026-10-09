@@ -76,6 +76,16 @@ export function useLocalStorage<T>(
 
 // ---- useInfiniteScroll ----
 
+function scrollParent(el: HTMLElement): HTMLElement | null {
+  let cur = el.parentElement;
+  while (cur) {
+    const style = getComputedStyle(cur);
+    if (/(auto|scroll)/.test(style.overflowY)) return cur;
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
 export function useInfiniteScroll(
   callback: () => void,
   options: { threshold?: number; rootMargin?: string; enabled?: boolean } = {},
@@ -100,7 +110,7 @@ export function useInfiniteScroll(
       (entries) => {
         if (entries[0]?.isIntersecting && enabledRef.current) callbackRef.current();
       },
-      { threshold, rootMargin },
+      { threshold, rootMargin, root: scrollParent(node) },
     );
 
     observer.observe(node);
