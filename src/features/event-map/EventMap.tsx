@@ -2,9 +2,10 @@
 // Балуны Яндекса полностью отключены — всё через React-компоненты.
 // При совпадении координат показываем список мероприятий на точке.
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import type { IEventSearchShortItem } from '@/entities/event';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
+import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlacement';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
 
@@ -493,46 +494,83 @@ export function EventMap({
 
 // ---- Модальный список мероприятий в одной точке ----
 
-function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
+export function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
   events: IEventSearchShortItem[];
   anchorX: number;
   anchorY: number;
   onSelect: (eventId: string) => void;
   onClose: () => void;
 }) {
-  const MODAL_W = 300;
-  const MODAL_ESTIMATED_H = Math.min(events.length * 52 + 48, 288);
-  const GAP = 12; // отступ от маркера
-
+  const modalRef = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState<PointGroupPlacement | null>(null);
   const positioned = anchorX >= 0 && anchorY >= 0;
 
-  // Вычисляем left/top так чтобы модал не уходил за края
-  // left: центрируем по X, но не выходим за [0, containerW - MODAL_W]
-  const rawLeft = anchorX - MODAL_W / 2;
-  const left    = Math.max(8, rawLeft);                         // не за левый край
-  // top: показываем над точкой, но не за верхний край
-  const rawTop  = anchorY - MODAL_ESTIMATED_H - GAP;
-  const top     = rawTop < 8
-    ? anchorY + GAP + 14   // если не влезает сверху — показываем снизу
-    : rawTop;
+  useLayoutEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+    const wrap = modal.offsetParent as HTMLElement | null;
+    if (!wrap) return;
 
-  const style: React.CSSProperties = positioned
-    ? { position: 'absolute', left, top, width: MODAL_W }
-    : { position: 'absolute', bottom: 24, left: '50%', marginLeft: -MODAL_W / 2, width: MODAL_W };
+    const measure = () => {
+      const list = modal.querySelector<HTMLElement>('[data-group-list]');
+      const header = modal.querySelector<HTMLElement>('[data-group-header]');
+      if (list) list.style.maxHeight = '240px';
+      const rect = wrap.getBoundingClientRect();
+      const viewport = window.visualViewport;
+      const next = placePointGroupModal({
+        anchorX,
+        anchorY,
+        positioned,
+        wrapLeft: rect.left,
+        wrapTop: rect.top,
+        wrapWidth: rect.width,
+        wrapHeight: rect.height,
+        viewportLeft: viewport?.offsetLeft ?? 0,
+        viewportTop: viewport?.offsetTop ?? 0,
+        viewportWidth: viewport?.width ?? window.innerWidth,
+        viewportHeight: viewport?.height ?? window.innerHeight,
+        naturalHeight: modal.offsetHeight,
+        headerHeight: header?.offsetHeight ?? 0,
+      });
+      if (list) list.style.maxHeight = `${next.listMaxHeight}px`;
+      setPlace(next);
+    };
 
-  const tailAbove = positioned && rawTop >= 8; // хвостик снизу модала (когда модал над точкой)
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('scroll', measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('scroll', measure);
+    };
+  }, [anchorX, anchorY, positioned, events.length]);
 
   return (
     <>
       <div className={styles.groupBackdrop} onClick={onClose} />
-      <div className={styles.groupModal} style={style}>
-        <div className={styles.groupHeader}>
+      <div
+        ref={modalRef}
+        className={styles.groupModal}
+        style={{
+          position: 'absolute',
+          visibility: place ? 'visible' : 'hidden',
+          left: place?.left ?? 0,
+          top: place?.top ?? 0,
+          width: place?.width ?? 300,
+        }}
+      >
+        <div className={styles.groupHeader} data-group-header>
           <span className={styles.groupTitle}>
             {events.length} мероприятия в этой точке
           </span>
           <button className={styles.groupClose} onClick={onClose}>✕</button>
         </div>
-        <div className={styles.groupList}>
+        <div className={styles.groupList} data-group-list style={{ maxHeight: place?.listMaxHeight }}>
           {events.map(ev => {
             const color = markerColors(ev)[0];
             return (
@@ -547,13 +585,12 @@ function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
             );
           })}
         </div>
-        {/* Хвостик — снизу если модал над точкой, сверху если под */}
-        {positioned && (
+        {positioned && place && (
           <div
             className={styles.groupTail}
-            style={tailAbove
-              ? { bottom: -7, top: 'auto', left: Math.max(12, Math.min(MODAL_W - 26, anchorX - left - 7)) }
-              : { top: -7, bottom: 'auto', left: Math.max(12, Math.min(MODAL_W - 26, anchorX - left - 7)), transform: 'rotate(180deg)' }
+            style={place.tailAbove
+              ? { bottom: -7, top: 'auto', left: place.tailLeft }
+              : { top: -7, bottom: 'auto', left: place.tailLeft, transform: 'rotate(180deg)' }
             }
           />
         )}
