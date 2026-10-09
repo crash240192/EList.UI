@@ -68,20 +68,33 @@ export function normalizeEventListItem(raw: unknown): EventListItemData {
     eventTypes: types.length > 0 ? types : single ? [single] : [],
     eventType: single,
     parameters: params
-      ? {
-          cost: Number(params.cost ?? params.Cost ?? 0),
-          ageLimit: (
-            params.ageLimit ??
-            params.AgeLimit ??
-            e.ageLimit ??
-            e.AgeLimit ??
-            null
-          ) as number | null,
-          maxPersonsCount: (params.maxPersonsCount ?? params.MaxPersonsCount ?? null) as number | null,
-          ticketsEnabled: Boolean(params.ticketsEnabled ?? params.TicketsEnabled ?? false),
-          private: Boolean(params.private ?? params.Private ?? false),
-          allowedGender: readAllowedGender(params),
-        }
+      ? (() => {
+          const cost = Number(params.cost ?? params.Cost ?? 0);
+          const minRaw = params.priceMin ?? params.PriceMin;
+          const maxRaw = params.priceMax ?? params.PriceMax;
+          const priceMin = minRaw == null || minRaw === ''
+            ? cost
+            : Number(minRaw);
+          const priceMax = maxRaw == null || maxRaw === ''
+            ? priceMin
+            : Number(maxRaw);
+          return {
+            cost,
+            priceMin: Number.isFinite(priceMin) ? priceMin : cost,
+            priceMax: Number.isFinite(priceMax) ? priceMax : (Number.isFinite(priceMin) ? priceMin : cost),
+            ageLimit: (
+              params.ageLimit ??
+              params.AgeLimit ??
+              e.ageLimit ??
+              e.AgeLimit ??
+              null
+            ) as number | null,
+            maxPersonsCount: (params.maxPersonsCount ?? params.MaxPersonsCount ?? null) as number | null,
+            ticketsEnabled: Boolean(params.ticketsEnabled ?? params.TicketsEnabled ?? false),
+            private: Boolean(params.private ?? params.Private ?? false),
+            allowedGender: readAllowedGender(params),
+          };
+        })()
       : null,
     participantsCount: (e.participantsCount ?? e.ParticipantsCount ?? null) as number | null,
     ...(colors?.length ? { colors } : {}),

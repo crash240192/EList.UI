@@ -55,6 +55,7 @@ import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
 import { BuyTicketModal, TicketCheckInPanel } from '@/features/tickets';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import {
   ContentReportModal,
   EventModerationDetailsModal,
@@ -248,8 +249,17 @@ export default function EventPage() {
   const [buyTicketOpen, setBuyTicketOpen] = useState(false);
   const [genderJoinKind, setGenderJoinKind] = useState<'join' | 'ticket' | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [globalTicketSales, setGlobalTicketSales] = useState(false);
 
   usePageTitle(event?.name ?? null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => { if (!cancelled) setGlobalTicketSales(f.ticketSalesEnabled); })
+      .catch(() => { if (!cancelled) setGlobalTicketSales(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   // После успешной загрузки события: иначе getByEventId ловит 13003 до «мне есть 18»
   // и плашка Access Denied остаётся до F5.
@@ -661,7 +671,19 @@ export default function EventPage() {
 
   const cost = event.parameters?.cost ?? 0;
   const allowedGender = readAllowedGender(event.parameters);
-  const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled);
+  const priceMin = event.parameters?.priceMin != null && Number.isFinite(Number(event.parameters.priceMin))
+    ? Number(event.parameters.priceMin)
+    : cost;
+  const priceMax = event.parameters?.priceMax != null && Number.isFinite(Number(event.parameters.priceMax))
+    ? Number(event.parameters.priceMax)
+    : priceMin;
+  const priceLabel = priceMin <= 0 && priceMax <= 0
+    ? null
+    : priceMin === priceMax
+      ? `${priceMin.toLocaleString('ru-RU')} ₽`
+      : `${priceMin.toLocaleString('ru-RU')}–${priceMax.toLocaleString('ru-RU')} ₽`;
+  /** Событие с билетами И глобальный kill-switch API. */
+  const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled) && globalTicketSales;
   const maxPersons = event.parameters?.maxPersonsCount ?? null;
   const participantCap = maxPersons != null && maxPersons > 0 ? maxPersons : null;
   const isParticipantLimitFull =
@@ -941,13 +963,13 @@ export default function EventPage() {
                 />
               </div>
               <div className={styles.heroTagsRight}>
-                {cost === 0 ? (
+                {!priceLabel ? (
                   <span className={styles.tagFree}>Бесплатно</span>
                 ) : ticketsEnabled ? (
-                  <span className={styles.tagPaid}>{cost.toLocaleString('ru-RU')} ₽</span>
+                  <span className={styles.tagPaid}>{priceLabel}</span>
                 ) : (
                   <span className={styles.tagPaid} title="Оплата на месте у организатора">
-                    {cost.toLocaleString('ru-RU')} ₽ · на месте
+                    {priceLabel} · на месте
                   </span>
                 )}
                 <span className={styles.tagAge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
@@ -1046,52 +1068,53 @@ export default function EventPage() {
                     Пригласить
                   </button>
                 )}
-                {ticketsEnabled && !eventFinished && !isOrganizer && !isParticipating && (
+                {ticketsEnabled && !eventFinished && !isOrganizer && (
                   <div className={styles.joinBtnWrap}>
-                    {limitNotice && isParticipantLimitFull && (
+                    {limitNotice && isParticipantLimitFull && !isParticipating && (
                       <div className={styles.joinLimitNotice} role="status">
                         Достигнут лимит участников ({participantCap})
                       </div>
                     )}
-                    <Button
-                      variant="primary"
-                      className={`${styles.btnTicket} ${joinShake ? styles.btnJoinShake : ''}`}
-                      disabled={ticketBuyDisabled && !isParticipantLimitFull}
-                      title={
-                        isParticipantLimitFull
-                          ? `Достигнут лимит участников (${participantCap})`
-                          : undefined
-                      }
-                      onClick={() => {
-                        if (!authenticated) {
-                          setAuthDialogOpen(true);
-                          return;
-                        }
-                        if (isParticipantLimitFull || (remainingSeats != null && remainingSeats <= 0)) {
-                          triggerParticipantLimitFeedback();
-                          return;
-                        }
-                        void confirmJoinOrAsk('ticket');
-                      }}
-                    >
-                      {cost <= 0 ? 'Получить билет' : 'Купить билет'}
-                    </Button>
-                  </div>
-                )}
-                {ticketsEnabled && !eventFinished && !isOrganizer && isParticipating && (
-                  <>
-                    <span className={styles.actionJoinSep} aria-hidden />
-                    <div className={styles.joinBtnWrap}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       <Button
-                        variant="danger"
-                        loading={actionLoading}
-                        onClick={onJoinClick}
-                        disabled={actionLoading}
+                        variant="primary"
+                        className={`${styles.btnTicket} ${joinShake ? styles.btnJoinShake : ''}`}
+                        disabled={ticketBuyDisabled && !isParticipantLimitFull}
+                        title={
+                          isParticipantLimitFull
+                            ? `Достигнут лимит участников (${participantCap})`
+                            : isParticipating
+                              ? 'Купить дополнительный билет (например, в подарок)'
+                              : undefined
+                        }
+                        onClick={() => {
+                          if (!authenticated) {
+                            setAuthDialogOpen(true);
+                            return;
+                          }
+                          if (isParticipantLimitFull || (remainingSeats != null && remainingSeats <= 0)) {
+                            triggerParticipantLimitFeedback();
+                            return;
+                          }
+                          void confirmJoinOrAsk('ticket');
+                        }}
                       >
-                        Покинуть
+                        {isParticipating
+                          ? (cost <= 0 ? 'Ещё билет' : 'Купить в подарок')
+                          : (cost <= 0 ? 'Получить билет' : 'Купить билет')}
                       </Button>
+                      {isParticipating && (
+                        <Button
+                          variant="danger"
+                          loading={actionLoading}
+                          onClick={onJoinClick}
+                          disabled={actionLoading}
+                        >
+                          Покинуть
+                        </Button>
+                      )}
                     </div>
-                  </>
+                  </div>
                 )}
                 {showFreeJoin && !eventFinished && !isOrganizer && isParticipating && (
                   <span className={styles.actionJoinSep} aria-hidden />
@@ -1404,9 +1427,15 @@ export default function EventPage() {
           eventName={event.name}
           unitPrice={cost}
           remainingSeats={remainingSeats}
+          giftMode={isParticipating}
           onClose={() => setBuyTicketOpen(false)}
           onPurchased={async () => {
-            toast('Билет оформлен — вы идёте на мероприятие', 'success');
+            toast(
+              isParticipating
+                ? 'Билет оформлен — передайте его в «Мои билеты»'
+                : 'Билет оформлен — вы идёте на мероприятие',
+              'success',
+            );
             if (!id || !accountId) return;
             try {
               const list = await fetchEventParticipants(id);

@@ -18,6 +18,8 @@ export interface EventListItemData {
   eventType?: IEventType | null;
   parameters?: {
     cost?: number;
+    priceMin?: number | null;
+    priceMax?: number | null;
     ageLimit?: number | null;
     maxPersonsCount?: number | null;
     ticketsEnabled?: boolean;
@@ -52,13 +54,23 @@ export function readAllowedGender(source: {
 
 export function getEventListParams(event: EventListItemData) {
   const p = event.parameters;
+  const cost = p?.cost ?? 0;
+  const priceMin = p?.priceMin != null && Number.isFinite(Number(p.priceMin))
+    ? Number(p.priceMin)
+    : cost;
+  const priceMax = p?.priceMax != null && Number.isFinite(Number(p.priceMax))
+    ? Number(p.priceMax)
+    : priceMin;
   return {
-    cost: p?.cost ?? 0,
+    cost,
+    priceMin,
+    priceMax,
     ageLimit: p?.ageLimit ?? null,
     maxPersonsCount: p?.maxPersonsCount ?? null,
     participantsCount: event.participantsCount ?? null,
     isPrivate: Boolean(p?.private),
     allowedGender: readAllowedGender(p),
+    ticketsEnabled: Boolean(p?.ticketsEnabled),
   };
 }
 
@@ -72,9 +84,22 @@ export function formatEventListItemDate(iso?: string | null): string {
   });
 }
 
-export function formatEventListItemPrice(cost: number): { label: string; free: boolean } {
-  if (cost === 0) return { label: 'Бесплатно', free: true };
-  return { label: `${cost.toLocaleString('ru-RU')} ₽`, free: false };
+/** Диапазон цен: Бесплатно / X ₽ / X–Y ₽ */
+export function formatEventListItemPrice(
+  priceMin: number,
+  priceMax?: number | null,
+): { label: string; free: boolean } {
+  const lo = Number.isFinite(priceMin) ? Math.max(0, priceMin) : 0;
+  const hiRaw = priceMax != null && Number.isFinite(priceMax) ? Number(priceMax) : lo;
+  const hi = Math.max(lo, hiRaw);
+  if (lo <= 0 && hi <= 0) return { label: 'Бесплатно', free: true };
+  if (lo === hi) {
+    return { label: `${lo.toLocaleString('ru-RU')} ₽`, free: false };
+  }
+  return {
+    label: `${lo.toLocaleString('ru-RU')}–${hi.toLocaleString('ru-RU')} ₽`,
+    free: false,
+  };
 }
 
 export function getEventListCoverBackground(event: EventListItemData): string {
