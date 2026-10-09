@@ -863,19 +863,22 @@ export default function EventPage() {
           <div className={styles.heroBottom}>
             <h1 className={styles.heroTitle}>{event.name}</h1>
             <div className={styles.heroDateTime}>
-              {isSameCalendarDay(event.startTime, event.endTime) ? (
-                <>
-                  {formatEventHeroDate(event.startTime, false)}
-                  <span className={styles.heroDateDot}>·</span>
-                  {formatEventHeroTime(event.startTime)}
-                  {event.endTime ? ` — ${formatEventHeroTime(event.endTime)}` : ''}
-                </>
-              ) : (
-                <>
-                  {formatEventHeroDate(event.startTime, true)}, {formatEventHeroTime(event.startTime)}
-                  {event.endTime ? ` → ${formatEventHeroDate(event.endTime, true)}, ${formatEventHeroTime(event.endTime)}` : ''}
-                </>
-              )}
+              <span className={eventFinished ? styles.heroDateStrike : undefined}>
+                {isSameCalendarDay(event.startTime, event.endTime) ? (
+                  <>
+                    {formatEventHeroDate(event.startTime, false)}
+                    <span className={styles.heroDateDot}>·</span>
+                    {formatEventHeroTime(event.startTime)}
+                    {event.endTime ? ` — ${formatEventHeroTime(event.endTime)}` : ''}
+                  </>
+                ) : (
+                  <>
+                    {formatEventHeroDate(event.startTime, true)}, {formatEventHeroTime(event.startTime)}
+                    {event.endTime ? ` → ${formatEventHeroDate(event.endTime, true)}, ${formatEventHeroTime(event.endTime)}` : ''}
+                  </>
+                )}
+              </span>
+              {eventFinished && <span className={styles.heroFinished}>Завершено</span>}
             </div>
             <div className={styles.heroTagsRow}>
               <div className={styles.heroTagsLeft}>
