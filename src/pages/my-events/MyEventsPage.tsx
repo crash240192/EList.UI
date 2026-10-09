@@ -85,13 +85,13 @@ export default function MyEventsPage() {
     startTime:  filters.startTime,
     endTime:    filters.endTime,
     price:      filters.price,
-    // Для вкладки «Организую» с чекбоксом: если показываем отменённые — active: false
-    ...(ownerFilter === 'mine' && showCancelled ? { active: false } : {}),
+    // Галочка на всех вкладках: active: false включает отменённые в выдачу
+    ...(showCancelled ? { active: false } : {}),
   // @ts-ignore
     _v:         searchVersion,
   }), [debouncedName, selectedCategories, selectedTypes,
        filters.startTime, filters.endTime, filters.price,
-       ownerFilter, showCancelled, searchVersion]);
+       showCancelled, searchVersion]);
 
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useMyEvents({
     accountId,
@@ -196,7 +196,7 @@ export default function MyEventsPage() {
       />
 
       {/* ── Кнопка создать + переключатель активные/прошедшие ── */}
-      <div className={`${styles.subHeader}${ownerFilter === 'mine' ? ` ${styles.subHeaderWithCancelled}` : ''}`}>
+      <div className={`${styles.subHeader} ${styles.subHeaderWithCancelled}`}>
         <TabBar
           className={styles.archiveTabs}
           tabs={[
@@ -207,13 +207,11 @@ export default function MyEventsPage() {
           onChange={id => setTab(id as typeof tab)}
         />
         <div className={styles.subHeaderActions}>
-          {ownerFilter === 'mine' && (
-            <label className={styles.showCancelled}>
-              <input type="checkbox" checked={showCancelled}
-                onChange={e => setShowCancelled(e.target.checked)} />
-              <span>Показывать отменённые</span>
-            </label>
-          )}
+          <label className={styles.showCancelled}>
+            <input type="checkbox" checked={showCancelled}
+              onChange={e => setShowCancelled(e.target.checked)} />
+            <span>Показывать отменённые</span>
+          </label>
           <button className={styles.createBtn} onClick={() => navigate('/create-event')}>
             + Создать
           </button>

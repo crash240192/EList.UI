@@ -292,7 +292,7 @@
     align-self: stretch;
   }
 
-  /* Галочка только на «Организую» — тогда переносим actions на вторую строку */
+  /* Галочка на всех вкладках — переносим actions на вторую строку */
   .subHeaderWithCancelled {
     flex-wrap: wrap;
     align-items: stretch;
