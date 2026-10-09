@@ -7,7 +7,7 @@
 // - При повторном переключении → сразу показываем кешированные данные
 // - При прокрутке до конца → загружаем следующую страницу, только если первая уже загружена
 // - Пустой список в ответе → останавливаем пагинацию для этой вкладки
-// - Сброс кеша при смене доп. фильтров (название, тип, дата, цена), но не при смене фазы
+// - Сброс кеша при смене доп. фильтров (название, тип, дата, цена, отменённые), но не при смене фазы
 // - Ответ пишется в кеш своей пары и двигает UI только если она всё ещё открыта
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -98,6 +98,7 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     startTime:  extraParams.startTime,
     endTime:    extraParams.endTime,
     price:      extraParams.price,
+    includeInactive: extraParams.active === false,
   });
   const prevFilterKey = useRef(filterKey);
 
@@ -154,7 +155,7 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
         categories: extraParams.categories || undefined,
         types:      extraParams.types      || undefined,
         price:      extraParams.price      || undefined,
-        ...(includeInactive && filter === 'mine' ? { active: false } : {}),
+        ...(includeInactive ? { active: false } : {}),
         pageIndex:  page,
         pageSize:   PAGE_SIZE,
       });
