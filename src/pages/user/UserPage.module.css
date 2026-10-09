@@ -153,6 +153,15 @@
   margin-top: 2px;
 }
 
+/* Имя и логин стоят на тёмной шапке. В светлой теме обычный текст там пропадает. */
+:global(body.light-theme) .fullName {
+  color: #f0f1f7;
+}
+
+:global(body.light-theme) .loginLine {
+  color: #c5c8d4;
+}
+
 .profileCity {
   font-size: 12px;
   color: var(--text-secondary);
