@@ -17,8 +17,15 @@ import {
   createEventTemplate,
   updateEventTemplate,
   searchEventTemplates,
+  fetchEventTicketTypes,
+  createEmptyTicketTypeDraft,
+  ticketTypeDraftFromApi,
+  toTicketTypeRequests,
+  minActiveTicketTypePrice,
+  parseTicketTypePrice,
   type ICreateEventPayload,
   type IEventTemplate,
+  type ITicketTypeDraft,
 } from '@/entities/event';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import type { IEvent, IEventType } from '@/entities/event';
@@ -100,6 +107,7 @@ import {
   type CreateEventDraftSnapshot,
 } from './createEventDraft';
 import { CreateEventLeaveModal } from './CreateEventLeaveModal';
+import { consumeSimilarEventSeed } from './similarEventSeed';
 import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
   EVENT_AGE_LIMIT_OPTIONS,
@@ -314,6 +322,7 @@ export default function CreateEventPage() {
   const pickInviteBtnRef = useRef<HTMLButtonElement>(null);
   const [autoInviteEnabled, setAutoInviteEnabled] = useState(false);
   const [autoInviteMode, setAutoInviteMode] = useState<'all' | 'select'>('select');
+  const [ticketTypes, setTicketTypes] = useState<ITicketTypeDraft[]>([]);
 
   // Кошелёк / тариф
   const [tariffValidator, setTariffValidator] = useState<ITariffValidator | null>(null);
@@ -591,6 +600,7 @@ export default function CreateEventPage() {
     setInviteUserIds([]);
     setAutoInviteEnabled(false);
     setAutoInviteMode('select');
+    setTicketTypes([]);
     setPendingTemplate(null);
     setSourceTemplate(null);
     loadedBWListsRef.current = new Set();
@@ -628,6 +638,7 @@ export default function CreateEventPage() {
       setInviteUserIds(draft.inviteUserIds);
       setAutoInviteEnabled(draft.autoInviteEnabled);
       setAutoInviteMode(draft.autoInviteMode);
+      setTicketTypes(draft.ticketTypes ?? []);
       setSourceTemplate(null);
       loadedBWListsRef.current = new Set();
       initialEventTypeIdsRef.current = null;
@@ -645,11 +656,88 @@ export default function CreateEventPage() {
       return;
     }
 
+    if (searchParams.get('similar') === '1') {
+      const seed = consumeSimilarEventSeed();
+      if (seed) {
+        setForm({
+          ...EMPTY,
+          ...seed.form,
+          startDate: '',
+          startTime: '',
+          endDate: '',
+          endTime: '',
+        });
+        setLoading(false);
+        setSaving(false);
+        setFieldErrors(new Set());
+        setLat(seed.lat);
+        setLng(seed.lng);
+        setCoverUrl(seed.coverUrl);
+        setCoverImageId(seed.coverImageId);
+        setCoverFocus(seed.coverFocus);
+        setPickerOpen(false);
+        setEndMode('duration');
+        setDurationH('2');
+        setDurationM('0');
+        setWhitelist(seed.whitelist);
+        setBlacklist(seed.blacklist);
+        setListModalOpen(false);
+        setInviteUserIds([]);
+        setAutoInviteEnabled(false);
+        setAutoInviteMode('select');
+        setTicketTypes(seed.ticketTypes ?? []);
+        setSourceTemplate(null);
+        loadedBWListsRef.current = new Set();
+        templateAppliedRef.current = false;
+        if (seed.selectedTypes.length > 0) {
+          initialEventTypeIdsRef.current = seed.selectedTypes;
+          initialTypesAppliedRef.current = false;
+          const catalog = allTypesRef.current;
+          if (catalog.length > 0) {
+            const selection = deriveCategoryTypeSelection(seed.selectedTypes, catalog);
+            setSelectedCategories(selection.selectedCategories);
+            setSelectedTypes(selection.selectedTypes);
+            initialTypesAppliedRef.current = true;
+          } else {
+            setSelectedCategories([]);
+            setSelectedTypes(seed.selectedTypes);
+          }
+        } else {
+          setSelectedCategories([]);
+          setSelectedTypes([]);
+          initialEventTypeIdsRef.current = null;
+          initialTypesAppliedRef.current = false;
+        }
+        saveCreateEventDraft(aid, {
+          ...seed,
+          form: {
+            ...seed.form,
+            startDate: '',
+            startTime: '',
+            endDate: '',
+            endTime: '',
+          },
+          endMode: 'duration',
+          durationH: '2',
+          durationM: '0',
+          inviteUserIds: [],
+          autoInviteEnabled: false,
+          autoInviteMode: 'select',
+          ticketTypes: seed.ticketTypes ?? [],
+        });
+        draftHydratedRef.current = true;
+        const next = new URLSearchParams(searchParams);
+        next.delete('similar');
+        setSearchParams(next, { replace: true });
+        return;
+      }
+    }
+
     const draft = loadCreateEventDraft(aid);
     if (draft) applyDraft(draft);
     else resetCreateForm();
     draftHydratedRef.current = true;
-  }, [isEditing, id, accountId, resetCreateForm]);
+  }, [isEditing, id, accountId, resetCreateForm, searchParams, setSearchParams]);
 
   const draftSnapshotRef = useRef<CreateEventDraftSnapshot | null>(null);
   const discardCreateDraftRef = useRef(false);
@@ -672,6 +760,7 @@ export default function CreateEventPage() {
       inviteUserIds,
       autoInviteEnabled,
       autoInviteMode,
+      ticketTypes,
     };
   }
 
@@ -850,8 +939,11 @@ export default function CreateEventPage() {
     const loadParams = USE_MOCK
       ? Promise.resolve(null)
       : fetchEventParameters(id!).catch(() => null);
+    const loadTicketTypes = USE_MOCK
+      ? Promise.resolve([])
+      : fetchEventTicketTypes(id!, true).catch(() => []);
 
-    Promise.all([loadEvent, loadTypes, loadParams]).then(([ev, evTypes, params]) => {
+    Promise.all([loadEvent, loadTypes, loadParams, loadTicketTypes]).then(([ev, evTypes, params, apiTicketTypes]) => {
       const evRaw = ev as IEvent & Record<string, unknown>;
       const embedded = (ev.parameters
         ?? (evRaw as { Parameters?: typeof ev.parameters }).Parameters
@@ -893,6 +985,13 @@ export default function CreateEventPage() {
         allowedGender:      parameters?.allowedGender ?? '',
         ticketsEnabled:     Boolean(parameters?.ticketsEnabled),
       });
+      if (Boolean(parameters?.ticketsEnabled) && apiTicketTypes.length > 0) {
+        setTicketTypes(apiTicketTypes.map(ticketTypeDraftFromApi));
+      } else if (Boolean(parameters?.ticketsEnabled)) {
+        setTicketTypes([createEmptyTicketTypeDraft(0)]);
+      } else {
+        setTicketTypes([]);
+      }
       if (ev.latitude)      setLat(ev.latitude);
       if (ev.longitude)     setLng(ev.longitude);
       if (ev.coverUrl)      setCoverUrl(ev.coverUrl);
@@ -1010,7 +1109,7 @@ export default function CreateEventPage() {
 
   // Если типы мероприятия загрузились раньше справочника — применить выбор после allTypes
   useEffect(() => {
-    if (!isEditing || initialTypesAppliedRef.current) return;
+    if (initialTypesAppliedRef.current) return;
     const typeIds = initialEventTypeIdsRef.current;
     if (!typeIds?.length || !allTypes.length) return;
 
@@ -1018,7 +1117,7 @@ export default function CreateEventPage() {
     setSelectedCategories(selection.selectedCategories);
     setSelectedTypes(selection.selectedTypes);
     initialTypesAppliedRef.current = true;
-  }, [isEditing, allTypes]);
+  }, [allTypes]);
 
   // Вспомогательные
   const set = (key: keyof FormState) =>
@@ -1399,6 +1498,15 @@ export default function CreateEventPage() {
     if (form.cost !== '0') setForm(f => ({ ...f, cost: '0' }));
   }, [tariffReady, canSetCost, form.cost]);
 
+  // При онлайн-билетах cost = min(active types) для совместимости / тарифа
+  useEffect(() => {
+    if (!form.ticketsEnabled) return;
+    const minPrice = minActiveTicketTypePrice(ticketTypes);
+    if (minPrice == null) return;
+    const next = String(minPrice);
+    if (form.cost !== next) setForm(f => ({ ...f, cost: next }));
+  }, [form.ticketsEnabled, form.cost, ticketTypes]);
+
   useEffect(() => {
     if (loading || !tariffReady) return;
     // Только 0+ — прописываем 0 и на создании, и на редактировании
@@ -1627,6 +1735,7 @@ export default function CreateEventPage() {
           setSaving(false);
           return;
         }
+        const editTicketsOn = canEnableTickets && form.ticketsEnabled;
         await assignEventParameters(id!, {
           cost:               editCost,
           private:            form.isPrivate,
@@ -1634,7 +1743,12 @@ export default function CreateEventPage() {
           ageLimit:           parseAgeLimit(),
           allowedGender:      form.allowedGender || null,
           allowUsersToInvite: form.allowUsersToInvite,
-          ticketsEnabled:     canEnableTickets && form.ticketsEnabled,
+          ticketsEnabled:     editTicketsOn,
+          ...(editTicketsOn
+            ? { ticketTypes: toTicketTypeRequests(
+                ticketTypes.length > 0 ? ticketTypes : [createEmptyTicketTypeDraft(0)],
+              ) }
+            : { ticketTypes: [] }),
         });
         await assignEventTypes(id!, resolvedTypeIds);
         navigate(`/event/${id}`);
@@ -1717,6 +1831,13 @@ export default function CreateEventPage() {
         allowedGender: form.allowedGender || undefined,
         allowUsersToInvite: form.allowUsersToInvite,
         ticketsEnabled: canEnableTickets && form.ticketsEnabled,
+        ...((canEnableTickets && form.ticketsEnabled)
+          ? {
+              ticketTypes: toTicketTypeRequests(
+                ticketTypes.length > 0 ? ticketTypes : [createEmptyTicketTypeDraft(0)],
+              ),
+            }
+          : {}),
       },
       eventTypes: resolvedTypeIds,
       organizatorAccountIds:
@@ -1946,6 +2067,15 @@ export default function CreateEventPage() {
     })();
   };
 
+  const ensureDefaultTicketType = useCallback(() => {
+    setTicketTypes(prev => {
+      if (prev.length > 0) return prev;
+      const draft = createEmptyTicketTypeDraft(0);
+      draft.price = form.cost || '0';
+      return [draft];
+    });
+  }, [form.cost]);
+
   const handleTicketsToggle = (enabled: boolean) => {
     if (!enabled) {
       setForm(f => ({ ...f, ticketsEnabled: false }));
@@ -1960,6 +2090,7 @@ export default function CreateEventPage() {
         if (!ok) return;
       }
       setForm(f => ({ ...f, ticketsEnabled: true }));
+      ensureDefaultTicketType();
     })();
   };
 
@@ -1969,6 +2100,7 @@ export default function CreateEventPage() {
     setOrgAgreementResume(null);
     if (resume === 'enableTickets') {
       setForm(f => ({ ...f, ticketsEnabled: true }));
+      ensureDefaultTicketType();
       return;
     }
     if (resume === 'publish') {
@@ -2299,9 +2431,9 @@ export default function CreateEventPage() {
             )}
 
             <div className={styles.paramGrid}>
-              <Field label="Стоимость, ₽">
+              <Field label={form.ticketsEnabled ? 'Стоимость от типов, ₽' : 'Стоимость, ₽'}>
                 <LockedInput
-                  locked={!canSetCost}
+                  locked={!canSetCost || form.ticketsEnabled}
                   value={form.cost}
                   onChange={e => {
                     const v = e.target.value.replace(/[^0-9.,]/g, '');
@@ -2315,9 +2447,11 @@ export default function CreateEventPage() {
                   hasError={hasErr('cost')}
                   hint={hasErr('cost')
                     ? costToastMessage
-                    : canSetCost
-                      ? `до ${(effectiveMaxCost ?? MAX_EVENT_COST).toLocaleString('ru-RU')} ₽`
-                      : (hasTariff ? 'Недоступно в тарифе' : 'Без тарифа — только бесплатные')}
+                    : form.ticketsEnabled
+                      ? 'Считается как минимум цены активных типов'
+                      : canSetCost
+                        ? `до ${(effectiveMaxCost ?? MAX_EVENT_COST).toLocaleString('ru-RU')} ₽`
+                        : (hasTariff ? 'Недоступно в тарифе' : 'Без тарифа — только бесплатные')}
                 />
               </Field>
               <Field label="Макс. участников">
@@ -2400,10 +2534,95 @@ export default function CreateEventPage() {
                   lockedHint="Проверка соглашений..."
                 />
               )}
-              {canEnableTickets && form.ticketsEnabled && (parseFloat(form.cost) || 0) <= 0 && (
-                <p className={styles.fieldHint}>
-                  Стоимость 0 ₽ — бесплатные билеты: выдаются сразу при «покупке», без оплаты.
-                </p>
+              {canEnableTickets && form.ticketsEnabled && (
+                <div className={styles.ticketTypesBox}>
+                  <div className={styles.ticketTypesHeader}>
+                    <span className={styles.ticketTypesTitle}>Типы билетов</span>
+                    <button
+                      type="button"
+                      className={styles.whitelistAdd}
+                      onClick={() => setTicketTypes(prev => [
+                        ...prev,
+                        createEmptyTicketTypeDraft(prev.length),
+                      ])}
+                    >
+                      + Тип
+                    </button>
+                  </div>
+                  <p className={styles.fieldHint}>
+                    Один тип на заказ при покупке. Цена события = минимум активных типов.
+                  </p>
+                  {ticketTypes.map((tt, index) => (
+                    <div key={tt.clientKey} className={styles.ticketTypeRow}>
+                      <input
+                        className={styles.ticketTypeName}
+                        value={tt.name}
+                        placeholder="Название"
+                        onChange={e => {
+                          const name = e.target.value.slice(0, 120);
+                          setTicketTypes(prev => prev.map((row, i) => (
+                            i === index ? { ...row, name } : row
+                          )));
+                        }}
+                      />
+                      <input
+                        className={styles.ticketTypePrice}
+                        type="text"
+                        inputMode="decimal"
+                        value={tt.price}
+                        placeholder="₽"
+                        onChange={e => {
+                          const price = e.target.value.replace(/[^0-9.,]/g, '');
+                          const digits = price.replace(/[.,]/g, '');
+                          if (digits.length > 9) return;
+                          setTicketTypes(prev => prev.map((row, i) => (
+                            i === index ? { ...row, price } : row
+                          )));
+                        }}
+                      />
+                      <input
+                        className={styles.ticketTypeCap}
+                        type="text"
+                        inputMode="numeric"
+                        value={tt.capacity}
+                        placeholder="∞"
+                        onChange={e => {
+                          const capacity = e.target.value.replace(/[^0-9]/g, '');
+                          setTicketTypes(prev => prev.map((row, i) => (
+                            i === index ? { ...row, capacity } : row
+                          )));
+                        }}
+                      />
+                      <label className={styles.ticketTypeActive}>
+                        <input
+                          type="checkbox"
+                          checked={tt.active}
+                          onChange={e => {
+                            const active = e.target.checked;
+                            setTicketTypes(prev => prev.map((row, i) => (
+                              i === index ? { ...row, active } : row
+                            )));
+                          }}
+                        />
+                        вкл
+                      </label>
+                      <button
+                        type="button"
+                        className={styles.ticketTypeRemove}
+                        disabled={ticketTypes.length <= 1}
+                        onClick={() => setTicketTypes(prev => prev.filter((_, i) => i !== index))}
+                        aria-label="Удалить тип"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {ticketTypes.some(t => t.active && (parseTicketTypePrice(t.price) || 0) <= 0) && (
+                    <p className={styles.fieldHint}>
+                      Тип с ценой 0 ₽ — бесплатные билеты: выдаются сразу при «покупке», без оплаты.
+                    </p>
+                  )}
+                </div>
               )}
               {(parseFloat(form.cost) || 0) > 0 && !form.ticketsEnabled && (
                 <p className={styles.fieldHint}>

@@ -3,6 +3,7 @@
 
 import { DEFAULT_COVER_FOCUS, normalizeCoverFocus, type CoverFocus } from '@/shared/lib/coverFocus';
 import type { Gender } from '@/shared/api/types';
+import type { ITicketTypeDraft } from '@/entities/event/ticketTypesApi';
 import type { CreateEventHost } from './CreateEventHostChooser';
 import type { IWhitelistUser } from './WhitelistModal';
 
@@ -49,6 +50,8 @@ export interface CreateEventDraft {
   inviteUserIds: string[];
   autoInviteEnabled: boolean;
   autoInviteMode: 'all' | 'select';
+  /** Типы билетов (при ticketsEnabled); для similar-event / черновика. */
+  ticketTypes: ITicketTypeDraft[];
 }
 
 function storageKey(accountId: string): string {
@@ -103,6 +106,29 @@ function parseUsers(raw: unknown): IWhitelistUser[] {
       firstName: typeof o.firstName === 'string' ? o.firstName : null,
       lastName: typeof o.lastName === 'string' ? o.lastName : null,
       avatarId: typeof o.avatarId === 'string' ? o.avatarId : null,
+    });
+  }
+  return out;
+}
+
+function parseTicketTypes(raw: unknown): ITicketTypeDraft[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ITicketTypeDraft[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    const clientKey = typeof o.clientKey === 'string' && o.clientKey
+      ? o.clientKey
+      : `tt-${out.length}-${Date.now()}`;
+    out.push({
+      clientKey,
+      id: typeof o.id === 'string' && o.id ? o.id : null,
+      name: asString(o.name, 'Стандарт') || 'Стандарт',
+      description: asString(o.description),
+      price: asString(o.price, '0') || '0',
+      capacity: asString(o.capacity),
+      sortOrder: typeof o.sortOrder === 'number' && Number.isFinite(o.sortOrder) ? o.sortOrder : out.length,
+      active: asBool(o.active, true),
     });
   }
   return out;
@@ -170,6 +196,7 @@ export function loadCreateEventDraft(accountId: string | null | undefined): Crea
       inviteUserIds: asStringList(parsed.inviteUserIds),
       autoInviteEnabled: asBool(parsed.autoInviteEnabled),
       autoInviteMode,
+      ticketTypes: parseTicketTypes(parsed.ticketTypes),
     };
     if (!isCreateEventDraftDirty(draft)) {
       removeCreateEventDraftStorage(accountId);
@@ -207,6 +234,7 @@ export function isCreateEventDraftDirty(
   if (f.allowUsersToInvite !== true) return true;
   if (f.allowedGender) return true;
   if (f.ticketsEnabled) return true;
+  if (draft.ticketTypes.length > 0) return true;
   if (draft.lat != null || draft.lng != null) return true;
   if (draft.coverImageId || persistableCoverUrl(draft.coverUrl)) return true;
   const focus = normalizeCoverFocus(draft.coverFocus);

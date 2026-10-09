@@ -17,6 +17,8 @@ export interface ITicket {
   id: string;
   orderId: string;
   eventId: string;
+  ticketTypeId?: string | null;
+  ticketTypeName?: string | null;
   holderAccountId: string;
   status: TicketStatus;
   code: string;
@@ -39,6 +41,8 @@ export interface IOrder {
   eventId: string;
   buyerAccountId: string;
   sellerOrganizationId: string | null;
+  ticketTypeId?: string | null;
+  ticketTypeName?: string | null;
   quantity: number;
   amountTotal: number;
   amountSeller: number;
@@ -52,6 +56,7 @@ export interface IOrder {
 
 export interface ICreateOrderRequest {
   eventId: string;
+  ticketTypeId?: string | null;
   quantity: number;
   idempotencyKey: string;
 }

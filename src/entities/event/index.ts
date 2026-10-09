@@ -65,6 +65,22 @@ export type {
 } from './eventExtrasApi';
 
 export {
+  fetchEventTicketTypes,
+  createEmptyTicketTypeDraft,
+  ticketTypeDraftFromApi,
+  ticketTypeDraftCloneForSeed,
+  toTicketTypeRequests,
+  minActiveTicketTypePrice,
+  parseTicketTypePrice,
+} from './ticketTypesApi';
+
+export type {
+  IEventTicketType,
+  IEventTicketTypeRequest,
+  ITicketTypeDraft,
+} from './ticketTypesApi';
+
+export {
   fetchEventRating,
   voteEventRating,
   deleteEventRating,
