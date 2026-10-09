@@ -98,12 +98,14 @@ interface AlbumCardProps {
   hideMeta?: boolean;
   /** Правый край растворяется, если за плиткой ещё есть альбомы. */
   fadeRight?: boolean;
+  /** Сколько альбомов не влезло — подпись «+N» поверх этой плитки. */
+  overflowCount?: number;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeRight = false, onOpen, onEdit, onDelete }: AlbumCardProps) {
+function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeRight = false, overflowCount = 0, onOpen, onEdit, onDelete }: AlbumCardProps) {
   const [coverIds, setCoverIds] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
@@ -209,6 +211,10 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
         )}
       </div>
       </div>
+
+      {overflowCount > 0 && (
+        <span className={styles.albumOverflowCount} aria-hidden>+{overflowCount}</span>
+      )}
 
       {canManage && (
         <div className={styles.albumMenuWrap}>
@@ -486,7 +492,9 @@ export function EventAlbums({
 
   if (compact) {
     const hasAlbums = albums.length > 0;
-    const collapsedAlbums = albums.slice(0, 3);
+    // Организатор видит 3 обложки и кнопку «добавить». Остальные — 4 обложки.
+    const collapsedLimit = canManage ? 3 : 4;
+    const collapsedAlbums = albums.slice(0, collapsedLimit);
     const hiddenAlbumCount = Math.max(0, albums.length - collapsedAlbums.length);
     return (
       <div className={styles.albumsSection}>
@@ -497,10 +505,10 @@ export function EventAlbums({
               type="button"
               className={`${styles.count} ${styles.countOverflow}`}
               aria-expanded={false}
-              aria-label={`Ещё альбомы: ${hiddenAlbumCount}`}
+              aria-label={`Альбомы: ${albums.length}`}
               onClick={() => setAlbumsExpanded(true)}
             >
-              +{hiddenAlbumCount}
+              {albums.length}
             </button>
           )}
           {hasAlbums && isMobile && (showExpandedAlbums || hiddenAlbumCount === 0) && (
@@ -538,6 +546,7 @@ export function EventAlbums({
                 canManage={canManageAlbum(a, { isOrganizer: canManage })}
                 hideMeta
                 fadeRight={hiddenAlbumCount > 0 && index === collapsedAlbums.length - 1}
+                overflowCount={hiddenAlbumCount > 0 && index === collapsedAlbums.length - 1 ? hiddenAlbumCount : 0}
                 coverVersion={coverVersionByAlbumId[a.id] ?? 0}
                 onOpen={() => openAlbum(a)}
                 onEdit={() => setFormAlbum(a)}
