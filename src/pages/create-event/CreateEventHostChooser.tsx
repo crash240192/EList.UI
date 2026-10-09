@@ -75,6 +75,13 @@ function buildTemplateCardInfo(t: IEventTemplate): TemplateCardInfo {
   const isPrivate = Boolean(params?.private);
   const cost = Number(params?.cost ?? 0);
   const age = params?.ageLimit;
+  const ticketTypesRaw = Array.isArray(params?.ticketTypes) ? params.ticketTypes : [];
+  const activeTicketTypes = ticketTypesRaw.filter(t => {
+    if (!t || typeof t !== 'object') return false;
+    const o = t as { active?: unknown; Active?: unknown };
+    const a = o.active ?? o.Active;
+    return a === undefined || a === null ? true : Boolean(a);
+  });
 
   let when: string | null = null;
   if (ev?.startTime) {
@@ -93,16 +100,45 @@ function buildTemplateCardInfo(t: IEventTemplate): TemplateCardInfo {
   if (inviteAll) inviteLabel = 'Пригласить всех подписчиков';
   else if (inviteIds.length > 0) inviteLabel = `Приглашений: ${inviteIds.length}`;
 
+  let ticketsLabel: string | null = null;
+  if (params?.ticketsEnabled) {
+    const n = activeTicketTypes.length;
+    if (n > 1) ticketsLabel = `Билеты · ${n}`;
+    else if (n === 1) {
+      const only = activeTicketTypes[0] as { name?: unknown; Name?: unknown };
+      const name = String(only.name ?? only.Name ?? '').trim();
+      ticketsLabel = name ? `Билеты: ${name}` : 'Билеты';
+    } else {
+      ticketsLabel = 'Билеты';
+    }
+  }
+
+  const prices = activeTicketTypes
+    .map(t => {
+      const o = t as { price?: unknown; Price?: unknown };
+      const n = Number(o.price ?? o.Price);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    })
+    .filter((n): n is number => n != null);
+  const priceMin = prices.length > 0 ? Math.min(...prices) : cost;
+  const priceMax = prices.length > 0 ? Math.max(...prices) : cost;
+  let costLabel = 'Бесплатно';
+  if (prices.length > 1 && priceMin !== priceMax) {
+    costLabel = `${priceMin.toLocaleString('ru-RU')}–${priceMax.toLocaleString('ru-RU')} ₽`;
+  } else if (priceMin > 0) {
+    costLabel = `${priceMin.toLocaleString('ru-RU')} ₽`;
+  }
+
   return {
     eventName: ev?.name?.trim() || null,
     address: ev?.address?.trim() || null,
     when,
-    costLabel: cost > 0 ? `${cost.toLocaleString('ru-RU')} ₽` : 'Бесплатно',
+    costLabel,
     privacyLabel: isPrivate ? 'Закрытое' : 'Открытое',
     ageLabel: age == null || Number.isNaN(Number(age)) ? null : `${Math.trunc(Number(age))}+`,
     inviteLabel,
     listLabel,
-    ticketsLabel: params?.ticketsEnabled ? 'Билеты' : null,
+    ticketsLabel,
     coverImageId: ev?.coverImageId ? String(ev.coverImageId) : null,
     coverUrl: ev?.coverUrl ? String(ev.coverUrl) : null,
   };
