@@ -665,6 +665,17 @@ export default function EventPage() {
   );
 
   const cost = event.parameters?.cost ?? 0;
+  const priceMin = event.parameters?.priceMin != null && Number.isFinite(Number(event.parameters.priceMin))
+    ? Number(event.parameters.priceMin)
+    : cost;
+  const priceMax = event.parameters?.priceMax != null && Number.isFinite(Number(event.parameters.priceMax))
+    ? Number(event.parameters.priceMax)
+    : priceMin;
+  const priceLabel = priceMin <= 0 && priceMax <= 0
+    ? null
+    : priceMin === priceMax
+      ? `${priceMin.toLocaleString('ru-RU')} ₽`
+      : `${priceMin.toLocaleString('ru-RU')}–${priceMax.toLocaleString('ru-RU')} ₽`;
   /** Событие с билетами И глобальный kill-switch API. */
   const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled) && globalTicketSales;
   const maxPersons = event.parameters?.maxPersonsCount ?? null;
@@ -913,13 +924,13 @@ export default function EventPage() {
                 />
               </div>
               <div className={styles.heroTagsRight}>
-                {cost === 0 ? (
+                {!priceLabel ? (
                   <span className={styles.tagFree}>Бесплатно</span>
                 ) : ticketsEnabled ? (
-                  <span className={styles.tagPaid}>{cost.toLocaleString('ru-RU')} ₽</span>
+                  <span className={styles.tagPaid}>{priceLabel}</span>
                 ) : (
                   <span className={styles.tagPaid} title="Оплата на месте у организатора">
-                    {cost.toLocaleString('ru-RU')} ₽ · на месте
+                    {priceLabel} · на месте
                   </span>
                 )}
                 <span className={styles.tagAge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>

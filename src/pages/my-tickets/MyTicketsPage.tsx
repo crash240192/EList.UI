@@ -253,6 +253,7 @@ export default function MyTicketsPage() {
                           {ORDER_STATUS_LABELS[order.status] ?? order.status}
                         </span>
                         <span className={styles.metaText}>
+                          {order.ticketTypeName ? `${order.ticketTypeName} · ` : ''}
                           {order.quantity} шт. · {formatMoney(order.amountTotal, order.currency)}
                         </span>
                       </div>
@@ -313,6 +314,9 @@ export default function MyTicketsPage() {
                           >
                             {TICKET_STATUS_LABELS[ticket.status] ?? ticket.status}
                           </span>
+                          {ticket.ticketTypeName && (
+                            <span className={styles.metaText}>{ticket.ticketTypeName}</span>
+                          )}
                           {issued && <span className={styles.metaText}>{issued}</span>}
                         </div>
                         {ticket.code && (
@@ -405,6 +409,7 @@ export default function MyTicketsPage() {
                             {ORDER_STATUS_LABELS[order.status] ?? order.status}
                           </span>
                           <span className={styles.metaText}>
+                            {order.ticketTypeName ? `${order.ticketTypeName} · ` : ''}
                             {order.quantity} шт. · {formatMoney(order.amountTotal, order.currency)}
                           </span>
                           {created && <span className={styles.metaText}>{created}</span>}

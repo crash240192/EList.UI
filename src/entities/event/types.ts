@@ -34,7 +34,11 @@ export interface IEventType {
 
 export interface IEventParameters {
   id: string;
-  cost: number;                 // 0 = бесплатно
+  cost: number;                 // 0 = бесплатно; при tickets = priceMin
+  /** Мин. цена активных типов (или cost без билетов) */
+  priceMin?: number | null;
+  /** Макс. цена активных типов (или = priceMin) */
+  priceMax?: number | null;
   private: boolean;
   maxPersonsCount: number | null;
   ageLimit: number | null;

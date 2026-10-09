@@ -84,7 +84,7 @@ export function EventListItem({
   bleedCover,
 }: EventListItemProps) {
   const params = getEventListParams(event);
-  const price = formatEventListItemPrice(params.cost);
+  const price = formatEventListItemPrice(params.priceMin, params.priceMax);
   const coverBg = getEventListCoverBackground(event);
   const dateLabel = formatEventListItemDate(event.startTime);
   const hasTypes = getEventTypes(event).length > 0;
