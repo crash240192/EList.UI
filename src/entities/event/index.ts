@@ -75,6 +75,17 @@ export type {
 } from './ticketStaffApi';
 
 export {
+  fetchEventTicketStats,
+  fetchOrganizationEventsTicketSummary,
+} from './ticketStatsApi';
+
+export type {
+  EventTicketStatsResponse,
+  EventTicketTypeStatsItem,
+  OrganizationEventTicketSummaryItem,
+} from './ticketStatsApi';
+
+export {
   fetchEventTicketTypes,
   createEmptyTicketTypeDraft,
   ticketTypeDraftFromApi,
