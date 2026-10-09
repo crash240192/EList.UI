@@ -7,6 +7,7 @@
 // - При прокрутке до конца → загружаем следующую страницу
 // - Пустой список в ответе → останавливаем пагинацию для этой вкладки
 // - Сброс всего кеша при смене доп. фильтров (название, тип, дата, цена)
+// - Ответ записывается в кеш своей вкладки и двигает UI только если она всё ещё открыта
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { IEvent, IEventsSearchParams } from '@/entities/event';
@@ -69,8 +70,15 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     others: emptyTab(),
   });
 
-  // Отслеживаем идущую загрузку для текущей вкладки
-  const loadingRef = useRef(false);
+  // Отдельный замок на вкладку: ответ «Организую» не должен снимать загрузку «Все мои»
+  const loadingRef = useRef<Record<OwnerFilter, boolean>>({
+    all: false,
+    mine: false,
+    others: false,
+  });
+  const ownerFilterRef = useRef(ownerFilter);
+  ownerFilterRef.current = ownerFilter;
+  const generationRef = useRef(0);
 
   // Ключ для сброса кеша при смене фильтров (не включает ownerFilter)
   const filterKey = JSON.stringify({
@@ -88,6 +96,8 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
   if (prevFilterKey.current !== filterKey) {
     prevFilterKey.current = filterKey;
     cache.current = { all: emptyTab(), mine: emptyTab(), others: emptyTab() };
+    loadingRef.current = { all: false, mine: false, others: false };
+    generationRef.current += 1;
   }
 
   // UI-state: только то, что нужно для рендера
@@ -102,23 +112,32 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     const s = cache.current[ownerFilter];
     setHasMore(s.hasMore);
     setIsLoading(!s.isLoaded);
+    setIsLoadingMore(false);
     setError(null);
-    loadingRef.current = false;
   }, [ownerFilter, filterKey]);
 
-  // Функция загрузки страницы
-  const loadPage = useCallback(async (page: number) => {
-    if (!accountId || loadingRef.current) return;
-    loadingRef.current = true;
+  const includeInactive = extraParams.active === false;
+
+  // Функция загрузки страницы. filter фиксируется в момент вызова,
+  // чтобы поздний ответ ушёл в кеш той вкладки, которая его запросила.
+  const loadPage = useCallback(async (page: number, filter: OwnerFilter) => {
+    if (!accountId || loadingRef.current[filter]) return;
+    loadingRef.current[filter] = true;
+    const generation = generationRef.current;
 
     const isFirst = page === 0;
-    if (isFirst) setIsLoading(true);
-    else         setIsLoadingMore(true);
-    setError(null);
+    const stillViewing = () =>
+      generation === generationRef.current && ownerFilterRef.current === filter;
+
+    if (stillViewing()) {
+      if (isFirst) setIsLoading(true);
+      else setIsLoadingMore(true);
+      setError(null);
+    }
 
     try {
       const result = await fetchEvents({
-        ...ownerParams(ownerFilter, accountId),
+        ...ownerParams(filter, accountId),
         // Активные: startTime = сейчас (ещё идут или впереди) — ближайшие сверху
         // Прошедшие: endTime = сейчас — только что закончившиеся сверху (EndTime DESC)
         ...(tab === 'active'
@@ -131,47 +150,60 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
         categories: extraParams.categories || undefined,
         types:      extraParams.types      || undefined,
         price:      extraParams.price      || undefined,
-        ...(extraParams.active === false ? { active: false } : {}),
+        ...(includeInactive && filter === 'mine' ? { active: false } : {}),
         pageIndex:  page,
         pageSize:   PAGE_SIZE,
       });
 
-      const incoming = result.result ?? [];
-      const s        = cache.current[ownerFilter];
+      if (generation !== generationRef.current) return;
+
+      const incoming = result?.result ?? [];
+      const total = typeof result?.total === 'number' ? result.total : null;
+      const s = cache.current[filter];
 
       s.events   = isFirst ? incoming : [...s.events, ...incoming];
       s.page     = page;
-      // Если вернулся пустой список или меньше PAGE_SIZE — больше нет
-      s.hasMore  = incoming.length >= PAGE_SIZE;
+      // Полная страница и total ещё не исчерпан — есть следующая
+      s.hasMore  = incoming.length >= PAGE_SIZE
+        && (total == null || (page + 1) * PAGE_SIZE < total);
       s.isLoaded = true;
 
-      setHasMore(s.hasMore);
-      setTick(t => t + 1); // обновить рендер
+      if (stillViewing()) {
+        setHasMore(s.hasMore);
+        setTick(t => t + 1);
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      if (stillViewing()) {
+        setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      }
     } finally {
-      loadingRef.current = false;
-      setIsLoading(false);
-      setIsLoadingMore(false);
+      if (generation === generationRef.current) {
+        loadingRef.current[filter] = false;
+      }
+      if (stillViewing()) {
+        setIsLoading(false);
+        setIsLoadingMore(false);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownerFilter, filterKey, accountId]);
+  }, [filterKey, accountId, includeInactive]);
 
   // Первая загрузка вкладки
   useEffect(() => {
     if (!accountId) return;
     if (!cache.current[ownerFilter].isLoaded) {
-      loadPage(0);
+      void loadPage(0, ownerFilter);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownerFilter, filterKey, accountId]);
+  }, [ownerFilter, filterKey, accountId, loadPage]);
 
   const loadMore = useCallback(() => {
     const s = cache.current[ownerFilter];
-    if (!s.hasMore || loadingRef.current) return;
-    loadPage(s.page + 1);
+    if (!s.hasMore || loadingRef.current[ownerFilter]) return;
+    void loadPage(s.page + 1, ownerFilter);
   }, [ownerFilter, loadPage]);
 
+  void tick;
   const events = cache.current[ownerFilter].events;
 
   return { events, isLoading, isLoadingMore, hasMore, error, loadMore };
