@@ -221,13 +221,21 @@
   border-radius:20px;
   font-size:10px;
   font-weight:500;
-  backdrop-filter:blur(6px);
   display:inline-flex;
   align-items:center;
   gap:4px;
+}
+.tagFree,.tagPaid {
+  backdrop-filter:blur(6px);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.45),
     0 3px 10px rgba(0, 0, 0, 0.3);
+}
+/* box-shadow вместе с backdrop-filter рисуется прямоугольником и ещё режется overflow ряда */
+.tagType {
+  filter:
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55))
+    drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
 }
 .tagFree { background:rgba(16,185,129,.65); color:#fff; border:.5px solid rgba(16,185,129,.4); }
 .tagPaid { background:rgba(0,0,0,.45); color:var(--warning); border:.5px solid rgba(255,255,255,.28); font-weight:600; }
