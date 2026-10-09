@@ -139,6 +139,11 @@
 }
 
 @media (max-width: 639px) {
+  .profileInfo {
+    /* Название целиком на тёмной шапке, адрес остаётся ниже, на белом. */
+    padding-bottom: 24px;
+  }
+
   .nameRowMobile {
     display: flex;
   }
@@ -157,6 +162,11 @@
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+/* Название стоит на тёмной шапке. В светлой теме обычный текст там пропадает. */
+:global(body.light-theme) .fullName {
+  color: #f0f1f7;
 }
 
 .profileMeta {
