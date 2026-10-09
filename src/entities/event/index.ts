@@ -85,6 +85,10 @@ export type {
   OrganizationEventTicketSummaryItem,
 } from './ticketStatsApi';
 
+export { fetchTicketDeskHub } from './ticketDeskHubApi';
+
+export type { TicketDeskHubItem } from './ticketDeskHubApi';
+
 export {
   fetchEventTicketTypes,
   createEmptyTicketTypeDraft,

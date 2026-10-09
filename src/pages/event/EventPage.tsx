@@ -1,7 +1,7 @@
 // pages/event/EventPage.tsx
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { IEvent, IEventOrganizator, IParticipantView } from '@/entities/event';
 import {
   fetchEventById, participateEvent, leaveEvent,
@@ -54,7 +54,7 @@ import { useEventAgeAccessDialog } from '@/features/event/useEventAgeAccessDialo
 import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
-import { BuyTicketModal, EventTicketStaffPanel, TicketCheckInPanel } from '@/features/tickets';
+import { BuyTicketModal, EventTicketStaffPanel } from '@/features/tickets';
 import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import {
   ContentReportModal,
@@ -1276,7 +1276,15 @@ export default function EventPage() {
 
             {isOrganizer && ticketsEnabled && id && (
               <>
-                <TicketCheckInPanel eventId={id} />
+                <Link
+                  className={styles.deskCta}
+                  to={`/tickets/desk?eventId=${encodeURIComponent(id)}`}
+                >
+                  <span className={styles.deskCtaTitle}>Рабочее место на входе</span>
+                  <span className={styles.deskCtaHint}>
+                    Скан QR, подтверждение и счётчики — на desk
+                  </span>
+                </Link>
                 <EventTicketStaffPanel eventId={id} />
               </>
             )}
