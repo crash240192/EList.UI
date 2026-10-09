@@ -173,7 +173,9 @@ export default function MyEventsPage() {
     };
   }, [isReady, listUiKey]);
 
-  const sentinelRef = useInfiniteScroll(loadMore);
+  const sentinelRef = useInfiniteScroll(loadMore, {
+    enabled: !isLoading && !isLoadingMore && hasMore,
+  });
 
   return (
     <div className={styles.page}>
@@ -279,7 +281,7 @@ export default function MyEventsPage() {
         )}
 
         {hasMore && (
-          <div ref={sentinelRef} className={styles.sentinel}>
+          <div key={`${tab}-${ownerFilter}`} ref={sentinelRef} className={styles.sentinel}>
             {isLoadingMore && <span className={styles.loadingMore}>Загрузка...</span>}
           </div>
         )}
