@@ -9,6 +9,7 @@ export interface TicketDeskHubItem {
   endTime: string;
   active: boolean;
   ticketsEnabled: boolean;
+  address?: string | null;
   organizationId?: string | null;
   organizationName?: string | null;
   /** organizer | staff */
@@ -24,6 +25,15 @@ export interface TicketDeskHubItem {
   remaining?: number | null;
 }
 
+function optionalText(...keys: unknown[]): string | null {
+  for (const v of keys) {
+    if (v == null || v === '') continue;
+    const s = String(v).trim();
+    if (s) return s;
+  }
+  return null;
+}
+
 function normalizeHubItem(raw: Record<string, unknown>): TicketDeskHubItem {
   const access = String(raw.access ?? raw.Access ?? 'organizer');
   const canUndo = raw.canUndoCheckIn ?? raw.CanUndoCheckIn;
@@ -34,8 +44,9 @@ function normalizeHubItem(raw: Record<string, unknown>): TicketDeskHubItem {
     endTime: String(raw.endTime ?? raw.EndTime ?? ''),
     active: Boolean(raw.active ?? raw.Active),
     ticketsEnabled: Boolean(raw.ticketsEnabled ?? raw.TicketsEnabled),
+    address: optionalText(raw.address, raw.Address),
     organizationId: (raw.organizationId ?? raw.OrganizationId ?? null) as string | null,
-    organizationName: (raw.organizationName ?? raw.OrganizationName ?? null) as string | null,
+    organizationName: optionalText(raw.organizationName, raw.OrganizationName),
     access,
     canCheckIn: Boolean(raw.canCheckIn ?? raw.CanCheckIn),
     canViewStats: Boolean(raw.canViewStats ?? raw.CanViewStats),
