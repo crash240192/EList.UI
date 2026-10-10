@@ -16,6 +16,7 @@ export function formatOrganizationRole(role: OrganizationRoleValue): string {
   switch (role) {
     case OrganizationRole.Owner: return 'Владелец';
     case OrganizationRole.Manager: return 'Администратор';
+    case OrganizationRole.TicketTaker: return 'Билетёр';
     default: return role;
   }
 }

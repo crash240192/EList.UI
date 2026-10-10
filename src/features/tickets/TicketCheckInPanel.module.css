@@ -9,6 +9,32 @@
   gap: 8px;
 }
 
+.staffList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.staffRow {
+  margin: 0;
+}
+
+.staffLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.staffLabel input {
+  margin: 0;
+}
+
 .label {
   font-size: 10px;
   font-weight: 600;
@@ -39,6 +65,29 @@
 .input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.scanBtn {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.scanBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scanLoading {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .actions {

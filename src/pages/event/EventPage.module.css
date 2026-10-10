@@ -788,3 +788,33 @@
     z-index: 140;
   }
 }
+
+.deskCta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.deskCta:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.deskCtaTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.deskCtaHint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}

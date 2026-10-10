@@ -21,6 +21,7 @@ export {
   completePayment,
   fetchMyOrders,
   fetchOrderById,
+  cancelOrder,
   fetchMyTickets,
   fetchTicketByCode,
   transferTicket,
@@ -29,6 +30,7 @@ export {
   fetchRefundsByOrder,
   validateTicket,
   checkInTicket,
+  undoCheckInTicket,
 } from './api';
 
 export {

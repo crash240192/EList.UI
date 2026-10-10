@@ -15,12 +15,14 @@ export const AUTH_REQUIRED_ROUTE_PREFIXES = [
   '/settings',
   '/wallet',
   '/my-tickets',
+  '/tickets',
   '/my-reports',
   '/reports-against-me',
   '/admin',
   '/moderation',
   '/bug-reports',
 ] as const;
+
 
 export function isPublicAuthRoute(pathname = window.location.pathname): boolean {
   return PUBLIC_AUTH_ROUTES.some(route => pathname.startsWith(route));
@@ -49,6 +51,7 @@ export const AUTH_REQUIRED_NAV_PATHS = new Set<string>([
   '/settings',
   '/wallet',
   '/my-tickets',
+  '/tickets',
   '/my-reports',
   '/reports-against-me',
   '/admin',

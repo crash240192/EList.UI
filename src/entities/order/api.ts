@@ -26,17 +26,30 @@ function asNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function optionalStr(raw: Record<string, unknown>, camel: string, pascal: string): string | null {
+  const v = raw[camel] ?? raw[pascal];
+  return v == null || v === '' ? null : String(v);
+}
+
 function normalizeTicket(raw: Record<string, unknown>): ITicket {
   return {
     id: asStr(raw.id ?? raw.Id),
     orderId: asStr(raw.orderId ?? raw.OrderId),
     eventId: asStr(raw.eventId ?? raw.EventId),
-    holderAccountId: asStr(raw.holderAccountId ?? raw.HolderAccountId),
+    ticketTypeId: optionalStr(raw, 'ticketTypeId', 'TicketTypeId'),
+    ticketTypeName: optionalStr(raw, 'ticketTypeName', 'TicketTypeName'),
+    holderAccountId: optionalStr(raw, 'holderAccountId', 'HolderAccountId'),
+    holderLogin: optionalStr(raw, 'holderLogin', 'HolderLogin'),
+    holderDisplayName: optionalStr(raw, 'holderDisplayName', 'HolderDisplayName'),
     status: asStr(raw.status ?? raw.Status) as TicketStatus,
     code: asStr(raw.code ?? raw.Code),
     issuedAt: raw.issuedAt != null || raw.IssuedAt != null
       ? asStr(raw.issuedAt ?? raw.IssuedAt)
       : null,
+    checkedInAt: raw.checkedInAt != null || raw.CheckedInAt != null
+      ? asStr(raw.checkedInAt ?? raw.CheckedInAt)
+      : null,
+    checkedInByAccountId: optionalStr(raw, 'checkedInByAccountId', 'CheckedInByAccountId'),
   };
 }
 
@@ -56,6 +69,8 @@ function normalizeOrder(raw: Record<string, unknown>): IOrder {
       const v = raw.sellerOrganizationId ?? raw.SellerOrganizationId;
       return v == null || v === '' ? null : String(v);
     })(),
+    ticketTypeId: optionalStr(raw, 'ticketTypeId', 'TicketTypeId'),
+    ticketTypeName: optionalStr(raw, 'ticketTypeName', 'TicketTypeName'),
     quantity: asNum(raw.quantity ?? raw.Quantity),
     amountTotal: asNum(raw.amountTotal ?? raw.AmountTotal),
     amountSeller: asNum(raw.amountSeller ?? raw.AmountSeller),
@@ -85,6 +100,7 @@ export async function createOrder(
     eventId: payload.eventId,
     quantity: payload.quantity,
     idempotencyKey: payload.idempotencyKey ?? newIdempotencyKey(),
+    ...(payload.ticketTypeId ? { ticketTypeId: payload.ticketTypeId } : {}),
   };
   const r = await apiClient.post<Record<string, unknown>>('/api/orders', body);
   const raw = (r.result ?? {}) as Record<string, unknown>;
@@ -128,6 +144,15 @@ export async function fetchOrderById(orderId: string): Promise<IOrder | null> {
   } catch {
     return null;
   }
+}
+
+/** POST /api/orders/{orderId}/cancel — неоплаченный Pending/Authorized */
+export async function cancelOrder(orderId: string): Promise<IOrder> {
+  const r = await apiClient.post<Record<string, unknown>>(
+    `/api/orders/${orderId}/cancel`,
+    {},
+  );
+  return normalizeOrder((r.result ?? {}) as Record<string, unknown>);
 }
 
 /** GET /api/orders/tickets/my?eventId= */
@@ -212,6 +237,15 @@ export async function validateTicket(payload: ITicketCheckInRequest): Promise<IT
 export async function checkInTicket(payload: ITicketCheckInRequest): Promise<ITicket> {
   const r = await apiClient.post<Record<string, unknown>>(
     '/api/orders/tickets/check-in',
+    payload,
+  );
+  return normalizeTicket((r.result ?? {}) as Record<string, unknown>);
+}
+
+/** POST /api/orders/tickets/undo-check-in — Owner/Manager: Used→Issued */
+export async function undoCheckInTicket(payload: ITicketCheckInRequest): Promise<ITicket> {
+  const r = await apiClient.post<Record<string, unknown>>(
+    '/api/orders/tickets/undo-check-in',
     payload,
   );
   return normalizeTicket((r.result ?? {}) as Record<string, unknown>);

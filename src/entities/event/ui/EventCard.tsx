@@ -124,9 +124,21 @@ function Footer({ children }: { children: React.ReactNode }) { return <div class
 function Price() {
   const { event } = useEventCard();
   const cost = event.parameters?.cost ?? 0;
+  const min = event.parameters?.priceMin != null && Number.isFinite(Number(event.parameters.priceMin))
+    ? Number(event.parameters.priceMin)
+    : cost;
+  const max = event.parameters?.priceMax != null && Number.isFinite(Number(event.parameters.priceMax))
+    ? Number(event.parameters.priceMax)
+    : min;
+  const free = min <= 0 && max <= 0;
+  const label = free
+    ? 'Бесплатно'
+    : min === max
+      ? `${min.toLocaleString('ru-RU')} ₽`
+      : `${min.toLocaleString('ru-RU')}–${max.toLocaleString('ru-RU')} ₽`;
   return (
-    <span className={`${styles.price} ${cost === 0 ? styles.priceFree : styles.pricePaid}`}>
-      {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
+    <span className={`${styles.price} ${free ? styles.priceFree : styles.pricePaid}`}>
+      {label}
     </span>
   );
 }

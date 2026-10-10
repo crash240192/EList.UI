@@ -17,6 +17,7 @@ import {
   OrganizationRole,
   OrganizationVerificationStatus,
   addOrganizationManager,
+  addOrganizationTicketTaker,
   createOrganization,
   fetchMyOrganizations,
   fetchOrganizationById,
@@ -44,6 +45,7 @@ import {
   transferOrganizationOwnership,
   updateOrganization,
   updateOrganizationContact,
+  updateOrganizationMemberRole,
   type OrganizationLegalFormValue,
   type OrganizationLegalRequest,
   type OrganizationMemberResponse,
@@ -618,6 +620,7 @@ function OrganizationDetailView({
           organizationId={organizationId}
           members={members}
           isOwner={isOwner}
+          canEdit={canEdit}
           myAccountId={myAccountId}
           onChanged={reload}
         />
@@ -1522,29 +1525,37 @@ function OrganizationMembersSection({
   organizationId,
   members,
   isOwner,
+  canEdit,
   myAccountId,
   onChanged,
 }: {
   organizationId: string;
   members: OrganizationMemberResponse[];
   isOwner: boolean;
+  canEdit: boolean;
   myAccountId: string;
   onChanged: () => Promise<void>;
 }) {
   const [accountId, setAccountId] = useState('');
+  const [addRole, setAddRole] = useState<OrganizationRoleValue>(
+    isOwner ? OrganizationRole.Manager : OrganizationRole.TicketTaker,
+  );
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [transferId, setTransferId] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const uuidFilled = accountId.trim().length > 0;
+  const canAddMembers = isOwner || canEdit;
   const existingMemberIds = useMemo(
     () => new Set(members.map(m => m.accountId)),
     [members],
   );
 
-  const addManagers = async (ids: string[]) => {
-    if (!isOwner || ids.length === 0) return;
+  const addMembers = async (ids: string[], role: OrganizationRoleValue) => {
+    if (!canAddMembers || ids.length === 0) return;
+    if (role === OrganizationRole.Manager && !isOwner) return;
+    if (role !== OrganizationRole.Manager && role !== OrganizationRole.TicketTaker) return;
     setBusy(true);
     setMsg(null);
     let added = 0;
@@ -1552,7 +1563,11 @@ function OrganizationMembersSection({
     for (const id of ids) {
       if (existingMemberIds.has(id)) continue;
       try {
-        await addOrganizationManager(organizationId, { accountId: id });
+        if (role === OrganizationRole.TicketTaker) {
+          await addOrganizationTicketTaker(organizationId, { accountId: id });
+        } else {
+          await addOrganizationManager(organizationId, { accountId: id });
+        }
         added += 1;
       } catch (e) {
         lastError = e instanceof Error ? e.message : 'Не удалось добавить';
@@ -1563,10 +1578,13 @@ function OrganizationMembersSection({
     } catch {
       // список мог не обновиться — сообщение всё равно покажем
     }
+    const roleLabel = formatOrganizationRole(role).toLowerCase();
     if (added > 0 && !lastError) {
       setAccountId('');
       setMsg({
-        text: added === 1 ? 'Администратор добавлен' : `Добавлено администраторов: ${added}`,
+        text: added === 1
+          ? `${formatOrganizationRole(role)} добавлен`
+          : `Добавлено (${roleLabel}): ${added}`,
         ok: true,
       });
     } else if (added > 0 && lastError) {
@@ -1578,17 +1596,33 @@ function OrganizationMembersSection({
   };
 
   const handleAdd = async () => {
-    if (!isOwner) return;
+    if (!canAddMembers) return;
     if (!uuidFilled) {
       setPickerOpen(true);
       return;
     }
-    await addManagers([accountId.trim()]);
+    await addMembers([accountId.trim()], addRole);
   };
 
   const handlePickFromSubscribers = (ids: string[]) => {
     setPickerOpen(false);
-    void addManagers(ids);
+    void addMembers(ids, addRole);
+  };
+
+  const handleSetRole = async (memberAccountId: string, role: OrganizationRoleValue) => {
+    if (!isOwner) return;
+    if (role !== OrganizationRole.Manager && role !== OrganizationRole.TicketTaker) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await updateOrganizationMemberRole(organizationId, { accountId: memberAccountId, role });
+      setMsg({ text: `Роль: ${formatOrganizationRole(role)}`, ok: true });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось сменить роль', ok: false });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleRemove = async (memberAccountId: string) => {
@@ -1644,7 +1678,8 @@ function OrganizationMembersSection({
         <div className={styles.scardHead}>
           <div className={styles.scardTitle}>Команда</div>
           <div className={styles.scardDesc}>
-            Администраторы могут редактировать профиль. Владелец управляет составом и продажами.
+            Администраторы редактируют профиль. Билетёры — только контроль входа на назначенных событиях.
+            Владелец управляет составом и продажами.
           </div>
         </div>
         <ul className={styles.memberList}>
@@ -1671,6 +1706,25 @@ function OrganizationMembersSection({
                 </div>
                 {isOwner && !isMemberOwner && (
                   <div className={styles.memberActions}>
+                    {m.role === OrganizationRole.TicketTaker ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy || !m.active}
+                        onClick={() => { void handleSetRole(m.accountId, OrganizationRole.Manager); }}
+                      >
+                        Сделать админом
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy || !m.active}
+                        onClick={() => { void handleSetRole(m.accountId, OrganizationRole.TicketTaker); }}
+                      >
+                        Сделать билетёром
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1698,16 +1752,29 @@ function OrganizationMembersSection({
         </ul>
       </div>
 
-      {isOwner && (
+      {canAddMembers && (
         <div className={styles.scard}>
           <div className={styles.scardHead}>
-            <div className={styles.scardTitle}>Добавить администратора</div>
+            <div className={styles.scardTitle}>Добавить участника</div>
             <div className={styles.scardDesc}>
-              Введите UUID или выберите из подписчиков
+              {isOwner
+                ? 'Администратор или билетёр — UUID либо выбор из подписчиков'
+                : 'Билетёр — UUID либо выбор из подписчиков'}
             </div>
           </div>
           <div className={styles.formBody}>
             <div className={styles.inlineForm}>
+              {isOwner && (
+                <select
+                  className={styles.input}
+                  value={addRole}
+                  onChange={e => setAddRole(e.target.value as OrganizationRoleValue)}
+                  aria-label="Роль нового участника"
+                >
+                  <option value={OrganizationRole.Manager}>Администратор</option>
+                  <option value={OrganizationRole.TicketTaker}>Билетёр</option>
+                </select>
+              )}
               <input
                 className={styles.input}
                 value={accountId}

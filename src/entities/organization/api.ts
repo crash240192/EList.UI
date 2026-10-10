@@ -14,6 +14,7 @@ import type {
   OrganizationRequest,
   OrganizationResponse,
   TransferOwnershipRequest,
+  UpdateOrganizationMemberRoleRequest,
 } from './types';
 import { OrganizationLegalForm } from './types';
 
@@ -84,6 +85,22 @@ export async function addOrganizationManager(
   payload: AddOrganizationMemberRequest,
 ): Promise<void> {
   await apiClient.post(`/api/organizations/managers/add/${organizationId}`, payload);
+}
+
+/** POST /api/organizations/ticket-takers/add/{organizationId} */
+export async function addOrganizationTicketTaker(
+  organizationId: string,
+  payload: AddOrganizationMemberRequest,
+): Promise<void> {
+  await apiClient.post(`/api/organizations/ticket-takers/add/${organizationId}`, payload);
+}
+
+/** PUT /api/organizations/members/role/{organizationId} */
+export async function updateOrganizationMemberRole(
+  organizationId: string,
+  payload: UpdateOrganizationMemberRoleRequest,
+): Promise<void> {
+  await apiClient.put(`/api/organizations/members/role/${organizationId}`, payload);
 }
 
 /** DELETE /api/organizations/members/remove/{organizationId}/{accountId} */
