@@ -1,4 +1,4 @@
-// pages/tickets/TicketsHubPage.tsx — hub «Билеты» (W6c)
+// pages/tickets/TicketsHubPage.tsx — hub «Билеты» (W6c / polish)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -23,6 +23,24 @@ function formatWhen(iso: string): string {
   }
 }
 
+function formatRange(start: string, end: string): string {
+  const a = formatWhen(start);
+  if (!end) return a;
+  try {
+    const sameDay = new Date(start).toDateString() === new Date(end).toDateString();
+    if (sameDay) {
+      const endTime = new Date(end).toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      return `${a} – ${endTime}`;
+    }
+  } catch {
+    /* fall through */
+  }
+  return `${a} – ${formatWhen(end)}`;
+}
+
 export default function TicketsHubPage() {
   usePageTitle('Билеты');
   const [items, setItems] = useState<TicketDeskHubItem[]>([]);
@@ -35,7 +53,8 @@ export default function TicketsHubPage() {
     setError(null);
     try {
       const hub = await fetchTicketDeskHub(100);
-      setItems(hub);
+      // Пояс: API уже фильтрует ticketsEnabled; на клиенте — страховка
+      setItems(hub.filter(i => i.ticketsEnabled !== false));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось загрузить список');
       setItems([]);
@@ -63,18 +82,20 @@ export default function TicketsHubPage() {
     return items.filter(i => i.organizationId === orgFilter);
   }, [items, orgFilter]);
 
+  const showOrgFilter = orgOptions.length > 1;
+
   return (
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.head}>
           <h1 className={styles.title}>Билеты</h1>
           <p className={styles.subtitle}>
-            Мероприятия для контроля входа. Откройте desk, чтобы сканировать и гасить билеты.
+            Мероприятия с включёнными билетами. Откройте desk для скана и контроля входа.
           </p>
         </div>
         <div className={styles.body}>
-          {orgOptions.length > 1 && (
-            <div className={styles.filters}>
+          <div className={styles.filters}>
+            {showOrgFilter && (
               <select
                 className={styles.select}
                 value={orgFilter}
@@ -86,18 +107,18 @@ export default function TicketsHubPage() {
                   <option key={o.id} value={o.id}>{o.name}</option>
                 ))}
               </select>
-              <Button size="sm" variant="secondary" onClick={() => { void load(); }}>
-                Обновить
-              </Button>
-            </div>
-          )}
+            )}
+            <Button size="sm" variant="secondary" onClick={() => { void load(); }}>
+              Обновить
+            </Button>
+          </div>
 
           {loading && <p className={styles.loading}>Загрузка…</p>}
           {error && <p className={styles.error}>{error}</p>}
           {!loading && !error && visible.length === 0 && (
             <p className={styles.empty}>
-              Нет доступных мероприятий. Назначьте билетёра на событие или откройте событие
-              организации с продажей билетов.
+              Нет мероприятий с включёнными билетами. Включите билеты в параметрах события
+              или назначьте билетёра на такое событие.
             </p>
           )}
 
@@ -112,11 +133,28 @@ export default function TicketsHubPage() {
                     <div className={styles.rowTop}>
                       <div>
                         <div className={styles.eventName}>{item.name}</div>
+                        {item.organizationName && (
+                          <div className={styles.org}>
+                            <span className={styles.orgLabel}>Организация · </span>
+                            {item.organizationName}
+                          </div>
+                        )}
                         <div className={styles.meta}>
-                          {formatWhen(item.startTime)}
-                          {item.organizationName ? ` · ${item.organizationName}` : ''}
-                          {item.access === 'staff' ? ' · билетёр' : ' · организатор'}
+                          {formatRange(item.startTime, item.endTime)}
                         </div>
+                        {item.address && (
+                          <div className={styles.address}>{item.address}</div>
+                        )}
+                      </div>
+                      <div className={styles.chips}>
+                        {item.access === 'staff' ? (
+                          <span className={styles.chipStaff}>Билетёр</span>
+                        ) : (
+                          <span className={styles.chip}>Организатор</span>
+                        )}
+                        {!item.active && (
+                          <span className={styles.chipMuted}>Неактивно</span>
+                        )}
                       </div>
                     </div>
                     {item.canViewStats && (

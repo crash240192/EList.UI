@@ -1,13 +1,21 @@
 .page {
   composes: pageColumn from '@/shared/styles/pageShell.module.css';
+  /* Скролл внутри карточки, не у всей страницы */
+  overflow: hidden;
 }
 
 .card {
   composes: cardFlex from '@/shared/styles/pageShell.module.css';
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - var(--header-h, 56px) - 40px);
+  overflow: hidden;
 }
 
 .head {
   composes: cardHead from '@/shared/styles/pageShell.module.css';
+  flex-shrink: 0;
+  padding-bottom: 12px;
 }
 
 .title {
@@ -25,11 +33,13 @@
 }
 
 .body {
-  padding: 16px 20px 24px;
+  padding: 0 20px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .filters {
@@ -37,6 +47,7 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .select {
@@ -54,10 +65,14 @@
 .list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 8px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .row {
@@ -88,10 +103,59 @@
   color: var(--text-primary);
 }
 
+.org {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.orgLabel {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 .meta {
   margin-top: 4px;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--text-muted);
+}
+
+.address {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.chipStaff {
+  composes: chip;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  color: var(--accent);
+}
+
+.chipMuted {
+  composes: chip;
+  opacity: 0.85;
 }
 
 .badges {
@@ -123,8 +187,19 @@
   margin: 0;
   font-size: 14px;
   color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .error {
   color: var(--danger);
+}
+
+@media (max-width: 639px) {
+  .card {
+    max-height: calc(100vh - var(--header-h, 56px));
+  }
+
+  .body {
+    padding: 0 16px 12px;
+  }
 }
