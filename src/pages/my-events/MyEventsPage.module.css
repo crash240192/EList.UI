@@ -201,13 +201,13 @@
   padding: 2px 8px;
 }
 
-/* Отменённое: вся карточка ч/б и едва размыта, плашка на фото как на обложке события */
+/* Отменённое: вся карточка ч/б, плашка на фото как на обложке события */
 .cancelledHost {
   position: relative;
 }
 
 .cancelledGray {
-  filter: grayscale(1) blur(0.5px);
+  filter: grayscale(1);
 }
 
 .cancelledOnPhoto {
