@@ -226,11 +226,18 @@
   aspect-ratio: 16 / 9;
 }
 
+/* Плашка по центру промежутка от левого края карточки до текста.
+   Ширина совпадает с началом описания в bleed-строке:
+   бордер + (120px * 4/3 * 0.75) + 15px. */
 .cancelledOnPhotoRow {
   left: 0;
   top: 0;
   bottom: 0;
-  width: calc(120px * 4 / 3);
+  width: calc(1px + (120px * 4 / 3) * 0.75 + 15px);
+}
+
+.cancelledHost:has(.cardOrganizer) .cancelledOnPhotoRow {
+  width: calc(3px + (120px * 4 / 3) * 0.75 + 15px);
 }
 
 .cancelledPill {
