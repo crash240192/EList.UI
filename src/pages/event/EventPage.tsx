@@ -565,14 +565,14 @@ export default function EventPage() {
   }, [id, accountId, isParticipating, toast]);
 
   const handleCancelEvent = useCallback(async () => {
-    if (!id) return;
+    if (!id || !event?.active || isEventFinished(event.startTime, event.endTime)) return;
     setActionLoading(true);
     try {
       await apiClient.delete(`/api/events/${id}/cancel`);
       setEvent(ev => ev ? { ...ev, active: false, cancelSource: 'organizer' } : ev);
       setCancelConfirm(false);
     } finally { setActionLoading(false); }
-  }, [id]);
+  }, [id, event?.active, event?.startTime, event?.endTime]);
 
   const handleShare = useCallback(() => {
     if (!event?.id) return;
@@ -700,6 +700,9 @@ export default function EventPage() {
     || isParticipantLimitFull
     || (remainingSeats != null && remainingSeats <= 0);
   const eventFinished = isEventFinished(event.startTime, event.endTime);
+  // Отменённое не помечается завершённым. Завершённое нельзя отменить.
+  const showFinished = eventFinished && isEventActive;
+  const showCancelled = !isEventActive;
   const allowUsersToInvite = event.parameters?.allowUsersToInvite;
   const canUsersInviteByEventPolicy = allowUsersToInvite === null || allowUsersToInvite === undefined || allowUsersToInvite === true;
   const canShowInviteButton = !eventFinished && !!event?.id
@@ -916,9 +919,9 @@ export default function EventPage() {
                     <HeroContextMenuItem onClick={() => { setOrganizerReportsOpen(true); setMobileMenuOpen(false); }}>
                       Жалобы{organizerReportsCount > 0 ? ` (${organizerReportsCount})` : ''}
                     </HeroContextMenuItem>
-                    {event.active && (
+                    {isEventActive && !eventFinished && (
                       <HeroContextMenuItem danger onClick={() => { setCancelConfirm(true); setMobileMenuOpen(false); }}>
-                        {eventFinished ? 'Удалить' : 'Отменить мероприятие'}
+                        Отменить мероприятие
                       </HeroContextMenuItem>
                     )}
                   </HeroContextMenu>
@@ -930,7 +933,7 @@ export default function EventPage() {
           <div className={styles.heroBottom}>
             <h1 className={styles.heroTitle}>{event.name}</h1>
             <div className={styles.heroDateTime}>
-              <span className={eventFinished || !isEventActive ? styles.heroDateStrike : undefined}>
+              <span className={showFinished || showCancelled ? styles.heroDateStrike : undefined}>
                 {isSameCalendarDay(event.startTime, event.endTime) ? (
                   <>
                     {formatEventHeroDate(event.startTime, false)}
@@ -945,8 +948,8 @@ export default function EventPage() {
                   </>
                 )}
               </span>
-              {eventFinished && <span className={styles.heroFinished}>Завершено</span>}
-              {!isEventActive && (
+              {showFinished && <span className={styles.heroFinished}>Завершено</span>}
+              {showCancelled && (
                 <span className={styles.heroCancelled}>
                   {event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено'}
                 </span>

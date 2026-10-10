@@ -54,6 +54,11 @@ const OWNER_TABS = [
   { key: 'others', label: 'Участвую' },
 ];
 
+function cancelledLabel(event: { active?: boolean; cancelSource?: string | null }): string | null {
+  if (event.active !== false) return null;
+  return event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено';
+}
+
 export default function MyEventsPage() {
   usePageTitle('Мои события');
   const isMobileList = useMediaQuery(media.mobile);
@@ -85,13 +90,13 @@ export default function MyEventsPage() {
     startTime:  filters.startTime,
     endTime:    filters.endTime,
     price:      filters.price,
-    // Для вкладки «Организую» с чекбоксом: если показываем отменённые — active: false
-    ...(ownerFilter === 'mine' && showCancelled ? { active: false } : {}),
+    // Галочка на всех вкладках: active: false включает отменённые в выдачу
+    ...(showCancelled ? { active: false } : {}),
   // @ts-ignore
     _v:         searchVersion,
   }), [debouncedName, selectedCategories, selectedTypes,
        filters.startTime, filters.endTime, filters.price,
-       ownerFilter, showCancelled, searchVersion]);
+       showCancelled, searchVersion]);
 
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useMyEvents({
     accountId,
@@ -196,7 +201,7 @@ export default function MyEventsPage() {
       />
 
       {/* ── Кнопка создать + переключатель активные/прошедшие ── */}
-      <div className={`${styles.subHeader}${ownerFilter === 'mine' ? ` ${styles.subHeaderWithCancelled}` : ''}`}>
+      <div className={`${styles.subHeader} ${styles.subHeaderWithCancelled}`}>
         <TabBar
           className={styles.archiveTabs}
           tabs={[
@@ -207,13 +212,11 @@ export default function MyEventsPage() {
           onChange={id => setTab(id as typeof tab)}
         />
         <div className={styles.subHeaderActions}>
-          {ownerFilter === 'mine' && (
-            <label className={styles.showCancelled}>
-              <input type="checkbox" checked={showCancelled}
-                onChange={e => setShowCancelled(e.target.checked)} />
-              <span>Показывать отменённые</span>
-            </label>
-          )}
+          <label className={styles.showCancelled}>
+            <input type="checkbox" checked={showCancelled}
+              onChange={e => setShowCancelled(e.target.checked)} />
+            <span>Показывать отменённые</span>
+          </label>
           <button className={styles.createBtn} onClick={() => navigate('/create-event')}>
             + Создать
           </button>
@@ -241,17 +244,38 @@ export default function MyEventsPage() {
           <EventList>
             {events.map((event, idx) => (
               <Fragment key={event.id}>
-                <EventListItem
-                  event={event}
-                  bleedCover
-                  onClick={() => navigate(`/event/${event.id}`)}
-                  className={event.isOrganizer ? styles.cardOrganizer : undefined}
-                  header={
-                    event.isOrganizer ? (
-                      <span className={styles.organizerTagInline}>Организатор</span>
-                    ) : undefined
-                  }
-                />
+                {cancelledLabel(event) ? (
+                  <div className={styles.cancelledHost}>
+                    <div className={styles.cancelledGray}>
+                      <EventListItem
+                        event={event}
+                        bleedCover
+                        onClick={() => navigate(`/event/${event.id}`)}
+                        className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                        header={
+                          event.isOrganizer ? (
+                            <span className={styles.organizerTagInline}>Организатор</span>
+                          ) : undefined
+                        }
+                      />
+                    </div>
+                    <div className={`${styles.cancelledOnPhoto} ${styles.cancelledOnPhotoRow}`}>
+                      <span className={styles.cancelledPill}>{cancelledLabel(event)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <EventListItem
+                    event={event}
+                    bleedCover
+                    onClick={() => navigate(`/event/${event.id}`)}
+                    className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                    header={
+                      event.isOrganizer ? (
+                        <span className={styles.organizerTagInline}>Организатор</span>
+                      ) : undefined
+                    }
+                  />
+                )}
                 {shouldInsertAdAfterIndex(idx) && (
                   <AdSlot key={`ad-${event.id}`} />
                 )}
@@ -263,14 +287,21 @@ export default function MyEventsPage() {
             {events.map((event, idx) => (
               <Fragment key={event.id}>
                 <div className={styles.cardWrap}>
-                  {event.isOrganizer && (
-                    <span className={styles.organizerTag}>Организатор</span>
+                  <div className={cancelledLabel(event) ? styles.cancelledGray : undefined}>
+                    {event.isOrganizer && (
+                      <span className={styles.organizerTag}>Организатор</span>
+                    )}
+                    <EventCard.Preset
+                      event={event}
+                      onClick={() => navigate(`/event/${event.id}`)}
+                      className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                    />
+                  </div>
+                  {cancelledLabel(event) && (
+                    <div className={`${styles.cancelledOnPhoto} ${styles.cancelledOnPhotoCard}`}>
+                      <span className={styles.cancelledPill}>{cancelledLabel(event)}</span>
+                    </div>
                   )}
-                  <EventCard.Preset
-                    event={event}
-                    onClick={() => navigate(`/event/${event.id}`)}
-                    className={event.isOrganizer ? styles.cardOrganizer : undefined}
-                  />
                 </div>
                 {shouldInsertAdAfterIndex(idx) && (
                   <AdSlot key={`ad-${event.id}`} />

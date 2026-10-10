@@ -201,6 +201,64 @@
   padding: 2px 8px;
 }
 
+/* Отменённое: вся карточка ч/б и едва размыта, плашка на фото как на обложке события */
+.cancelledHost {
+  position: relative;
+}
+
+.cancelledGray {
+  filter: grayscale(1) blur(0.5px);
+}
+
+.cancelledOnPhoto {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.cancelledOnPhotoCard {
+  left: 0;
+  right: 0;
+  top: 0;
+  aspect-ratio: 16 / 9;
+}
+
+/* Плашка по центру промежутка от левого края карточки до текста.
+   Ширина совпадает с началом описания в bleed-строке:
+   бордер + (120px * 4/3 * 0.75) + 15px. */
+.cancelledOnPhotoRow {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(1px + (120px * 4 / 3) * 0.75 + 15px);
+}
+
+.cancelledHost:has(.cardOrganizer) .cancelledOnPhotoRow {
+  width: calc(3px + (120px * 4 / 3) * 0.75 + 15px);
+}
+
+.cancelledPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: #fff;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid #ef4444;
+  backdrop-filter: blur(6px);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
 /* ---- States ---- */
 .empty {
   display: flex; flex-direction: column; align-items: center;
@@ -292,7 +350,7 @@
     align-self: stretch;
   }
 
-  /* Галочка только на «Организую» — тогда переносим actions на вторую строку */
+  /* Галочка на всех вкладках — переносим actions на вторую строку */
   .subHeaderWithCancelled {
     flex-wrap: wrap;
     align-items: stretch;
