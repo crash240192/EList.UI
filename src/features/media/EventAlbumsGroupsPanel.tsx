@@ -2,17 +2,25 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   getAlbumsByEvents,
   getAlbumsByOrganizationEvents,
-  getAlbumFiles,
+  getAlbumCoverFileIds,
   type IAlbum,
   type IEventAlbumsGroup,
 } from '@/entities/media/albumApi';
-import { EventListItem } from '@/entities/event/ui/EventListItem';
+import {
+  formatEventListItemDate,
+  getEventListCoverBackground,
+  type EventListItemData,
+} from '@/entities/event/lib/eventListItemUtils';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { useInfiniteScroll } from '@/shared/hooks';
+import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { media } from '@/shared/lib/breakpoints';
+import { useInfiniteScroll, useMediaQuery } from '@/shared/hooks';
 import styles from './EventAlbumsGroupsPanel.module.css';
 
 const PAGE_SIZE = 10;
+const COLLAPSED_MAX = 5;
+const STACK_LAYER_MAX = 4;
 
 function albumCountLabel(count: number): string {
   if (count === 1) return '1 альбом';
@@ -20,45 +28,195 @@ function albumCountLabel(count: number): string {
   return `${count} альбомов`;
 }
 
-function AlbumTile({ album, onOpen }: { album: IAlbum; onOpen: () => void }) {
-  const [cover, setCover] = useState<string | null>(null);
+function ClockIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    getAlbumFiles(album.id, 1, 1).then(files => {
-      if (!cancelled && files.length > 0) setCover(files[0].fileId);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [album.id]);
+function ChevronUpIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
+  );
+}
+
+function EventGroupHeader({
+  event,
+  onOpen,
+}: {
+  event: EventListItemData;
+  onOpen: () => void;
+}) {
+  const coverBg = getEventListCoverBackground(event);
+  const dateLabel = formatEventListItemDate(event.startTime);
+  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
 
   return (
-    <button type="button" className={styles.albumCard} onClick={onOpen}>
-      <div className={styles.albumCover}>
-        {cover
-          ? <AuthImage fileId={cover} alt="" className={styles.albumCoverImg} />
-          : (
-            <div className={styles.albumCoverEmpty}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M3 9h18" />
-                <circle cx="9" cy="15" r="2" />
-                <path d="M14 13l3 4" />
-              </svg>
-            </div>
-          )}
-        {album.parameters?.private && (
-          <div className={styles.privateBadge} aria-label="Приватный альбом">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <rect x="3" y="11" width="18" height="11" rx="2" />
-              <path d="M7 11V7a5 5 0 0110 0v4" />
-            </svg>
+    <button type="button" className={styles.eventHeader} onClick={onOpen}>
+      <div className={styles.eventCover} style={{ background: coverBg }}>
+        {event.coverImageId ? (
+          <AuthImage
+            fileId={event.coverImageId}
+            alt=""
+            className={styles.eventCoverImg}
+            style={focusStyle}
+            fallback={
+              event.coverUrl
+                ? <img src={event.coverUrl} alt="" className={styles.eventCoverImg} style={focusStyle} />
+                : null
+            }
+          />
+        ) : event.coverUrl ? (
+          <img src={event.coverUrl} alt="" className={styles.eventCoverImg} style={focusStyle} />
+        ) : null}
+      </div>
+      <div className={styles.eventInfo}>
+        <div className={styles.eventName}>{event.name}</div>
+        {dateLabel && (
+          <div className={styles.eventDate}>
+            <ClockIcon />
+            {dateLabel}
           </div>
         )}
       </div>
-      <div className={styles.albumMeta}>
-        <div className={styles.albumName}>{album.name}</div>
-        {album.description && <div className={styles.albumDesc}>{album.description}</div>}
-      </div>
+      <svg className={styles.eventChevron} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
+    </button>
+  );
+}
+
+function AlbumCover({
+  album,
+  iconSize,
+  mosaic = false,
+}: {
+  album: IAlbum;
+  iconSize: number;
+  /** Развёрнутая карточка: сетка до 4 первых фото */
+  mosaic?: boolean;
+}) {
+  const [coverIds, setCoverIds] = useState<string[]>([]);
+  const previewLimit = mosaic ? 4 : 1;
+
+  useEffect(() => {
+    let cancelled = false;
+    setCoverIds([]);
+    getAlbumCoverFileIds(album.id, previewLimit).then(ids => {
+      if (!cancelled) setCoverIds(ids);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [album.id, previewLimit]);
+
+  const coverCount = coverIds.length;
+  const showMosaic = mosaic && coverCount > 1;
+
+  return (
+    <div className={styles.albumCover}>
+      {showMosaic ? (
+        <div
+          className={styles.albumCoverMosaic}
+          data-count={Math.min(coverCount, 4)}
+          aria-hidden
+        >
+          {coverIds.slice(0, 4).map((fileId, i) => (
+            <div key={`${fileId}-${i}`} className={styles.albumCoverMosaicCell}>
+              <AuthImage fileId={fileId} alt="" className={styles.albumCoverImg} />
+            </div>
+          ))}
+        </div>
+      ) : coverCount > 0 ? (
+        <AuthImage fileId={coverIds[0]} alt="" className={styles.albumCoverImg} />
+      ) : (
+        <div className={styles.albumCoverEmpty}>
+          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M3 9h18" />
+            <circle cx="9" cy="15" r="2" />
+            <path d="M14 13l3 4" />
+          </svg>
+        </div>
+      )}
+      {album.parameters?.private && (
+        <div className={styles.privateBadge} aria-label="Приватный альбом">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <rect x="3" y="11" width="18" height="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0110 0v4" />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlbumTile({
+  album,
+  compact,
+  onOpen,
+}: {
+  album: IAlbum;
+  compact?: boolean;
+  onOpen: () => void;
+}) {
+  const iconSize = compact ? 16 : 24;
+  const className = [
+    styles.albumCard,
+    compact ? styles.albumCardThumb : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={onOpen}
+      aria-label={compact ? album.name : undefined}
+      title={compact ? album.name : undefined}
+    >
+      <AlbumCover album={album} iconSize={iconSize} mosaic={!compact} />
+      {!compact && (
+        <div className={styles.albumMeta}>
+          <div className={styles.albumName}>{album.name}</div>
+          {album.description && <div className={styles.albumDesc}>{album.description}</div>}
+        </div>
+      )}
+    </button>
+  );
+}
+
+function AlbumStack({
+  albums,
+  extraCount,
+  onOpen,
+}: {
+  albums: IAlbum[];
+  extraCount: number;
+  onOpen: () => void;
+}) {
+  const layers = albums.slice(0, STACK_LAYER_MAX).reverse();
+
+  return (
+    <button
+      type="button"
+      className={styles.stackThumb}
+      onClick={onOpen}
+      aria-label={`Ещё ${albumCountLabel(extraCount)}`}
+      title={`Ещё ${albumCountLabel(extraCount)}`}
+    >
+      <span className={styles.stackThumbLayers}>
+        {layers.map(album => (
+          <span key={album.id} className={styles.stackThumbLayer}>
+            <AlbumCover album={album} iconSize={14} />
+          </span>
+        ))}
+      </span>
+      {extraCount > 0 && (
+        <span className={styles.stackThumbPlus}>+{extraCount}</span>
+      )}
     </button>
   );
 }
@@ -73,21 +231,72 @@ function EventGroupSection({
   onOpenEvent: (eventId: string) => void;
 }) {
   const { event, albums } = group;
+  const isMobile = useMediaQuery(media.mobile);
+  // Свёртка только на мобилке; на tablet/desktop всегда развёрнутые карточки.
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const expanded = !isMobile || mobileExpanded;
+  const showStack = !expanded && albums.length > COLLAPSED_MAX;
+  const expand = () => setMobileExpanded(true);
+
+  const gridClass = expanded ? styles.albumGrid : styles.albumGridCollapsed;
+
+  let tiles;
+  if (expanded) {
+    tiles = albums.map(album => (
+      <AlbumTile
+        key={album.id}
+        album={album}
+        onOpen={() => onOpenAlbum(album)}
+      />
+    ));
+  } else if (showStack) {
+    const head = albums.slice(0, COLLAPSED_MAX - 1);
+    const rest = albums.slice(COLLAPSED_MAX - 1);
+    tiles = (
+      <>
+        {head.map(album => (
+          <AlbumTile
+            key={album.id}
+            album={album}
+            compact
+            onOpen={expand}
+          />
+        ))}
+        <AlbumStack
+          albums={rest}
+          extraCount={albums.length - COLLAPSED_MAX}
+          onOpen={expand}
+        />
+      </>
+    );
+  } else {
+    tiles = albums.map(album => (
+      <AlbumTile
+        key={album.id}
+        album={album}
+        compact
+        onOpen={expand}
+      />
+    ));
+  }
 
   return (
     <section className={styles.eventGroup}>
-      <EventListItem
-        event={event}
-        onClick={() => onOpenEvent(event.id)}
-        showChevron
-        bleedCover
-        footer={<span>{albumCountLabel(albums.length)}</span>}
-      />
-      <div className={styles.albumGrid}>
-        {albums.map(album => (
-          <AlbumTile key={album.id} album={album} onOpen={() => onOpenAlbum(album)} />
-        ))}
+      <EventGroupHeader event={event} onOpen={() => onOpenEvent(event.id)} />
+      <div className={gridClass}>
+        {tiles}
       </div>
+      {isMobile && mobileExpanded && (
+        <button
+          type="button"
+          className={`${styles.collapseBtn} noHoverGlow`}
+          onClick={() => setMobileExpanded(false)}
+        >
+          <ChevronUpIcon />
+          <span className={styles.collapseTitle}>Свернуть</span>
+          <ChevronUpIcon />
+        </button>
+      )}
     </section>
   );
 }

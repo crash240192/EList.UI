@@ -9,6 +9,7 @@ import type {
   OrganizationMemberResponse,
   OrganizationPayoutRequest,
   OrganizationPayoutResponse,
+  OrganizationProviderOnboardingResponse,
   OrganizationRegistryParty,
   OrganizationRequest,
   OrganizationResponse,
@@ -215,6 +216,21 @@ export async function saveOrganizationPayout(
   payload: OrganizationPayoutRequest,
 ): Promise<void> {
   await apiClient.put(`/api/organizations/payout/${organizationId}`, payload);
+}
+
+/** POST /api/organizations/payout/{organizationId}/provider-onboarding/start */
+export async function startOrganizationProviderOnboarding(
+  organizationId: string,
+  returnUrl?: string | null,
+): Promise<OrganizationProviderOnboardingResponse> {
+  const r = await apiClient.post<OrganizationProviderOnboardingResponse>(
+    `/api/organizations/payout/${organizationId}/provider-onboarding/start`,
+    { returnUrl: returnUrl ?? null },
+  );
+  if (!r.result) {
+    throw new Error(r.message || 'Не удалось запустить онбординг');
+  }
+  return r.result;
 }
 
 /** POST /api/organizations/verification/submit/{organizationId} */

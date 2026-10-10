@@ -28,6 +28,23 @@
   gap: 14px;
 }
 
+@media (max-width: 639px) {
+  .list {
+    padding: 10px 12px 16px;
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .skeleton {
+    height: 120px;
+    border-radius: 14px;
+  }
+}
+
 /* ---- Map ---- */
 
 .mapPlaceholder {

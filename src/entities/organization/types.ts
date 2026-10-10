@@ -1,4 +1,4 @@
-// entities/organization/types.ts — модели по swagger EList API
+// entities/organization/types.ts — модели по swagger API
 
 /** Роль участника (OrganizationMemberRole) */
 export const OrganizationRole = {
@@ -150,6 +150,13 @@ export interface OrganizationPayoutResponse {
   taxRegime?: string | null;
   provider?: PaymentProviderValue | null;
   onboardingStatus?: OrganizationOnboardingStatusValue | null;
+}
+
+export interface OrganizationProviderOnboardingResponse {
+  provider?: PaymentProviderValue | null;
+  providerSellerId?: string | null;
+  onboardingStatus: OrganizationOnboardingStatusValue;
+  confirmationUrl?: string | null;
 }
 
 export interface OrganizationResponse {

@@ -4,7 +4,11 @@ export type {
   IConversationPersonInfo,
   IConversationRequest,
   IMessage,
+  IMessageLocation,
+  IMessagePathNode,
   IMessageRequest,
+  IMessageVoteResult,
+  MessageVoteValue,
 } from './types';
 
 export {
@@ -14,8 +18,13 @@ export {
   fetchConversation,
   fetchEventConversations,
   fetchConversationMessages,
+  fetchConversationRootMessages,
   fetchMessageReplies,
+  fetchMessageLocation,
   createMessage,
   updateMessage,
   deleteMessage,
+  likeMessage,
+  dislikeMessage,
+  removeMessageVote,
 } from './api';

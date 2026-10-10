@@ -22,6 +22,8 @@ export interface IInvitationEvent {
     ageLimit?: number | null;
     maxPersonsCount?: number | null;
     private?: boolean;
+    ticketsEnabled?: boolean;
+    allowedGender?: 'Female' | 'Male' | null;
   } | null;
   participantsCount?: number | null;
   colors?: string[];
@@ -88,6 +90,12 @@ function normalizeEvent(raw: unknown): IInvitationEvent {
       ? {
           ...base.parameters,
           private: !!(rawParams?.private ?? rawParams?.Private),
+          ticketsEnabled: Boolean(
+            base.parameters.ticketsEnabled
+              ?? rawParams?.ticketsEnabled
+              ?? rawParams?.TicketsEnabled
+              ?? false,
+          ),
         }
       : null,
   };
@@ -132,6 +140,105 @@ export interface IInvitationsSearchRequest {
 
 export async function createInvitations(req: ICreateInvitationRequest): Promise<void> {
   await apiClient.post('/api/invitations/create', req);
+}
+
+export interface ICreateInvitationsToAccountRequest {
+  invitedAccountId: string;
+  eventIds: string[];
+  inviterOrganizationId?: string | null;
+}
+
+export interface IInvitationToAccountFailure {
+  eventId: string;
+  errorCode: number;
+  message: string;
+}
+
+export interface ICreateInvitationsToAccountResult {
+  succeededEventIds: string[];
+  failures: IInvitationToAccountFailure[];
+}
+
+function normalizeToAccountResult(raw: unknown): ICreateInvitationsToAccountResult {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const succeededRaw = r.succeededEventIds ?? r.SucceededEventIds;
+  const failuresRaw = r.failures ?? r.Failures;
+  const succeededEventIds = Array.isArray(succeededRaw)
+    ? succeededRaw.map(id => String(id))
+    : [];
+  const failures: IInvitationToAccountFailure[] = Array.isArray(failuresRaw)
+    ? failuresRaw.map(row => {
+        const f = (row ?? {}) as Record<string, unknown>;
+        return {
+          eventId: String(f.eventId ?? f.EventId ?? ''),
+          errorCode: Number(f.errorCode ?? f.ErrorCode ?? 0),
+          message: String(f.message ?? f.Message ?? ''),
+        };
+      })
+    : [];
+  return { succeededEventIds, failures };
+}
+
+/** POST /api/invitations/createToAccount — пригласить одного пользователя на несколько событий */
+export async function createInvitationsToAccount(
+  req: ICreateInvitationsToAccountRequest,
+): Promise<ICreateInvitationsToAccountResult> {
+  const r = await apiClient.post<unknown>('/api/invitations/createToAccount', {
+    invitedAccountId: req.invitedAccountId,
+    eventIds: req.eventIds,
+    inviterOrganizationId: req.inviterOrganizationId ?? null,
+  });
+  return normalizeToAccountResult(r.result);
+}
+
+export interface IInviteToEventEligibility {
+  eventId: string;
+  accountId: string;
+  allowed: boolean;
+  reason: string | null;
+  errorCode: number;
+  ticketsRequired: boolean;
+}
+
+function normalizeEligibility(row: Record<string, unknown>): IInviteToEventEligibility {
+  return {
+    eventId: String(row.eventId ?? row.EventId ?? ''),
+    accountId: String(row.accountId ?? row.AccountId ?? ''),
+    allowed: Boolean(row.allowed ?? row.Allowed),
+    reason: (row.reason ?? row.Reason ?? null) as string | null,
+    errorCode: Number(row.errorCode ?? row.ErrorCode ?? 0),
+    ticketsRequired: Boolean(row.ticketsRequired ?? row.TicketsRequired),
+  };
+}
+
+/** POST /api/invitations/canInviteToEvent — eligibility для списка аккаунтов на одно событие */
+export async function fetchCanInviteToEventByEvent(params: {
+  eventId: string;
+  accountIds: string[];
+  inviterOrganizationId?: string | null;
+}): Promise<IInviteToEventEligibility[]> {
+  const r = await apiClient.post<unknown>('/api/invitations/canInviteToEvent', {
+    eventId: params.eventId,
+    accountIds: params.accountIds,
+    inviterOrganizationId: params.inviterOrganizationId ?? null,
+  });
+  const list = Array.isArray(r.result) ? r.result : [];
+  return list.map(row => normalizeEligibility((row ?? {}) as Record<string, unknown>));
+}
+
+/** POST /api/invitations/canInviteToEvents — eligibility для одного аккаунта на список событий */
+export async function fetchCanInviteToEventByAccount(params: {
+  accountId: string;
+  eventIds: string[];
+  inviterOrganizationId?: string | null;
+}): Promise<IInviteToEventEligibility[]> {
+  const r = await apiClient.post<unknown>('/api/invitations/canInviteToEvents', {
+    accountId: params.accountId,
+    eventIds: params.eventIds,
+    inviterOrganizationId: params.inviterOrganizationId ?? null,
+  });
+  const list = Array.isArray(r.result) ? r.result : [];
+  return list.map(row => normalizeEligibility((row ?? {}) as Record<string, unknown>));
 }
 
 function parseInvitationPaged(

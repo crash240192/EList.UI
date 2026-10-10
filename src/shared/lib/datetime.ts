@@ -110,3 +110,35 @@ export function formatAge(birthDateIso: string): string {
   const age = getAge(birthDateIso);
   return `${age} ${pluralYears(age)}`;
 }
+
+const EVENT_HERO_MONTH_FULL = [
+  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+] as const;
+
+const EVENT_HERO_MONTH_ABBR = [
+  'янв.', 'фев.', 'мар.', 'апр.', 'мая', 'июня',
+  'июля', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.',
+] as const;
+
+export function isSameCalendarDay(startIso: string, endIso: string | null | undefined): boolean {
+  if (!endIso) return true;
+  const a = new Date(startIso);
+  const b = new Date(endIso);
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+export function formatEventHeroTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Дата в шапке мероприятия: год всегда; месяц сокращается только у многодневных. */
+export function formatEventHeroDate(iso: string, abbreviateMonth: boolean): string {
+  const d = new Date(iso);
+  const weekday = d.toLocaleDateString('ru-RU', { weekday: 'short' }).replace(/\.$/, '');
+  const months = abbreviateMonth ? EVENT_HERO_MONTH_ABBR : EVENT_HERO_MONTH_FULL;
+  return `${weekday}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+

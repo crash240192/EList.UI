@@ -496,7 +496,7 @@ export function RatingWidget({
     <>
       <button
         type="button"
-        className={`${styles.badge} ${!allowVote || !accountId ? styles.badgeDisabled : ''}`}
+        className={`${styles.badge} ${score > 0 ? '' : styles.badgePending} ${!allowVote || !accountId ? styles.badgeDisabled : ''}`}
         onClick={handleBadgeClick}
         title={badgeTitle}
       >

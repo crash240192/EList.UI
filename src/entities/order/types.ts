@@ -9,7 +9,9 @@ export type OrderStatus =
   | 'PartiallyRefunded'
   | 'Failed';
 
-export type TicketStatus = 'Issued' | 'Used' | 'Refunded' | 'Void';
+export type TicketStatus = 'Issued' | 'Used' | 'Refunded' | 'Void' | 'RefundPending';
+
+export type RefundStatus = 'Pending' | 'Succeeded' | 'Failed';
 
 export interface ITicket {
   id: string;
@@ -19,6 +21,17 @@ export interface ITicket {
   status: TicketStatus;
   code: string;
   issuedAt: string | null;
+}
+
+export interface IRefund {
+  id: string;
+  orderId: string;
+  amount: number;
+  reason: string | null;
+  status: RefundStatus;
+  createDate: string;
+  providerRefundId: string | null;
+  ticketIds: string[];
 }
 
 export interface IOrder {
@@ -65,6 +78,10 @@ export interface ICreateRefundRequest {
   orderId: string;
   ticketIds?: string[];
   reason?: string;
+}
+
+export interface ICancelRefundRequest {
+  refundId: string;
 }
 
 export interface ITicketCheckInRequest {

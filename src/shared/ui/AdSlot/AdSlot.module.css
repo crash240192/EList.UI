@@ -72,6 +72,59 @@
   opacity: 0.85;
 }
 
+@media (max-width: 639px) {
+  .wrap {
+    min-height: 120px;
+    border-radius: 14px;
+  }
+
+  .inner {
+    min-height: 0;
+  }
+
+  .placeholder {
+    position: relative;
+    flex-direction: row;
+    min-height: 120px;
+    align-items: stretch;
+    --ad-bleed-h: 120px;
+    --ad-cover-w: calc(var(--ad-bleed-h) * 4 / 3);
+    --ad-text-inset: calc(var(--ad-cover-w) * 0.75);
+  }
+
+  /* Match EventListItem bleedCover: 4:3, body from 75% width */
+  .placeholderCover {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--ad-cover-w);
+    height: 100%;
+    flex: none;
+    border-bottom: none;
+    border-right: none;
+  }
+
+  .placeholderBody {
+    position: relative;
+    z-index: 1;
+    padding: 12px 12px 12px var(--ad-text-inset);
+    gap: 6px;
+    justify-content: center;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .placeholderText {
+    font-size: 12px;
+  }
+
+  .placeholderLine {
+    height: 10px;
+  }
+}
+
 /* Боковая панель */
 .sidebarWrap {
   position: relative;

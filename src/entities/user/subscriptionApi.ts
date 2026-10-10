@@ -75,6 +75,16 @@ export async function fetchSubscribersCount(accountId?: string): Promise<number>
   } catch { return 0; }
 }
 
+/** GET /api/subscriptions/isSubscribed/{accountId} — подписан ли текущий пользователь */
+export async function fetchIsSubscribed(accountId: string): Promise<boolean> {
+  try {
+    const r = await apiClient.get<boolean>(`/api/subscriptions/isSubscribed/${accountId}`);
+    return Boolean(r.result);
+  } catch {
+    return false;
+  }
+}
+
 /** POST /api/subscriptions/getSubscriptions */
 export async function fetchSubscriptions(
   accountId: string,
@@ -147,6 +157,26 @@ export async function fetchSubscribers(
       pageSize:  paged?.pageSize  ?? pageSize,
     };
   } catch { return { items: [], total: 0, pageIndex, pageSize }; }
+}
+
+/**
+ * Есть ли accountId среди подписчиков myAccountId.
+ * Идём страницами, пока не найдём или список не кончится.
+ */
+export async function fetchIsMySubscriber(
+  myAccountId: string,
+  accountId: string,
+): Promise<boolean> {
+  const wanted = accountId.trim().toLowerCase();
+  if (!myAccountId || !wanted) return false;
+  const pageSize = 100;
+  for (let pageIndex = 0; pageIndex < 20; pageIndex += 1) {
+    const page = await fetchSubscribers(myAccountId, { pageIndex, pageSize });
+    if (page.items.some(item => item.account.id.trim().toLowerCase() === wanted)) return true;
+    const loaded = (pageIndex + 1) * pageSize;
+    if (page.items.length === 0 || loaded >= page.total) return false;
+  }
+  return false;
 }
 
 /** Подписаться */

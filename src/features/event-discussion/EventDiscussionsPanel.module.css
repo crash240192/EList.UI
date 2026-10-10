@@ -22,6 +22,17 @@
   min-width: 0;
 }
 
+.tabsTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-left: 10px;
+  margin-left: 2px;
+  border-left: 1px solid var(--border);
+  align-self: center;
+}
+
 .tabs {
   display: flex;
   flex-wrap: nowrap;
@@ -146,6 +157,22 @@
 .body {
   position: relative;
   min-height: 120px;
+}
+
+@media (max-width: 639px) {
+  .panel {
+    gap: 10px;
+  }
+
+  .tabsRow {
+    gap: 6px;
+    padding-bottom: 6px;
+  }
+
+  .tab {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
 }
 
 .empty {

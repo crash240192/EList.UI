@@ -15,6 +15,7 @@ export {
   lookupOrganizationByInn,
   fetchOrganizationPayout,
   saveOrganizationPayout,
+  startOrganizationProviderOnboarding,
   submitOrganizationVerification,
   setOrganizationTicketsEnabled,
 } from './api';
@@ -65,6 +66,7 @@ export {
   type OrganizationLegalRequest,
   type OrganizationPayoutRequest,
   type OrganizationRegistryParty,
+  type OrganizationProviderOnboardingResponse,
   type OrganizationAccountPublicData,
   type OrganizationPersonInfo,
   type OrganizationMemberResponse,

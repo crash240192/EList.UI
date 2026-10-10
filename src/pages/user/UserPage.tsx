@@ -13,7 +13,7 @@ import { useSafeBack } from '@/shared/lib/useSafeBack';
 import {
   fetchSubscriptionsCount,
   fetchSubscribersCount,
-  fetchSubscriptions,
+  fetchIsSubscribed,
   subscribe,
   unsubscribe,
   type INotifySettings,
@@ -33,6 +33,11 @@ import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { useAuthStore } from '@/app/store';
 import { UserShareMenu } from '@/features/user/UserShareMenu';
+import {
+  InviteBlockedDialog,
+  ProfileEventInviteModal,
+  checkCanInviteOrReason,
+} from '@/features/user/ProfileInviteDialogs';
 import { ContentReportModal } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import {
@@ -49,12 +54,11 @@ import {
   getContactIconKind,
   getUpcomingPreview,
   isContactLink,
-  splitEventsByPhase,
   type ContactIconKind,
   type UserEventsPhase,
   type UserEventsScope,
 } from './userPageUtils';
-import { formatAge } from '@/shared/lib/datetime';
+import { formatAge, pluralYears } from '@/shared/lib/datetime';
 import styles from './UserPage.module.css';
 
 type MainTab = UserEventsScope | 'albums';
@@ -204,20 +208,9 @@ function UserEventsPanel({
   onPhaseChange: (phase: UserEventsPhase) => void;
   onOpen: (eventId: string) => void;
 }) {
-  const filtered = useMemo(() => splitEventsByPhase(events, phase), [events, phase]);
-
   const sentinelRef = useInfiniteScroll(onLoadMore, {
     enabled: !isLoading && !isLoadingMore && hasMore,
   });
-
-  // Первая страница может целиком попасть в другую фазу — подгружаем дальше,
-  // пока не появятся карточки или не кончатся данные.
-  useEffect(() => {
-    if (isLoading || isLoadingMore || !hasMore) return;
-    if (filtered.length > 0) return;
-    if (events.length === 0) return;
-    onLoadMore();
-  }, [isLoading, isLoadingMore, hasMore, filtered.length, events.length, onLoadMore]);
 
   return (
     <div className={styles.tabContent}>
@@ -240,7 +233,7 @@ function UserEventsPanel({
         </div>
       )}
 
-      {!isLoading && filtered.length === 0 && !hasMore && (
+      {!isLoading && events.length === 0 && (
         <p className={styles.placeholder}>
           {scope === 'all'
             ? (phase === 'upcoming' ? 'Нет предстоящих мероприятий' : 'Нет прошедших мероприятий')
@@ -250,13 +243,9 @@ function UserEventsPanel({
         </p>
       )}
 
-      {!isLoading && filtered.length === 0 && hasMore && (
-        <p className={styles.placeholder}>Загрузка…</p>
-      )}
-
-      {!isLoading && filtered.length > 0 && (
+      {!isLoading && events.length > 0 && (
         <EventList className={styles.eventsList}>
-          {filtered.map(event => (
+          {events.map(event => (
             <EventListItem
               key={event.id}
               event={event}
@@ -273,7 +262,7 @@ function UserEventsPanel({
         </div>
       )}
 
-      {!isLoading && !hasMore && total > events.length && filtered.length > 0 && (
+      {!isLoading && !hasMore && total > events.length && events.length > 0 && (
         <p className={styles.moreHint}>Показано {events.length} из {total}</p>
       )}
     </div>
@@ -306,6 +295,10 @@ export default function UserPage() {
   const [profile, setProfile] = useState<IFullProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Пока грузится новый профиль, не оставлять карточку предыдущего: иначе его
+  // avatarId записывается в кэш уже нового accountId и остаётся, если у того нет фото.
+  const profileRouteKey = targetId ?? 'me';
+  const [loadedRouteKey, setLoadedRouteKey] = useState(profileRouteKey);
   const [mainTab, setMainTab] = useState<MainTab>('all');
   const [albumsCount, setAlbumsCount] = useState(0);
   const [organizerRating, setOrganizerRating] = useState<number | null>(null);
@@ -315,6 +308,9 @@ export default function UserPage() {
   const [listModal, setListModal] = useState<ListModal>(null);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [inviteChecking, setInviteChecking] = useState(false);
+  const [inviteEventsOpen, setInviteEventsOpen] = useState(false);
+  const [inviteBlockedReason, setInviteBlockedReason] = useState<string | null>(null);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
@@ -328,15 +324,29 @@ export default function UserPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
 
-  const { scopes: eventScopes } = useUserProfileEvents(profileAccountId || null);
+  const { scopes: eventScopes, upcomingScopes, scopeTotals } = useUserProfileEvents(
+    profileAccountId || null,
+    eventsPhase,
+  );
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     fetchFullProfile(targetId)
-      .then(setProfile)
-      .catch(e => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
-      .finally(() => setLoading(false));
+      .then(data => {
+        if (cancelled) return;
+        setProfile(data);
+        const accountId = data.account?.id;
+        if (accountId) seedAvatarCache(accountId, data.account.avatarId ?? null);
+      })
+      .catch(e => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [targetId]);
 
   useEffect(() => {
@@ -393,12 +403,41 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!profileAccountId || !myAccountId || isOwnProfile) return;
-    fetchSubscriptions(myAccountId, { pageSize: 200 })
-      .then(page => {
-        setIsSubscribed(page.items.some((s: { account: { id: string } }) => s.account.id === profileAccountId));
+    let cancelled = false;
+    fetchIsSubscribed(profileAccountId)
+      .then(subscribed => {
+        if (!cancelled) setIsSubscribed(subscribed);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setIsSubscribed(false);
+      });
+    return () => { cancelled = true; };
   }, [profileAccountId, myAccountId, isOwnProfile]);
+
+  useEffect(() => {
+    setInviteEventsOpen(false);
+    setInviteBlockedReason(null);
+    setInviteChecking(false);
+  }, [profileAccountId, myAccountId, isOwnProfile]);
+
+  const handleInviteClick = useCallback(() => {
+    if (!profileAccountId || inviteChecking) return;
+    setInviteChecking(true);
+    void (async () => {
+      try {
+        const check = await checkCanInviteOrReason(profileAccountId);
+        if (!check.ok) {
+          setInviteBlockedReason(check.reason);
+          return;
+        }
+        setInviteEventsOpen(true);
+      } catch (e) {
+        setInviteBlockedReason(e instanceof Error ? e.message : 'Не удалось проверить приглашение');
+      } finally {
+        setInviteChecking(false);
+      }
+    })();
+  }, [profileAccountId, inviteChecking]);
 
   const handleSubscribe = useCallback(async (settings: INotifySettings) => {
     if (!profileAccountId) return;
@@ -444,25 +483,32 @@ export default function UserPage() {
         };
 
   const tabCounts: Record<MainTab, number> = {
-    all: eventScopes.all.total || eventScopes.all.events.length,
-    created: eventScopes.created.total || eventScopes.created.events.length,
-    participating: eventScopes.participating.total || eventScopes.participating.events.length,
+    all: scopeTotals.all,
+    created: scopeTotals.created,
+    participating: scopeTotals.participating,
     albums: albumsCount,
   };
 
   const upcomingPreview = useMemo(() => {
-    const created = getUpcomingPreview(eventScopes.created.events, 'created', 2);
-    const participating = getUpcomingPreview(eventScopes.participating.events, 'participating', 2);
+    const created = getUpcomingPreview(upcomingScopes.created.events, 'created', 2);
+    const participating = getUpcomingPreview(upcomingScopes.participating.events, 'participating', 2);
     return [...created, ...participating]
       .sort((a, b) => new Date(a.event.startTime).getTime() - new Date(b.event.startTime).getTime())
       .slice(0, 3);
-  }, [eventScopes.created.events, eventScopes.participating.events]);
+  }, [upcomingScopes.created.events, upcomingScopes.participating.events]);
 
   const pageTitle = profile
     ? ([profile.person?.lastName, profile.person?.firstName].filter(Boolean).join(' ')
         || `@${profile.account.login}`)
     : null;
   usePageTitle(pageTitle);
+
+  if (loadedRouteKey !== profileRouteKey) {
+    setLoadedRouteKey(profileRouteKey);
+    setProfile(null);
+    setLoading(true);
+    setError(null);
+  }
 
   if (loading) return <Skeleton />;
   if (error || !profile) {
@@ -476,9 +522,13 @@ export default function UserPage() {
 
   const { account, contacts, person } = profile;
   const fullName = [person?.lastName, person?.firstName].filter(Boolean).join(' ');
-  const ageLabel = person?.birthDate ? formatAge(person.birthDate) : null;
+  const ageLabel = person?.birthDate
+    ? formatAge(person.birthDate)
+    : (typeof person?.ageYears === 'number' ? `${person.ageYears} ${pluralYears(person.ageYears)}` : null);
   const visibleContacts = contacts.filter(c => isOwnProfile || c.show);
   const initials = (fullName || account.login).slice(0, 2).toUpperCase();
+  const profileCity = account.profileCity?.trim() || null;
+  const canOpenProfilePhotos = isOwnProfile || Boolean(account.avatarId);
 
   return (
     <div className={styles.page}>
@@ -502,6 +552,17 @@ export default function UserPage() {
               >
                 <ShareIcon />
               </button>
+              {isOwnProfile && (
+                <button
+                  type="button"
+                  className={`${heroStyles.heroBtn} noHoverGlow`}
+                  onClick={() => navigate('/settings')}
+                  aria-label="Настройки"
+                  title="Настройки"
+                >
+                  <SettingsIcon />
+                </button>
+              )}
               {!isOwnProfile && authenticated && (
                 <>
                   <button
@@ -540,22 +601,25 @@ export default function UserPage() {
         <div className={styles.profileHeader}>
           <button
             type="button"
-            className={styles.avatarWrap}
+            className={`noHoverGlow ${styles.avatarWrap}`}
+            disabled={!canOpenProfilePhotos}
             onClick={async () => {
+              if (!canOpenProfilePhotos) return;
               const history = await getAvatarHistory(profileAccountId);
-              setLightboxFileIds(
-                history
-                  .map(h => (typeof h === 'string' ? h : (h as { fileId?: string; id?: string }).fileId ?? (h as { id?: string }).id))
-                  .filter(Boolean) as string[],
-              );
+              const ids = history
+                .map(h => (typeof h === 'string' ? h : (h as { fileId?: string; id?: string }).fileId ?? (h as { id?: string }).id))
+                .filter(Boolean) as string[];
+              if (ids.length === 0 && !account.avatarId) return;
+              setLightboxFileIds(ids.length > 0 ? ids : account.avatarId ? [account.avatarId] : []);
             }}
-            aria-label="Открыть фото профиля"
+            aria-label={canOpenProfilePhotos ? 'Открыть фото профиля' : 'Фото профиля скрыто'}
           >
             <UserAvatar
               accountId={profileAccountId}
               avatarId={account.avatarId ?? null}
               initials={initials}
               size={88}
+              onlineDotSize={22}
               className={styles.avatar}
             />
           </button>
@@ -565,8 +629,15 @@ export default function UserPage() {
               {fullName && <h1 className={styles.fullName}>{fullName}</h1>}
             </div>
             <div className={styles.loginLine}>@{account.login}</div>
-            {(ageLabel || person?.gender) && (
+            {profileCity && (
+              <div className={styles.profileCity}>{profileCity}</div>
+            )}
+            {(ageLabel || person?.gender || person?.isBirthdayToday) && (
               <div className={styles.profileMeta}>
+                {person?.isBirthdayToday && <span className={styles.birthdayAccent}>День рождения</span>}
+                {person?.isBirthdayToday && (ageLabel || person?.gender) && (
+                  <span className={styles.profileMetaDot} aria-hidden>·</span>
+                )}
                 {ageLabel && <span>{ageLabel}</span>}
                 {ageLabel && person?.gender && <span className={styles.profileMetaDot} aria-hidden>·</span>}
                 {person?.gender && <span>{person.gender === 'Male' ? 'Мужской' : 'Женский'}</span>}
@@ -576,12 +647,22 @@ export default function UserPage() {
 
           {!isOwnProfile && authenticated && (
             <div className={styles.profileActions}>
+              <div className={styles.inviteSlot}>
+                <button
+                  type="button"
+                  className={styles.btnInvite}
+                  onClick={handleInviteClick}
+                  disabled={inviteChecking}
+                >
+                  {inviteChecking ? '…' : 'Пригласить'}
+                </button>
+              </div>
               {isSubscribed ? (
                 <button type="button" className={`${styles.btnJoin} ${styles.btnLeave}`} onClick={() => void handleUnsubscribe()}>
                   Отписаться
                 </button>
               ) : (
-                <button type="button" className={styles.btnJoin} onClick={() => setShowSubscribe(true)}>
+                <button type="button" className={`${styles.btnJoin} ${styles.btnSubscribe}`} onClick={() => setShowSubscribe(true)}>
                   Подписаться
                 </button>
               )}
@@ -590,19 +671,6 @@ export default function UserPage() {
         </div>
 
         <div className={styles.statsBar}>
-          <div className={styles.statGroup}>
-            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{eventScopes.created.total || eventScopes.created.events.length}</span>
-              <span className={styles.statLabel}>организовал</span>
-            </div>
-            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{eventScopes.participating.total || eventScopes.participating.events.length}</span>
-              <span className={styles.statLabel}>посетил</span>
-            </div>
-          </div>
-
-          <div className={styles.statGroupDivider} aria-hidden />
-
           <div className={styles.statGroup}>
             <button
               type="button"
@@ -786,6 +854,20 @@ export default function UserPage() {
         </div>
       </div>
 
+      {inviteEventsOpen && myAccountId && (
+        <ProfileEventInviteModal
+          myAccountId={myAccountId}
+          profileAccountId={profileAccountId}
+          onClose={() => setInviteEventsOpen(false)}
+        />
+      )}
+      {inviteBlockedReason && (
+        <InviteBlockedDialog
+          reason={inviteBlockedReason}
+          onClose={() => setInviteBlockedReason(null)}
+        />
+      )}
+
       {showSubscribe && (
         <SubscribeModal
           targetLogin={account.login}
@@ -872,6 +954,15 @@ function ShareIcon() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
       <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }

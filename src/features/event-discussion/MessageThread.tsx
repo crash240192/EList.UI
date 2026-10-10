@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import type { IMessage } from '@/entities/conversation';
-import { createMessage } from '@/entities/conversation';
+import type { IMessage, IMessageLocation, IMessagePathNode } from '@/entities/conversation';
+import { createMessage, fetchMessageLocation } from '@/entities/conversation';
+import { getCachedAvatarId } from '@/features/auth/useAvatar';
 import { useRootMessages } from './useRootMessages';
 import { MessageRow } from './MessageRow';
 import { MessageComposer } from './MessageComposer';
@@ -20,17 +21,19 @@ import {
 import type { HoleRect } from './discussionDimClipPath';
 import { DiscussionRefreshProvider, useDiscussionRefreshActions } from './discussionRefreshContext';
 import { useDiscussionSlotRect } from './useDiscussionSlotRect';
-import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { useDelayedBusy } from '@/shared/lib/useDelayedBusy';
 import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import {
-  DISCUSSION_VIEW_MODE_LABELS,
-  DISCUSSION_VIEW_MODE_STORAGE_KEY,
-  isDiscussionViewMode,
+  DISCUSSION_ROOT_PAGE_SIZE,
+  DISCUSSION_TREE_SIBLING_PAGE_SIZE,
   type DiscussionViewMode,
 } from './discussionViewMode';
-import { useLocalStorage } from '@/shared/hooks';
 import { DiscussionMessageSkeleton } from './DiscussionMessageSkeleton';
+import { DiscussionLoadMore } from './DiscussionLoadMore';
+import {
+  clearDiscussionChromeClearance,
+  setDiscussionChromeClearance,
+} from './discussionChromeClearance';
 import styles from './MessageThread.module.css';
 
 interface MessageThreadProps {
@@ -40,6 +43,12 @@ interface MessageThreadProps {
   layoutBoundsRef?: RefObject<HTMLElement | null>;
   /** Можно ли писать комментарии (false — только чтение) */
   canComment?: boolean;
+  /** Дерево или лента — управляется панелью обсуждений */
+  viewMode?: DiscussionViewMode;
+  /** Deep-link: прокрутить к сообщению после загрузки нужных страниц */
+  focusMessageId?: string | null;
+  /** После успешной прокрутки к комментарию */
+  onFocusHandled?: () => void;
 }
 
 function MessageThreadInner({
@@ -47,26 +56,130 @@ function MessageThreadInner({
   currentAccountId,
   layoutBoundsRef,
   canComment = true,
+  viewMode = 'tree',
+  focusMessageId = null,
+  onFocusHandled,
 }: MessageThreadProps) {
   const location = useLocation();
-  const { messages, loading, loadingMore, hasMore, remainingMore, error, loadMore, refresh, removeMessage } =
-    useRootMessages(conversationId);
-  const { bump } = useDiscussionRefreshActions();
+  const [focusLocation, setFocusLocation] = useState<IMessageLocation | null>(null);
+  /** null пока ждём первый location; иначе стартовая страница корней (не сбрасываем при смене message) */
+  const [bootstrapPage, setBootstrapPage] = useState<number | null>(
+    focusMessageId ? null : 0,
+  );
+  const focusHandledRef = useRef(false);
+  /** После успешного скролла: путь оставляем (ветки раскрыты), скролл больше не гоняем */
+  const [focusSettled, setFocusSettled] = useState(false);
+  /** Подсветка цели ~3 с после успешного перехода */
+  const [focusHighlightId, setFocusHighlightId] = useState<string | null>(null);
+  const highlightTimerRef = useRef(0);
+
+  useEffect(() => {
+    if (!focusMessageId) {
+      // Query уже очищен после успешного deep-link — не сбрасываем focusLocation,
+      // иначе ветки сворачиваются и MessageReplies перезагружается.
+      setBootstrapPage((prev) => (prev === null ? 0 : prev));
+      return;
+    }
+
+    focusHandledRef.current = false;
+    setFocusSettled(false);
+    // Не обнуляем bootstrapPage / focusLocation до ответа API —
+    // иначе лента схлопывается и экран улетает вверх при клике по уведомлению на той же странице.
+    let cancelled = false;
+    void (async () => {
+      try {
+        const loc = await fetchMessageLocation(focusMessageId, {
+          rootPageSize: DISCUSSION_ROOT_PAGE_SIZE,
+          siblingPageSize: DISCUSSION_TREE_SIBLING_PAGE_SIZE,
+        });
+        if (cancelled) return;
+        if (!loc || loc.conversationId !== conversationId) {
+          setBootstrapPage((prev) => (prev === null ? 0 : prev));
+          return;
+        }
+        setFocusLocation(loc);
+        setBootstrapPage((prev) => {
+          if (prev === null) return loc.rootPageIndex;
+          return Math.max(prev, loc.rootPageIndex);
+        });
+      } catch {
+        if (!cancelled) setBootstrapPage((prev) => (prev === null ? 0 : prev));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusMessageId, conversationId]);
+
+  useEffect(() => () => {
+    if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+  }, []);
+
+  const rootsConversationId = bootstrapPage !== null ? conversationId : null;
+  const {
+    messages,
+    loading,
+    loadingMore,
+    remaining,
+    error,
+    loadMore,
+    removeMessage,
+    insertMessage,
+    patchMessage,
+  } = useRootMessages(rootsConversationId, {
+    loadThroughPage: bootstrapPage ?? 0,
+  });
+  const { appendChild } = useDiscussionRefreshActions();
   const [replyTarget, setReplyTarget] = useState<IMessage | null>(null);
   const [replyThreadRootId, setReplyThreadRootId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useLocalStorage<DiscussionViewMode>(
-    DISCUSSION_VIEW_MODE_STORAGE_KEY,
-    'tree',
-  );
-  const safeViewMode: DiscussionViewMode = isDiscussionViewMode(viewMode) ? viewMode : 'tree';
+  const safeViewMode: DiscussionViewMode = viewMode === 'flat' ? 'flat' : 'tree';
   const [replyScrollTailPx, setReplyScrollTailPx] = useState(0);
   const [replyHighlightHole, setReplyHighlightHole] = useState<HoleRect | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dockVisible, setDockVisible] = useState(true);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const boundsRef = layoutBoundsRef ?? threadRef;
+  const onFocusHandledRef = useRef(onFocusHandled);
+  onFocusHandledRef.current = onFocusHandled;
+
+  const focusTargetId = focusLocation?.messageId ?? null;
+  const focusPath: IMessagePathNode[] = focusLocation?.path ?? [];
+  /** Предки цели — принудительно раскрываем ветки даже если pathTail ещё не дошёл */
+  const focusExpandIds = focusLocation?.ancestorIds?.length
+    ? focusLocation.ancestorIds
+    : focusPath.slice(0, -1).map((n) => n.messageId);
+  /**
+   * Цель скролла: query message (даже пока location грузится),
+   * чтобы при клике по другому уведомлению на той же странице не доскролливать к старому.
+   */
+  const activeFocusTargetId = focusSettled
+    ? null
+    : (focusMessageId || focusTargetId);
+  const highlightMessageId = focusHighlightId
+    ?? (focusSettled ? null : activeFocusTargetId);
+
+  const markFocusHandled = useCallback(() => {
+    if (focusHandledRef.current) return;
+    focusHandledRef.current = true;
+    setFocusSettled(true);
+    const id = focusMessageId || focusTargetId;
+    if (id) {
+      setFocusHighlightId(id);
+      if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = window.setTimeout(() => {
+        setFocusHighlightId((prev) => (prev === id ? null : prev));
+        highlightTimerRef.current = 0;
+      }, 3000);
+    }
+    // Чуть отложить очистку URL: вложенные ответы ещё дорисовываются на медленной сети
+    window.setTimeout(() => {
+      onFocusHandledRef.current?.();
+    }, 120);
+  }, [focusMessageId, focusTargetId]);
 
   useEffect(() => {
     const node = anchorRef.current;
@@ -203,22 +316,46 @@ function MessageThreadInner({
     setSheetOpen(true);
   }, []);
 
-  const handleSubmit = async (text: string) => {
+  const handleSubmit = async ({ text, fileIds }: { text: string; fileIds: string[] }) => {
     if (!currentAccountId) return;
     const replyToId = replyTarget?.id ?? null;
-    await createMessage({
+    const messageId = await createMessage({
       conversationId,
       messageText: text,
       accountId: currentAccountId,
       replyTo: replyToId,
+      fileIds: fileIds.length ? fileIds : undefined,
     });
+    const now = new Date().toISOString();
+    const cachedAvatar = getCachedAvatarId(currentAccountId);
+    const localMessage: IMessage = {
+      id: messageId,
+      conversationId,
+      messageText: text.trim(),
+      replied: false,
+      accountId: currentAccountId,
+      replyTo: replyToId,
+      createDate: now,
+      updateDate: now,
+      fileIds: fileIds.length ? fileIds : undefined,
+      likesCount: 0,
+      dislikesCount: 0,
+      currentUserVote: null,
+      account: {
+        id: currentAccountId,
+        avatarId: cachedAvatar === undefined ? null : cachedAvatar,
+      },
+    };
+
     if (replyToId) {
-      bump(replyToId);
+      // Дерево: в список прямых ответов родителя; лента: ещё и под корень ветки
+      appendChild(replyToId, localMessage);
+      patchMessage(replyToId, { replied: true });
       if (safeViewMode === 'flat' && replyThreadRootId && replyThreadRootId !== replyToId) {
-        bump(replyThreadRootId);
+        appendChild(replyThreadRootId, localMessage);
       }
     } else {
-      refresh();
+      insertMessage(localMessage);
     }
     closeSheet();
   };
@@ -231,17 +368,55 @@ function MessageThreadInner({
   const trackSlot = sheetOpen || showFab;
   const slot = useDiscussionSlotRect(boundsRef, trackSlot);
 
+  /** Keep event-page scroll-top above FAB / sticky composer on mobile */
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const update = () => {
+      if (sheetOpen) {
+        setDiscussionChromeClearance(0);
+        return;
+      }
+      if (showDock && dockRef.current) {
+        const h = dockRef.current.getBoundingClientRect().height;
+        setDiscussionChromeClearance(h + 10);
+        return;
+      }
+      if (showFab) {
+        const fabSize = window.matchMedia('(max-width: 639px)').matches ? 40 : 44;
+        setDiscussionChromeClearance(fabSize + 14);
+        return;
+      }
+      setDiscussionChromeClearance(0);
+    };
+
+    update();
+
+    const dockEl = dockRef.current;
+    if (!showDock || !dockEl || typeof ResizeObserver === 'undefined') {
+      return () => clearDiscussionChromeClearance();
+    }
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(dockEl);
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+      clearDiscussionChromeClearance();
+    };
+  }, [showDock, showFab, sheetOpen]);
+
   const showThreadSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
-  const showMoreSpinner = useDelayedBusy(loadingMore, DISCUSSION_PRELOADER_DELAY_MS);
 
   const fabStyle: CSSProperties | undefined = showFab
     ? {
         position: 'fixed',
         left:
           slot.width > 0
-            ? Math.min(slot.left + slot.width - 52 - 8, window.innerWidth - 60)
-            : window.innerWidth - 60,
-        bottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
+            ? Math.min(slot.left + slot.width - 44 - 6, window.innerWidth - 52)
+            : window.innerWidth - 52,
+        bottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
         zIndex: 499,
       }
     : undefined;
@@ -257,55 +432,42 @@ function MessageThreadInner({
       {!loading && !error && messages.length === 0 && (
         <p className={styles.muted}>Пока нет комментариев. Будьте первым!</p>
       )}
-      {!loading && messages.length > 0 && (
-        <div className={styles.viewModeBar} role="group" aria-label="Вид комментариев">
-          {(['tree', 'flat'] as DiscussionViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={`${styles.viewModeBtn} ${safeViewMode === mode ? styles.viewModeBtnActive : ''}`}
-              aria-pressed={safeViewMode === mode}
-              onClick={() => setViewMode(mode)}
-            >
-              {DISCUSSION_VIEW_MODE_LABELS[mode]}
-            </button>
-          ))}
-        </div>
-      )}
       {!loading && (
         <div className={styles.list}>
-          {messages.map((msg) => (
-            <MessageRow
-              key={msg.id}
-              message={msg}
-              depth={0}
-              highlighted={activeReplyId === msg.id}
-              activeReplyId={activeReplyId}
-              conversationId={conversationId}
-              currentAccountId={currentAccountId}
-              viewMode={safeViewMode}
-              threadRootId={msg.id}
-              onReply={canComment ? handleReply : undefined}
-              onDeleted={handleDeleted}
-            />
-          ))}
+          {messages.map((msg) => {
+            const onFocusPath = focusPath.length > 0 && focusPath[0]?.messageId === msg.id;
+            const isFocusHighlight = highlightMessageId === msg.id;
+            return (
+              <MessageRow
+                key={msg.id}
+                message={msg}
+                depth={0}
+                highlighted={activeReplyId === msg.id || isFocusHighlight}
+                focusTarget={isFocusHighlight}
+                activeReplyId={activeReplyId}
+                conversationId={conversationId}
+                currentAccountId={currentAccountId}
+                viewMode={safeViewMode}
+                threadRootId={msg.id}
+                focusPathTail={onFocusPath ? focusPath.slice(1) : undefined}
+                focusExpandIds={focusExpandIds}
+                focusTargetId={activeFocusTargetId}
+                focusHighlightId={highlightMessageId}
+                onFocusHandled={markFocusHandled}
+                onReply={canComment ? handleReply : undefined}
+                onDeleted={handleDeleted}
+              />
+            );
+          })}
         </div>
       )}
-      {hasMore && !loading && !error && (
-        <button
-          type="button"
-          className={`${styles.moreBtn} ${loadingMore && showMoreSpinner ? styles.moreBtnLoading : ''}`}
-          disabled={loadingMore}
-          onClick={loadMore}
-          aria-busy={loadingMore}
-          aria-label={loadingMore ? 'Загрузка' : undefined}
-        >
-          {loadingMore && showMoreSpinner ? (
-            <AppPreloader size="sm" layout="inline" role="none" />
-          ) : (
-            `Загрузить ещё (${remainingMore})`
-          )}
-        </button>
+      {!loading && !error && (
+        <DiscussionLoadMore
+          remaining={remaining}
+          loading={loadingMore}
+          label="Ещё комментарии"
+          onLoadMore={loadMore}
+        />
       )}
 
       {sheetOpen && replyTarget && replyScrollTailPx > 0 && (
@@ -314,7 +476,7 @@ function MessageThreadInner({
 
       <div ref={anchorRef} className={styles.composerAnchor}>
         {showDock && (
-          <div className={styles.composerDock}>
+          <div ref={dockRef} className={styles.composerDock}>
             <MessageComposer
               replyingTo={replyTarget ? messageAuthorName(replyTarget) : null}
               onCancelReply={() => setReplyTarget(null)}

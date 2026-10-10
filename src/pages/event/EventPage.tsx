@@ -25,12 +25,23 @@ import { EventMapModal } from '@/features/event-map/EventMapModal';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
+import { SimilarEventDialog } from './SimilarEventDialog';
+import {
+  buildSimilarEventSeed,
+  saveSimilarEventSeed,
+  type SimilarEventField,
+} from '@/pages/create-event/similarEventSeed';
 import { EventDiscussionsPanel } from '@/features/event-discussion';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError, isApiError, isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { formatEventHeroDate, formatEventHeroTime, isSameCalendarDay } from '@/shared/lib/datetime';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
+import { readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
+import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
+import { OppositeGenderDialog } from '@/features/event/OppositeGenderDialog';
+import { myGenderConflictsWith } from '@/features/event/oppositeGender';
 import { buildEventShareUrl } from '@/shared/lib/shareLink';
 import { ShareMenu } from '@/shared/ui/ShareMenu/ShareMenu';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
@@ -44,7 +55,14 @@ import { usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import { Button } from '@/shared/ui/Button';
 import { BuyTicketModal, TicketCheckInPanel } from '@/features/tickets';
-import { ContentReportModal, EventModerationStrip, OrganizerReportsModal, useOrganizerReportsCount } from '@/features/content-reports';
+import {
+  ContentReportModal,
+  EventModerationDetailsModal,
+  EventModerationStrip,
+  OrganizerReportsModal,
+  useEventTargetModerationStats,
+  useOrganizerReportsCount,
+} from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
@@ -192,7 +210,9 @@ export default function EventPage() {
   const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
   const [inviteModalOpen,       setInviteModalOpen]       = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
+  const [descTogglePressed, setDescTogglePressed] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [similarOpen, setSimilarOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -204,6 +224,7 @@ export default function EventPage() {
   const [coverReported, setCoverReported] = useState(false);
   const [reportedOrganizatorIds, setReportedOrganizatorIds] = useState<Set<string>>(() => new Set());
   const [organizerReportsOpen, setOrganizerReportsOpen] = useState(false);
+  const [moderationDetailsOpen, setModerationDetailsOpen] = useState(false);
   const [addOrgModalOpen, setAddOrgModalOpen] = useState(false);
   const [bwListOpen,      setBwListOpen]      = useState(false);
   const [mapModalOpen,    setMapModalOpen]    = useState(false);
@@ -225,23 +246,37 @@ export default function EventPage() {
   const [heroCollapse, setHeroCollapse] = useState(0);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [buyTicketOpen, setBuyTicketOpen] = useState(false);
+  const [genderJoinKind, setGenderJoinKind] = useState<'join' | 'ticket' | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   usePageTitle(event?.name ?? null);
 
+  // После успешной загрузки события: иначе getByEventId ловит 13003 до «мне есть 18»
+  // и плашка Access Denied остаётся до F5.
   const {
     organizers,
     isOrganizer,
     organizerIds,
     denied: organizersDenied,
     refetch: refetchOrganizers,
-  } = useEventOrganizers(id, accountId);
+  } = useEventOrganizers(id, accountId, { enabled: Boolean(event) });
 
+  const canSeeEventModeration = Boolean((isOrganizer || hasPlatformAccess) && id);
   const {
     count: organizerReportsCount,
     refresh: refreshOrganizerReportsCount,
     setCount: setOrganizerReportsCount,
   } = useOrganizerReportsCount(id, Boolean(isOrganizer && id));
+  const {
+    stats: eventModerationStats,
+    refresh: refreshEventModerationStats,
+    hasSignal: hasEventModerationSignal,
+    openCount: eventModerationOpenCount,
+  } = useEventTargetModerationStats(id, canSeeEventModeration);
+  const showReportsHeroChip = canSeeEventModeration && (
+    hasEventModerationSignal || organizerReportsCount > 0
+  );
+  const reportsHeroCount = Math.max(eventModerationOpenCount, organizerReportsCount);
 
   useEffect(() => {
     if (searchParams.get('organizerReports') !== '1') return;
@@ -251,6 +286,9 @@ export default function EventPage() {
     next.delete('organizerReports');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, isOrganizer, id]);
+
+  // Deep-link к комментарию (?message=): скролл делает MessageThread/MessageRow.
+  // Не вызываем scrollIntoView(#event-discussions) — конкурирует с прокруткой к сообщению.
 
   const { orgOrganizers, personOrganizers } = useMemo(() => {
     const orgs: IEventOrganizator[] = [];
@@ -276,6 +314,33 @@ export default function EventPage() {
 
   /** Организация-организатор — приглашения от её имени */
   const inviterOrganizationId = orgOrganizers[0]?.organizationId ?? null;
+
+  const handleCreateSimilar = useCallback(async (fields: SimilarEventField[]) => {
+    if (!event) return;
+    const org = orgOrganizers.find(o => o.organizationId);
+    const host = org?.organizationId
+      ? {
+          kind: 'organization' as const,
+          organizationId: org.organizationId,
+          organizationName: org.organizationName?.trim() || 'Организация',
+          canSellTickets: false,
+        }
+      : { kind: 'user' as const };
+    const seed = await buildSimilarEventSeed({
+      event,
+      selected: new Set(fields),
+      host,
+    });
+    saveSimilarEventSeed(seed);
+    const q = new URLSearchParams({ similar: '1' });
+    if (host.kind === 'organization') {
+      q.set('host', 'org');
+      q.set('organizationId', host.organizationId);
+    } else {
+      q.set('host', 'user');
+    }
+    navigate(`/create-event?${q.toString()}`);
+  }, [event, navigate, orgOrganizers]);
 
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
 
@@ -490,14 +555,14 @@ export default function EventPage() {
   }, [id, accountId, isParticipating, toast]);
 
   const handleCancelEvent = useCallback(async () => {
-    if (!id) return;
+    if (!id || !event?.active || isEventFinished(event.startTime, event.endTime)) return;
     setActionLoading(true);
     try {
       await apiClient.delete(`/api/events/${id}/cancel`);
       setEvent(ev => ev ? { ...ev, active: false, cancelSource: 'organizer' } : ev);
       setCancelConfirm(false);
     } finally { setActionLoading(false); }
-  }, [id]);
+  }, [id, event?.active, event?.startTime, event?.endTime]);
 
   const handleShare = useCallback(() => {
     if (!event?.id) return;
@@ -595,6 +660,7 @@ export default function EventPage() {
   );
 
   const cost = event.parameters?.cost ?? 0;
+  const allowedGender = readAllowedGender(event.parameters);
   const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled);
   const maxPersons = event.parameters?.maxPersonsCount ?? null;
   const participantCap = maxPersons != null && maxPersons > 0 ? maxPersons : null;
@@ -610,6 +676,9 @@ export default function EventPage() {
     || isParticipantLimitFull
     || (remainingSeats != null && remainingSeats <= 0);
   const eventFinished = isEventFinished(event.startTime, event.endTime);
+  // Отменённое не помечается завершённым. Завершённое нельзя отменить.
+  const showFinished = eventFinished && isEventActive;
+  const showCancelled = !isEventActive;
   const allowUsersToInvite = event.parameters?.allowUsersToInvite;
   const canUsersInviteByEventPolicy = allowUsersToInvite === null || allowUsersToInvite === undefined || allowUsersToInvite === true;
   const canShowInviteButton = !eventFinished && !!event?.id
@@ -623,6 +692,24 @@ export default function EventPage() {
     (authenticated && isParticipantLimitFull);
   const fillPct = maxPersons ? Math.round((participants.length / maxPersons) * 100) : null;
 
+  const confirmJoinOrAsk = async (kind: 'join' | 'ticket') => {
+    setActionLoading(true);
+    let conflict = false;
+    try {
+      conflict = await myGenderConflictsWith(allowedGender);
+    } catch {
+      conflict = false;
+    } finally {
+      setActionLoading(false);
+    }
+    if (conflict) {
+      setGenderJoinKind(kind);
+      return;
+    }
+    if (kind === 'ticket') setBuyTicketOpen(true);
+    else void handleParticipate();
+  };
+
   const onJoinClick = () => {
     if (!authenticated) {
       setAuthDialogOpen(true);
@@ -632,7 +719,11 @@ export default function EventPage() {
       triggerParticipantLimitFeedback();
       return;
     }
-    void handleParticipate();
+    if (isParticipating) {
+      void handleParticipate();
+      return;
+    }
+    void confirmJoinOrAsk('join');
   };
 
   const scrollToTop = () => {
@@ -782,20 +873,29 @@ export default function EventPage() {
                     open={mobileMenuOpen}
                     onClose={() => setMobileMenuOpen(false)}
                     anchorRef={organizerMenuRef}
+                    accent
                   >
-                    <HeroContextMenuItem onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>
-                      Редактировать
-                    </HeroContextMenuItem>
-                    <HeroContextMenuItem onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>
-                      Добавить организатора
-                    </HeroContextMenuItem>
+                    {eventFinished ? (
+                      <HeroContextMenuItem onClick={() => { setSimilarOpen(true); setMobileMenuOpen(false); }}>
+                        Создать аналогичное
+                      </HeroContextMenuItem>
+                    ) : (
+                      <>
+                        <HeroContextMenuItem onClick={() => { navigate(`/edit-event/${event.id}`); setMobileMenuOpen(false); }}>
+                          Редактировать
+                        </HeroContextMenuItem>
+                        <HeroContextMenuItem onClick={() => { setAddOrgModalOpen(true); setMobileMenuOpen(false); }}>
+                          Добавить организатора
+                        </HeroContextMenuItem>
+                      </>
+                    )}
                     <HeroContextMenuItem onClick={() => { setBwListOpen(true); setMobileMenuOpen(false); }}>
                       {event.parameters?.private ? 'Белый список' : 'Черный список'}
                     </HeroContextMenuItem>
                     <HeroContextMenuItem onClick={() => { setOrganizerReportsOpen(true); setMobileMenuOpen(false); }}>
                       Жалобы{organizerReportsCount > 0 ? ` (${organizerReportsCount})` : ''}
                     </HeroContextMenuItem>
-                    {event.active && (
+                    {isEventActive && !eventFinished && (
                       <HeroContextMenuItem danger onClick={() => { setCancelConfirm(true); setMobileMenuOpen(false); }}>
                         Отменить мероприятие
                       </HeroContextMenuItem>
@@ -809,24 +909,34 @@ export default function EventPage() {
           <div className={styles.heroBottom}>
             <h1 className={styles.heroTitle}>{event.name}</h1>
             <div className={styles.heroDateTime}>
-              {isSameDay(event.startTime, event.endTime) ? (
-                <>
-                  {formatDateStart(event.startTime)}
-                  <span className={styles.heroDateDot}>·</span>
-                  {formatTime(event.startTime)}
-                  {event.endTime ? ` — ${formatTime(event.endTime)}` : ''}
-                </>
-              ) : (
-                <>
-                  {formatDateStart(event.startTime)}, {formatTime(event.startTime)}
-                  {event.endTime ? ` → ${formatDateStart(event.endTime)}, ${formatTime(event.endTime)}` : ''}
-                </>
+              <span className={showFinished || showCancelled ? styles.heroDateStrike : undefined}>
+                {isSameCalendarDay(event.startTime, event.endTime) ? (
+                  <>
+                    {formatEventHeroDate(event.startTime, false)}
+                    <span className={styles.heroDateDot}>·</span>
+                    {formatEventHeroTime(event.startTime)}
+                    {event.endTime ? ` — ${formatEventHeroTime(event.endTime)}` : ''}
+                  </>
+                ) : (
+                  <>
+                    {formatEventHeroDate(event.startTime, true)}, {formatEventHeroTime(event.startTime)}
+                    {event.endTime ? ` → ${formatEventHeroDate(event.endTime, true)}, ${formatEventHeroTime(event.endTime)}` : ''}
+                  </>
+                )}
+              </span>
+              {showFinished && <span className={styles.heroFinished}>Завершено</span>}
+              {showCancelled && (
+                <span className={styles.heroCancelled}>
+                  {event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено'}
+                </span>
               )}
             </div>
             <div className={styles.heroTagsRow}>
               <div className={styles.heroTagsLeft}>
                 <EventTypeChipsOverflow
                   event={event}
+                  fitWidth
+                  maxFitLines={3}
                   variant="overlay"
                   invert
                   iconSize={10}
@@ -852,10 +962,34 @@ export default function EventPage() {
                     Закрытое
                   </span>
                 )}
-                {!isEventActive && (
-                  <span className={styles.tagCancelled}>
-                    {event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено'}
-                  </span>
+                {showReportsHeroChip && (
+                  <button
+                    type="button"
+                    className={styles.tagReports}
+                    onClick={() => {
+                      if (eventModerationStats) {
+                        setModerationDetailsOpen(true);
+                        return;
+                      }
+                      if (isOrganizer) setOrganizerReportsOpen(true);
+                    }}
+                    aria-label={
+                      reportsHeroCount > 0
+                        ? `Жалобы: ${reportsHeroCount}`
+                        : 'Жалобы и ограничения'
+                    }
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                      <line x1="4" y1="22" x2="4" y2="15" />
+                    </svg>
+                    Жалобы
+                    {reportsHeroCount > 0 && (
+                      <span className={styles.tagReportsCount}>
+                        {reportsHeroCount > 99 ? '99+' : reportsHeroCount}
+                      </span>
+                    )}
+                  </button>
                 )}
               </div>
             </div>
@@ -940,7 +1074,7 @@ export default function EventPage() {
                           triggerParticipantLimitFeedback();
                           return;
                         }
-                        setBuyTicketOpen(true);
+                        void confirmJoinOrAsk('ticket');
                       }}
                     >
                       {cost <= 0 ? 'Получить билет' : 'Купить билет'}
@@ -993,7 +1127,7 @@ export default function EventPage() {
           </div>
         </div>
 
-        {(isOrganizer || hasPlatformAccess) && id && (
+        {canSeeEventModeration && id && (
           <EventModerationStrip
             eventId={id}
             isCancelled={!event.active}
@@ -1004,7 +1138,6 @@ export default function EventPage() {
               && !event.active
               && event.cancelSource === 'moderation'
             }
-            canRevokePenalties={hasPlatformAccess}
             onRestored={() => {
               setEvent(ev => ev
                 ? {
@@ -1016,6 +1149,7 @@ export default function EventPage() {
                   cancelledByAccountId: null,
                 }
                 : ev);
+              void refreshEventModerationStats();
             }}
           />
         )}
@@ -1032,77 +1166,35 @@ export default function EventPage() {
             {(event.description?.length ?? 0) > 200 && (
               <button
                 type="button"
-                className={styles.descToggle}
-                onClick={() => setDescExpanded(v => !v)}
+                className={`${styles.descToggle} noHoverGlow ${descTogglePressed ? styles.descTogglePressed : ''}`}
+                onPointerDown={() => setDescTogglePressed(true)}
+                onPointerUp={() => setDescTogglePressed(false)}
+                onPointerCancel={() => setDescTogglePressed(false)}
+                onPointerLeave={() => setDescTogglePressed(false)}
+                onClick={e => {
+                  setDescExpanded(v => !v);
+                  setDescTogglePressed(false);
+                  e.currentTarget.blur();
+                }}
                 aria-expanded={descExpanded}
               >
                 <span className={styles.descToggleLine} aria-hidden />
-                <span className={styles.descToggleBody}>
-                  <span className={styles.descToggleTitle}>
-                    {descExpanded ? 'Свернуть' : 'Показать полностью'}
-                  </span>
-                  <span className={styles.descToggleHint}>
-                    {descExpanded ? 'Скрыть описание' : 'Развернуть описание'}
-                  </span>
+                <span className={styles.descToggleTitle}>
+                  {descExpanded ? 'Свернуть' : 'Показать полностью'}
                 </span>
                 {descExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
               </button>
             )}
+            {allowedGender && (
+              <div className={styles.genderLimit}>
+                <div className={styles.secLabel}>Ограничение по полу</div>
+                <GenderLimitBadge gender={allowedGender} />
+              </div>
+            )}
           </div>
 
-          {/* Сайдбар: участники → альбомы → организаторы */}
+          {/* Сайдбар: организаторы → альбомы → участники */}
           <div className={styles.sidePanel}>
-
-            {showParticipantsBlock && (
-              <AccessDeniedGate denied={participantsDenied} variant="section">
-                {participantsDenied ? (
-                  <SectionDeniedPlaceholder lines={3} />
-                ) : (
-                  <button
-                    type="button"
-                    className={`${styles.participantsBlock} ${sortedParticipants.length === 0 ? styles.participantsBlockEmpty : ''}`}
-                    onClick={() => setParticipantsModalOpen(true)}
-                    aria-label={`Участники: ${sortedParticipants.length}`}
-                  >
-                    <div className={styles.participantsBlockHead}>
-                      <span className={styles.participantsBlockTitle}>
-                        Участники ({sortedParticipants.length})
-                      </span>
-                      {maxPersons != null && (
-                        <span className={styles.participantsBlockCap}>
-                          {participants.length} / {maxPersons}
-                        </span>
-                      )}
-                    </div>
-
-                    {maxPersons != null && (
-                      <div className={styles.participantsFillTrack}>
-                        <div
-                          className={styles.fillInner}
-                          style={{ width: `${Math.min(fillPct ?? 0, 100)}%` }}
-                        />
-                      </div>
-                    )}
-
-                    {sortedParticipants.length > 0 && (
-                      <ParticipantsChipPreview participants={participantChips} />
-                    )}
-                  </button>
-                )}
-              </AccessDeniedGate>
-            )}
-
-            {isOrganizer && ticketsEnabled && id && (
-              <TicketCheckInPanel eventId={id} />
-            )}
-
-            <EventAlbums
-              eventId={id!}
-              compact
-              canManage={isOrganizer}
-              isParticipating={isParticipating}
-              accountId={accountId}
-            />
 
             {(orgOrganizers.length > 0 || personOrganizers.length > 0 || organizersDenied) && (
               <AccessDeniedGate denied={organizersDenied} variant="section">
@@ -1162,9 +1254,60 @@ export default function EventPage() {
               </AccessDeniedGate>
             )}
 
+            {isOrganizer && ticketsEnabled && id && (
+              <TicketCheckInPanel eventId={id} />
+            )}
+
+            <EventAlbums
+              eventId={id!}
+              compact
+              canManage={isOrganizer}
+              isParticipating={isParticipating}
+              accountId={accountId}
+            />
+
+            {showParticipantsBlock && (
+              <AccessDeniedGate denied={participantsDenied} variant="section">
+                {participantsDenied ? (
+                  <SectionDeniedPlaceholder lines={3} />
+                ) : (
+                  <button
+                    type="button"
+                    className={`${styles.participantsBlock} ${sortedParticipants.length === 0 ? styles.participantsBlockEmpty : ''}`}
+                    onClick={() => setParticipantsModalOpen(true)}
+                    aria-label={`Участники: ${sortedParticipants.length}`}
+                  >
+                    <div className={styles.participantsBlockHead}>
+                      <span className={styles.participantsBlockTitle}>
+                        Участники ({sortedParticipants.length})
+                      </span>
+                      {maxPersons != null && (
+                        <span className={styles.participantsBlockCap}>
+                          {participants.length} / {maxPersons}
+                        </span>
+                      )}
+                    </div>
+
+                    {maxPersons != null && (
+                      <div className={styles.participantsFillTrack}>
+                        <div
+                          className={styles.fillInner}
+                          style={{ width: `${Math.min(fillPct ?? 0, 100)}%` }}
+                        />
+                      </div>
+                    )}
+
+                    {sortedParticipants.length > 0 && (
+                      <ParticipantsChipPreview participants={participantChips} />
+                    )}
+                  </button>
+                )}
+              </AccessDeniedGate>
+            )}
+
           </div>
 
-          <div className={styles.discussionsSection}>
+          <div id="event-discussions" className={styles.discussionsSection}>
             {id && (
               <EventDiscussionsPanel
                 eventId={id}
@@ -1190,6 +1333,12 @@ export default function EventPage() {
         <CancelConfirmDialog eventName={event.name} loading={actionLoading}
           onConfirm={handleCancelEvent} onClose={() => setCancelConfirm(false)} />
       )}
+      {similarOpen && (
+        <SimilarEventDialog
+          onClose={() => setSimilarOpen(false)}
+          onConfirm={handleCreateSimilar}
+        />
+      )}
       {reportModalOpen && reportTarget && (
         <ContentReportModal
           targetType={reportTarget.type}
@@ -1205,6 +1354,16 @@ export default function EventPage() {
               setReportedOrganizatorIds(prev => new Set(prev).add(reportTarget.id));
             }
           }}
+        />
+      )}
+      {moderationDetailsOpen && eventModerationStats && (
+        <EventModerationDetailsModal
+          stats={eventModerationStats}
+          canRevokePenalties={hasPlatformAccess}
+          canOpenReportsList={isOrganizer}
+          onOpenReportsList={() => setOrganizerReportsOpen(true)}
+          onClose={() => setModerationDetailsOpen(false)}
+          onChanged={() => void refreshEventModerationStats()}
         />
       )}
       {organizerReportsOpen && event?.id && (
@@ -1228,6 +1387,17 @@ export default function EventPage() {
           inviterOrganizationId={inviterOrganizationId}
           isPrivate={!!event.parameters?.private}
           onClose={() => setInviteModalOpen(false)}
+        />
+      )}
+      {genderJoinKind && (
+        <OppositeGenderDialog
+          onParticipate={() => {
+            const kind = genderJoinKind;
+            setGenderJoinKind(null);
+            if (kind === 'ticket') setBuyTicketOpen(true);
+            else void handleParticipate();
+          }}
+          onDecline={() => setGenderJoinKind(null)}
         />
       )}
       {buyTicketOpen && event?.id && (
@@ -1385,27 +1555,14 @@ function PageSkeleton() {
 
 // ── Date helpers ──
 
-const RU_DATE = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
-const RU_TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
-const RU_SHORT = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-function formatDateStart(iso: string)   { return RU_DATE.format(new Date(iso)); }
-function formatTime(iso: string)        { return RU_TIME.format(new Date(iso)); }
-function isSameDay(start: string, end: string | null): boolean {
-  if (!end) return true;
-  const a = new Date(start), b = new Date(end);
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
-}
 function formatDateFull(start: string, end: string | null) {
-  if (!end) return RU_SHORT.format(new Date(start));
-  if (isSameDay(start, end)) {
-    // Одна дата: «24 мая, 19:00 — 23:00»
-    return `${RU_SHORT.format(new Date(start))} — ${RU_TIME.format(new Date(end))}`;
+  if (!end || isSameCalendarDay(start, end)) {
+    const times = end
+      ? `${formatEventHeroTime(start)} — ${formatEventHeroTime(end)}`
+      : formatEventHeroTime(start);
+    return `${formatEventHeroDate(start, false)} · ${times}`;
   }
-  // Разные даты: «24 мая, 19:00 — 25 мая, 23:00»
-  return `${RU_SHORT.format(new Date(start))} — ${RU_SHORT.format(new Date(end))}`;
+  return `${formatEventHeroDate(start, true)}, ${formatEventHeroTime(start)} → ${formatEventHeroDate(end, true)}, ${formatEventHeroTime(end)}`;
 }
 
 // ── Icons ──

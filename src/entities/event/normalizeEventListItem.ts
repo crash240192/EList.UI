@@ -1,5 +1,5 @@
 import type { IEventType } from './types';
-import type { EventListItemData } from './lib/eventListItemUtils';
+import { readAllowedGender, type EventListItemData } from './lib/eventListItemUtils';
 import { parseCoverFocusFromRecord } from '@/shared/lib/coverFocus';
 
 function normalizeEventCategory(raw: unknown): IEventType['eventCategory'] {
@@ -79,6 +79,8 @@ export function normalizeEventListItem(raw: unknown): EventListItemData {
           ) as number | null,
           maxPersonsCount: (params.maxPersonsCount ?? params.MaxPersonsCount ?? null) as number | null,
           ticketsEnabled: Boolean(params.ticketsEnabled ?? params.TicketsEnabled ?? false),
+          private: Boolean(params.private ?? params.Private ?? false),
+          allowedGender: readAllowedGender(params),
         }
       : null,
     participantsCount: (e.participantsCount ?? e.ParticipantsCount ?? null) as number | null,

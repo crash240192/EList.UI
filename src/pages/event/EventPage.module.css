@@ -138,6 +138,11 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* Длинные слова без пробелов — перенос, а не выезд за край; clamp держит высоту hero */
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .heroDateTime {
   position: relative;
@@ -153,6 +158,39 @@
   margin: 0 5px;
   color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
+}
+.heroDateStrike {
+  text-decoration: line-through;
+  text-decoration-thickness: 0.6px;
+  text-decoration-color: rgba(255, 255, 255, 0.95);
+}
+.heroFinished,
+.heroCancelled {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: #fff;
+  text-shadow: none;
+  text-decoration: none;
+  vertical-align: 1px;
+  backdrop-filter: blur(6px);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.3);
+}
+.heroFinished {
+  background: rgba(255, 255, 255, 0.16);
+  border: 0.5px solid rgba(255, 255, 255, 0.55);
+}
+.heroCancelled {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid #ef4444;
 }
 .heroTagsRow {
   position: relative;
@@ -183,13 +221,21 @@
   border-radius:20px;
   font-size:10px;
   font-weight:500;
-  backdrop-filter:blur(6px);
   display:inline-flex;
   align-items:center;
   gap:4px;
+}
+.tagFree,.tagPaid {
+  backdrop-filter:blur(6px);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.45),
     0 3px 10px rgba(0, 0, 0, 0.3);
+}
+/* box-shadow вместе с backdrop-filter рисуется прямоугольником и ещё режется overflow ряда */
+.tagType {
+  filter:
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55))
+    drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
 }
 .tagFree { background:rgba(16,185,129,.65); color:#fff; border:.5px solid rgba(16,185,129,.4); }
 .tagPaid { background:rgba(0,0,0,.45); color:var(--warning); border:.5px solid rgba(255,255,255,.28); font-weight:600; }
@@ -254,9 +300,9 @@
   height: var(--control-height);
   padding: 0 var(--control-padding-x);
   border-radius: var(--control-radius);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-secondary);
+  border: none;
+  background: var(--accent);
+  color: #fff;
   font-size: var(--control-font-size);
   font-weight: var(--control-font-weight);
   font-family: inherit;
@@ -266,8 +312,8 @@
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .btnInvite:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--accent-hover);
+  color: #fff;
 }
 
 .btnTicket {
@@ -337,10 +383,34 @@
 }
 .btnJoinShake { animation:joinShake .45s ease; }
 
-.tagCancelled {
+.tagReports {
   padding:3px 10px; border-radius:20px; font-size:10px; font-weight:600;
-  backdrop-filter:blur(6px); background:rgba(239,68,68,.75); color:#fff;
-  border:.5px solid rgba(239,68,68,.5);
+  backdrop-filter:blur(6px); background:rgba(245,158,11,.78); color:#fff;
+  border:.5px solid rgba(245,158,11,.55);
+  display:inline-flex; align-items:center; gap:5px;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.tagReports:hover {
+  background:rgba(245,158,11,.9);
+}
+
+.tagReportsCount {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* Main grid: desktop — сайдбар слева, описание+обсуждения справа;
@@ -529,8 +599,19 @@
 .mgmtBtnDanger:hover { background:rgba(239,68,68,.08); }
 
 /* Right: description */
-.desc { font-size:13px; color:var(--text-secondary); line-height:1.7; white-space:pre-line; }
+.desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  white-space: pre-line;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .descClamped { display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+
+.genderLimit { margin-top: 16px; }
 
 .descToggle {
   display:flex; align-items:center; gap:10px;
@@ -539,9 +620,14 @@
   border:none; background:transparent;
   cursor:pointer; text-align:left; font-family:inherit;
   border-radius:0 10px 10px 0;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
   transition:background .12s;
 }
-.descToggle:hover { background:color-mix(in srgb, var(--accent) 5%, var(--surface-2) 95%); }
+.descToggle:active,
+.descTogglePressed {
+  background:color-mix(in srgb, var(--accent) 5%, var(--surface-2) 95%);
+}
 .descToggleLine {
   width:2px; align-self:stretch; flex-shrink:0; border-radius:2px;
   background:linear-gradient(
@@ -550,9 +636,7 @@
     color-mix(in srgb, var(--accent) 20%, var(--border) 80%)
   );
 }
-.descToggleBody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-.descToggleTitle { font-size:12px; font-weight:600; color:var(--accent); }
-.descToggleHint { font-size:11px; color:var(--text-muted); }
+.descToggleTitle { flex:1; min-width:0; font-size:12px; font-weight:600; color:var(--accent); }
 .descToggle svg { flex-shrink:0; color:var(--accent); }
 
 /* Details cards */
@@ -693,14 +777,14 @@
 
 @media (max-width: 639px) {
   .scrollTopBtn {
-    left: 16px;
-    bottom: 16px;
+    left: auto;
+    right: 16px;
+    /* Lift above discussion FAB / sticky composer when present */
+    bottom: calc(
+      16px + env(safe-area-inset-bottom, 0px) + var(--discussion-chrome-clearance, 0px)
+    );
     padding: 9px 12px;
-  }
-}
-
-@media (max-width: 639px) {
-  .scrollTopBtn {
-    left: 16px;
+    /* Above sticky composer dock (130), below composer sheet (500+) */
+    z-index: 140;
   }
 }

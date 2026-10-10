@@ -19,14 +19,17 @@ import {
   getOrganizationAvatar,
 } from '@/entities/organization';
 import { apiClient } from '@/shared/api/client';
-import { isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
+import { getApiErrorCode, isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
+import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { TabBar } from '@/shared/ui/TabBar';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { EventListItem } from '@/entities/event/ui/EventListItem';
-import { EVENT_TYPE_CHIPS_MAX } from '@/entities/event/lib/eventListItemUtils';
+import { EVENT_TYPE_CHIPS_MAX, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
+import { OppositeGenderDialog } from '@/features/event/OppositeGenderDialog';
+import { myGenderConflictsWith } from '@/features/event/oppositeGender';
 import listItemStyles from '@/entities/event/ui/EventListItem/EventListItem.module.css';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -191,6 +194,7 @@ export default function InvitationsPage() {
   const [sentErr, setSentErr] = useState<string | null>(null);
   const [sentLoaded, setSentLoaded] = useState(false);
   const [previewInv, setPreviewInv] = useState<IInvitation | null>(null);
+  const [genderConfirmInv, setGenderConfirmInv] = useState<IInvitation | null>(null);
   const [confirmDecl, setConfirmDecl] = useState<IInvitation | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<IInvitation | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
@@ -287,7 +291,30 @@ export default function InvitationsPage() {
     setPreviewInv(inv);
   };
 
+  const requestAccept = async (inv: IInvitation) => {
+    try {
+      const conflict = await myGenderConflictsWith(readAllowedGender(inv.event.parameters));
+      if (conflict) {
+        setGenderConfirmInv(inv);
+        return;
+      }
+    } catch {
+      /* профиль недоступен — не блокируем принятие */
+    }
+    void doAccept(inv);
+  };
+
   const doAccept = async (inv: IInvitation) => {
+    const ticketsEnabled = Boolean(inv.event.parameters?.ticketsEnabled);
+
+    // Модель A: ticketed — accept не создаёт участие; сразу на карточку к покупке/получению билета.
+    if (ticketsEnabled) {
+      useToastStore.getState().add('Приглашение не даёт вход — нужен билет', 'info');
+      openEvent(inv.eventId);
+      setPreviewInv(null);
+      return;
+    }
+
     try {
       await apiClient.get(`/api/invitations/accept?invitationId=${inv.id}`);
       setItems(prev => prev.filter(i => i.id !== inv.id));
@@ -297,6 +324,15 @@ export default function InvitationsPage() {
       openEvent(inv.eventId);
       setPreviewInv(null);
     } catch (e) {
+      if (isApiError(e) && getApiErrorCode(e) === ApiErrorCode.OrganizationPaymentRequired) {
+        useToastStore.getState().add(
+          e.serverMessage || 'Для участия нужно купить билет',
+          'info',
+        );
+        openEvent(inv.eventId);
+        setPreviewInv(null);
+        return;
+      }
       if (isApiError(e) && isAccessDeniedError(e)) {
         useToastStore.getState().add(e.serverMessage || e.message);
       }
@@ -459,7 +495,18 @@ export default function InvitationsPage() {
           inv={previewInv}
           orgById={orgById}
           onClose={() => setPreviewInv(null)}
-          onAccept={() => doAccept(previewInv)}
+          onAccept={() => requestAccept(previewInv)}
+        />
+      )}
+
+      {genderConfirmInv && (
+        <OppositeGenderDialog
+          onParticipate={() => {
+            const inv = genderConfirmInv;
+            setGenderConfirmInv(null);
+            void doAccept(inv);
+          }}
+          onDecline={() => setGenderConfirmInv(null)}
         />
       )}
 
@@ -632,6 +679,7 @@ function AcceptDialog({
   const daysLabel = days === 0 ? 'сегодня' : days === 1 ? 'завтра' : days > 0 ? `через ${days} дн.` : '';
   const name = inviterName(inv, orgById);
   const fromOrg = Boolean(inv.inviterOrganizationId);
+  const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled);
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -681,6 +729,11 @@ function AcceptDialog({
                 <div className={styles.dmetaVal} style={params.cost === 0 ? { color: 'var(--success)' } : undefined}>
                   {params.cost === 0 ? 'Бесплатно' : `${params.cost.toLocaleString('ru-RU')} ₽`}
                 </div>
+                {ticketsEnabled && (
+                  <div className={styles.dmetaSub}>
+                    Приглашение не даёт вход — нужен билет
+                  </div>
+                )}
                 {params.maxPersonsCount != null && params.participantsCount != null && (
                   <div className={styles.dmetaSub}>
                     {params.participantsCount} из {params.maxPersonsCount} мест занято
@@ -691,7 +744,11 @@ function AcceptDialog({
           </div>
           <div className={styles.dialogBtns}>
             <button type="button" className={styles.dbtnLater} onClick={onClose}>Решу позже</button>
-            <button type="button" className={styles.dbtnAccept} onClick={onAccept}>Принять приглашение</button>
+            <button type="button" className={styles.dbtnAccept} onClick={onAccept}>
+              {ticketsEnabled
+                ? (params.cost === 0 ? 'Перейти к билету' : 'Перейти к покупке')
+                : 'Принять приглашение'}
+            </button>
           </div>
         </div>
       </div>

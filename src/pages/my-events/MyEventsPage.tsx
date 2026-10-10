@@ -3,11 +3,13 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EventCard } from '@/entities/event';
+import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
 import { useMyEvents, type OwnerFilter } from '@/features/event-list/useMyEvents';
 import { FilterBar } from '@/features/event-filters/FilterBar';
 import { useMyEventsFiltersStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
-import { useInfiniteScroll, useDebounce, usePageTitle } from '@/shared/hooks';
+import { useInfiniteScroll, useDebounce, usePageTitle, useMediaQuery } from '@/shared/hooks';
+import { media } from '@/shared/lib/breakpoints';
 import type { IEventsSearchParams, EventViewMode } from '@/entities/event';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
@@ -52,8 +54,14 @@ const OWNER_TABS = [
   { key: 'others', label: 'Участвую' },
 ];
 
+function cancelledLabel(event: { active?: boolean; cancelSource?: string | null }): string | null {
+  if (event.active !== false) return null;
+  return event.cancelSource === 'moderation' ? 'Отменено модерацией' : 'Отменено';
+}
+
 export default function MyEventsPage() {
   usePageTitle('Мои события');
+  const isMobileList = useMediaQuery(media.mobile);
   const navigate = useNavigate();
   const { accountId, loading: accountLoading } = useAccountId();
   const { filters, setFilter, resetFilters } = useMyEventsFiltersStore();
@@ -82,13 +90,13 @@ export default function MyEventsPage() {
     startTime:  filters.startTime,
     endTime:    filters.endTime,
     price:      filters.price,
-    // Для вкладки «Организую» с чекбоксом: если показываем отменённые — active: false
-    ...(ownerFilter === 'mine' && showCancelled ? { active: false } : {}),
+    // Галочка на всех вкладках: active: false включает отменённые в выдачу
+    ...(showCancelled ? { active: false } : {}),
   // @ts-ignore
     _v:         searchVersion,
   }), [debouncedName, selectedCategories, selectedTypes,
        filters.startTime, filters.endTime, filters.price,
-       ownerFilter, showCancelled, searchVersion]);
+       showCancelled, searchVersion]);
 
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useMyEvents({
     accountId,
@@ -170,7 +178,9 @@ export default function MyEventsPage() {
     };
   }, [isReady, listUiKey]);
 
-  const sentinelRef = useInfiniteScroll(loadMore);
+  const sentinelRef = useInfiniteScroll(loadMore, {
+    enabled: !isLoading && !isLoadingMore && hasMore,
+  });
 
   return (
     <div className={styles.page}>
@@ -191,7 +201,7 @@ export default function MyEventsPage() {
       />
 
       {/* ── Кнопка создать + переключатель активные/прошедшие ── */}
-      <div className={styles.subHeader}>
+      <div className={`${styles.subHeader} ${styles.subHeaderWithCancelled}`}>
         <TabBar
           className={styles.archiveTabs}
           tabs={[
@@ -201,14 +211,12 @@ export default function MyEventsPage() {
           activeId={tab}
           onChange={id => setTab(id as typeof tab)}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          {ownerFilter === 'mine' && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              <input type="checkbox" checked={showCancelled}
-                onChange={e => setShowCancelled(e.target.checked)} />
-              Показывать отменённые
-            </label>
-          )}
+        <div className={styles.subHeaderActions}>
+          <label className={styles.showCancelled}>
+            <input type="checkbox" checked={showCancelled}
+              onChange={e => setShowCancelled(e.target.checked)} />
+            <span>Показывать отменённые</span>
+          </label>
           <button className={styles.createBtn} onClick={() => navigate('/create-event')}>
             + Создать
           </button>
@@ -218,7 +226,7 @@ export default function MyEventsPage() {
       {/* ---- Content ---- */}
       <div className={styles.list} ref={listElRef}>
         {!isReady || isLoading ? (
-          <div className={styles.grid}>
+          <div className={isMobileList ? styles.eventListSkeleton : styles.grid}>
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className={styles.skeleton} />
             ))}
@@ -232,19 +240,68 @@ export default function MyEventsPage() {
               </button>
             )}
           </div>
+        ) : isMobileList ? (
+          <EventList>
+            {events.map((event, idx) => (
+              <Fragment key={event.id}>
+                {cancelledLabel(event) ? (
+                  <div className={styles.cancelledHost}>
+                    <div className={styles.cancelledGray}>
+                      <EventListItem
+                        event={event}
+                        bleedCover
+                        onClick={() => navigate(`/event/${event.id}`)}
+                        className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                        header={
+                          event.isOrganizer ? (
+                            <span className={styles.organizerTagInline}>Организатор</span>
+                          ) : undefined
+                        }
+                      />
+                    </div>
+                    <div className={`${styles.cancelledOnPhoto} ${styles.cancelledOnPhotoRow}`}>
+                      <span className={styles.cancelledPill}>{cancelledLabel(event)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <EventListItem
+                    event={event}
+                    bleedCover
+                    onClick={() => navigate(`/event/${event.id}`)}
+                    className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                    header={
+                      event.isOrganizer ? (
+                        <span className={styles.organizerTagInline}>Организатор</span>
+                      ) : undefined
+                    }
+                  />
+                )}
+                {shouldInsertAdAfterIndex(idx) && (
+                  <AdSlot key={`ad-${event.id}`} />
+                )}
+              </Fragment>
+            ))}
+          </EventList>
         ) : (
           <div className={styles.grid}>
             {events.map((event, idx) => (
               <Fragment key={event.id}>
                 <div className={styles.cardWrap}>
-                  {event.isOrganizer && (
-                    <span className={styles.organizerTag}>Организатор</span>
+                  <div className={cancelledLabel(event) ? styles.cancelledGray : undefined}>
+                    {event.isOrganizer && (
+                      <span className={styles.organizerTag}>Организатор</span>
+                    )}
+                    <EventCard.Preset
+                      event={event}
+                      onClick={() => navigate(`/event/${event.id}`)}
+                      className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                    />
+                  </div>
+                  {cancelledLabel(event) && (
+                    <div className={`${styles.cancelledOnPhoto} ${styles.cancelledOnPhotoCard}`}>
+                      <span className={styles.cancelledPill}>{cancelledLabel(event)}</span>
+                    </div>
                   )}
-                  <EventCard.Preset
-                    event={event}
-                    onClick={() => navigate(`/event/${event.id}`)}
-                    className={event.isOrganizer ? styles.cardOrganizer : undefined}
-                  />
                 </div>
                 {shouldInsertAdAfterIndex(idx) && (
                   <AdSlot key={`ad-${event.id}`} />
@@ -255,7 +312,7 @@ export default function MyEventsPage() {
         )}
 
         {hasMore && (
-          <div ref={sentinelRef} className={styles.sentinel}>
+          <div key={`${tab}-${ownerFilter}`} ref={sentinelRef} className={styles.sentinel}>
             {isLoadingMore && <span className={styles.loadingMore}>Загрузка...</span>}
           </div>
         )}
