@@ -169,6 +169,73 @@
 .fieldHint  { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 .fieldHintWarn { font-size: 11px; color: #b45309; margin-top: 3px; }
 
+.ticketTypesBox {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2, rgba(0,0,0,0.03));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ticketTypesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ticketTypesTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.ticketTypeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 72px 56px auto 28px;
+  gap: 6px;
+  align-items: center;
+}
+@media (max-width: 639px) {
+  .ticketTypeRow {
+    grid-template-columns: minmax(0, 1fr) 64px 52px auto 28px;
+  }
+}
+.ticketTypeName,
+.ticketTypePrice,
+.ticketTypeCap {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 7px 8px;
+}
+.ticketTypeActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.ticketTypeRemove {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.ticketTypeRemove:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ticketTypeRemove:not(:disabled):hover { color: var(--danger); }
+
 .nameFieldWrap { position: relative; min-width: 0; max-width: 100%; }
 .nameFieldWrapHint { z-index: 3; }
 .nameOverflowHint {
