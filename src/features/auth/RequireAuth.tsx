@@ -17,13 +17,14 @@ export function RequireAuth({ children }: RequireAuthProps) {
 
   useEffect(() => {
     if (!hasAuthToken()) {
-      navigate('/login', { replace: true, state: { from: location.pathname } });
+      const from = `${location.pathname}${location.search}`;
+      navigate('/login', { replace: true, state: { from } });
       return;
     }
     if (needsActivation && location.pathname !== '/activate') {
       navigate('/activate', { replace: true });
     }
-  }, [token, needsActivation, location.pathname, navigate]);
+  }, [token, needsActivation, location.pathname, location.search, navigate]);
 
   if (!hasAuthToken() || needsActivation) return null;
 

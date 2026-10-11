@@ -7,7 +7,11 @@ export function registerSessionUnauthorizedHandler(fn: () => void): void {
   handler = fn;
 }
 
-/** Сброс сессии и переход на /login (обработчик регистрируется в router) */
+/**
+ * Сброс сессии при протухшем/невалидном токене.
+ * Редирект на /login — только если текущий маршрут требует авторизации
+ * (см. registerSessionUnauthorizedHandler в router).
+ */
 export function handleSessionUnauthorized(): void {
   if (handling) return;
   handling = true;

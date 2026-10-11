@@ -7,7 +7,7 @@ import styles from './AuthPage.module.css';
 interface AuthBrandProps {
   /** Подзаголовок под логотипом */
   subtitle?: boolean;
-  /** Ссылка «Мне просто посмотреть» под логотипом */
+  /** Кнопка возврата к карте событий */
   showBrowseLink?: boolean;
 }
 
@@ -20,14 +20,14 @@ export function AuthLogoImg() {
   return <img src={brandLogo} alt={BRAND_NAME} className={styles.logoImg} draggable={false} />;
 }
 
-/** Логотип (ссылка на главную) и опциональный выход к анонимному просмотру. */
+/** Логотип (ссылка на главную) и опциональный выход к анонимному просмотру карты. */
 export function AuthBrand({ subtitle = true, showBrowseLink = true }: AuthBrandProps) {
   return (
     <div className={styles.logoWrap}>
       <Link
         to="/"
         className={styles.logoLink}
-        aria-label="На главную"
+        aria-label="На главную — карта событий"
         onContextMenu={preventImageSave}
       >
         <AuthLogoImg />
@@ -36,10 +36,35 @@ export function AuthBrand({ subtitle = true, showBrowseLink = true }: AuthBrandP
         <div className={styles.logoSub}>{BRAND_TAGLINE}</div>
       )}
       {showBrowseLink && (
-        <Link to="/" className={styles.browseLink}>
-          Мне просто посмотреть
+        <Link to="/" className={styles.browseBtn}>
+          <MapIcon />
+          <span className={styles.browseBtnText}>
+            <span className={styles.browseBtnTitle}>Вернуться к карте</span>
+            <span className={styles.browseBtnHint}>Смотреть события без входа</span>
+          </span>
         </Link>
       )}
     </div>
+  );
+}
+
+function MapIcon() {
+  return (
+    <svg
+      className={styles.browseBtnIcon}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6" />
+      <line x1="9" y1="3" x2="9" y2="18" />
+      <line x1="15" y1="6" x2="15" y2="21" />
+    </svg>
   );
 }

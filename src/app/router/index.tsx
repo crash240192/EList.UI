@@ -6,7 +6,10 @@ import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
 import { RequireAuth } from '@/features/auth/RequireAuth';
 import { setApiErrorHandler } from '@/shared/api/client';
-import { isPublicAppRoute } from '@/shared/auth/unauthorized';
+import {
+  isPublicAuthRoute,
+  requiresAuthRoute,
+} from '@/shared/auth/unauthorized';
 import { registerSessionUnauthorizedHandler } from '@/shared/auth/sessionUnauthorized';
 import { useAuthStore, useToastStore } from '@/app/store';
 import { ToastContainer } from '@/shared/ui/Toast/Toast';
@@ -97,18 +100,31 @@ const router = createBrowserRouter([
   },
 ]);
 
-// 401 от API / WebSocket — сброс токена и редирект (кроме публичных auth-страниц)
+// 401 / протухший токен: сброс сессии.
+// На /login уводим только с маршрутов, где вход обязателен (RequireAuth).
+// Карта, событие, профиль, 404 и т.п. — остаёмся на месте.
 registerSessionUnauthorizedHandler(() => {
+  const path = window.location.pathname;
+  const mustLogin = requiresAuthRoute(path);
   useAuthStore.getState().logout();
-  if (!isPublicAppRoute()) {
+
+  if (mustLogin) {
     const loginPath = '/login';
-    router.navigate(loginPath, { replace: true });
-    // Если SPA-навигация не сработала (вызов из fetch/WS вне React) — жёсткий переход
+    router.navigate(loginPath, { replace: true, state: { from: path } });
     window.setTimeout(() => {
-      if (!isPublicAppRoute()) {
+      if (requiresAuthRoute(window.location.pathname)) {
         window.location.replace(loginPath);
       }
     }, 150);
+    return;
+  }
+
+  // На публичных страницах не редиректим; подсказка, почему пропал «аватар».
+  if (!isPublicAuthRoute(path)) {
+    useToastStore.getState().add(
+      'Сессия истекла. Войдите снова, чтобы пользоваться личным кабинетом.',
+      'info',
+    );
   }
 });
 

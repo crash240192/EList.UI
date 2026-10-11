@@ -5,7 +5,7 @@ export const PUBLIC_AUTH_ROUTES = ['/login', '/activate', '/register', '/forgot-
 /** Доступны без JWT (гостевой режим) */
 export const PUBLIC_APP_ROUTE_PREFIXES = ['/', '/event/', '/user/', '/organization/', '/cookies'] as const;
 
-/** Требуют авторизации */
+/** Требуют авторизации (синхронно с RequireAuth в router) */
 export const AUTH_REQUIRED_ROUTE_PREFIXES = [
   '/my-events',
   '/invitations',
@@ -16,6 +16,7 @@ export const AUTH_REQUIRED_ROUTE_PREFIXES = [
   '/wallet',
   '/my-tickets',
   '/tickets',
+  '/payments/return',
   '/my-reports',
   '/reports-against-me',
   '/admin',
