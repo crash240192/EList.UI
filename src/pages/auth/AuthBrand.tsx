@@ -20,7 +20,7 @@ export function AuthLogoImg() {
   return <img src={brandLogo} alt={BRAND_NAME} className={styles.logoImg} draggable={false} />;
 }
 
-/** Логотип (ссылка на главную) и опциональный выход к анонимному просмотру карты. */
+/** Логотип (ссылка на главную) и опциональный выход к карте. */
 export function AuthBrand({ subtitle = true, showBrowseLink = true }: AuthBrandProps) {
   return (
     <div className={styles.logoWrap}>
@@ -38,10 +38,7 @@ export function AuthBrand({ subtitle = true, showBrowseLink = true }: AuthBrandP
       {showBrowseLink && (
         <Link to="/" className={styles.browseBtn}>
           <MapIcon />
-          <span className={styles.browseBtnText}>
-            <span className={styles.browseBtnTitle}>Вернуться к карте</span>
-            <span className={styles.browseBtnHint}>Смотреть события без входа</span>
-          </span>
+          Вернуться к карте
         </Link>
       )}
     </div>
