@@ -250,14 +250,23 @@ export default function EventPage() {
   const [genderJoinKind, setGenderJoinKind] = useState<'join' | 'ticket' | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [globalTicketSales, setGlobalTicketSales] = useState(false);
+  const [globalTicketsModule, setGlobalTicketsModule] = useState(false);
 
   usePageTitle(event?.name ?? null);
 
   useEffect(() => {
     let cancelled = false;
     fetchAppFeatures()
-      .then(f => { if (!cancelled) setGlobalTicketSales(f.ticketSalesEnabled); })
-      .catch(() => { if (!cancelled) setGlobalTicketSales(false); });
+      .then(f => {
+        if (cancelled) return;
+        setGlobalTicketsModule(f.ticketsEnabled);
+        setGlobalTicketSales(f.ticketSalesEnabled);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setGlobalTicketsModule(false);
+        setGlobalTicketSales(false);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -1279,7 +1288,7 @@ export default function EventPage() {
               </AccessDeniedGate>
             )}
 
-            {isOrganizer && eventTicketsOn && id && (
+            {isOrganizer && eventTicketsOn && globalTicketsModule && id && (
               <>
                 <Link
                   className={styles.deskCta}

@@ -34,6 +34,8 @@ export type CreateEventHost =
 
 interface Props {
   onContinue: (host: CreateEventHost, template: IEventTemplate | null) => void;
+  /** Когда false — только личный хост (без выбора организации). */
+  organizationsEnabled?: boolean;
 }
 
 interface OrgOption {
@@ -144,7 +146,10 @@ function buildTemplateCardInfo(t: IEventTemplate): TemplateCardInfo {
   };
 }
 
-export function CreateEventHostChooser({ onContinue }: Props) {
+export function CreateEventHostChooser({
+  onContinue,
+  organizationsEnabled = true,
+}: Props) {
   const goBack = useSafeBack('/');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,10 +173,24 @@ export function CreateEventHostChooser({ onContinue }: Props) {
       setError(null);
       try {
         const id = await getOrFetchAccountId();
-        const [profile, myOrgs] = await Promise.all([
-          fetchFullProfile(null),
-          fetchMyOrganizations(),
-        ]);
+        const profile = await fetchFullProfile(null);
+        if (cancelled) return;
+
+        setAccountId(id);
+        setLogin(profile.account.login);
+        setAvatarId(profile.account.avatarId ?? null);
+        const name = [profile.person?.firstName, profile.person?.lastName]
+          .filter(Boolean)
+          .join(' ');
+        setFullName(name);
+
+        if (!organizationsEnabled) {
+          setOrgs([]);
+          setSelected({ kind: 'user' });
+          return;
+        }
+
+        const myOrgs = await fetchMyOrganizations();
         if (cancelled) return;
 
         const eligible = await filterOrganizationsEligibleToHostEvents(myOrgs);
@@ -185,13 +204,6 @@ export function CreateEventHostChooser({ onContinue }: Props) {
         );
         if (cancelled) return;
 
-        setAccountId(id);
-        setLogin(profile.account.login);
-        setAvatarId(profile.account.avatarId ?? null);
-        const name = [profile.person?.firstName, profile.person?.lastName]
-          .filter(Boolean)
-          .join(' ');
-        setFullName(name);
         setOrgs(withLogos);
       } catch (e) {
         if (!cancelled) {
@@ -202,7 +214,7 @@ export function CreateEventHostChooser({ onContinue }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [organizationsEnabled]);
 
   // Шаблоны для выбранного хоста
   useEffect(() => {

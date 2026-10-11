@@ -1,11 +1,12 @@
 // pages/tickets/TicketsHubPage.tsx — hub «Билеты» (W6c / polish)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import {
   fetchTicketDeskHub,
   type TicketDeskHubItem,
 } from '@/entities/event';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { usePageTitle } from '@/shared/hooks';
 import { Button } from '@/shared/ui/Button';
 import styles from './TicketsHubPage.module.css';
@@ -43,10 +44,19 @@ function formatRange(start: string, end: string): string {
 
 export default function TicketsHubPage() {
   usePageTitle('Билеты');
+  const [ticketsModuleOn, setTicketsModuleOn] = useState<boolean | null>(null);
   const [items, setItems] = useState<TicketDeskHubItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [orgFilter, setOrgFilter] = useState<string>('all');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => { if (!cancelled) setTicketsModuleOn(f.ticketsEnabled); })
+      .catch(() => { if (!cancelled) setTicketsModuleOn(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,8 +74,9 @@ export default function TicketsHubPage() {
   }, []);
 
   useEffect(() => {
+    if (ticketsModuleOn !== true) return;
     void load();
-  }, [load]);
+  }, [load, ticketsModuleOn]);
 
   const orgOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -83,6 +94,10 @@ export default function TicketsHubPage() {
   }, [items, orgFilter]);
 
   const showOrgFilter = orgOptions.length > 1;
+
+  if (ticketsModuleOn === false) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className={styles.page}>

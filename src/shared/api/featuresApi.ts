@@ -3,6 +3,11 @@
 import { getAppVersion, getClientPlatform, getOrCreateClientHash } from '@/shared/api/client';
 
 export interface IAppFeatures {
+  /** Создание организаций и сбор legal/payout/verification. */
+  organizationsEnabled: boolean;
+  /** Весь билетный модуль (заказы, desk, check-in, my-tickets). */
+  ticketsEnabled: boolean;
+  /** Платные продажи (имеет смысл только при ticketsEnabled). */
   ticketSalesEnabled: boolean;
   /** Desk: показывать login/ФИО holder (server flag) */
   ticketDeskRevealHolder: boolean;
@@ -12,6 +17,13 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/eList';
 
 let cached: IAppFeatures | null = null;
 let inflight: Promise<IAppFeatures> | null = null;
+
+const DISABLED: IAppFeatures = {
+  organizationsEnabled: false,
+  ticketsEnabled: false,
+  ticketSalesEnabled: false,
+  ticketDeskRevealHolder: false,
+};
 
 /** GET /api/features — кэш на сессию вкладки. */
 export async function fetchAppFeatures(force = false): Promise<IAppFeatures> {
@@ -29,8 +41,16 @@ export async function fetchAppFeatures(force = false): Promise<IAppFeatures> {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const raw = await res.json() as Record<string, unknown>;
+      const ticketsEnabled = Boolean(
+        raw.ticketsEnabled ?? raw.TicketsEnabled ?? false,
+      );
       cached = {
-        ticketSalesEnabled: Boolean(
+        organizationsEnabled: Boolean(
+          raw.organizationsEnabled ?? raw.OrganizationsEnabled ?? false,
+        ),
+        ticketsEnabled,
+        // На всякий случай: продажи не могут быть шире модуля билетов.
+        ticketSalesEnabled: ticketsEnabled && Boolean(
           raw.ticketSalesEnabled ?? raw.TicketSalesEnabled ?? false,
         ),
         ticketDeskRevealHolder: Boolean(
@@ -39,7 +59,7 @@ export async function fetchAppFeatures(force = false): Promise<IAppFeatures> {
       };
       return cached;
     } catch {
-      cached = { ticketSalesEnabled: false, ticketDeskRevealHolder: false };
+      cached = { ...DISABLED };
       return cached;
     } finally {
       inflight = null;

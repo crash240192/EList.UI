@@ -1,7 +1,7 @@
 // pages/my-tickets/MyTicketsPage.tsx
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   cancelOrder,
   cancelRefund,
@@ -26,6 +26,7 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { Button } from '@/shared/ui/Button';
 import { QrCodeImage } from '@/shared/ui/QrCode/QrCodeImage';
 import { TicketPrintModal } from '@/features/tickets';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { GiftRecipientModal } from './GiftRecipientModal';
 import styles from './MyTicketsPage.module.css';
 
@@ -69,6 +70,7 @@ export default function MyTicketsPage() {
   const toast = useToastStore(s => s.add);
   const { accountId } = useAccountId();
 
+  const [ticketsModuleOn, setTicketsModuleOn] = useState<boolean | null>(null);
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [pendingOrders, setPendingOrders] = useState<OrderRow[]>([]);
   const [historyOrders, setHistoryOrders] = useState<OrderRow[]>([]);
@@ -93,6 +95,14 @@ export default function MyTicketsPage() {
     }
     return map;
   }, [pendingOrders, historyOrders]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => { if (!cancelled) setTicketsModuleOn(f.ticketsEnabled); })
+      .catch(() => { if (!cancelled) setTicketsModuleOn(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -144,8 +154,9 @@ export default function MyTicketsPage() {
   }, []);
 
   useEffect(() => {
+    if (ticketsModuleOn !== true) return;
     void load();
-  }, [load]);
+  }, [load, ticketsModuleOn]);
 
   const sorted = useMemo(
     () => [...tickets].sort((a, b) => {
@@ -159,6 +170,10 @@ export default function MyTicketsPage() {
   const isEmpty = sorted.length === 0
     && pendingOrders.length === 0
     && historyOrders.length === 0;
+
+  if (ticketsModuleOn === false) {
+    return <Navigate to="/" replace />;
+  }
 
   const confirmRefund = async () => {
     if (!refundTicket || busy) return;
