@@ -44,6 +44,7 @@ import {
   getEventUrgency,
 } from './invitationsPageUtils';
 import type { IEventType } from '@/entities/event/types';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import styles from './InvitationsPage.module.css';
 
 type Tab = 'incoming' | 'sent';
@@ -199,6 +200,7 @@ export default function InvitationsPage() {
   const [confirmCancel, setConfirmCancel] = useState<IInvitation | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const [orgById, setOrgById] = useState<Record<string, OrgInviterInfo>>({});
+  const [ticketsModuleOn, setTicketsModuleOn] = useState(false);
 
   const unviewedCount = useMemo(
     () => items.filter(isInvitationUnviewed).length,
@@ -206,6 +208,14 @@ export default function InvitationsPage() {
   );
 
   const urgentInv = useMemo(() => findUrgentInvitation(items), [items]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => { if (!cancelled) setTicketsModuleOn(f.ticketsEnabled); })
+      .catch(() => { if (!cancelled) setTicketsModuleOn(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     fetchUserInvitations()
@@ -305,7 +315,7 @@ export default function InvitationsPage() {
   };
 
   const doAccept = async (inv: IInvitation) => {
-    const ticketsEnabled = Boolean(inv.event.parameters?.ticketsEnabled);
+    const ticketsEnabled = ticketsModuleOn && Boolean(inv.event.parameters?.ticketsEnabled);
 
     // Модель A: ticketed — accept не создаёт участие; сразу на карточку к покупке/получению билета.
     if (ticketsEnabled) {
@@ -494,6 +504,7 @@ export default function InvitationsPage() {
         <AcceptDialog
           inv={previewInv}
           orgById={orgById}
+          ticketsModuleOn={ticketsModuleOn}
           onClose={() => setPreviewInv(null)}
           onAccept={() => requestAccept(previewInv)}
         />
@@ -662,11 +673,13 @@ function SentInvitationRow({
 function AcceptDialog({
   inv,
   orgById,
+  ticketsModuleOn,
   onClose,
   onAccept,
 }: {
   inv: IInvitation;
   orgById: Record<string, OrgInviterInfo>;
+  ticketsModuleOn: boolean;
   onClose: () => void;
   onAccept: () => void;
 }) {
@@ -679,7 +692,7 @@ function AcceptDialog({
   const daysLabel = days === 0 ? 'сегодня' : days === 1 ? 'завтра' : days > 0 ? `через ${days} дн.` : '';
   const name = inviterName(inv, orgById);
   const fromOrg = Boolean(inv.inviterOrganizationId);
-  const ticketsEnabled = Boolean(event.parameters?.ticketsEnabled);
+  const ticketsEnabled = ticketsModuleOn && Boolean(event.parameters?.ticketsEnabled);
 
   return (
     <div className={styles.overlay} onClick={onClose}>

@@ -10,6 +10,7 @@ import {
   type TicketDeskHubItem,
 } from '@/entities/event';
 import { DeskCheckIn } from '@/features/tickets';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { usePageTitle } from '@/shared/hooks';
 import { Button } from '@/shared/ui/Button';
 import styles from './TicketsDeskPage.module.css';
@@ -34,11 +35,20 @@ export default function TicketsDeskPage() {
   const eventId = (searchParams.get('eventId') ?? '').trim();
   usePageTitle('Контроль входа');
 
+  const [ticketsModuleOn, setTicketsModuleOn] = useState<boolean | null>(null);
   const [hubItem, setHubItem] = useState<TicketDeskHubItem | null>(null);
   const [eventName, setEventName] = useState<string | null>(null);
   const [stats, setStats] = useState<EventTicketStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => { if (!cancelled) setTicketsModuleOn(f.ticketsEnabled); })
+      .catch(() => { if (!cancelled) setTicketsModuleOn(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!eventId) return;
@@ -90,17 +100,18 @@ export default function TicketsDeskPage() {
   }, [eventId]);
 
   useEffect(() => {
+    if (ticketsModuleOn !== true) return;
     void load();
-  }, [load]);
+  }, [load, ticketsModuleOn]);
 
   // Live counters (UC-S4)
   useEffect(() => {
-    if (!eventId || !hubItem?.canViewStats) return;
+    if (ticketsModuleOn !== true || !eventId || !hubItem?.canViewStats) return;
     const id = window.setInterval(() => {
       void load({ silent: true });
     }, STATS_POLL_MS);
     return () => window.clearInterval(id);
-  }, [eventId, hubItem?.canViewStats, load]);
+  }, [ticketsModuleOn, eventId, hubItem?.canViewStats, load]);
 
   const title = useMemo(
     () => eventName || hubItem?.name || 'Контроль входа',
@@ -111,6 +122,10 @@ export default function TicketsDeskPage() {
     hubItem?.canUndoCheckIn
     ?? (hubItem?.access === 'organizer'),
   );
+
+  if (ticketsModuleOn === false) {
+    return <Navigate to="/" replace />;
+  }
 
   if (!eventId) {
     return <Navigate to="/tickets" replace />;

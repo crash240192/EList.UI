@@ -6,6 +6,7 @@ import {
   type OrganizationResponse,
 } from '@/entities/organization';
 import { fetchTicketDeskHub } from '@/entities/event';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 
 /** Org даёт доступ к билетному hub (продажи или роль в команде). */
 export function organizationGrantsTicketDesk(org: OrganizationResponse): boolean {
@@ -20,11 +21,14 @@ export function organizationGrantsTicketDesk(org: OrganizationResponse): boolean
 }
 
 /**
- * Показать сайдбар «Билеты», если есть org с билетами/ролью
+ * Показать сайдбар «Билеты», если модуль включён и есть org с билетами/ролью
  * или уже есть назначения на desk (staff).
  */
 export async function canShowTicketDeskNav(): Promise<boolean> {
   try {
+    const features = await fetchAppFeatures();
+    if (!features.ticketsEnabled) return false;
+
     const [orgs, hub] = await Promise.all([
       fetchMyOrganizations(),
       fetchTicketDeskHub(1),

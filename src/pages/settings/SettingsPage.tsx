@@ -1,6 +1,6 @@
 // pages/settings/SettingsPage.tsx — макет examples/elist_settings_wallet.html
 
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchContactTypes } from '@/features/auth/registrationApi';
 import type { IContactType } from '@/features/auth/registrationApi';
@@ -37,6 +37,7 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { usePageTitle } from '@/shared/hooks';
 import { OrganizationsSettingsPanel } from '@/features/organizations';
 import { ModerationSettingsPanel } from '@/features/content-reports';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import styles from './SettingsPage.module.css';
 
 type SettingsTab = 'profile' | 'privacy' | 'security' | 'organizations' | 'moderation';
@@ -123,11 +124,45 @@ export default function SettingsPage() {
   const initialTab: SettingsTab = resolveSettingsTab(tabParam, orgParam);
 
   const [tab, setTab] = useState<SettingsTab>(initialTab);
-  const sections = [...new Set(NAV_ITEMS.map(i => i.section))];
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
+  const [featuresReady, setFeaturesReady] = useState(false);
 
   useEffect(() => {
-    setTab(resolveSettingsTab(tabParam, orgParam));
-  }, [tabParam, orgParam]);
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (cancelled) return;
+        setOrganizationsEnabled(f.organizationsEnabled);
+        setFeaturesReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setOrganizationsEnabled(false);
+        setFeaturesReady(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const visibleNavItems = useMemo(
+    () => NAV_ITEMS.filter(i => i.key !== 'organizations' || organizationsEnabled),
+    [organizationsEnabled],
+  );
+  const sections = [...new Set(visibleNavItems.map(i => i.section))];
+
+  useEffect(() => {
+    const next = resolveSettingsTab(tabParam, orgParam);
+    if (featuresReady && !organizationsEnabled && next === 'organizations') {
+      setTab('profile');
+      setSearchParams(prev => {
+        const nextParams = new URLSearchParams(prev);
+        nextParams.delete('tab');
+        nextParams.delete('org');
+        return nextParams;
+      }, { replace: true });
+      return;
+    }
+    setTab(next);
+  }, [tabParam, orgParam, featuresReady, organizationsEnabled, setSearchParams]);
 
   const selectTab = (next: SettingsTab) => {
     setTab(next);
@@ -156,7 +191,7 @@ export default function SettingsPage() {
           {sections.map(section => (
             <div key={section}>
               <div className={styles.snavSection}>{section}</div>
-              {NAV_ITEMS.filter(i => i.section === section).map(item => (
+              {visibleNavItems.filter(i => i.section === section).map(item => (
                 <button
                   key={item.key}
                   type="button"
@@ -184,7 +219,7 @@ export default function SettingsPage() {
               <PrivacySection />
             </div>
           )}
-          {tab === 'organizations' && (
+          {tab === 'organizations' && organizationsEnabled && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <OrganizationsSettingsPanel
                 initialOrganizationId={orgParam}

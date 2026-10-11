@@ -349,6 +349,8 @@ export default function CreateEventPage() {
   const [orgAgreementResume, setOrgAgreementResume] = useState<'publish' | 'enableTickets' | null>(null);
   const [checkingOrgAgreements, setCheckingOrgAgreements] = useState(false);
   const [globalTicketSales, setGlobalTicketSales] = useState(false);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
+  const [featuresReady, setFeaturesReady] = useState(false);
 
   const { toast, show: showToast } = useToast();
 
@@ -356,8 +358,18 @@ export default function CreateEventPage() {
     let cancelled = false;
     import('@/shared/api/featuresApi')
       .then(m => m.fetchAppFeatures())
-      .then(f => { if (!cancelled) setGlobalTicketSales(f.ticketSalesEnabled); })
-      .catch(() => { if (!cancelled) setGlobalTicketSales(false); });
+      .then(f => {
+        if (cancelled) return;
+        setGlobalTicketSales(f.ticketsEnabled && f.ticketSalesEnabled);
+        setOrganizationsEnabled(f.organizationsEnabled);
+        setFeaturesReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setGlobalTicketSales(false);
+        setOrganizationsEnabled(false);
+        setFeaturesReady(true);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -2166,9 +2178,13 @@ export default function CreateEventPage() {
   }
 
   if (!isEditing && hostGate === 'chooser') {
+    if (!featuresReady) {
+      return <div className={styles.page}><div className={styles.pageInner}>Загрузка…</div></div>;
+    }
     return (
       <div className={styles.page}>
         <CreateEventHostChooser
+          organizationsEnabled={organizationsEnabled}
           onContinue={(host, template) => {
             templateAppliedRef.current = false;
             setPendingTemplate(template);

@@ -13,6 +13,7 @@ import {
   fetchMyOrganizations,
   type OrganizationResponse,
 } from '@/entities/organization';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { useMediaQuery } from '@/shared/hooks';
 import { media } from '@/shared/lib/breakpoints';
 import styles from './HeaderAvatarMenu.module.css';
@@ -29,16 +30,33 @@ export function HeaderAvatarMenu() {
   const [docsOpen, setDocsOpen] = useState(false);
   const [orgsModalOpen, setOrgsModalOpen] = useState(false);
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchMyOrganizations()
-      .then(list => {
-        if (!cancelled) setOrganizations(list);
+    fetchAppFeatures()
+      .then(async f => {
+        if (cancelled) return;
+        setOrganizationsEnabled(f.organizationsEnabled);
+        setTicketsEnabled(f.ticketsEnabled);
+        if (!f.organizationsEnabled) {
+          setOrganizations([]);
+          return;
+        }
+        try {
+          const list = await fetchMyOrganizations();
+          if (!cancelled) setOrganizations(list);
+        } catch {
+          if (!cancelled) setOrganizations([]);
+        }
       })
       .catch(() => {
-        if (!cancelled) setOrganizations([]);
+        if (cancelled) return;
+        setOrganizationsEnabled(false);
+        setTicketsEnabled(false);
+        setOrganizations([]);
       });
     return () => { cancelled = true; };
   }, []);
@@ -106,7 +124,7 @@ export function HeaderAvatarMenu() {
             <span>Мой профиль</span>
           </button>
 
-          {organizations.length > 0 && (
+          {organizationsEnabled && organizations.length > 0 && (
             <button
               type="button"
               className={styles.menuItem}
@@ -118,18 +136,20 @@ export function HeaderAvatarMenu() {
             </button>
           )}
 
-          <button
-            type="button"
-            className={styles.menuItem}
-            role="menuitem"
-            onClick={() => {
-              closeMenu();
-              navigate('/my-tickets');
-            }}
-          >
-            <TicketIcon />
-            <span>Мои билеты</span>
-          </button>
+          {ticketsEnabled && (
+            <button
+              type="button"
+              className={styles.menuItem}
+              role="menuitem"
+              onClick={() => {
+                closeMenu();
+                navigate('/my-tickets');
+              }}
+            >
+              <TicketIcon />
+              <span>Мои билеты</span>
+            </button>
+          )}
 
           <button
             type="button"
