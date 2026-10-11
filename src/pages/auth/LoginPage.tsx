@@ -77,7 +77,10 @@ export default function LoginPage() {
         <AuthBrand />
 
         <h1 className={styles.heading}>Добро пожаловать</h1>
-        <p className={styles.subheading}>Войдите в аккаунт чтобы продолжить</p>
+        <p className={styles.subheading}>
+          Войдите в аккаунт, чтобы пользоваться личным кабинетом.
+          Карту событий можно смотреть без входа.
+        </p>
 
         <div className={styles.fields}>
           <div className={styles.field}>

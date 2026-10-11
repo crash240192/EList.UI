@@ -4,7 +4,12 @@ import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { cookies } from '@/shared/lib/cookies';
 import { isPublicAppRoute, isPublicAuthRoute } from './routes';
 
-export { PUBLIC_AUTH_ROUTES, isPublicAuthRoute, isPublicAppRoute } from './routes';
+export {
+  PUBLIC_AUTH_ROUTES,
+  isPublicAuthRoute,
+  isPublicAppRoute,
+  requiresAuthRoute,
+} from './routes';
 
 const COOKIE_ACTIVATION_REQUIRED = 'elist_activation_required';
 
@@ -22,15 +27,17 @@ export function isActivationApiPath(path: string): boolean {
   );
 }
 
-/** Нужно ли при 401 / ошибке авторизации сбрасывать сессию */
+/**
+ * Нужно ли при 401 / ошибке авторизации сбрасывать сессию.
+ *
+ * Гость (нет токена) — никогда: редирект на /login только через RequireAuth
+ * или явный AuthRequiredDialog, а не из фоновых API-ошибок.
+ */
 export function shouldForceLogoutForApi(path: string, hasAuthToken = false): boolean {
+  if (!hasAuthToken) return false;
   if (isActivationApiPath(path)) return false;
   // Неактивная сессия (ожидание кода активации) — сохраняем токен до activate
   if (cookies.get(COOKIE_ACTIVATION_REQUIRED) === 'true') return false;
-  // Была активная сессия — любая ошибка авторизации завершает её (в т.ч. на гостевых страницах)
-  if (hasAuthToken) return true;
-  // Гость на публичных страницах — не редиректим
-  if (isPublicAppRoute()) return false;
   return true;
 }
 
