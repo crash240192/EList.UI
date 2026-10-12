@@ -2,7 +2,7 @@
 // Публичная страница организации — по структуре и оформлению как UserPage
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
   OrganizationRole,
   fetchOrganizationById,
@@ -33,6 +33,7 @@ import {
   type ContactIconKind,
 } from '@/shared/lib/contactDisplay';
 import { useAuthStore } from '@/app/store';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
@@ -218,6 +219,24 @@ export default function OrganizationPage() {
   const [orgReported, setOrgReported] = useState(false);
   const [reportedPhotoIds, setReportedPhotoIds] = useState<Set<string>>(() => new Set());
   const reportMenuRef = useRef<HTMLButtonElement>(null);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState<boolean | null>(null);
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (cancelled) return;
+        setOrganizationsEnabled(f.organizationsEnabled);
+        setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setOrganizationsEnabled(false);
+        setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!authenticated || myAccountId) return;
@@ -225,6 +244,7 @@ export default function OrganizationPage() {
   }, [authenticated, myAccountId]);
 
   useEffect(() => {
+    if (organizationsEnabled !== true) return;
     if (!id) {
       setError('Организация не найдена');
       setLoading(false);
@@ -249,7 +269,7 @@ export default function OrganizationPage() {
         setOrg(null);
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, organizationsEnabled]);
 
   const orgUpcomingParams = useMemo(
     () => orgEventsSearchParams(id, 'upcoming'),
@@ -307,7 +327,11 @@ export default function OrganizationPage() {
     else if (logoId) setLightboxFileIds([logoId]);
   }, [id, logoId]);
 
-  if (loading) {
+  if (organizationsEnabled === false) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (organizationsEnabled === null || loading) {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
@@ -482,12 +506,14 @@ export default function OrganizationPage() {
                         {formatVerificationStatus(org.verificationStatus)}
                       </span>
                     </div>
-                    <div className={styles.systemInfoRow}>
-                      <span className={styles.systemInfoKey}>Продажа билетов</span>
-                      <span className={styles.systemInfoVal}>
-                        {org.canSellTickets ? 'Включена' : 'Выключена'}
-                      </span>
-                    </div>
+                    {ticketsEnabled && (
+                      <div className={styles.systemInfoRow}>
+                        <span className={styles.systemInfoKey}>Продажа билетов</span>
+                        <span className={styles.systemInfoVal}>
+                          {org.canSellTickets ? 'Включена' : 'Выключена'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </section>
               )}

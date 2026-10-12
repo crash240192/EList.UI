@@ -97,7 +97,7 @@ function EventOrganizerChip({
   authenticated: boolean;
   alreadyReported: boolean;
   canManage: boolean;
-  onOpen: () => void;
+  onOpen?: () => void;
   onReport: () => void;
   onRemove?: () => void;
 }) {
@@ -112,37 +112,48 @@ function EventOrganizerChip({
       ? `${organizer.firstName} ${organizer.lastName ?? ''}`.trim()
       : (organizer.login ?? 'Организатор'));
   const initials = name.slice(0, 2).toUpperCase();
+  const chipBody = (
+    <>
+      {kind === 'org' ? (
+        <div className={styles.orgChipLogo}>
+          {logoId ? (
+            <AuthImage
+              fileId={logoId}
+              alt={name}
+              className={styles.orgChipLogoImg}
+              fallback={<span>{initials}</span>}
+            />
+          ) : (
+            <span>{initials}</span>
+          )}
+        </div>
+      ) : (
+        <UserAvatar
+          accountId={organizer.accountId!}
+          avatarId={organizer.avatarId ?? null}
+          initials={(organizer.firstName?.[0] ?? organizer.login?.[0] ?? '?').toUpperCase()}
+          size={36}
+          className={styles.orgChipAvatar}
+        />
+      )}
+      <div>
+        <div className={styles.orgChipName}>{name}</div>
+        <div className={styles.orgChipRole}>{kind === 'org' ? 'Организация' : 'Организатор'}</div>
+      </div>
+    </>
+  );
 
   return (
     <div className={styles.orgChip}>
-      <button type="button" className={styles.orgChipMain} onClick={onOpen}>
-        {kind === 'org' ? (
-          <div className={styles.orgChipLogo}>
-            {logoId ? (
-              <AuthImage
-                fileId={logoId}
-                alt={name}
-                className={styles.orgChipLogoImg}
-                fallback={<span>{initials}</span>}
-              />
-            ) : (
-              <span>{initials}</span>
-            )}
-          </div>
-        ) : (
-          <UserAvatar
-            accountId={organizer.accountId!}
-            avatarId={organizer.avatarId ?? null}
-            initials={(organizer.firstName?.[0] ?? organizer.login?.[0] ?? '?').toUpperCase()}
-            size={36}
-            className={styles.orgChipAvatar}
-          />
-        )}
-        <div>
-          <div className={styles.orgChipName}>{name}</div>
-          <div className={styles.orgChipRole}>{kind === 'org' ? 'Организация' : 'Организатор'}</div>
+      {onOpen ? (
+        <button type="button" className={styles.orgChipMain} onClick={onOpen}>
+          {chipBody}
+        </button>
+      ) : (
+        <div className={styles.orgChipMain}>
+          {chipBody}
         </div>
-      </button>
+      )}
       {showMenu && (
         <>
           <button
@@ -251,6 +262,7 @@ export default function EventPage() {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [globalTicketSales, setGlobalTicketSales] = useState(false);
   const [globalTicketsModule, setGlobalTicketsModule] = useState(false);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
 
   usePageTitle(event?.name ?? null);
 
@@ -261,11 +273,13 @@ export default function EventPage() {
         if (cancelled) return;
         setGlobalTicketsModule(f.ticketsEnabled);
         setGlobalTicketSales(f.ticketSalesEnabled);
+        setOrganizationsEnabled(f.organizationsEnabled);
       })
       .catch(() => {
         if (cancelled) return;
         setGlobalTicketsModule(false);
         setGlobalTicketSales(false);
+        setOrganizationsEnabled(false);
       });
     return () => { cancelled = true; };
   }, []);
@@ -1249,7 +1263,9 @@ export default function EventPage() {
                           authenticated={authenticated}
                           alreadyReported={reportedOrganizatorIds.has(o.id)}
                           canManage={isOrganizer}
-                          onOpen={() => navigate(`/organization/${orgId}`)}
+                          onOpen={organizationsEnabled
+                            ? () => navigate(`/organization/${orgId}`)
+                            : undefined}
                           onReport={() => {
                             setReportTarget({ type: ReportTargetType.EventOrganizator, id: o.id });
                             setReportModalOpen(true);

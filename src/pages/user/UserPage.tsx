@@ -47,6 +47,7 @@ import {
   getOrganizationAvatar,
   type OrganizationResponse,
 } from '@/entities/organization';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   formatContactHref,
@@ -323,11 +324,24 @@ export default function UserPage() {
   const reportMenuRef = useRef<HTMLButtonElement>(null);
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
 
   const { scopes: eventScopes, upcomingScopes, scopeTotals } = useUserProfileEvents(
     profileAccountId || null,
     eventsPhase,
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setOrganizationsEnabled(f.organizationsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setOrganizationsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -368,7 +382,7 @@ export default function UserPage() {
   }, [profileAccountId]);
 
   useEffect(() => {
-    if (!profileAccountId) {
+    if (!profileAccountId || !organizationsEnabled) {
       setOrganizations([]);
       setOrgLogoById({});
       return;
@@ -399,7 +413,7 @@ export default function UserPage() {
       });
 
     return () => { cancelled = true; };
-  }, [profileAccountId, isOwnProfile]);
+  }, [profileAccountId, isOwnProfile, organizationsEnabled]);
 
   useEffect(() => {
     if (!profileAccountId || !myAccountId || isOwnProfile) return;

@@ -62,6 +62,13 @@
   color: var(--text-muted);
 }
 
+.revisionLabel {
+  margin: 0;
+  font-size: var(--font-xs, 12px);
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
 .body {
   flex: 1;
   min-height: 0;

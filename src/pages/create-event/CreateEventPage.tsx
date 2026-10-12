@@ -349,6 +349,7 @@ export default function CreateEventPage() {
   const [orgAgreementResume, setOrgAgreementResume] = useState<'publish' | 'enableTickets' | null>(null);
   const [checkingOrgAgreements, setCheckingOrgAgreements] = useState(false);
   const [globalTicketSales, setGlobalTicketSales] = useState(false);
+  const [ticketsModuleEnabled, setTicketsModuleEnabled] = useState(false);
   const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
   const [featuresReady, setFeaturesReady] = useState(false);
 
@@ -361,12 +362,14 @@ export default function CreateEventPage() {
       .then(f => {
         if (cancelled) return;
         setGlobalTicketSales(f.ticketsEnabled && f.ticketSalesEnabled);
+        setTicketsModuleEnabled(f.ticketsEnabled);
         setOrganizationsEnabled(f.organizationsEnabled);
         setFeaturesReady(true);
       })
       .catch(() => {
         if (cancelled) return;
         setGlobalTicketSales(false);
+        setTicketsModuleEnabled(false);
         setOrganizationsEnabled(false);
         setFeaturesReady(true);
       });
@@ -2185,6 +2188,7 @@ export default function CreateEventPage() {
       <div className={styles.page}>
         <CreateEventHostChooser
           organizationsEnabled={organizationsEnabled}
+          ticketsEnabled={ticketsModuleEnabled}
           onContinue={(host, template) => {
             templateAppliedRef.current = false;
             setPendingTemplate(template);

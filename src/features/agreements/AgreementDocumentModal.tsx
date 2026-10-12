@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import type { IAgreementDocument } from '@/entities/agreement';
 import { AgreementDocumentHtml } from './AgreementDocumentHtml';
+import { agreementRevisionLabel } from './agreementRevisionLabel';
 import styles from './AgreementDocumentModal.module.css';
 
 interface AgreementDocumentModalProps {
@@ -31,9 +32,16 @@ export function AgreementDocumentModal({
         aria-labelledby="agreement-doc-title"
       >
         <div className={styles.header}>
-          <h2 id="agreement-doc-title" className={styles.title}>
-            {doc?.header || (loading ? 'Загрузка…' : 'Документ')}
-          </h2>
+          <div className={styles.headerText}>
+            <h2 id="agreement-doc-title" className={styles.title}>
+              {doc?.header || (loading ? 'Загрузка…' : 'Документ')}
+            </h2>
+            {doc && agreementRevisionLabel(doc.creationDate) && (
+              <p className={styles.revisionLabel}>
+                {agreementRevisionLabel(doc.creationDate)}
+              </p>
+            )}
+          </div>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
             ×
           </button>

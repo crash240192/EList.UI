@@ -15,6 +15,7 @@ import {
 import { useAuthStore } from '@/app/store';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { AgreementDocumentHtml } from './AgreementDocumentHtml';
+import { agreementRevisionLabel } from './agreementRevisionLabel';
 import styles from './UserAgreementsGate.module.css';
 
 const CHECK_TYPES: DocumentTypeValue[] = [DocumentType.Consent, DocumentType.Agreement];
@@ -173,6 +174,11 @@ function ReconsentDialog({
             <h2 id="reconsent-title" className={styles.title}>
               {item.document.header || 'Обновление соглашения'}
             </h2>
+            {agreementRevisionLabel(item.document.creationDate) && (
+              <p className={styles.revisionLabel}>
+                {agreementRevisionLabel(item.document.creationDate)}
+              </p>
+            )}
             {total > 1 && (
               <p className={styles.stepHint}>Документ {step} из {total}</p>
             )}

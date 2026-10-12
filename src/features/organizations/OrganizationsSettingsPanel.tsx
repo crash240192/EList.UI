@@ -76,6 +76,7 @@ import { AgreementDocumentModal } from '@/features/agreements';
 import { OrgAgreementAcceptDialog } from '@/features/agreements';
 import { TariffPlansPicker } from '@/features/wallet';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
@@ -495,6 +496,25 @@ function OrganizationDetailView({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [section, setSection] = useState<OrgDetailSection>('profile');
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!ticketsEnabled && section === 'sales') {
+      setSection('profile');
+    }
+  }, [ticketsEnabled, section]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -576,7 +596,9 @@ function OrganizationDetailView({
               { id: 'members' as const, label: 'Команда' },
               { id: 'legal' as const, label: 'Юридические данные' },
               { id: 'finance' as const, label: 'Финансы' },
-              { id: 'sales' as const, label: 'Продажа билетов' },
+              ...(ticketsEnabled
+                ? [{ id: 'sales' as const, label: 'Продажа билетов' }]
+                : []),
             ]
           ).map(t => (
             <button
@@ -611,7 +633,9 @@ function OrganizationDetailView({
             isOwner={isOwner}
             documentTypes={ORG_OFFER_DOCUMENT_TYPES}
             title="Документы организации"
-            description="Договор оферты с организацией. Соглашение на продажу билетов — на вкладке «Продажа билетов»."
+            description={ticketsEnabled
+              ? 'Договор оферты с организацией. Соглашение на продажу билетов — на вкладке «Продажа билетов».'
+              : 'Договор оферты с организацией.'}
           />
         </>
       )}
@@ -642,7 +666,7 @@ function OrganizationDetailView({
           />
         </>
       )}
-      {(section === 'legal' || section === 'sales') && (
+      {(section === 'legal' || (section === 'sales' && ticketsEnabled)) && (
         <OrganizationBillingSection
           view={section}
           organizationId={organizationId}
