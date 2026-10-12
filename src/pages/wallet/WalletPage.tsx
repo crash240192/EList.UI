@@ -490,7 +490,9 @@ export default function WalletPage() {
                   <div>
                     <div className={styles.sectionTitle}>История операций</div>
                     <div className={styles.sectionSubtitle}>
-                      Пополнения и списания тарифа, плюс билеты (ЮKassa). Баланс выше — только тариф.
+                      {ticketsEnabled
+                        ? 'Пополнения и списания тарифа, плюс билеты (ЮKassa). Баланс выше — только тариф.'
+                        : 'Пополнения и списания тарифа. Баланс выше — только тариф.'}
                     </div>
                   </div>
                 </div>

@@ -246,6 +246,7 @@ export function OrganizationsSettingsPanel({
   if (view.kind === 'create') {
     return (
       <OrganizationCreateView
+        ticketsEnabled={ticketsEnabled}
         onCancel={() => setView({ kind: 'list' })}
         onCreated={id => {
           void reload();
@@ -339,9 +340,11 @@ export function OrganizationsSettingsPanel({
 function OrganizationCreateView({
   onCancel,
   onCreated,
+  ticketsEnabled = false,
 }: {
   onCancel: () => void;
   onCreated: (id: string) => void;
+  ticketsEnabled?: boolean;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -414,7 +417,9 @@ function OrganizationCreateView({
         <div>
           <div className={styles.scardTitle}>Новая организация</div>
           <div className={styles.scardDesc}>
-            После создания вы станете владельцем. Продажа билетов подключается отдельно после верификации.
+            {ticketsEnabled
+              ? 'После создания вы станете владельцем. Продажа билетов подключается отдельно после верификации.'
+              : 'После создания вы станете владельцем и сможете публиковать анонсы от имени организации.'}
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onCancel}>Назад</Button>

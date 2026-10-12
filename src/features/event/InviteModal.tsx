@@ -15,6 +15,7 @@ import {
   inviteBlockReason,
 } from '@/entities/event/participationApi';
 import { fetchCanInviteBatch, type ICanInviteResult } from '@/entities/user/privacyApi';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { useDebounce, useInfiniteScroll } from '@/shared/hooks';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -94,9 +95,22 @@ export function InviteModal({
   const [eligibilityById, setEligibilityById] = useState<Map<string, IInviteToEventEligibility>>(
     () => new Map(),
   );
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useDebounce(search, 350);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     // В режиме отправки eligibility уже включает BL/WL — локальные short-листы не нужны.
@@ -175,7 +189,7 @@ export function InviteModal({
   const blockReasonFor = useCallback(
     (accountId: string): string | null => {
       if (useEventEligibility) {
-        return eligibilitySubtitle(eligibilityById.get(accountId));
+        return eligibilitySubtitle(eligibilityById.get(accountId), { ticketsEnabled });
       }
       const bw = inviteBlockReason(isPrivate, accountId, blackListIds, whiteListIds);
       if (bw) return bw;
@@ -187,6 +201,7 @@ export function InviteModal({
     },
     [
       useEventEligibility,
+      ticketsEnabled,
       eligibilityById,
       isPrivate,
       blackListIds,

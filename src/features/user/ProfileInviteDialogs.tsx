@@ -15,6 +15,7 @@ import {
   fetchMyOrganizations,
   type OrganizationResponse,
 } from '@/entities/organization';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import styles from './ProfileInviteDialogs.module.css';
 
@@ -61,8 +62,9 @@ function statusFromDenyReason(
 function rowFromEligibility(
   event: { id: string; name: string; startTime: string },
   el: IInviteToEventEligibility | undefined,
+  ticketsEnabled = true,
 ): InviteEventRow {
-  const ticketsRequired = el?.ticketsRequired === true;
+  const ticketsRequired = ticketsEnabled && el?.ticketsRequired === true;
 
   if (!el || el.allowed) {
     return {
@@ -92,6 +94,7 @@ async function loadInviteEvents(params: {
   profileAccountId: string;
   source: InviteSource;
   organizationId: string | null;
+  ticketsEnabled?: boolean;
 }): Promise<InviteEventRow[]> {
   const now = new Date().toISOString();
   const base = {
@@ -117,9 +120,10 @@ async function loadInviteEvents(params: {
   }).catch(() => [] as IInviteToEventEligibility[]);
 
   const byEvent = new Map(eligibility.map(row => [row.eventId, row]));
+  const ticketsOn = params.ticketsEnabled !== false;
 
   return events
-    .map(event => rowFromEligibility(event, byEvent.get(event.id)))
+    .map(event => rowFromEligibility(event, byEvent.get(event.id), ticketsOn))
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 }
 
@@ -167,8 +171,42 @@ export function ProfileEventInviteModal({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSummary, setSendSummary] = useState<string | null>(null);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+  const [featuresReady, setFeaturesReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (cancelled) return;
+        setOrganizationsEnabled(f.organizationsEnabled);
+        setTicketsEnabled(f.ticketsEnabled);
+        setFeaturesReady(true);
+        if (!f.organizationsEnabled) {
+          setSource('self');
+          setOrgs([]);
+          setOrgId(null);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setOrganizationsEnabled(false);
+        setTicketsEnabled(false);
+        setFeaturesReady(true);
+        setSource('self');
+        setOrgs([]);
+        setOrgId(null);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!featuresReady || !organizationsEnabled) {
+      setOrgs([]);
+      setOrgId(null);
+      return;
+    }
     let cancelled = false;
     fetchMyOrganizations()
       .then(list => {
@@ -181,9 +219,10 @@ export function ProfileEventInviteModal({
         if (!cancelled) setOrgs([]);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [featuresReady, organizationsEnabled]);
 
   useEffect(() => {
+    if (!featuresReady) return;
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
@@ -191,7 +230,7 @@ export function ProfileEventInviteModal({
     setSendSummary(null);
     setSendError(null);
 
-    if (source === 'organization' && !orgId) {
+    if (source === 'organization' && (!organizationsEnabled || !orgId)) {
       setEvents([]);
       setLoading(false);
       return;
@@ -200,8 +239,9 @@ export function ProfileEventInviteModal({
     loadInviteEvents({
       myAccountId,
       profileAccountId,
-      source,
-      organizationId: source === 'organization' ? orgId : null,
+      source: organizationsEnabled ? source : 'self',
+      organizationId: organizationsEnabled && source === 'organization' ? orgId : null,
+      ticketsEnabled,
     })
       .then(rows => {
         if (!cancelled) setEvents(rows);
@@ -217,7 +257,7 @@ export function ProfileEventInviteModal({
       });
 
     return () => { cancelled = true; };
-  }, [myAccountId, profileAccountId, source, orgId]);
+  }, [myAccountId, profileAccountId, source, orgId, featuresReady, organizationsEnabled, ticketsEnabled]);
 
   const selectableIds = useMemo(
     () => events.filter(e => e.status === 'ok').map(e => e.id),
@@ -310,6 +350,7 @@ export function ProfileEventInviteModal({
           <h3 className={styles.title}>Пригласить</h3>
         </div>
 
+        {organizationsEnabled && (
         <div className={styles.sourceRow} role="tablist" aria-label="От чьего имени">
           <button
             type="button"
@@ -332,8 +373,9 @@ export function ProfileEventInviteModal({
             От организации
           </button>
         </div>
+        )}
 
-        {source === 'organization' && orgs.length > 0 && (
+        {organizationsEnabled && source === 'organization' && orgs.length > 0 && (
           <div className={styles.orgRow}>
             <label className={styles.orgLabel} htmlFor="invite-org-select">Организация</label>
             <select
@@ -352,10 +394,11 @@ export function ProfileEventInviteModal({
         <div className={styles.list}>
           {loading && <p className={styles.empty}>Загрузка…</p>}
           {!loading && loadError && <p className={styles.error}>{loadError}</p>}
-          {!loading && !loadError && source === 'organization' && orgs.length === 0 && (
+          {!loading && !loadError && organizationsEnabled && source === 'organization' && orgs.length === 0 && (
             <p className={styles.empty}>Нет организаций, от имени которых можно приглашать</p>
           )}
-          {!loading && !loadError && events.length === 0 && !(source === 'organization' && orgs.length === 0) && (
+          {!loading && !loadError && events.length === 0
+            && !(organizationsEnabled && source === 'organization' && orgs.length === 0) && (
             <p className={styles.empty}>Нет предстоящих мероприятий</p>
           )}
           {!loading && !loadError && events.map(event => {

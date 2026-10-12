@@ -61,15 +61,23 @@ function personInviterName(inv: IInvitation): string {
   return inv.inviter?.account?.login ?? 'Неизвестный';
 }
 
-function inviterName(inv: IInvitation, orgById: Record<string, OrgInviterInfo>): string {
-  if (inv.inviterOrganizationId) {
+function inviterName(
+  inv: IInvitation,
+  orgById: Record<string, OrgInviterInfo>,
+  organizationsEnabled = true,
+): string {
+  if (organizationsEnabled && inv.inviterOrganizationId) {
     return orgById[inv.inviterOrganizationId]?.name ?? 'Организация';
   }
   return personInviterName(inv);
 }
 
-function inviterInitials(inv: IInvitation, orgById: Record<string, OrgInviterInfo>): string {
-  if (inv.inviterOrganizationId) {
+function inviterInitials(
+  inv: IInvitation,
+  orgById: Record<string, OrgInviterInfo>,
+  organizationsEnabled = true,
+): string {
+  if (organizationsEnabled && inv.inviterOrganizationId) {
     const name = orgById[inv.inviterOrganizationId]?.name ?? 'ОР';
     return name.slice(0, 2).toUpperCase();
   }
@@ -83,15 +91,17 @@ function InviterAvatar({
   orgById,
   size,
   className,
+  organizationsEnabled = true,
 }: {
   inv: IInvitation;
   orgById: Record<string, OrgInviterInfo>;
   size: number;
   className?: string;
+  organizationsEnabled?: boolean;
 }) {
-  if (inv.inviterOrganizationId) {
+  if (organizationsEnabled && inv.inviterOrganizationId) {
     const org = orgById[inv.inviterOrganizationId];
-    const initials = inviterInitials(inv, orgById);
+    const initials = inviterInitials(inv, orgById, organizationsEnabled);
     return (
       <div
         className={`${styles.orgAvatar} ${className ?? ''}`}
@@ -116,7 +126,7 @@ function InviterAvatar({
     <UserAvatar
       accountId={inv.inviterAccountId}
       avatarId={inv.inviter?.account?.avatarId ?? null}
-      initials={inviterInitials(inv, orgById)}
+      initials={inviterInitials(inv, orgById, organizationsEnabled)}
       size={size}
       className={className}
     />
@@ -201,6 +211,7 @@ export default function InvitationsPage() {
   const [markingAll, setMarkingAll] = useState(false);
   const [orgById, setOrgById] = useState<Record<string, OrgInviterInfo>>({});
   const [ticketsModuleOn, setTicketsModuleOn] = useState(false);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
 
   const unviewedCount = useMemo(
     () => items.filter(isInvitationUnviewed).length,
@@ -212,8 +223,16 @@ export default function InvitationsPage() {
   useEffect(() => {
     let cancelled = false;
     fetchAppFeatures()
-      .then(f => { if (!cancelled) setTicketsModuleOn(f.ticketsEnabled); })
-      .catch(() => { if (!cancelled) setTicketsModuleOn(false); });
+      .then(f => {
+        if (cancelled) return;
+        setTicketsModuleOn(f.ticketsEnabled);
+        setOrganizationsEnabled(f.organizationsEnabled);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTicketsModuleOn(false);
+        setOrganizationsEnabled(false);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -247,6 +266,7 @@ export default function InvitationsPage() {
 
   // Имена/логотипы организаций-приглашающих
   useEffect(() => {
+    if (!organizationsEnabled) return;
     const ids = [...new Set(
       [...items, ...sentItems]
         .map(inv => inv.inviterOrganizationId)
@@ -273,7 +293,7 @@ export default function InvitationsPage() {
       setOrgById(prev => ({ ...prev, ...Object.fromEntries(entries) }));
     });
     return () => { cancelled = true; };
-  }, [items, sentItems, orgById]);
+  }, [items, sentItems, orgById, organizationsEnabled]);
 
   const markViewedIfNeeded = async (inv: IInvitation) => {
     if (!isInvitationUnviewed(inv)) return;
@@ -455,6 +475,7 @@ export default function InvitationsPage() {
                 key={inv.id}
                 inv={inv}
                 orgById={orgById}
+                organizationsEnabled={organizationsEnabled}
                 onOpen={() => handleInvitationClick(inv)}
                 onPreview={() => openPreview(inv)}
                 onDecline={() => setConfirmDecl(inv)}
@@ -504,6 +525,7 @@ export default function InvitationsPage() {
         <AcceptDialog
           inv={previewInv}
           orgById={orgById}
+          organizationsEnabled={organizationsEnabled}
           ticketsModuleOn={ticketsModuleOn}
           onClose={() => setPreviewInv(null)}
           onAccept={() => requestAccept(previewInv)}
@@ -565,12 +587,14 @@ export default function InvitationsPage() {
 function InvitationRow({
   inv,
   orgById,
+  organizationsEnabled,
   onOpen,
   onPreview,
   onDecline,
 }: {
   inv: IInvitation;
   orgById: Record<string, OrgInviterInfo>;
+  organizationsEnabled: boolean;
   onOpen: () => void;
   onPreview: () => void;
   onDecline: () => void;
@@ -578,7 +602,7 @@ function InvitationRow({
   const event = inv.event;
   const urgency = getEventUrgency(event.startTime);
   const unviewed = isInvitationUnviewed(inv);
-  const name = inviterName(inv, orgById);
+  const name = inviterName(inv, orgById, organizationsEnabled);
 
   return (
     <EventListItem
@@ -592,6 +616,7 @@ function InvitationRow({
           <InviterAvatar
             inv={inv}
             orgById={orgById}
+            organizationsEnabled={organizationsEnabled}
             size={18}
             className={styles.whoAvatar}
           />
@@ -673,12 +698,14 @@ function SentInvitationRow({
 function AcceptDialog({
   inv,
   orgById,
+  organizationsEnabled,
   ticketsModuleOn,
   onClose,
   onAccept,
 }: {
   inv: IInvitation;
   orgById: Record<string, OrgInviterInfo>;
+  organizationsEnabled: boolean;
   ticketsModuleOn: boolean;
   onClose: () => void;
   onAccept: () => void;
@@ -690,8 +717,8 @@ function AcceptDialog({
   const days = getDaysUntil(event.startTime);
   const coverBg = getEventCoverBackground(event as Parameters<typeof getEventCoverBackground>[0]);
   const daysLabel = days === 0 ? 'сегодня' : days === 1 ? 'завтра' : days > 0 ? `через ${days} дн.` : '';
-  const name = inviterName(inv, orgById);
-  const fromOrg = Boolean(inv.inviterOrganizationId);
+  const name = inviterName(inv, orgById, organizationsEnabled);
+  const fromOrg = organizationsEnabled && Boolean(inv.inviterOrganizationId);
   const ticketsEnabled = ticketsModuleOn && Boolean(event.parameters?.ticketsEnabled);
 
   return (
@@ -708,6 +735,7 @@ function AcceptDialog({
             <InviterAvatar
               inv={inv}
               orgById={orgById}
+              organizationsEnabled={organizationsEnabled}
               size={28}
               className={styles.dialogInviterAv}
             />

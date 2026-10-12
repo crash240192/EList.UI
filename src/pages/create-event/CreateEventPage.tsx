@@ -1107,10 +1107,18 @@ export default function CreateEventPage() {
       setEditTicketsCapability('unknown');
       return;
     }
+    if (!featuresReady) return;
     let cancelled = false;
     setEditTicketsCapability('unknown');
     (async () => {
       try {
+        if (!organizationsEnabled) {
+          if (!cancelled) {
+            setEventHost({ kind: 'user' });
+            setEditTicketsCapability('no');
+          }
+          return;
+        }
         const organizers = await fetchEventOrganizators(id);
         const orgOrganizer = organizers.find(o => o.organizationId);
         if (orgOrganizer?.organizationId) {
@@ -1141,7 +1149,7 @@ export default function CreateEventPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isEditing, id, editAccess]);
+  }, [isEditing, id, editAccess, featuresReady, organizationsEnabled]);
 
   // Сброс флага билетов, если продажа глобально/для org недоступна (Cost=0 + tickets = бесплатные билеты — ок)
   useEffect(() => {
@@ -2273,7 +2281,7 @@ export default function CreateEventPage() {
           }} />
           <div>
             <h1 className={styles.title}>{isEditing ? 'Редактировать мероприятие' : 'Новое мероприятие'}</h1>
-            {eventHost?.kind === 'organization' && (
+            {organizationsEnabled && eventHost?.kind === 'organization' && (
               <div className={styles.hostBadge}>
                 от имени «{eventHost.organizationName}»
               </div>
@@ -2677,7 +2685,9 @@ export default function CreateEventPage() {
               )}
               {(parseFloat(form.cost) || 0) > 0 && !form.ticketsEnabled && (
                 <p className={styles.fieldHint}>
-                  Без онлайн-билетов стоимость показывается как «на месте» — запись свободная, оплата у организатора.
+                  {ticketsModuleEnabled
+                    ? 'Без онлайн-билетов стоимость показывается как «на месте» — запись свободная, оплата у организатора.'
+                    : 'Стоимость показывается как «на месте» — запись свободная, оплата у организатора.'}
                 </p>
               )}
             </div>
@@ -3016,7 +3026,7 @@ export default function CreateEventPage() {
             <div className={styles.templateDialogTitle}>Сохранить как шаблон</div>
             <p className={styles.templateDialogHint}>
               Сохранится текущая форма
-              {eventHost?.kind === 'organization'
+              {organizationsEnabled && eventHost?.kind === 'organization'
                 ? ` для организации «${eventHost.organizationName}»`
                 : ' в ваши шаблоны'}
               , включая дату, время, приглашения и списки доступа.

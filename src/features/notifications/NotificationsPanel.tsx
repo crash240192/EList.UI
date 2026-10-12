@@ -64,12 +64,25 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
   const closeAfterReadAllRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (closeAfterReadAllRef.current != null) {
       clearTimeout(closeAfterReadAllRef.current);
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setOrganizationsEnabled(f.organizationsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setOrganizationsEnabled(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -272,7 +285,11 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         ) : (
           visibleItems.map(n => {
             const hasTitle = !!n.title;
-            const messageText = n.message || notificationTypeLabel(n.type);
+            const typeLabel = notificationTypeLabel(n.type);
+            const messageText = n.message
+              || (organizationsEnabled || !/организац/i.test(typeLabel)
+                ? typeLabel
+                : 'Уведомление');
             const eventStart = formatEventStart(n.eventShort?.startTime);
             const ratingPreview = n.ratingData ? (
               <NotificationRatingPreview rating={n.ratingData} />
