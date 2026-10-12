@@ -20,6 +20,15 @@ import {
   type IAccountPrivacySettings,
   type PrivacyAudience,
 } from '@/entities/user/privacyApi';
+import {
+  DocumentType,
+  checkUserAgreement,
+  fetchLastDocument,
+  type IAgreementDocument,
+} from '@/entities/agreement';
+import { UserAgreementAcceptDialog } from '@/features/agreements';
+import { ApiError } from '@/shared/api/client';
+import { isDistributionConsentRequiredCode } from '@/shared/api/errorCodes';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { POPULAR_CITIES, useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { cookies } from '@/shared/lib/cookies';
@@ -565,6 +574,7 @@ function PrivacySection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [distributionDoc, setDistributionDoc] = useState<IAgreementDocument | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -579,7 +589,35 @@ function PrivacySection() {
     return () => { cancelled = true; };
   }, []);
 
-  const setAudience = (key: keyof IAccountPrivacySettings, value: PrivacyAudience) => {
+  const ensureDistributionConsent = async (): Promise<boolean> => {
+    try {
+      const ok = await checkUserAgreement(DocumentType.DistributionConsent);
+      if (ok) return true;
+    } catch {
+      /* документ может отсутствовать — всё равно пробуем открыть */
+    }
+    const doc = await fetchLastDocument(DocumentType.DistributionConsent).catch(() => null);
+    if (!doc) {
+      setMsg({
+        text: 'Согласие на распространение персональных данных ещё не опубликовано',
+        ok: false,
+      });
+      return false;
+    }
+    setDistributionDoc(doc);
+    return false;
+  };
+
+  const setAudience = async (key: keyof IAccountPrivacySettings, value: PrivacyAudience) => {
+    const isPdVisibility =
+      key === 'ageVisibility'
+      || key === 'genderVisibility'
+      || key === 'locationVisibility'
+      || key === 'profilePhotosVisibility';
+    if (isPdVisibility && value !== 'Nobody') {
+      const allowed = await ensureDistributionConsent();
+      if (!allowed) return;
+    }
     setSettings(prev => (prev ? { ...prev, [key]: value } : prev));
   };
 
@@ -599,6 +637,9 @@ function PrivacySection() {
       setSettings(saved);
       setMsg({ text: 'Настройки приватности сохранены', ok: true });
     } catch (e) {
+      if (e instanceof ApiError && isDistributionConsentRequiredCode(e.code)) {
+        await ensureDistributionConsent();
+      }
       setMsg({ text: e instanceof Error ? e.message : 'Ошибка сохранения', ok: false });
     } finally {
       setSaving(false);
@@ -634,7 +675,7 @@ function PrivacySection() {
           <div className={styles.frowControl}>
             <Select
               value={settings.whoCanInviteMe}
-              onChange={v => setAudience('whoCanInviteMe', v as PrivacyAudience)}
+              onChange={v => { void setAudience('whoCanInviteMe', v as PrivacyAudience); }}
               options={WHO_CAN_INVITE_OPTIONS}
             />
             <div className={styles.frowHint}>{WHO_CAN_INVITE_HINTS[settings.whoCanInviteMe]}</div>
@@ -645,7 +686,7 @@ function PrivacySection() {
           <div className={styles.frowControl}>
             <Select
               value={settings.ageVisibility}
-              onChange={v => setAudience('ageVisibility', v as PrivacyAudience)}
+              onChange={v => { void setAudience('ageVisibility', v as PrivacyAudience); }}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
             <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.ageVisibility]}</div>
@@ -656,7 +697,7 @@ function PrivacySection() {
           <div className={styles.frowControl}>
             <Select
               value={settings.genderVisibility}
-              onChange={v => setAudience('genderVisibility', v as PrivacyAudience)}
+              onChange={v => { void setAudience('genderVisibility', v as PrivacyAudience); }}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
             <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.genderVisibility]}</div>
@@ -667,7 +708,7 @@ function PrivacySection() {
           <div className={styles.frowControl}>
             <Select
               value={settings.locationVisibility}
-              onChange={v => setAudience('locationVisibility', v as PrivacyAudience)}
+              onChange={v => { void setAudience('locationVisibility', v as PrivacyAudience); }}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
             <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.locationVisibility]}</div>
@@ -678,7 +719,7 @@ function PrivacySection() {
           <div className={styles.frowControl}>
             <Select
               value={settings.profilePhotosVisibility}
-              onChange={v => setAudience('profilePhotosVisibility', v as PrivacyAudience)}
+              onChange={v => { void setAudience('profilePhotosVisibility', v as PrivacyAudience); }}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
             <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.profilePhotosVisibility]}</div>
@@ -691,9 +732,22 @@ function PrivacySection() {
               <input
                 type="checkbox"
                 checked={settings.showBirthdayToday}
-                onChange={e => setSettings(prev => (prev
-                  ? { ...prev, showBirthdayToday: e.target.checked }
-                  : prev))}
+                onChange={e => {
+                  const checked = e.target.checked;
+                  if (checked) {
+                    void (async () => {
+                      const allowed = await ensureDistributionConsent();
+                      if (!allowed) return;
+                      setSettings(prev => (prev
+                        ? { ...prev, showBirthdayToday: true }
+                        : prev));
+                    })();
+                    return;
+                  }
+                  setSettings(prev => (prev
+                    ? { ...prev, showBirthdayToday: false }
+                    : prev));
+                }}
               />
               Показывать акцент в день рождения
             </label>
@@ -705,6 +759,20 @@ function PrivacySection() {
         {!msg && <span />}
         <Button onClick={() => void handleSave()} loading={saving}>Сохранить</Button>
       </div>
+
+      {distributionDoc && (
+        <UserAgreementAcceptDialog
+          item={{ type: DocumentType.DistributionConsent, document: distributionDoc }}
+          onCancel={() => setDistributionDoc(null)}
+          onComplete={() => {
+            setDistributionDoc(null);
+            setMsg({
+              text: 'Согласие принято. Теперь можно открыть данные для других пользователей.',
+              ok: true,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -748,15 +816,51 @@ function ContactForm({ types, initial, onSave, onCancel }: {
   const [form, setForm] = useState({
     typeId: initial?.contactType?.id ?? (types[0]?.id ?? ''),
     value: initial?.value ?? '',
-    show: initial?.show ?? true,
+    show: initial?.show ?? false,
     isAuthorizationContact: initial?.isAuthorizationContact ?? false,
   });
   const [saving, setSaving] = useState(false);
+  const [distributionDoc, setDistributionDoc] = useState<IAgreementDocument | null>(null);
+  const [localErr, setLocalErr] = useState<string | null>(null);
+
+  const ensureDistributionConsent = async (): Promise<boolean> => {
+    try {
+      if (await checkUserAgreement(DocumentType.DistributionConsent)) return true;
+    } catch {
+      /* ignore */
+    }
+    const doc = await fetchLastDocument(DocumentType.DistributionConsent).catch(() => null);
+    if (!doc) {
+      setLocalErr('Согласие на распространение персональных данных ещё не опубликовано');
+      return false;
+    }
+    setDistributionDoc(doc);
+    return false;
+  };
+
+  const handleShowToggle = async (checked: boolean) => {
+    if (!checked) {
+      setForm(f => ({ ...f, show: false }));
+      return;
+    }
+    const allowed = await ensureDistributionConsent();
+    if (allowed) setForm(f => ({ ...f, show: true }));
+  };
 
   const handleSave = async () => {
     if (!form.value.trim()) return;
     setSaving(true);
-    try { await onSave(form); } finally { setSaving(false); }
+    setLocalErr(null);
+    try {
+      await onSave(form);
+    } catch (e) {
+      if (e instanceof ApiError && isDistributionConsentRequiredCode(e.code)) {
+        await ensureDistributionConsent();
+      }
+      setLocalErr(e instanceof Error ? e.message : 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -769,16 +873,28 @@ function ContactForm({ types, initial, onSave, onCancel }: {
       <div className={styles.contactFormFlags}>
         <label className={styles.checkLabel}>
           <input type="checkbox" checked={form.show}
-            onChange={e => setForm(f => ({ ...f, show: e.target.checked }))} />
+            onChange={e => { void handleShowToggle(e.target.checked); }} />
           Показывать публично
         </label>
       </div>
+      {localErr && <div className={styles.msgErr}>{localErr}</div>}
       <div className={styles.contactFormActions}>
         <Button variant="ghost" size="sm" onClick={onCancel}>Отмена</Button>
-        <Button size="sm" onClick={handleSave} loading={saving}>
+        <Button size="sm" onClick={() => { void handleSave(); }} loading={saving}>
           {initial ? 'Сохранить' : 'Добавить'}
         </Button>
       </div>
+      {distributionDoc && (
+        <UserAgreementAcceptDialog
+          item={{ type: DocumentType.DistributionConsent, document: distributionDoc }}
+          onCancel={() => setDistributionDoc(null)}
+          onComplete={() => {
+            setDistributionDoc(null);
+            setForm(f => ({ ...f, show: true }));
+            setLocalErr(null);
+          }}
+        />
+      )}
     </div>
   );
 }

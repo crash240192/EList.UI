@@ -32,6 +32,8 @@ function consentLabel(type: DocumentTypeValue): string {
       return 'Согласен с условиями пользовательского соглашения';
     case DocumentType.Policy:
       return 'Ознакомлен с политикой обработки персональных данных';
+    case DocumentType.DistributionConsent:
+      return 'Согласен на распространение персональных данных';
     default:
       return 'Принимаю условия документа';
   }

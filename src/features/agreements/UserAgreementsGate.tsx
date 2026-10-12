@@ -155,7 +155,9 @@ function ReconsentDialog({
 
   const consentLabel = item.type === DocumentType.Consent
     ? 'Согласен на обработку персональных данных'
-    : 'Согласен с условиями пользовательского соглашения';
+    : item.type === DocumentType.DistributionConsent
+      ? 'Согласен на распространение персональных данных'
+      : 'Согласен с условиями пользовательского соглашения';
 
   return createPortal(
     <>

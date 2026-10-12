@@ -148,9 +148,7 @@ export function AppLayout() {
         </div>
 
         <div className={styles.headerRight}>
-          <span className={authenticated ? styles.hideOnMobile : undefined}>
-            <UserAgreementsInfoButton />
-          </span>
+          <UserAgreementsInfoButton />
           {authenticated && (
             <span className={styles.hideOnMobile}>
               <BugReportButton />
