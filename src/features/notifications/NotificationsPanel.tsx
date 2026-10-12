@@ -10,6 +10,8 @@ import {
   notificationTypeLabel,
 } from '@/entities/notification/notificationNavigation';
 import { sendTestNotification } from '@/entities/notification/api';
+import { useToastStore } from '@/app/store';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { useNotificationsStore } from './notificationsStore';
 import { useDebouncedWsStatus } from './useDebouncedWsStatus';
 import { NotificationRatingPreview } from './NotificationRatingPreview';
@@ -47,6 +49,7 @@ function formatWhen(iso: string): string {
 
 export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const navigate = useNavigate();
+  const toast = useToastStore(s => s.add);
   const { accountId } = useAccountId();
   const items = useNotificationsStore(s => s.items);
   const wsStatus = useDebouncedWsStatus(useNotificationsStore(s => s.wsStatus));
@@ -61,12 +64,25 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const [testMsg, setTestMsg] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
   const closeAfterReadAllRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (closeAfterReadAllRef.current != null) {
       clearTimeout(closeAfterReadAllRef.current);
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setOrganizationsEnabled(f.organizationsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setOrganizationsEnabled(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -81,6 +97,20 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     if (!target) return;
 
     onClose();
+
+    const goOrgOrHome = async (
+      whenEnabled: () => void,
+      whenDisabledPath: string,
+    ) => {
+      const features = await fetchAppFeatures().catch(() => null);
+      if (!features?.organizationsEnabled) {
+        toast('Раздел организаций временно недоступен', 'info');
+        navigate(whenDisabledPath);
+        return;
+      }
+      whenEnabled();
+    };
+
     switch (target.kind) {
       case 'invitations':
         navigate('/invitations');
@@ -117,13 +147,19 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         );
         break;
       case 'organization':
-        navigate(`/organization/${target.organizationId}`);
+        void goOrgOrHome(
+          () => navigate(`/organization/${target.organizationId}`),
+          '/',
+        );
         break;
       case 'settings-organizations':
-        navigate(
-          target.organizationId
-            ? `/settings?tab=organizations&org=${target.organizationId}`
-            : '/settings?tab=organizations',
+        void goOrgOrHome(
+          () => navigate(
+            target.organizationId
+              ? `/settings?tab=organizations&org=${target.organizationId}`
+              : '/settings?tab=organizations',
+          ),
+          '/settings',
         );
         break;
       case 'settings-moderation':
@@ -133,7 +169,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         window.dispatchEvent(new Event('elist:recheck-agreements'));
         break;
     }
-  }, [markRead, navigate, onClose]);
+  }, [markRead, navigate, onClose, toast]);
 
   const closeNotification = useCallback((e: React.MouseEvent, n: INotification) => {
     e.stopPropagation();
@@ -249,7 +285,11 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         ) : (
           visibleItems.map(n => {
             const hasTitle = !!n.title;
-            const messageText = n.message || notificationTypeLabel(n.type);
+            const typeLabel = notificationTypeLabel(n.type);
+            const messageText = n.message
+              || (organizationsEnabled || !/организац/i.test(typeLabel)
+                ? typeLabel
+                : 'Уведомление');
             const eventStart = formatEventStart(n.eventShort?.startTime);
             const ratingPreview = n.ratingData ? (
               <NotificationRatingPreview rating={n.ratingData} />

@@ -22,11 +22,14 @@ export function formatInviteEligibilityReason(
   return text;
 }
 
-export function eligibilitySubtitle(el: IInviteToEventEligibility | undefined): string | null {
+export function eligibilitySubtitle(
+  el: IInviteToEventEligibility | undefined,
+  options?: { ticketsEnabled?: boolean },
+): string | null {
   if (!el) return null;
   if (!el.allowed) {
     return formatInviteEligibilityReason(el.reason, el.errorCode) || 'Нельзя пригласить';
   }
-  if (el.ticketsRequired) return 'Нужен билет';
+  if (options?.ticketsEnabled !== false && el.ticketsRequired) return 'Нужен билет';
   return null;
 }

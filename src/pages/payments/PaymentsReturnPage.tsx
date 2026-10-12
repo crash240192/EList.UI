@@ -12,6 +12,7 @@ import {
   fetchWalletDeposit,
   type WalletDepositStatus,
 } from '@/entities/user/walletApi';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { usePageTitle } from '@/shared/hooks';
 import { useToastStore } from '@/app/store';
 import { Button } from '@/shared/ui/Button';
@@ -98,12 +99,34 @@ export default function PaymentsReturnPage() {
   const [phase, setPhase] = useState<'working' | 'ok' | 'error'>('working');
   const [message, setMessage] = useState('Подтверждаем оплату…');
   const [kind, setKind] = useState<'order' | 'wallet'>('order');
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
 
     void (async () => {
+      let ticketsOn = false;
+      try {
+        ticketsOn = (await fetchAppFeatures()).ticketsEnabled;
+        setTicketsEnabled(ticketsOn);
+      } catch {
+        ticketsOn = false;
+        setTicketsEnabled(false);
+      }
+
       const purpose = params.get('purpose');
       const isStub = params.get('stub') === '1';
       let depositId = params.get('depositId') || undefined;
@@ -209,7 +232,11 @@ export default function PaymentsReturnPage() {
           await completePayment({ orderId, providerPaymentId });
           try { sessionStorage.removeItem(PENDING_ORDER_KEY); } catch { /* ignore */ }
           setPhase('ok');
-          setMessage('Оплата прошла успешно. Билет уже в разделе «Мои билеты».');
+          setMessage(
+            ticketsOn
+              ? 'Оплата прошла успешно. Билет уже в разделе «Мои билеты».'
+              : 'Оплата прошла успешно.',
+          );
           toast('Оплата подтверждена', 'success');
         } catch (e) {
           setPhase('error');
@@ -235,7 +262,11 @@ export default function PaymentsReturnPage() {
       if (result === 'ok') {
         try { sessionStorage.removeItem(PENDING_ORDER_KEY); } catch { /* ignore */ }
         setPhase('ok');
-        setMessage('Оплата прошла успешно. Билет уже в разделе «Мои билеты».');
+        setMessage(
+          ticketsOn
+            ? 'Оплата прошла успешно. Билет уже в разделе «Мои билеты».'
+            : 'Оплата прошла успешно.',
+        );
         toast('Оплата подтверждена', 'success');
         return;
       }
@@ -248,8 +279,10 @@ export default function PaymentsReturnPage() {
 
       setPhase('error');
       setMessage(
-        'Не дождались подтверждения оплаты. Если списание прошло, билет появится в «Мои билеты» '
-        + 'после уведомления от банка — обновите страницу чуть позже.',
+        ticketsOn
+          ? 'Не дождались подтверждения оплаты. Если списание прошло, билет появится в «Мои билеты» '
+            + 'после уведомления от банка — обновите страницу чуть позже.'
+          : 'Не дождались подтверждения оплаты. Если списание прошло, обновите страницу чуть позже.',
       );
     })();
   }, [params, toast]);
@@ -265,13 +298,22 @@ export default function PaymentsReturnPage() {
           {phase !== 'working' && (
             <>
               <Button
-                onClick={() => navigate(kind === 'wallet' ? '/wallet' : '/my-tickets', { replace: true })}
+                onClick={() => navigate(
+                  kind === 'wallet'
+                    ? '/wallet'
+                    : (ticketsEnabled ? '/my-tickets' : '/'),
+                  { replace: true },
+                )}
               >
-                {kind === 'wallet' ? 'В кошелёк' : 'Мои билеты'}
+                {kind === 'wallet'
+                  ? 'В кошелёк'
+                  : (ticketsEnabled ? 'Мои билеты' : 'На главную')}
               </Button>
-              <Button variant="secondary" onClick={() => navigate('/', { replace: true })}>
-                На главную
-              </Button>
+              {(kind === 'wallet' || ticketsEnabled) && (
+                <Button variant="secondary" onClick={() => navigate('/', { replace: true })}>
+                  На главную
+                </Button>
+              )}
             </>
           )}
         </div>

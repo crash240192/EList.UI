@@ -17,6 +17,7 @@ import { PlatformStaffGate } from '@/features/admin/PlatformStaffGate';
 import {
   DOCUMENT_TYPE_LABELS,
   addAgreementDocument,
+  defaultRequiresAgreement,
   fetchLastDocument,
   fetchLastDocuments,
   type DocumentTypeValue,
@@ -1240,6 +1241,7 @@ function AgreementDocumentForm({
   const [header, setHeader] = useState('');
   const [text, setText] = useState('');
   const [version, setVersion] = useState('1.0.0');
+  const [requiresAgreement, setRequiresAgreement] = useState(defaultRequiresAgreement(type));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -1255,6 +1257,11 @@ function AgreementDocumentForm({
         setHeader(doc?.header ?? '');
         setText(doc?.text ?? '');
         setVersion(suggestNextVersion(doc?.version));
+        setRequiresAgreement(
+          typeof doc?.requiresAgreement === 'boolean'
+            ? doc.requiresAgreement
+            : defaultRequiresAgreement(type),
+        );
       })
       .catch(e => {
         if (cancelled) return;
@@ -1262,6 +1269,7 @@ function AgreementDocumentForm({
         setHeader('');
         setText('');
         setVersion('1.0.0');
+        setRequiresAgreement(defaultRequiresAgreement(type));
         setLoadErr(e instanceof Error ? e.message : 'Не удалось загрузить документ');
       })
       .finally(() => {
@@ -1286,6 +1294,7 @@ function AgreementDocumentForm({
         text: text.trim(),
         type,
         version: versionValue,
+        requiresAgreement,
       });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Ошибка сохранения');
@@ -1344,6 +1353,20 @@ function AgreementDocumentForm({
           autoComplete="off"
         />
         <span className={styles.fieldHint}>Формат x.x.x, например 1.0.0</span>
+      </FormField>
+
+      <FormField label="Соглашение">
+        <label className={styles.checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={requiresAgreement}
+            onChange={e => setRequiresAgreement(e.target.checked)}
+          />
+          Требует соглашения
+        </label>
+        <span className={styles.fieldHint}>
+          Если включено — в интерфейсе показывается галочка принятия; для Consent/Agreement также блокируется API до принятия.
+        </span>
       </FormField>
 
       <div className={styles.formActions}>

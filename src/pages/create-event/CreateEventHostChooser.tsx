@@ -36,6 +36,8 @@ interface Props {
   onContinue: (host: CreateEventHost, template: IEventTemplate | null) => void;
   /** Когда false — только личный хост (без выбора организации). */
   organizationsEnabled?: boolean;
+  /** Когда false — без билетных подписей в хосте/шаблонах. */
+  ticketsEnabled?: boolean;
 }
 
 interface OrgOption {
@@ -148,7 +150,8 @@ function buildTemplateCardInfo(t: IEventTemplate): TemplateCardInfo {
 
 export function CreateEventHostChooser({
   onContinue,
-  organizationsEnabled = true,
+  organizationsEnabled = false,
+  ticketsEnabled = false,
 }: Props) {
   const goBack = useSafeBack('/');
   const [loading, setLoading] = useState(true);
@@ -286,7 +289,7 @@ export function CreateEventHostChooser({
               <div className={styles.sectionLabel}>От чьего лица</div>
               <p className={styles.sectionHint}>
                 От организации можно публиковать, если она активна и принята оферта организатора.
-                Продажа билетов — после верификации.
+                {ticketsEnabled ? ' Продажа билетов — после верификации.' : ''}
               </p>
               <div className={styles.hostGrid}>
                 <button
@@ -324,6 +327,7 @@ export function CreateEventHostChooser({
                   const isSelected =
                     selected.kind === 'organization'
                     && selected.organizationId === org.id;
+                  const canSell = ticketsEnabled && Boolean(org.canSellTickets);
                   return (
                     <button
                       key={org.id}
@@ -333,7 +337,7 @@ export function CreateEventHostChooser({
                         kind: 'organization',
                         organizationId: org.id,
                         organizationName: org.name,
-                        canSellTickets: Boolean(org.canSellTickets),
+                        canSellTickets: canSell,
                       })}
                     >
                       <div className={`${styles.hostAvatar} ${styles.hostAvatarSquare}`}>
@@ -351,9 +355,11 @@ export function CreateEventHostChooser({
                       <div className={styles.hostInfo}>
                         <span className={styles.hostName}>{org.name}</span>
                         <span className={styles.hostMeta}>
-                          {org.canSellTickets
-                            ? 'Организация · билеты доступны'
-                            : 'Организация · анонсы'}
+                          {ticketsEnabled
+                            ? (canSell
+                              ? 'Организация · билеты доступны'
+                              : 'Организация · анонсы')
+                            : 'Организация'}
                         </span>
                       </div>
                       <span className={styles.checkMark} aria-hidden>
@@ -404,7 +410,7 @@ export function CreateEventHostChooser({
                     info.privacyLabel,
                     info.costLabel,
                     info.ageLabel,
-                    info.ticketsLabel,
+                    ticketsEnabled ? info.ticketsLabel : null,
                     info.inviteLabel,
                     info.listLabel,
                   ].filter(Boolean) as string[];

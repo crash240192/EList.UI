@@ -76,6 +76,7 @@ import { AgreementDocumentModal } from '@/features/agreements';
 import { OrgAgreementAcceptDialog } from '@/features/agreements';
 import { TariffPlansPicker } from '@/features/wallet';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
@@ -198,6 +199,19 @@ export function OrganizationsSettingsPanel({
   const [items, setItems] = useState<OrganizationResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -232,6 +246,7 @@ export function OrganizationsSettingsPanel({
   if (view.kind === 'create') {
     return (
       <OrganizationCreateView
+        ticketsEnabled={ticketsEnabled}
         onCancel={() => setView({ kind: 'list' })}
         onCreated={id => {
           void reload();
@@ -259,7 +274,9 @@ export function OrganizationsSettingsPanel({
           <div>
             <div className={styles.scardTitle}>Мои организации</div>
             <div className={styles.scardDesc}>
-              Создавайте организации, добавляйте администраторов и подключайте продажу билетов
+              {ticketsEnabled
+                ? 'Создавайте организации, добавляйте администраторов и подключайте продажу билетов'
+                : 'Создавайте организации и добавляйте администраторов для публикации анонсов'}
             </div>
           </div>
           {showHeaderCreate && (
@@ -275,7 +292,9 @@ export function OrganizationsSettingsPanel({
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>Организаций пока нет</p>
             <p className={styles.emptySub}>
-              Создайте организацию, чтобы публиковать анонсы от её имени и позже подключить продажу билетов
+              {ticketsEnabled
+                ? 'Создайте организацию, чтобы публиковать анонсы от её имени и позже подключить продажу билетов'
+                : 'Создайте организацию, чтобы публиковать анонсы от её имени'}
             </p>
             <Button onClick={() => setView({ kind: 'create' })}>Создать организацию</Button>
           </div>
@@ -300,7 +319,7 @@ export function OrganizationsSettingsPanel({
                       {!org.active && (
                         <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
                       )}
-                      {org.canSellTickets && (
+                      {ticketsEnabled && org.canSellTickets && (
                         <span className={`${styles.badge} ${styles.badgeOk}`}>Билеты</span>
                       )}
                     </div>
@@ -321,9 +340,11 @@ export function OrganizationsSettingsPanel({
 function OrganizationCreateView({
   onCancel,
   onCreated,
+  ticketsEnabled = false,
 }: {
   onCancel: () => void;
   onCreated: (id: string) => void;
+  ticketsEnabled?: boolean;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -396,7 +417,9 @@ function OrganizationCreateView({
         <div>
           <div className={styles.scardTitle}>Новая организация</div>
           <div className={styles.scardDesc}>
-            После создания вы станете владельцем. Продажа билетов подключается отдельно после верификации.
+            {ticketsEnabled
+              ? 'После создания вы станете владельцем. Продажа билетов подключается отдельно после верификации.'
+              : 'После создания вы станете владельцем и сможете публиковать анонсы от имени организации.'}
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onCancel}>Назад</Button>
@@ -495,6 +518,25 @@ function OrganizationDetailView({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [section, setSection] = useState<OrgDetailSection>('profile');
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!ticketsEnabled && section === 'sales') {
+      setSection('profile');
+    }
+  }, [ticketsEnabled, section]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -576,7 +618,9 @@ function OrganizationDetailView({
               { id: 'members' as const, label: 'Команда' },
               { id: 'legal' as const, label: 'Юридические данные' },
               { id: 'finance' as const, label: 'Финансы' },
-              { id: 'sales' as const, label: 'Продажа билетов' },
+              ...(ticketsEnabled
+                ? [{ id: 'sales' as const, label: 'Продажа билетов' }]
+                : []),
             ]
           ).map(t => (
             <button
@@ -611,7 +655,9 @@ function OrganizationDetailView({
             isOwner={isOwner}
             documentTypes={ORG_OFFER_DOCUMENT_TYPES}
             title="Документы организации"
-            description="Договор оферты с организацией. Соглашение на продажу билетов — на вкладке «Продажа билетов»."
+            description={ticketsEnabled
+              ? 'Договор оферты с организацией. Соглашение на продажу билетов — на вкладке «Продажа билетов».'
+              : 'Договор оферты с организацией.'}
           />
         </>
       )}
@@ -622,6 +668,7 @@ function OrganizationDetailView({
           isOwner={isOwner}
           canEdit={canEdit}
           myAccountId={myAccountId}
+          ticketsEnabled={ticketsEnabled}
           onChanged={reload}
         />
       )}
@@ -642,7 +689,7 @@ function OrganizationDetailView({
           />
         </>
       )}
-      {(section === 'legal' || section === 'sales') && (
+      {(section === 'legal' || (section === 'sales' && ticketsEnabled)) && (
         <OrganizationBillingSection
           view={section}
           organizationId={organizationId}
@@ -1527,6 +1574,7 @@ function OrganizationMembersSection({
   isOwner,
   canEdit,
   myAccountId,
+  ticketsEnabled,
   onChanged,
 }: {
   organizationId: string;
@@ -1534,11 +1582,14 @@ function OrganizationMembersSection({
   isOwner: boolean;
   canEdit: boolean;
   myAccountId: string;
+  ticketsEnabled: boolean;
   onChanged: () => Promise<void>;
 }) {
   const [accountId, setAccountId] = useState('');
   const [addRole, setAddRole] = useState<OrganizationRoleValue>(
-    isOwner ? OrganizationRole.Manager : OrganizationRole.TicketTaker,
+    isOwner || !ticketsEnabled
+      ? OrganizationRole.Manager
+      : OrganizationRole.TicketTaker,
   );
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -1546,7 +1597,7 @@ function OrganizationMembersSection({
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const uuidFilled = accountId.trim().length > 0;
-  const canAddMembers = isOwner || canEdit;
+  const canAddMembers = isOwner || (canEdit && ticketsEnabled);
   const existingMemberIds = useMemo(
     () => new Set(members.map(m => m.accountId)),
     [members],
@@ -1555,6 +1606,7 @@ function OrganizationMembersSection({
   const addMembers = async (ids: string[], role: OrganizationRoleValue) => {
     if (!canAddMembers || ids.length === 0) return;
     if (role === OrganizationRole.Manager && !isOwner) return;
+    if (role === OrganizationRole.TicketTaker && !ticketsEnabled) return;
     if (role !== OrganizationRole.Manager && role !== OrganizationRole.TicketTaker) return;
     setBusy(true);
     setMsg(null);
@@ -1678,8 +1730,9 @@ function OrganizationMembersSection({
         <div className={styles.scardHead}>
           <div className={styles.scardTitle}>Команда</div>
           <div className={styles.scardDesc}>
-            Администраторы редактируют профиль. Билетёры — только контроль входа на назначенных событиях.
-            Владелец управляет составом и продажами.
+            {ticketsEnabled
+              ? 'Администраторы редактируют профиль. Билетёры — только контроль входа на назначенных событиях. Владелец управляет составом и продажами.'
+              : 'Администраторы редактируют профиль. Владелец управляет составом.'}
           </div>
         </div>
         <ul className={styles.memberList}>
@@ -1706,7 +1759,7 @@ function OrganizationMembersSection({
                 </div>
                 {isOwner && !isMemberOwner && (
                   <div className={styles.memberActions}>
-                    {m.role === OrganizationRole.TicketTaker ? (
+                    {ticketsEnabled && m.role === OrganizationRole.TicketTaker ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1715,7 +1768,7 @@ function OrganizationMembersSection({
                       >
                         Сделать админом
                       </Button>
-                    ) : (
+                    ) : ticketsEnabled && m.role !== OrganizationRole.TicketTaker ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1724,7 +1777,7 @@ function OrganizationMembersSection({
                       >
                         Сделать билетёром
                       </Button>
-                    )}
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1757,14 +1810,16 @@ function OrganizationMembersSection({
           <div className={styles.scardHead}>
             <div className={styles.scardTitle}>Добавить участника</div>
             <div className={styles.scardDesc}>
-              {isOwner
-                ? 'Администратор или билетёр — UUID либо выбор из подписчиков'
-                : 'Билетёр — UUID либо выбор из подписчиков'}
+              {ticketsEnabled
+                ? (isOwner
+                  ? 'Администратор или билетёр — UUID либо выбор из подписчиков'
+                  : 'Билетёр — UUID либо выбор из подписчиков')
+                : 'Администратор — UUID либо выбор из подписчиков'}
             </div>
           </div>
           <div className={styles.formBody}>
             <div className={styles.inlineForm}>
-              {isOwner && (
+              {isOwner && ticketsEnabled && (
                 <select
                   className={styles.input}
                   value={addRole}
