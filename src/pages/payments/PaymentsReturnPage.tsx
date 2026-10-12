@@ -118,6 +118,15 @@ export default function PaymentsReturnPage() {
     started.current = true;
 
     void (async () => {
+      let ticketsOn = false;
+      try {
+        ticketsOn = (await fetchAppFeatures()).ticketsEnabled;
+        setTicketsEnabled(ticketsOn);
+      } catch {
+        ticketsOn = false;
+        setTicketsEnabled(false);
+      }
+
       const purpose = params.get('purpose');
       const isStub = params.get('stub') === '1';
       let depositId = params.get('depositId') || undefined;
@@ -223,7 +232,11 @@ export default function PaymentsReturnPage() {
           await completePayment({ orderId, providerPaymentId });
           try { sessionStorage.removeItem(PENDING_ORDER_KEY); } catch { /* ignore */ }
           setPhase('ok');
-          setMessage('Оплата прошла успешно. Билет уже в разделе «Мои билеты».');
+          setMessage(
+            ticketsOn
+              ? 'Оплата прошла успешно. Билет уже в разделе «Мои билеты».'
+              : 'Оплата прошла успешно.',
+          );
           toast('Оплата подтверждена', 'success');
         } catch (e) {
           setPhase('error');
@@ -249,7 +262,11 @@ export default function PaymentsReturnPage() {
       if (result === 'ok') {
         try { sessionStorage.removeItem(PENDING_ORDER_KEY); } catch { /* ignore */ }
         setPhase('ok');
-        setMessage('Оплата прошла успешно. Билет уже в разделе «Мои билеты».');
+        setMessage(
+          ticketsOn
+            ? 'Оплата прошла успешно. Билет уже в разделе «Мои билеты».'
+            : 'Оплата прошла успешно.',
+        );
         toast('Оплата подтверждена', 'success');
         return;
       }
@@ -262,8 +279,10 @@ export default function PaymentsReturnPage() {
 
       setPhase('error');
       setMessage(
-        'Не дождались подтверждения оплаты. Если списание прошло, билет появится в «Мои билеты» '
-        + 'после уведомления от банка — обновите страницу чуть позже.',
+        ticketsOn
+          ? 'Не дождались подтверждения оплаты. Если списание прошло, билет появится в «Мои билеты» '
+            + 'после уведомления от банка — обновите страницу чуть позже.'
+          : 'Не дождались подтверждения оплаты. Если списание прошло, обновите страницу чуть позже.',
       );
     })();
   }, [params, toast]);

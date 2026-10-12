@@ -95,15 +95,30 @@ export default function WalletPage() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [topUpAmount, setTopUpAmount] = useState('');
   const [topUpBusy, setTopUpBusy] = useState(false);
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    import('@/shared/api/featuresApi')
+      .then(m => m.fetchAppFeatures())
+      .then(f => {
+        if (!cancelled) setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const loadHistory = useCallback(async (
     currentTariff: ITariff | null,
     currentWallet: IWallet | null,
     tariffsCatalog: ITariff[] = [],
+    includeTicketOrders = false,
   ) => {
     setHistoryLoading(true);
     try {
-      // Единая лента: депозиты + ledger списаний тарифа + билеты (ЮKassa).
+      // Единая лента: депозиты + ledger списаний тарифа (+ билеты при включённом модуле).
       // Баланс карточки при этом остаётся только тарифным.
       const rows: HistoryRow[] = [];
       const tariffNameById = new Map<string, string>();
@@ -153,32 +168,34 @@ export default function WalletPage() {
         }
       }
 
-      const orders = await fetchMyOrders().catch(() => [] as IOrder[]);
-      const eventIds = [...new Set(orders.map(o => o.eventId).filter(Boolean))];
-      const nameById = new Map<string, string>();
-      await Promise.all(eventIds.map(async (eventId) => {
-        try {
-          const ev = await fetchEventById(eventId);
-          if (ev?.name) nameById.set(eventId, ev.name);
-        } catch { /* ignore */ }
-      }));
+      if (includeTicketOrders) {
+        const orders = await fetchMyOrders().catch(() => [] as IOrder[]);
+        const eventIds = [...new Set(orders.map(o => o.eventId).filter(Boolean))];
+        const nameById = new Map<string, string>();
+        await Promise.all(eventIds.map(async (eventId) => {
+          try {
+            const ev = await fetchEventById(eventId);
+            if (ev?.name) nameById.set(eventId, ev.name);
+          } catch { /* ignore */ }
+        }));
 
-      for (const order of orders) {
-        const when = order.paidAt || order.createDate;
-        const sortAt = when ? new Date(when).getTime() : 0;
-        const dateLabel = when ? formatDateTime(when) : '';
-        const status = ORDER_STATUS_LABELS[order.status] ?? order.status;
-        const qty = order.quantity > 1 ? ` · ${order.quantity} билета` : ' · Билет';
-        const isRefund = order.status === 'Refunded' || order.status === 'PartiallyRefunded';
-        const amountAbs = formatMoney(order.amountTotal, order.currency);
-        rows.push({
-          id: `order-${order.id}`,
-          kind: isRefund ? 'in' : 'out',
-          name: nameById.get(order.eventId) || 'Билет на мероприятие',
-          meta: `${dateLabel}${qty} · ${status} · ЮKassa`,
-          amount: isRefund ? `+ ${amountAbs}` : `− ${amountAbs}`,
-          sortAt: Number.isFinite(sortAt) ? sortAt : 0,
-        });
+        for (const order of orders) {
+          const when = order.paidAt || order.createDate;
+          const sortAt = when ? new Date(when).getTime() : 0;
+          const dateLabel = when ? formatDateTime(when) : '';
+          const status = ORDER_STATUS_LABELS[order.status] ?? order.status;
+          const qty = order.quantity > 1 ? ` · ${order.quantity} билета` : ' · Билет';
+          const isRefund = order.status === 'Refunded' || order.status === 'PartiallyRefunded';
+          const amountAbs = formatMoney(order.amountTotal, order.currency);
+          rows.push({
+            id: `order-${order.id}`,
+            kind: isRefund ? 'in' : 'out',
+            name: nameById.get(order.eventId) || 'Билет на мероприятие',
+            meta: `${dateLabel}${qty} · ${status} · ЮKassa`,
+            amount: isRefund ? `+ ${amountAbs}` : `− ${amountAbs}`,
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
       }
 
       rows.sort((a, b) => b.sortAt - a.sortAt);
@@ -196,10 +213,13 @@ export default function WalletPage() {
       if (!w) w = await createWallet();
       setWallet(w);
 
-      const [tariffs, person] = await Promise.all([
+      const [tariffs, person, features] = await Promise.all([
         tariffApi.getAll(false).catch(() => []),
         getMyPersonInfo().catch(() => null),
+        import('@/shared/api/featuresApi').then(m => m.fetchAppFeatures()).catch(() => null),
       ]);
+      const ticketsOn = Boolean(features?.ticketsEnabled);
+      setTicketsEnabled(ticketsOn);
       setAllTariffs([...tariffs].sort((a, b) => a.cost - b.cost));
 
       if (person) {
@@ -210,10 +230,10 @@ export default function WalletPage() {
       if (w?.tariffId) {
         const t = tariffs.find(x => x.id === w!.tariffId) ?? null;
         setTariff(t);
-        await loadHistory(t, w, tariffs);
+        await loadHistory(t, w, tariffs, ticketsOn);
       } else {
         setTariff(null);
-        await loadHistory(null, w, tariffs);
+        await loadHistory(null, w, tariffs, ticketsOn);
       }
 
       const validatorEntries = await Promise.all(
@@ -443,7 +463,9 @@ export default function WalletPage() {
                   <p className={styles.topUpHint}>
                     Баланс только для оплаты тарифа платформы. Пополнение не сдвигает активный период —
                     списание происходит при наступлении NextChargeAt и достаточном балансе (без минуса).
-                    Билеты идут через ЮKassa (сплит). Сейчас оплата — stub, как у билетов.
+                    {ticketsEnabled
+                      ? ' Билеты идут через ЮKassa (сплит). Сейчас оплата — stub, как у билетов.'
+                      : ' Сейчас оплата пополнения — stub.'}
                   </p>
                 </div>
               </div>

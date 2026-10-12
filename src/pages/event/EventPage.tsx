@@ -1244,14 +1244,16 @@ export default function EventPage() {
           {/* Сайдбар: организаторы → альбомы → участники */}
           <div className={styles.sidePanel}>
 
-            {(orgOrganizers.length > 0 || personOrganizers.length > 0 || organizersDenied) && (
+            {((organizationsEnabled && orgOrganizers.length > 0)
+              || personOrganizers.length > 0
+              || organizersDenied) && (
               <AccessDeniedGate denied={organizersDenied} variant="section">
                 {organizersDenied ? (
                   <SectionDeniedPlaceholder lines={3} />
                 ) : (
                   <div className={styles.orgsSection}>
                     <div className={styles.secLabel}>Организаторы</div>
-                    {orgOrganizers.map(o => {
+                    {organizationsEnabled && orgOrganizers.map(o => {
                       const orgId = o.organizationId!;
                       return (
                         <EventOrganizerChip
@@ -1263,9 +1265,7 @@ export default function EventPage() {
                           authenticated={authenticated}
                           alreadyReported={reportedOrganizatorIds.has(o.id)}
                           canManage={isOrganizer}
-                          onOpen={organizationsEnabled
-                            ? () => navigate(`/organization/${orgId}`)
-                            : undefined}
+                          onOpen={() => navigate(`/organization/${orgId}`)}
                           onReport={() => {
                             setReportTarget({ type: ReportTargetType.EventOrganizator, id: o.id });
                             setReportModalOpen(true);

@@ -408,6 +408,21 @@ export default function CreateEventPage() {
       setCanChooseHost(false);
       return;
     }
+    if (!featuresReady) {
+      setHostGate('checking');
+      return;
+    }
+
+    // Модуль организаций выключен — только личный хост, без chooser/deep-link org
+    if (!organizationsEnabled) {
+      if (hostParam === 'org' || orgIdParam) {
+        setSearchParams({}, { replace: true });
+      }
+      setCanChooseHost(false);
+      setEventHost({ kind: 'user' });
+      setHostGate('form');
+      return;
+    }
 
     if (!hostParam && !orgIdParam) {
       const restoredHost = loadCreateEventDraft(getStoredAccountId())?.host ?? null;
@@ -510,7 +525,7 @@ export default function CreateEventPage() {
         setHostGate('chooser');
       });
     return () => { cancelled = true; };
-  }, [isEditing, hostParam, orgIdParam, setSearchParams]);
+  }, [isEditing, hostParam, orgIdParam, setSearchParams, featuresReady, organizationsEnabled]);
 
   // Загрузка кошелька и тарифа (личный или организации)
   useEffect(() => {
