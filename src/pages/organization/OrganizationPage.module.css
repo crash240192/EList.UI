@@ -280,6 +280,38 @@
   line-height: 1.2;
 }
 
+.statItemRating {
+  margin-left: auto;
+  padding-right: 0;
+}
+
+.statItemStatic {
+  cursor: default;
+  border-radius: 0;
+}
+
+.statItemStatic:hover {
+  background: none;
+  box-shadow: none;
+}
+
+.statItemStatic:hover .statNum,
+.statItemStatic:hover .ratingNum {
+  color: var(--text-primary);
+}
+
+.statRating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ratingNum {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .systemInfo {
   display: flex;
   flex-direction: column;
