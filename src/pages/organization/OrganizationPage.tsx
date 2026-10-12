@@ -8,6 +8,10 @@ import {
   fetchOrganizationById,
   fetchOrganizationContacts,
   fetchOrganizationMembers,
+  fetchOrgSubscribersCount,
+  fetchIsSubscribedToOrganization,
+  subscribeToOrganization,
+  unsubscribeFromOrganization,
   formatOrganizationRole,
   formatVerificationStatus,
   getOrganizationAvatar,
@@ -22,9 +26,12 @@ import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { getOrFetchAccountId, getStoredAccountId } from '@/entities/user/api';
 import type { IContactDataItem } from '@/entities/user/profileApi';
+import type { INotifySettings } from '@/entities/user/subscriptionApi';
 import { useEvents } from '@/features/event-list/useEvents';
 import { OrganizationShareMenu } from '@/features/organization/OrganizationShareMenu';
 import { OrgMembersListModal } from '@/features/organizations/OrgMembersListModal';
+import { SubscribeModal } from '@/features/subscriptions/SubscribeModal';
+import { OrgSubscribersListModal } from '@/features/subscriptions/OrgSubscribersListModal';
 import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
 import {
   formatContactHref,
@@ -208,6 +215,10 @@ export default function OrganizationPage() {
   const [eventsPhase, setEventsPhase] = useState<EventsPhase>('upcoming');
   const [albumsCount, setAlbumsCount] = useState(0);
   const [showTeamModal, setShowTeamModal] = useState(false);
+  const [showSubscribersModal, setShowSubscribersModal] = useState(false);
+  const [showSubscribe, setShowSubscribe] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscribersCount, setSubscribersCount] = useState(0);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
@@ -237,18 +248,47 @@ export default function OrganizationPage() {
       fetchOrganizationMembers(id).catch(() => [] as OrganizationMemberResponse[]),
       getOrganizationAvatar(id),
       fetchOrganizationContacts(id),
+      fetchOrgSubscribersCount(id),
     ])
-      .then(([o, m, av, c]) => {
+      .then(([o, m, av, c, subCount]) => {
         setOrg(o);
         setMembers(m.length ? m : (o.members ?? []));
         setLogoId(av);
         setContacts(c);
+        setSubscribersCount(subCount);
       })
       .catch(e => {
         setError(e instanceof Error ? e.message : 'Ошибка загрузки');
         setOrg(null);
       })
       .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || !authenticated || !myAccountId) {
+      setIsSubscribed(false);
+      return;
+    }
+    let cancelled = false;
+    fetchIsSubscribedToOrganization(id)
+      .then(v => { if (!cancelled) setIsSubscribed(v); })
+      .catch(() => { if (!cancelled) setIsSubscribed(false); });
+    return () => { cancelled = true; };
+  }, [id, authenticated, myAccountId]);
+
+  const handleSubscribe = useCallback(async (settings: INotifySettings) => {
+    if (!id) return;
+    await subscribeToOrganization(id, { notifyEventCreated: settings.notifyEventCreated });
+    setIsSubscribed(true);
+    setSubscribersCount(c => c + 1);
+    setShowSubscribe(false);
+  }, [id]);
+
+  const handleUnsubscribe = useCallback(async () => {
+    if (!id) return;
+    await unsubscribeFromOrganization(id);
+    setIsSubscribed(false);
+    setSubscribersCount(c => Math.max(0, c - 1));
   }, [id]);
 
   const orgUpcomingParams = useMemo(
@@ -444,6 +484,28 @@ export default function OrganizationPage() {
               </div>
             )}
           </div>
+
+          {authenticated && org.active !== false && (
+            <div className={styles.profileActions}>
+              {isSubscribed ? (
+                <button
+                  type="button"
+                  className={`${styles.btnJoin} ${styles.btnLeave}`}
+                  onClick={() => { void handleUnsubscribe(); }}
+                >
+                  Отписаться
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={`${styles.btnJoin} ${styles.btnSubscribe}`}
+                  onClick={() => setShowSubscribe(true)}
+                >
+                  Подписаться
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className={styles.statsBar}>
@@ -457,6 +519,14 @@ export default function OrganizationPage() {
                 {orgEvents.total || orgEvents.events.length}
               </span>
               <span className={styles.statLabel}>события</span>
+            </button>
+            <button
+              type="button"
+              className={`${styles.statItem} ${styles.statItemClickable} ${showSubscribersModal ? styles.statItemActive : ''}`}
+              onClick={() => setShowSubscribersModal(true)}
+            >
+              <span className={styles.statNum}>{subscribersCount}</span>
+              <span className={styles.statLabel}>подписчики</span>
             </button>
             <button
               type="button"
@@ -677,6 +747,24 @@ export default function OrganizationPage() {
           members={members}
           currentAccountId={myAccountId}
           onClose={() => setShowTeamModal(false)}
+        />
+      )}
+
+      {showSubscribersModal && (
+        <OrgSubscribersListModal
+          organizationId={org.id}
+          currentAccountId={myAccountId}
+          onClose={() => setShowSubscribersModal(false)}
+        />
+      )}
+
+      {showSubscribe && (
+        <SubscribeModal
+          variant="organization"
+          targetLogin={org.name}
+          organizationLogoId={logoId}
+          onConfirm={handleSubscribe}
+          onCancel={() => setShowSubscribe(false)}
         />
       )}
     </div>

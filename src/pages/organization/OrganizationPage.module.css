@@ -73,6 +73,59 @@
   flex-wrap: wrap;
 }
 
+.profileActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: flex-end;
+  gap: 8px;
+}
+
+.btnJoin {
+  composes: btnPrimary from '../../shared/styles/actionButtons.module.css';
+}
+
+.profileActions .btnSubscribe {
+  background: var(--success);
+  color: #fff;
+  border: none;
+}
+
+.profileActions .btnSubscribe:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--success) 82%, #000);
+  color: #fff;
+  border: none;
+}
+
+.btnLeave {
+  composes: btnSecondary from '../../shared/styles/actionButtons.module.css';
+}
+
+.profileActions .btnLeave {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--surface-2);
+}
+
+.profileActions .btnLeave:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-2));
+}
+
+@media (max-width: 639px) {
+  .profileActions {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+
+  .profileActions .btnJoin {
+    flex: 1;
+  }
+}
+
 .avatarWrap {
   position: relative;
   flex-shrink: 0;

@@ -43,6 +43,7 @@ import { ReportTargetType } from '@/entities/contentReport';
 import {
   fetchMyOrganizations,
   fetchOrganizationsByAccount,
+  fetchOrgSubscriptionsCount,
   formatVerificationStatus,
   getOrganizationAvatar,
   type OrganizationResponse,
@@ -353,9 +354,10 @@ export default function UserPage() {
     if (!profileAccountId) return;
     Promise.all([
       fetchSubscriptionsCount(profileAccountId),
+      fetchOrgSubscriptionsCount(profileAccountId),
       fetchSubscribersCount(profileAccountId),
-    ]).then(([s, sc]) => {
-      setSubsCount(s);
+    ]).then(([userSubs, orgSubs, sc]) => {
+      setSubsCount(userSubs + orgSubs);
       setSubscrCount(sc);
     });
   }, [profileAccountId]);

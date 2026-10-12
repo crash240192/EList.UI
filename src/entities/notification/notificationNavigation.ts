@@ -201,8 +201,24 @@ export function getNotificationNavigationTarget(
     || typeNum === NOTIFICATION_TYPE_RELATED_PERSON_SUBSCRIBED
     || typeNum === NOTIFICATION_TYPE_RELATED_PERSON_UNSUBSCRIBED
   ) {
+    // Подписка на организацию: RelatedPerson* → страница организации;
+    // NewSubscription/Unsubscribed для менеджеров — профиль подписчика.
+    if (
+      orgIdFromData
+      && (
+        typeName === 'RelatedPersonSubscribed'
+        || typeName === 'RelatedPersonUnsubscribed'
+        || typeNum === NOTIFICATION_TYPE_RELATED_PERSON_SUBSCRIBED
+        || typeNum === NOTIFICATION_TYPE_RELATED_PERSON_UNSUBSCRIBED
+      )
+    ) {
+      return { kind: 'organization', organizationId: orgIdFromData };
+    }
     if (n.relatedAccountId) {
       return { kind: 'user', accountId: n.relatedAccountId };
+    }
+    if (orgIdFromData) {
+      return { kind: 'organization', organizationId: orgIdFromData };
     }
   }
 

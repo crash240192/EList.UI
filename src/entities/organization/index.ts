@@ -35,6 +35,21 @@ export {
 } from './avatarApi';
 
 export {
+  fetchOrgSubscriptionsCount,
+  fetchOrgSubscribersCount,
+  fetchIsSubscribedToOrganization,
+  fetchOrgSubscriptions,
+  fetchOrgSubscribers,
+  subscribeToOrganization,
+  updateOrgSubscriptionNotify,
+  unsubscribeFromOrganization,
+  type IOrgNotifySettings,
+  type IOrgSubscriptionItem,
+  type IOrgSubscriptionPage,
+  type IOrgSubscriptionSearchParams,
+} from './organizationSubscriptionApi';
+
+export {
   createOrganizationContact,
   updateOrganizationContact,
   fetchOrganizationContacts,
