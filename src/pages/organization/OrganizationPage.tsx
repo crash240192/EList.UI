@@ -23,6 +23,7 @@ import {
   type OrganizationResponse,
 } from '@/entities/organization';
 import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
+import { fetchOrganizationRating } from '@/entities/event';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { getOrFetchAccountId, getStoredAccountId } from '@/entities/user/api';
 import type { IContactDataItem } from '@/entities/user/profileApi';
@@ -42,6 +43,7 @@ import {
 import { useAuthStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
+import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { TabBar } from '@/shared/ui/TabBar';
@@ -214,6 +216,7 @@ export default function OrganizationPage() {
   const [mainTab, setMainTab] = useState<MainTab>('events');
   const [eventsPhase, setEventsPhase] = useState<EventsPhase>('upcoming');
   const [albumsCount, setAlbumsCount] = useState(0);
+  const [organizerRating, setOrganizerRating] = useState<number | null>(null);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showSubscribersModal, setShowSubscribersModal] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
@@ -234,6 +237,16 @@ export default function OrganizationPage() {
     if (!authenticated || myAccountId) return;
     getOrFetchAccountId().then(setMyAccountId).catch(() => {});
   }, [authenticated, myAccountId]);
+
+  useEffect(() => {
+    if (!id) {
+      setOrganizerRating(null);
+      return;
+    }
+    fetchOrganizationRating(id)
+      .then(setOrganizerRating)
+      .catch(() => setOrganizerRating(null));
+  }, [id]);
 
   useEffect(() => {
     if (!id) {
@@ -536,6 +549,20 @@ export default function OrganizationPage() {
               <span className={styles.statNum}>{activeMembers.length}</span>
               <span className={styles.statLabel}>команда</span>
             </button>
+          </div>
+
+          <div className={`${styles.statItem} ${styles.statItemStatic} ${styles.statItemRating}`}>
+            <div className={styles.statRating}>
+              {organizerRating != null && organizerRating > 0 ? (
+                <>
+                  <GradeBadge score={organizerRating} size="sm" />
+                  <span className={styles.ratingNum}>{organizerRating.toFixed(1)}</span>
+                </>
+              ) : (
+                <span className={styles.statNum}>—</span>
+              )}
+            </div>
+            <span className={styles.statLabel}>рейтинг организатора</span>
           </div>
         </div>
 

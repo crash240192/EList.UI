@@ -112,6 +112,7 @@ export {
   voteEventRating,
   deleteEventRating,
   fetchOrganizerRating,
+  fetchOrganizationRating,
   RATING_COMMENT_MAX_LENGTH,
 } from './ratingApi';
 
