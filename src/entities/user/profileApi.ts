@@ -61,10 +61,13 @@ function normalizeAccount(raw: IAccountData | null | undefined): IAccountData {
   }
   const r = raw as IAccountData & Record<string, unknown>;
   const city = r.profileCity ?? (r as Record<string, unknown>).ProfileCity;
+  const avatarRaw = r.avatarId ?? r.AvatarId;
   return {
-    id: String(r.id ?? ''),
-    login: String(r.login ?? ''),
-    avatarId: (r.avatarId ?? null) as string | null,
+    id: String(r.id ?? r.Id ?? ''),
+    login: String(r.login ?? r.Login ?? ''),
+    avatarId: (avatarRaw === null || avatarRaw === undefined || avatarRaw === ''
+      ? null
+      : String(avatarRaw)),
     profileCity: typeof city === 'string' && city.trim() ? city.trim() : null,
   };
 }
