@@ -413,14 +413,23 @@ export default function CreateEventPage() {
       return;
     }
 
-    // Модуль организаций выключен — только личный хост, без chooser/deep-link org
+    // Модуль организаций выключен — только личный хост, но chooser нужен для шаблонов
     if (!organizationsEnabled) {
       if (hostParam === 'org' || orgIdParam) {
         setSearchParams({}, { replace: true });
+        setCanChooseHost(true);
+        setHostGate('chooser');
+        return;
       }
-      setCanChooseHost(false);
-      setEventHost({ kind: 'user' });
-      setHostGate('form');
+      if (hostParam === 'user') {
+        // Уже прошли chooser (или deep-link) — форма от личного имени
+        setCanChooseHost(true);
+        setEventHost({ kind: 'user' });
+        setHostGate('form');
+        return;
+      }
+      setCanChooseHost(true);
+      setHostGate('chooser');
       return;
     }
 

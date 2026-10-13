@@ -287,10 +287,16 @@ export function CreateEventHostChooser({
 
             <section className={styles.section}>
               <div className={styles.sectionLabel}>От чьего лица</div>
-              <p className={styles.sectionHint}>
-                От организации можно публиковать, если она активна и принята оферта организатора.
-                {ticketsEnabled ? ' Продажа билетов — после верификации.' : ''}
-              </p>
+              {organizationsEnabled ? (
+                <p className={styles.sectionHint}>
+                  От организации можно публиковать, если она активна и принята оферта организатора.
+                  {ticketsEnabled ? ' Продажа билетов — после верификации.' : ''}
+                </p>
+              ) : (
+                <p className={styles.sectionHint}>
+                  Событие будет опубликовано от вашего личного профиля.
+                </p>
+              )}
               <div className={styles.hostGrid}>
                 <button
                   type="button"
