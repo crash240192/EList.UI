@@ -575,6 +575,13 @@ function PrivacySection() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [distributionDoc, setDistributionDoc] = useState<IAgreementDocument | null>(null);
+  /** Значение аудитории, выбранное до принятия DistributionConsent (иначе select «откатывается»). */
+  const [pendingAudience, setPendingAudience] = useState<{
+    key: keyof IAccountPrivacySettings;
+    value: PrivacyAudience;
+  } | null>(null);
+  /** Отложенный showBirthdayToday=true до принятия DistributionConsent. */
+  const [pendingBirthday, setPendingBirthday] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -616,9 +623,30 @@ function PrivacySection() {
       || key === 'profilePhotosVisibility';
     if (isPdVisibility && value !== 'Nobody') {
       const allowed = await ensureDistributionConsent();
-      if (!allowed) return;
+      if (!allowed) {
+        setPendingAudience({ key, value });
+        return;
+      }
     }
+    setPendingAudience(null);
     setSettings(prev => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const applyPendingAfterConsent = () => {
+    setDistributionDoc(null);
+    if (pendingAudience) {
+      const { key, value } = pendingAudience;
+      setPendingAudience(null);
+      setSettings(prev => (prev ? { ...prev, [key]: value } : prev));
+    }
+    if (pendingBirthday) {
+      setPendingBirthday(false);
+      setSettings(prev => (prev ? { ...prev, showBirthdayToday: true } : prev));
+    }
+    setMsg({
+      text: 'Согласие принято. Выбранная видимость применена — не забудьте сохранить настройки.',
+      ok: true,
+    });
   };
 
   const handleSave = async () => {
@@ -685,44 +713,66 @@ function PrivacySection() {
           <label className={styles.frowLabel}>Кто видит возраст</label>
           <div className={styles.frowControl}>
             <Select
-              value={settings.ageVisibility}
+              value={pendingAudience?.key === 'ageVisibility' ? pendingAudience.value : settings.ageVisibility}
               onChange={v => { void setAudience('ageVisibility', v as PrivacyAudience); }}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
-            <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.ageVisibility]}</div>
+            <div className={styles.frowHint}>
+              {PRIVACY_AUDIENCE_HINTS[
+                pendingAudience?.key === 'ageVisibility' ? pendingAudience.value : settings.ageVisibility
+              ]}
+            </div>
           </div>
         </div>
         <div className={styles.frow}>
           <label className={styles.frowLabel}>Кто видит пол</label>
           <div className={styles.frowControl}>
             <Select
-              value={settings.genderVisibility}
+              value={pendingAudience?.key === 'genderVisibility' ? pendingAudience.value : settings.genderVisibility}
               onChange={v => { void setAudience('genderVisibility', v as PrivacyAudience); }}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
-            <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.genderVisibility]}</div>
+            <div className={styles.frowHint}>
+              {PRIVACY_AUDIENCE_HINTS[
+                pendingAudience?.key === 'genderVisibility' ? pendingAudience.value : settings.genderVisibility
+              ]}
+            </div>
           </div>
         </div>
         <div className={styles.frow}>
           <label className={styles.frowLabel}>Кто видит город</label>
           <div className={styles.frowControl}>
             <Select
-              value={settings.locationVisibility}
+              value={pendingAudience?.key === 'locationVisibility' ? pendingAudience.value : settings.locationVisibility}
               onChange={v => { void setAudience('locationVisibility', v as PrivacyAudience); }}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
-            <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.locationVisibility]}</div>
+            <div className={styles.frowHint}>
+              {PRIVACY_AUDIENCE_HINTS[
+                pendingAudience?.key === 'locationVisibility' ? pendingAudience.value : settings.locationVisibility
+              ]}
+            </div>
           </div>
         </div>
         <div className={styles.frow}>
           <label className={styles.frowLabel}>Кто видит фото профиля</label>
           <div className={styles.frowControl}>
             <Select
-              value={settings.profilePhotosVisibility}
+              value={
+                pendingAudience?.key === 'profilePhotosVisibility'
+                  ? pendingAudience.value
+                  : settings.profilePhotosVisibility
+              }
               onChange={v => { void setAudience('profilePhotosVisibility', v as PrivacyAudience); }}
               options={PRIVACY_AUDIENCE_OPTIONS}
             />
-            <div className={styles.frowHint}>{PRIVACY_AUDIENCE_HINTS[settings.profilePhotosVisibility]}</div>
+            <div className={styles.frowHint}>
+              {PRIVACY_AUDIENCE_HINTS[
+                pendingAudience?.key === 'profilePhotosVisibility'
+                  ? pendingAudience.value
+                  : settings.profilePhotosVisibility
+              ]}
+            </div>
           </div>
         </div>
         <div className={styles.frow}>
@@ -737,13 +787,18 @@ function PrivacySection() {
                   if (checked) {
                     void (async () => {
                       const allowed = await ensureDistributionConsent();
-                      if (!allowed) return;
+                      if (!allowed) {
+                        setPendingBirthday(true);
+                        return;
+                      }
+                      setPendingBirthday(false);
                       setSettings(prev => (prev
                         ? { ...prev, showBirthdayToday: true }
                         : prev));
                     })();
                     return;
                   }
+                  setPendingBirthday(false);
                   setSettings(prev => (prev
                     ? { ...prev, showBirthdayToday: false }
                     : prev));
@@ -763,14 +818,12 @@ function PrivacySection() {
       {distributionDoc && (
         <UserAgreementAcceptDialog
           item={{ type: DocumentType.DistributionConsent, document: distributionDoc }}
-          onCancel={() => setDistributionDoc(null)}
-          onComplete={() => {
+          onCancel={() => {
             setDistributionDoc(null);
-            setMsg({
-              text: 'Согласие принято. Теперь можно открыть данные для других пользователей.',
-              ok: true,
-            });
+            setPendingAudience(null);
+            setPendingBirthday(false);
           }}
+          onComplete={applyPendingAfterConsent}
         />
       )}
     </div>
@@ -844,7 +897,11 @@ function ContactForm({ types, initial, onSave, onCancel }: {
       return;
     }
     const allowed = await ensureDistributionConsent();
-    if (allowed) setForm(f => ({ ...f, show: true }));
+    if (allowed) {
+      setForm(f => ({ ...f, show: true }));
+      return;
+    }
+    // Consent dialog opened — apply show=true after accept (onComplete).
   };
 
   const handleSave = async () => {
@@ -890,6 +947,7 @@ function ContactForm({ types, initial, onSave, onCancel }: {
           onCancel={() => setDistributionDoc(null)}
           onComplete={() => {
             setDistributionDoc(null);
+            setForm(f => ({ ...f, show: true }));
             setForm(f => ({ ...f, show: true }));
             setLocalErr(null);
           }}
