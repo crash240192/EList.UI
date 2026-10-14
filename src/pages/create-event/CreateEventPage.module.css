@@ -24,8 +24,6 @@
   .sidePanel { margin-top: 12px; gap: 0; }
   /* Скрываем обложку в чеклисте — на мобиле она уже есть в форме */
   .checklistCoverRow { display: none; }
-  /* Убираем предпросмотр обложки в карточке предпросмотра */
-  .previewCover { display: none; }
   .actions { margin: 0 14px; }
 }
 
@@ -421,11 +419,12 @@
   border-radius: 14px; overflow: hidden;
 }
 .previewCover {
-  height: 110px; background: var(--surface-2);
+  height: 110px;
+  background: var(--hero-gradient);
   display: flex; align-items: center; justify-content: center;
 }
 .previewCoverEmpty {
-  font-size: 11px; color: rgba(255, 255, 255, 0.85);
+  font-size: 22px; color: rgba(255, 255, 255, 0.85);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 .previewBody { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
