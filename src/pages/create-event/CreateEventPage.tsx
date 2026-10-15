@@ -109,7 +109,6 @@ import {
 } from './createEventDraft';
 import { CreateEventLeaveModal } from './CreateEventLeaveModal';
 import { consumeSimilarEventSeed } from './similarEventSeed';
-import { buildEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import {
   EVENT_AGE_LIMIT_OPTIONS,
   formatAgeLimitLabel,
@@ -1444,16 +1443,6 @@ export default function CreateEventPage() {
     ]),
   ], [allTypes, selectedCategories, selectedTypes]);
 
-  const getTypeColor = (t: IEventType) => t.eventCategory?.color ?? '#6366f1';
-
-  const previewCoverBg = useMemo(
-    () => buildEventCoverBackground(
-      'create-preview',
-      [...new Set(selectedTypeObjects.map(t => getTypeColor(t)))],
-    ),
-    [selectedTypeObjects],
-  );
-
   const handleRemoveTypeChip = (typeId: string) => {
     if (selectedTypes.includes(typeId)) {
       setSelectedTypes(p => p.filter(x => x !== typeId));
@@ -2759,10 +2748,7 @@ export default function CreateEventPage() {
 
         {/* Карточка предпросмотра */}
         <div className={styles.previewCard}>
-          <div
-            className={styles.previewCover}
-            style={!coverUrl && !coverImageId ? { background: previewCoverBg } : undefined}
-          >
+          <div className={styles.previewCover}>
             {coverImageId ? (
               <AuthImage
                 fileId={coverImageId}
