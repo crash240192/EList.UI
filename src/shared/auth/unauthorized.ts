@@ -30,8 +30,8 @@ export function isActivationApiPath(path: string): boolean {
 /**
  * Нужно ли при 401 / ошибке авторизации сбрасывать сессию.
  *
- * Гость (нет токена) — никогда: редирект на /login только через RequireAuth
- * или явный AuthRequiredDialog, а не из фоновых API-ошибок.
+ * Гость (нет токена) — никогда: на защищённых маршрутах RequireAuth уводит
+ * на главную + AuthRequiredDialog; явный переход на /login — только по кнопке «Войти».
  */
 export function shouldForceLogoutForApi(path: string, hasAuthToken = false): boolean {
   if (!hasAuthToken) return false;

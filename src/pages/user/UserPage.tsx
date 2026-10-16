@@ -279,7 +279,10 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!authenticated && (id === 'me' || !id)) {
-      navigate('/login', { replace: true, state: { from: `/user/${id ?? 'me'}` } });
+      navigate('/', {
+        replace: true,
+        state: { authRequiredFrom: `/user/${id ?? 'me'}` },
+      });
     }
   }, [authenticated, id, navigate]);
 

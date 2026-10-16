@@ -12,6 +12,8 @@ import { isAccessDeniedApiCode, isAgreementNotFoundCode } from './errorCodes';
 
 export const COOKIE_CLIENT_HASH = 'elist_client_hash';
 export const COOKIE_AUTH_TOKEN  = 'elist_auth_token';
+/** Версия приложения на момент логина — токен на бэкенде привязан к ClientHash(jwt|platform|version). */
+export const COOKIE_AUTH_APP_VERSION = 'elist_auth_app_version';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/eList';
 
@@ -71,16 +73,57 @@ function generateClientHash(): string {
 
 export function getOrCreateClientHash(): string {
   let hash = cookies.get(COOKIE_CLIENT_HASH);
-  if (!hash) { hash = generateClientHash(); cookies.set(COOKIE_CLIENT_HASH, hash, 3650); }
+  if (!hash) {
+    hash = generateClientHash();
+    cookies.set(COOKIE_CLIENT_HASH, hash, 3650);
+    // Токен привязан к ClientHash от authorization-jwt. Новый jwt → старый токен мёртв.
+    if (cookies.get(COOKIE_AUTH_TOKEN)) {
+      clearAuthToken();
+    }
+  }
   return hash;
 }
 
 export function getAuthToken(): string | null { return cookies.get(COOKIE_AUTH_TOKEN); }
-export function setAuthToken(token: string): void { cookies.set(COOKIE_AUTH_TOKEN, token, 30); }
-export function clearAuthToken(): void { cookies.delete(COOKIE_AUTH_TOKEN); }
+
+export function setAuthToken(token: string): void {
+  cookies.set(COOKIE_AUTH_TOKEN, token, 30);
+  cookies.set(COOKIE_AUTH_APP_VERSION, getAppVersion(), 30);
+}
+
+export function clearAuthToken(): void {
+  cookies.delete(COOKIE_AUTH_TOKEN);
+  cookies.delete(COOKIE_AUTH_APP_VERSION);
+}
+
 export function isAuthenticated(): boolean { return !!getAuthToken(); }
 
-/** Сброс сессии и редирект на /login (кроме публичных auth-страниц) */
+/**
+ * Сбрасывает заведомо невалидную сессию до запросов UI (re-consent, platform role).
+ * Не бьёт в API: только локальные cookies.
+ * @returns 'cleared' если токен убрали; иначе 'ok' / 'guest'
+ */
+export function reconcileClientAuthSession(): 'ok' | 'cleared' | 'guest' {
+  const token = cookies.get(COOKIE_AUTH_TOKEN);
+  if (!token) return 'guest';
+
+  const clientHash = cookies.get(COOKIE_CLIENT_HASH);
+  if (!clientHash) {
+    clearAuthToken();
+    getOrCreateClientHash();
+    return 'cleared';
+  }
+
+  const boundVersion = cookies.get(COOKIE_AUTH_APP_VERSION);
+  if (boundVersion != null && boundVersion !== getAppVersion()) {
+    clearAuthToken();
+    return 'cleared';
+  }
+
+  return 'ok';
+}
+
+/** Сброс сессии; редирект на /login только с маршрутов RequireAuth */
 export function notifyUnauthorized(): void {
   handleSessionUnauthorized();
 }
@@ -268,6 +311,9 @@ async function requestWithClientJwtOnly<T>(
 /**
  * GET со стандартными заголовками (client JWT + Authorization при наличии).
  * Не бросает при success:false и не показывает тост — для статусных проверок.
+ *
+ * Важно: HTTP 401 / коды «сессия невалидна» при наличии токена → сброс сессии,
+ * а не «false» (иначе UserAgreementsGate показывает re-consent гостю с мёртвым cookie).
  */
 async function getStatus(path: string): Promise<boolean> {
   const clientHash = getOrCreateClientHash();
@@ -280,9 +326,22 @@ async function getStatus(path: string): Promise<boolean> {
   if (authToken) headers['Authorization'] = authToken;
 
   const fetchPromise = fetch(`${BASE_URL}${path}`, { method: 'GET', headers }).then(async response => {
-    if (!response.ok) return false;
+    if (response.status === 401) {
+      if (shouldForceLogoutForApi(path, Boolean(authToken))) notifyUnauthorized();
+      return false;
+    }
     try {
       const data: CommandResult<unknown> = await response.json();
+      const code = data.errorCode ?? 0;
+      if (
+        Boolean(authToken)
+        && shouldForceLogoutForApi(path, true)
+        && isUnauthorizedApiErrorCode(code)
+      ) {
+        notifyUnauthorized();
+        return false;
+      }
+      if (!response.ok) return false;
       return Boolean(data.success);
     } catch {
       return false;

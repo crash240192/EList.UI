@@ -5,7 +5,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
 import { RequireAuth } from '@/features/auth/RequireAuth';
-import { setApiErrorHandler } from '@/shared/api/client';
+import { reconcileClientAuthSession, setApiErrorHandler } from '@/shared/api/client';
 import {
   isPublicAuthRoute,
   requiresAuthRoute,
@@ -15,6 +15,12 @@ import { useAuthStore, useToastStore } from '@/app/store';
 import { ToastContainer } from '@/shared/ui/Toast/Toast';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { lazyWithRetry } from '@/shared/lib/lazyWithRetry';
+
+// Мёртвый auth-cookie (нет client hash / смена app version) → сразу гостевой режим,
+// до UserAgreementsGate и фоновых API, чтобы не всплывал ложный re-consent.
+if (reconcileClientAuthSession() === 'cleared') {
+  useAuthStore.getState().logout();
+}
 
 const HomePage        = lazyWithRetry(() => import('@/pages/home/HomePage'));
 const EventPage       = lazyWithRetry(() => import('@/pages/event/EventPage'));
@@ -101,19 +107,19 @@ const router = createBrowserRouter([
 ]);
 
 // 401 / протухший токен: сброс сессии.
-// На /login уводим только с маршрутов, где вход обязателен (RequireAuth).
-// Карта, событие, профиль, 404 и т.п. — остаёмся на месте.
+// С защищённых маршрутов — на главную (анонимный просмотр) + диалог входа,
+// а не жёстко на /login: базовый функционал должен оставаться доступен гостю.
 registerSessionUnauthorizedHandler(() => {
   const path = window.location.pathname;
-  const mustLogin = requiresAuthRoute(path);
+  const mustPromptLogin = requiresAuthRoute(path);
   useAuthStore.getState().logout();
 
-  if (mustLogin) {
-    const loginPath = '/login';
-    router.navigate(loginPath, { replace: true, state: { from: path } });
+  if (mustPromptLogin) {
+    const from = `${path}${window.location.search}`;
+    router.navigate('/', { replace: true, state: { authRequiredFrom: from } });
     window.setTimeout(() => {
       if (requiresAuthRoute(window.location.pathname)) {
-        window.location.replace(loginPath);
+        window.location.replace('/');
       }
     }, 150);
     return;

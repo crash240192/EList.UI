@@ -5,6 +5,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useThemeStore, useAuthStore, useFiltersStore, usePlatformRoleStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
 import { CreateEventDraftModal } from '@/shared/ui/CreateEventDraftModal/CreateEventDraftModal';
+import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
 import { getStoredAccountId } from '@/entities/user/api';
 import { clearCreateEventDraft, loadCreateEventDraft } from '@/pages/create-event/createEventDraft';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
@@ -49,6 +50,8 @@ export function AppLayout() {
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
   const [draftResumeOpen, setDraftResumeOpen] = useState(false);
   const [showTicketsNav,  setShowTicketsNav]  = useState(false);
+  const [authRequiredOpen, setAuthRequiredOpen] = useState(false);
+  const [authRequiredFrom, setAuthRequiredFrom] = useState<string | undefined>();
   const { theme, toggleTheme } = useThemeStore();
   const { isAuthenticated, logout, accountId } = useAuthStore();
   const location = useLocation();
@@ -63,6 +66,16 @@ export function AppLayout() {
   const moderationCount = usePlatformModerationCount(authenticated && hasPlatformAccess);
   const { filters } = useFiltersStore();
   const navigate = useNavigate();
+
+  // Гость попал на RequireAuth / протухшая сессия на ЛК → остаёмся на карте + диалог входа
+  useEffect(() => {
+    const state = location.state as { authRequiredFrom?: string } | null;
+    const from = state?.authRequiredFrom;
+    if (!from || authenticated) return;
+    setAuthRequiredFrom(from);
+    setAuthRequiredOpen(true);
+    navigate(location.pathname + location.search, { replace: true, state: {} });
+  }, [authenticated, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (!authenticated) {
@@ -296,6 +309,14 @@ export function AppLayout() {
           onCancel={() => setDraftResumeOpen(false)}
         />
       )}
+
+      <AuthRequiredDialog
+        open={authRequiredOpen}
+        onClose={() => setAuthRequiredOpen(false)}
+        title="Требуется авторизация"
+        message="Войдите в аккаунт, чтобы открыть этот раздел. Поиск событий доступен без входа."
+        returnTo={authRequiredFrom}
+      />
 
       {/* ---- Main ---- */}
       <main className={styles.main}>
