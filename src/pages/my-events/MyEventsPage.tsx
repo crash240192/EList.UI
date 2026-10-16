@@ -1,10 +1,19 @@
 // pages/my-events/MyEventsPage.tsx
 
-import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
+import { useState, useMemo, useEffect, useRef, Fragment, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { EventCard } from '@/entities/event';
+import { EventCard, type IEvent } from '@/entities/event';
 import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
+import { PinMenuGlyph } from '@/entities/event/ui/PinnedCoverBadge/PinnedCoverBadge';
 import { useMyEvents, type OwnerFilter } from '@/features/event-list/useMyEvents';
+import { useMyEventsPinsStore } from '@/features/event-list/myEventsPinsStore';
+import {
+  EMPTY_IDS,
+  EMPTY_SNAPSHOTS,
+  myEventsQueryIsNarrowed,
+  orderPinnedMyEvents,
+} from '@/features/event-list/orderPinnedMyEvents';
 import { FilterBar } from '@/features/event-filters/FilterBar';
 import { useMyEventsFiltersStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
@@ -14,6 +23,7 @@ import type { IEventsSearchParams, EventViewMode } from '@/entities/event';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
 import { TabBar } from '@/shared/ui/TabBar';
+import { PinHit } from './PinHit';
 import styles from './MyEventsPage.module.css';
 
 type Tab = 'active' | 'archive';
@@ -74,8 +84,18 @@ export default function MyEventsPage() {
   const [showCancelled, setShowCancelled] = useState(readShowCancelled);
 
   const listElRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const scrollSaveTimerRef = useRef<number | null>(null);
   const prevListKeyRef = useRef<string | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; eventId: string } | null>(null);
+
+  const pinEntry = useMyEventsPinsStore((s) => (accountId ? s.byAccount[accountId] : undefined));
+  const pinEvent = useMyEventsPinsStore((s) => s.pin);
+  const unpinEvent = useMyEventsPinsStore((s) => s.unpin);
+  const rememberPin = useMyEventsPinsStore((s) => s.remember);
+  const pinnedIds = pinEntry?.ids ?? EMPTY_IDS;
+  const pinSnapshots = pinEntry?.snapshots ?? EMPTY_SNAPSHOTS;
+  const pinnedSet = useMemo(() => new Set(pinnedIds), [pinnedIds]);
 
   const handleSearch = () => setSearchVersion(v => v + 1);
 
@@ -104,6 +124,71 @@ export default function MyEventsPage() {
     extraParams,
     tab,
   });
+
+  const orderedEvents = useMemo(() => orderPinnedMyEvents({
+    events,
+    ids: pinnedIds,
+    snapshots: pinSnapshots,
+    allowSnapshots: !myEventsQueryIsNarrowed(extraParams),
+    tab,
+    owner: ownerFilter,
+    showCancelled,
+  }), [events, pinnedIds, pinSnapshots, extraParams, tab, ownerFilter, showCancelled]);
+
+  useEffect(() => {
+    if (!accountId) return;
+    for (const event of events) {
+      if (pinnedSet.has(event.id)) rememberPin(accountId, event);
+    }
+  }, [accountId, events, pinnedSet, rememberPin]);
+
+  const openMenu = useCallback((event: IEvent, x: number, y: number) => {
+    const width = 180;
+    const height = 52;
+    const margin = 8;
+    setMenu({
+      eventId: event.id,
+      x: Math.max(margin, Math.min(x, window.innerWidth - width - margin)),
+      y: Math.max(margin, Math.min(y, window.innerHeight - height - margin)),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (menuRef.current?.contains(e.target as Node)) return;
+      setMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenu(null);
+    };
+    const onScroll = () => setMenu(null);
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    const list = listElRef.current;
+    list?.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+      list?.removeEventListener('scroll', onScroll);
+    };
+  }, [menu]);
+
+  const toggleMenuPin = () => {
+    if (!menu || !accountId) return;
+    const alreadyPinned = pinnedSet.has(menu.eventId);
+    if (alreadyPinned) unpinEvent(accountId, menu.eventId);
+    else {
+      const event = orderedEvents.find((item) => item.id === menu.eventId);
+      if (event) pinEvent(accountId, event);
+    }
+    setMenu(null);
+    if (!alreadyPinned) {
+      requestAnimationFrame(() => {
+        listElRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
+  };
 
   const isReady = !accountLoading && !!accountId;
 
@@ -231,7 +316,7 @@ export default function MyEventsPage() {
               <div key={i} className={styles.skeleton} />
             ))}
           </div>
-        ) : events.length === 0 ? (
+        ) : orderedEvents.length === 0 ? (
           <div className={styles.empty}>
             <p>{tab === 'active' ? 'Нет активных событий' : 'Прошедшие пусты'}</p>
             {tab === 'active' && (
@@ -242,40 +327,44 @@ export default function MyEventsPage() {
           </div>
         ) : isMobileList ? (
           <EventList>
-            {events.map((event, idx) => (
+            {orderedEvents.map((event, idx) => (
               <Fragment key={event.id}>
-                {cancelledLabel(event) ? (
-                  <div className={styles.cancelledHost}>
-                    <div className={styles.cancelledGray}>
-                      <EventListItem
-                        event={event}
-                        bleedCover
-                        onClick={() => navigate(`/event/${event.id}`)}
-                        className={event.isOrganizer ? styles.cardOrganizer : undefined}
-                        header={
-                          event.isOrganizer ? (
-                            <span className={styles.organizerTagInline}>Организатор</span>
-                          ) : undefined
-                        }
-                      />
+                <PinHit onOpenMenu={(x, y) => openMenu(event, x, y)}>
+                  {cancelledLabel(event) ? (
+                    <div className={styles.cancelledHost}>
+                      <div className={styles.cancelledGray}>
+                        <EventListItem
+                          event={event}
+                          bleedCover
+                          pinned={pinnedSet.has(event.id)}
+                          onClick={() => navigate(`/event/${event.id}`)}
+                          className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                          header={
+                            event.isOrganizer ? (
+                              <span className={styles.organizerTagInline}>Организатор</span>
+                            ) : undefined
+                          }
+                        />
+                      </div>
+                      <div className={`${styles.cancelledOnPhoto} ${styles.cancelledOnPhotoRow}`}>
+                        <span className={styles.cancelledPill}>{cancelledLabel(event)}</span>
+                      </div>
                     </div>
-                    <div className={`${styles.cancelledOnPhoto} ${styles.cancelledOnPhotoRow}`}>
-                      <span className={styles.cancelledPill}>{cancelledLabel(event)}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <EventListItem
-                    event={event}
-                    bleedCover
-                    onClick={() => navigate(`/event/${event.id}`)}
-                    className={event.isOrganizer ? styles.cardOrganizer : undefined}
-                    header={
-                      event.isOrganizer ? (
-                        <span className={styles.organizerTagInline}>Организатор</span>
-                      ) : undefined
-                    }
-                  />
-                )}
+                  ) : (
+                    <EventListItem
+                      event={event}
+                      bleedCover
+                      pinned={pinnedSet.has(event.id)}
+                      onClick={() => navigate(`/event/${event.id}`)}
+                      className={event.isOrganizer ? styles.cardOrganizer : undefined}
+                      header={
+                        event.isOrganizer ? (
+                          <span className={styles.organizerTagInline}>Организатор</span>
+                        ) : undefined
+                      }
+                    />
+                  )}
+                </PinHit>
                 {shouldInsertAdAfterIndex(idx) && (
                   <AdSlot key={`ad-${event.id}`} />
                 )}
@@ -284,15 +373,18 @@ export default function MyEventsPage() {
           </EventList>
         ) : (
           <div className={styles.grid}>
-            {events.map((event, idx) => (
+            {orderedEvents.map((event, idx) => (
               <Fragment key={event.id}>
-                <div className={styles.cardWrap}>
+                <PinHit className={styles.cardWrap} onOpenMenu={(x, y) => openMenu(event, x, y)}>
                   <div className={cancelledLabel(event) ? styles.cancelledGray : undefined}>
                     {event.isOrganizer && (
-                      <span className={styles.organizerTag}>Организатор</span>
+                      <span className={`${styles.organizerTag} ${pinnedSet.has(event.id) ? styles.organizerTagShifted : ''}`}>
+                        Организатор
+                      </span>
                     )}
                     <EventCard.Preset
                       event={event}
+                      pinned={pinnedSet.has(event.id)}
                       onClick={() => navigate(`/event/${event.id}`)}
                       className={event.isOrganizer ? styles.cardOrganizer : undefined}
                     />
@@ -302,7 +394,7 @@ export default function MyEventsPage() {
                       <span className={styles.cancelledPill}>{cancelledLabel(event)}</span>
                     </div>
                   )}
-                </div>
+                </PinHit>
                 {shouldInsertAdAfterIndex(idx) && (
                   <AdSlot key={`ad-${event.id}`} />
                 )}
@@ -317,6 +409,21 @@ export default function MyEventsPage() {
           </div>
         )}
       </div>
+
+      {menu && createPortal(
+        <div
+          ref={menuRef}
+          className={styles.pinMenu}
+          style={{ left: menu.x, top: menu.y }}
+          role="menu"
+        >
+          <button type="button" className={styles.pinMenuItem} role="menuitem" onClick={toggleMenuPin}>
+            <PinMenuGlyph />
+            {pinnedSet.has(menu.eventId) ? 'Открепить' : 'Закрепить'}
+          </button>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

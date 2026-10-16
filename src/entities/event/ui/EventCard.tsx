@@ -9,6 +9,7 @@ import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { getEventTypes, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
 import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
+import { PinnedCoverBadge } from '@/entities/event/ui/PinnedCoverBadge/PinnedCoverBadge';
 import styles from './EventCard.module.css';
 
 interface EventCardContextValue { event: IEvent; }
@@ -52,7 +53,7 @@ function EventCard({ event, onClick, className = '', children }: EventCardProps)
 }
 
 // ---- Cover ----
-function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
+function Cover({ fallbackGradient, pinned }: { fallbackGradient?: string; pinned?: boolean }) {
   const { event } = useEventCard();
   const gradient = fallbackGradient ?? getEventCoverBackground(event);
   const hasCover = !!(event.coverImageId || event.coverUrl);
@@ -82,6 +83,7 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
         />
       )}
       <div className={styles.coverTopLeft}>
+        {pinned && <PinnedCoverBadge />}
         <span className={styles.ageBadge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
         {event.parameters?.private && (
           <span className={styles.privateBadge} aria-label="Приватное">
@@ -166,11 +168,11 @@ function Rating() {
 }
 
 // ---- Preset ----
-interface PresetProps { event: IEvent; onClick?: (e: IEvent) => void; className?: string; }
-function Preset({ event, onClick, className }: PresetProps) {
+interface PresetProps { event: IEvent; onClick?: (e: IEvent) => void; className?: string; pinned?: boolean; }
+function Preset({ event, onClick, className, pinned }: PresetProps) {
   return (
     <EventCard event={event} onClick={onClick} className={className}>
-      <Cover />
+      <Cover pinned={pinned} />
       <Body>
         <Title />
         <Meta />

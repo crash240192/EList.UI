@@ -12,6 +12,7 @@ import {
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
+import { PinnedCoverBadge } from '@/entities/event/ui/PinnedCoverBadge/PinnedCoverBadge';
 import styles from './EventListItem.module.css';
 
 export type EventListUrgencyKind = 'hot' | 'soon' | 'ok';
@@ -33,6 +34,8 @@ interface EventListItemProps {
   showChevron?: boolean;
   /** На мобилке обложка на всю высоту слева с градиентным затуханием */
   bleedCover?: boolean;
+  /** Значок закрепа в левом верхнем углу обложки */
+  pinned?: boolean;
 }
 
 function ClockIcon() {
@@ -83,6 +86,7 @@ export function EventListItem({
   actions,
   showChevron,
   bleedCover,
+  pinned,
 }: EventListItemProps) {
   const params = getEventListParams(event);
   const price = formatEventListItemPrice(params.priceMin, params.priceMax);
@@ -133,6 +137,7 @@ export function EventListItem({
           ) : (
             <div className={styles.coverPlaceholder} />
           )}
+          {pinned && <PinnedCoverBadge placement="corner" />}
           {urgency && (
             <span className={`${styles.urgBadge} ${urgClass}`}>{urgency.label}</span>
           )}
