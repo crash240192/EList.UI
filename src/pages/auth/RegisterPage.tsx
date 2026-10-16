@@ -1,14 +1,15 @@
 // pages/auth/RegisterPage.tsx
 // Двухшаговая регистрация:
-//   Шаг 1 — логин, пароль, контакт, город + согласия (Consent / Agreement); Policy — ссылка без галочки
-//   Шаг 2 — ФИО (имя+фамилия обязательны), пол, дата рождения (обязательна, возраст ≥ 14)
-//   Финал — createAccount(acceptConsent/Agreement + person) → login → /activate или /
+//   Шаг 1 — логин, пароль, контакт, город + согласия (Consent / Agreement); проверка уникальности
+//   Шаг 2 — ФИО, пол, ДР + опциональное DistributionConsent
+//   Финал — createAccount → login → /activate или /
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   fetchContactTypes,
   createAccount,
+  checkRegistrationAvailability,
   type IContactType,
 } from '@/features/auth/registrationApi';
 import { login } from '@/features/auth/api';
@@ -29,6 +30,7 @@ import { Select } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
 import { birthDateToApiIso, getAge, todayLocalDateString } from '@/shared/lib/datetime';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import type { Gender } from '@/shared/api/types';
 import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { ApiError } from '@/shared/api/client';
@@ -44,6 +46,9 @@ import styles from './AuthPage.module.css';
 import regStyles from './RegisterPage.module.css';
 
 const MIN_REGISTRATION_AGE = 14;
+
+const DISTRIBUTION_DENY_MESSAGE =
+  'Без согласия на распространение персональных данных ваше ФИО, аватарка и прочие персональные данные будут скрыты от других пользователей. Отображаемые данные можно в любой момент переключить в настройках приватности вашего аккаунта. Продолжить регистрацию?';
 
 interface Step1Form {
   login: string;
@@ -100,10 +105,12 @@ export default function RegisterPage() {
   const [error, setError]       = useState<string | null>(null);
   const [showPass, setShowPass] = useState(false);
   const [ageBlocked, setAgeBlocked] = useState(false);
+  const [denyDialogOpen, setDenyDialogOpen] = useState(false);
 
   const [savedCreds, setSavedCreds] = useState({ login: '', password: '' });
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [distributionConsentAccepted, setDistributionConsentAccepted] = useState(false);
 
   const [docModal, setDocModal] = useState<{
     open: boolean;
@@ -218,17 +225,46 @@ export default function RegisterPage() {
     }
   };
 
-  // ---- Шаг 1: только валидация, без запросов на создание аккаунта ----
-  const handleStep1 = () => {
+  // ---- Шаг 1: валидация + проверка уникальности логина/контакта ----
+  const handleStep1 = async () => {
     const err = validateStep1();
     if (err) { setError(err); return; }
     setError(null);
-    setSavedCreds({ login: form1.login.trim(), password: form1.password });
-    if (finalCoords) {
-      cookies.set('elist_user_lat', finalCoords.lat.toFixed(6), 30);
-      cookies.set('elist_user_lng', finalCoords.lng.toFixed(6), 30);
+    setLoading(true);
+    try {
+      await checkRegistrationAvailability({
+        login: form1.login.trim(),
+        authorizationContactType: form1.contactTypeId,
+        authorizationContactValue: contactSubmitValue(selectedContactType, form1.contactValue),
+      });
+      setSavedCreds({ login: form1.login.trim(), password: form1.password });
+      if (finalCoords) {
+        cookies.set('elist_user_lat', finalCoords.lat.toFixed(6), 30);
+        cookies.set('elist_user_lng', finalCoords.lng.toFixed(6), 30);
+      }
+      setStep(2);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось проверить логин и контакт');
+    } finally {
+      setLoading(false);
     }
-    setStep(2);
+  };
+
+  const requestFinishRegistration = () => {
+    const step2Err = validateStep2();
+    if (step2Err) {
+      setError(step2Err);
+      if (form2.birthDate && getAge(form2.birthDate) < MIN_REGISTRATION_AGE) {
+        setAgeBlocked(true);
+      }
+      return;
+    }
+    setError(null);
+    if (!distributionConsentAccepted) {
+      setDenyDialogOpen(true);
+      return;
+    }
+    void finishRegistration();
   };
 
   // ---- Финал: createAccount(+person) → login → /activate или / ----
@@ -257,11 +293,12 @@ export default function RegisterPage() {
         passwordConfirmation:      form1.passwordConfirmation,
         authorizationContactType:  form1.contactTypeId,
         authorizationContactValue: contactSubmitValue(selectedContactType, form1.contactValue),
-        showContact:               true,
+        showContact:               distributionConsentAccepted,
         latitude:  finalCoords?.lat ?? undefined,
         longitude: finalCoords?.lng ?? undefined,
         acceptConsent:             true,
         acceptAgreement:           true,
+        acceptDistributionConsent: distributionConsentAccepted,
         firstName:                 form2.firstName.trim(),
         lastName:                  form2.lastName.trim(),
         patronymic:                form2.patronymic.trim() || undefined,
@@ -286,6 +323,16 @@ export default function RegisterPage() {
     } catch (e) {
       if (e instanceof ApiError && e.code === ApiErrorCode.UserUnderMinimumAge) {
         setAgeBlocked(true);
+        setError(e.message);
+        return;
+      }
+      // Если уникальность всё же упала на create — вернуть на шаг 1 с ошибкой
+      if (
+        e instanceof ApiError
+        && (e.code === ApiErrorCode.DublicateAccount
+          || e.code === ApiErrorCode.AuthorizationContactIsNotEmpty)
+      ) {
+        setStep(1);
         setError(e.message);
         return;
       }
@@ -344,7 +391,7 @@ export default function RegisterPage() {
                 <input className={styles.input} placeholder="Придумайте логин"
                   value={form1.login} autoFocus autoComplete="username"
                   autoCapitalize="none"
-                  onChange={set1('login')} onKeyDown={e => e.key === 'Enter' && handleStep1()} />
+                  onChange={set1('login')} onKeyDown={e => e.key === 'Enter' && void handleStep1()} />
               </Field>
 
               <Field label="Пароль">
@@ -353,7 +400,7 @@ export default function RegisterPage() {
                     type={showPass ? 'text' : 'password'}
                     placeholder="Не менее 6 символов" value={form1.password}
                     autoComplete="new-password" onChange={set1('password')}
-                    onKeyDown={e => e.key === 'Enter' && handleStep1()} />
+                    onKeyDown={e => e.key === 'Enter' && void handleStep1()} />
                   <PasswordVisibilityButton
                     visible={showPass}
                     onToggle={() => setShowPass(v => !v)}
@@ -371,7 +418,7 @@ export default function RegisterPage() {
                     value={form1.passwordConfirmation}
                     autoComplete="new-password"
                     onChange={set1('passwordConfirmation')}
-                    onKeyDown={e => e.key === 'Enter' && handleStep1()}
+                    onKeyDown={e => e.key === 'Enter' && void handleStep1()}
                   />
                   <PasswordVisibilityButton
                     visible={showPass}
@@ -473,10 +520,10 @@ export default function RegisterPage() {
             <button
               className={styles.submitBtn}
               style={{ marginTop: 14 }}
-              onClick={handleStep1}
-              disabled={!canProceedStep1}
+              onClick={() => { void handleStep1(); }}
+              disabled={!canProceedStep1 || loading}
             >
-              Далее →
+              {loading ? <span className={styles.spinner} /> : 'Далее →'}
             </button>
 
             <div className={styles.switchRow}>
@@ -520,12 +567,39 @@ export default function RegisterPage() {
                   name="bday"
                 />
               </Field>
+
+              <div className={regStyles.agreements}>
+                <label className={regStyles.agreeRow}>
+                  <input
+                    type="checkbox"
+                    checked={distributionConsentAccepted}
+                    onChange={e => setDistributionConsentAccepted(e.target.checked)}
+                  />
+                  <span>
+                    Согласен на{' '}
+                    <button
+                      type="button"
+                      className={regStyles.docLink}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void openDocument(DocumentType.DistributionConsent);
+                      }}
+                    >
+                      распространение персональных данных
+                    </button>
+                  </span>
+                </label>
+                <p className={regStyles.policyHint}>
+                  Без согласия ФИО, аватар и прочие персональные данные будут скрыты от других пользователей.
+                  Настройки можно изменить позже в приватности аккаунта.
+                </p>
+              </div>
             </div>
 
             <button
               className={styles.submitBtn}
               style={{ marginTop: 14 }}
-              onClick={() => { void finishRegistration(); }}
+              onClick={requestFinishRegistration}
               disabled={loading || !canFinishStep2}
             >
               {loading ? <span className={styles.spinner} /> : 'Сохранить и войти'}
@@ -550,6 +624,21 @@ export default function RegisterPage() {
           loading={docModal.loading}
           error={docModal.error}
           onClose={() => setDocModal(m => ({ ...m, open: false }))}
+        />
+      )}
+
+      {denyDialogOpen && (
+        <ConfirmDialog
+          title="Согласие на распространение"
+          message={DISTRIBUTION_DENY_MESSAGE}
+          confirmLabel="Да"
+          cancelLabel="Отмена"
+          variant="accent"
+          onCancel={() => setDenyDialogOpen(false)}
+          onConfirm={() => {
+            setDenyDialogOpen(false);
+            void finishRegistration();
+          }}
         />
       )}
     </div>

@@ -16,6 +16,8 @@ export const ApiErrorCode = {
   ActivationAttemptsExceed: 1005,
   PasswordsDontMatch: 1006,
   NewAndOldPasswordsMatch: 1007,
+  /** Контакт уже используется (в т.ч. как контакт авторизации). */
+  AuthorizationContactIsNotEmpty: 1008,
 
   DublicateAccount: 2001,
   AccountNotFound: 2002,

@@ -7,7 +7,7 @@ import styles from './AuthPage.module.css';
 interface AuthBrandProps {
   /** Подзаголовок под логотипом */
   subtitle?: boolean;
-  /** Кнопка возврата к карте событий */
+  /** Кнопка перехода к карте событий */
   showBrowseLink?: boolean;
 }
 
@@ -38,7 +38,7 @@ export function AuthBrand({ subtitle = true, showBrowseLink = true }: AuthBrandP
       {showBrowseLink && (
         <Link to="/" className={styles.browseBtn}>
           <MapIcon />
-          Вернуться к карте
+          Перейти к карте
         </Link>
       )}
     </div>
