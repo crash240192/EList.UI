@@ -47,12 +47,14 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 18px;
+  -webkit-touch-callout: none;
 }
 .logoLink {
   display: block;
   line-height: 0;
   border-radius: 8px;
   transition: opacity 0.15s;
+  -webkit-touch-callout: none;
 }
 .logoLink:hover { opacity: 0.85; }
 .logoLink:focus-visible {
@@ -64,18 +66,46 @@
   height: 68px;
   object-fit: contain;
   display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 .logoSub {
   font-size: 11px; color: var(--text-muted);
 }
-.browseLink {
-  margin-top: 2px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
+.browseBtn {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
   text-decoration: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
 }
-.browseLink:hover { text-decoration: underline; }
+.browseBtn:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+}
+.browseBtn:active { transform: scale(0.99); }
+.browseBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.browseBtnIcon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
 
 /* ── Заголовок ── */
 .heading {

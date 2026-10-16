@@ -3,6 +3,7 @@
 
 import { apiClient } from '@/shared/api/client';
 import type { Gender } from '@/shared/api/types';
+import type { IEventTicketTypeRequest } from './ticketTypesApi';
 
 /** Параметры мероприятия внутри тела шаблона / create */
 export interface ICreateEventParametersBody {
@@ -13,6 +14,7 @@ export interface ICreateEventParametersBody {
   allowedGender?: Gender | null;
   allowUsersToInvite?: boolean;
   ticketsEnabled?: boolean;
+  ticketTypes?: IEventTicketTypeRequest[] | null;
 }
 
 /** EventRequest внутри CreateEventRequest */

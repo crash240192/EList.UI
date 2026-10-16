@@ -18,6 +18,8 @@ import { cookies } from '@/shared/lib/cookies';
 import styles from './FilterBar.module.css';
 
 const DEFAULT_RADIUS_M = 25000; // 25 км по умолчанию
+/** Согласовано с API MaxEventCost */
+const MAX_EVENT_COST = 1_000_000;
 
 interface FilterBarProps {
   searchName: string;
@@ -275,10 +277,21 @@ export function FilterBar({ searchName, onSearchChange, viewMode, onViewModeChan
               onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
           </div>
           <div className={styles.epBlock}>
-            <span className={styles.epLabel}>Цена, ₽</span>
-            <input type="number" min={0} step={100} className={styles.epInput}
+            <span className={styles.epLabel}>Цена до, ₽</span>
+            <input type="number" min={0} max={MAX_EVENT_COST} step={100} className={styles.epInput}
               placeholder="Любая" value={filters.price ?? ''}
-              onChange={e => setFilter('price', e.target.value ? Number(e.target.value) : undefined)} />
+              onChange={e => {
+                if (!e.target.value) {
+                  setFilter('price', undefined);
+                  return;
+                }
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n)) {
+                  setFilter('price', undefined);
+                  return;
+                }
+                setFilter('price', Math.min(Math.max(n, 0), MAX_EVENT_COST));
+              }} />
           </div>
           <div className={styles.epBlock}>
             <span className={styles.epLabel}>Радиус, км</span>

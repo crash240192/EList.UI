@@ -16,6 +16,8 @@ export const ApiErrorCode = {
   ActivationAttemptsExceed: 1005,
   PasswordsDontMatch: 1006,
   NewAndOldPasswordsMatch: 1007,
+  /** Контакт уже используется (в т.ч. как контакт авторизации). */
+  AuthorizationContactIsNotEmpty: 1008,
 
   DublicateAccount: 2001,
   AccountNotFound: 2002,
@@ -26,6 +28,8 @@ export const ApiErrorCode = {
   PersonNotExists: 4000,
   InvalidFirstName: 4001,
   InvalidLastName: 4002,
+  /** Возраст меньше минимально допустимого для сервиса (14 лет). */
+  UserUnderMinimumAge: 4003,
 
   SubscriptionAlreadyExists: 5000,
   SubscriptionNotExists: 5001,
@@ -49,6 +53,7 @@ export const ApiErrorCode = {
   TariffNotAssigned: 10004,
   PaymentValueMustBeOverZero: 10005,
   AccountWalletAlreadyExists: 10006,
+  DefaultFreeTariffAlreadyExists: 10007,
 
   OrganizationNotFound: 11001,
   OrganizationPaymentRequired: 11006,
@@ -69,6 +74,8 @@ export const ApiErrorCode = {
   AgreementNotFound: 18001,
   UserMustBeAuthorized: 18002,
   AgreementDocumentNotFound: 18003,
+  /** Нет согласия на распространение ПДн для открытия данных другим */
+  DistributionConsentRequired: 18007,
 
   ContentReportReasonNotFound: 20001,
   ContentReportAlreadyExists: 20003,
@@ -92,4 +99,9 @@ export function isEventAccessDeniedCode(code: number): boolean {
 /** Re-consent / отсутствие актуального Consent или Agreement */
 export function isAgreementNotFoundCode(code: number): boolean {
   return code === ApiErrorCode.AgreementNotFound;
+}
+
+/** Нужно принять согласие на распространение ПДн */
+export function isDistributionConsentRequiredCode(code: number): boolean {
+  return code === ApiErrorCode.DistributionConsentRequired;
 }

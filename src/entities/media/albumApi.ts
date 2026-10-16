@@ -6,12 +6,17 @@ import type { EventListItemData } from '@/entities/event/lib/eventListItemUtils'
 import { normalizeEventListItem } from '@/entities/event/normalizeEventListItem';
 import { fetchEventParameters } from '@/entities/event/eventExtrasApi';
 import { fetchEvents } from '@/entities/event/api';
+import { createConcurrencyLimiter } from '@/shared/lib/concurrencyLimit';
 
+/** Параллельные filesByAlbumId на ленте мозаик — не больше 4. */
+const limitAlbumCoverList = createConcurrencyLimiter(4);
 export interface IAlbumParams {
   albumId?: string;
   headAlbum?: boolean;
   participantsReadonly?: boolean;
   private?: boolean;
+  /** 1 = DiscussionPhotos и т.п.; null/undefined — обычный альбом */
+  systemKind?: number | null;
 }
 
 export interface IAlbum {
@@ -23,6 +28,10 @@ export interface IAlbum {
   organizationId?: string;
   wallpaperId?: string;
   parameters?: IAlbumParams;
+}
+
+export function isSystemAlbum(album: IAlbum | null | undefined): boolean {
+  return album?.parameters?.systemKind != null;
 }
 
 export interface ICreateAlbumPayload {
@@ -61,10 +70,45 @@ export async function deleteAlbum(albumId: string): Promise<void> {
   await apiClient.delete(`/api/media/albums/${albumId}`);
 }
 
+function normalizeAlbumParams(raw: unknown): IAlbumParams | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const systemRaw = r.systemKind ?? r.SystemKind;
+  return {
+    albumId: r.albumId != null || r.AlbumId != null ? String(r.albumId ?? r.AlbumId) : undefined,
+    headAlbum: Boolean(r.headAlbum ?? r.HeadAlbum),
+    participantsReadonly: Boolean(r.participantsReadonly ?? r.ParticipantsReadonly),
+    private: Boolean(r.private ?? r.Private),
+    systemKind: systemRaw == null || systemRaw === '' ? null : Number(systemRaw),
+  };
+}
+
+function normalizeAlbum(raw: unknown): IAlbum {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const params = normalizeAlbumParams(r.parameters ?? r.Parameters);
+  return {
+    id: String(r.id ?? r.Id ?? ''),
+    name: String(r.name ?? r.Name ?? ''),
+    description: r.description != null || r.Description != null
+      ? String(r.description ?? r.Description)
+      : undefined,
+    eventId: r.eventId != null || r.EventId != null ? String(r.eventId ?? r.EventId) : undefined,
+    accountId: r.accountId != null || r.AccountId != null ? String(r.accountId ?? r.AccountId) : undefined,
+    organizationId: r.organizationId != null || r.OrganizationId != null
+      ? String(r.organizationId ?? r.OrganizationId)
+      : undefined,
+    wallpaperId: r.wallpaperId != null || r.WallpaperId != null
+      ? String(r.wallpaperId ?? r.WallpaperId)
+      : undefined,
+    parameters: params,
+  };
+}
+
 /** Получить альбомы события */
 export async function getEventAlbums(eventId: string): Promise<IAlbum[]> {
   const res = await apiClient.get<IAlbum[]>(`/api/media/albums/byEvent/${eventId}`);
-  return ((res as any).result ?? res) as IAlbum[];
+  const list = ((res as any).result ?? res) as unknown[];
+  return Array.isArray(list) ? list.map(normalizeAlbum) : [];
 }
 
 export interface IEventAlbumsGroup {
@@ -76,7 +120,7 @@ function normalizeAlbumsGroup(raw: unknown): IEventAlbumsGroup {
   const row = (raw ?? {}) as Record<string, unknown>;
   const event = row.event ?? row.Event;
   const albumsRaw = row.albums ?? row.Albums;
-  const albums = Array.isArray(albumsRaw) ? albumsRaw as IAlbum[] : [];
+  const albums = Array.isArray(albumsRaw) ? albumsRaw.map(normalizeAlbum) : [];
   return {
     event: normalizeEventListItem(event),
     albums,
@@ -201,12 +245,82 @@ export interface IAlbumFile {
   albumId: string;
 }
 
+interface AlbumFilesPage {
+  files: IAlbumFile[];
+  total: number;
+}
+
+function readAlbumFileTotal(value: unknown, fallback: number): number {
+  const numeric = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim() !== ''
+      ? Number(value)
+      : NaN;
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function parseAlbumFilesPage(res: unknown): AlbumFilesPage {
+  const data = (res as { result?: unknown } | null)?.result ?? res;
+  let files: IAlbumFile[] = [];
+  let declaredTotal: unknown;
+
+  if (Array.isArray(data)) {
+    files = data as IAlbumFile[];
+  } else if (data && typeof data === 'object') {
+    const page = data as { result?: unknown; items?: unknown; total?: unknown; Total?: unknown };
+    if (Array.isArray(page.result)) files = page.result as IAlbumFile[];
+    else if (Array.isArray(page.items)) files = page.items as IAlbumFile[];
+    declaredTotal = page.total ?? page.Total;
+  }
+
+  return {
+    files,
+    total: readAlbumFileTotal(declaredTotal, files.length),
+  };
+}
+
+async function fetchAlbumFilesPage(albumId: string, pageIndex: number, pageSize: number): Promise<AlbumFilesPage> {
+  const res = await apiClient.get<unknown>(
+    `/api/media/albums/filesByAlbumId/${albumId}?pageIndex=${pageIndex}&pageSize=${pageSize}`,
+  );
+  return parseAlbumFilesPage(res);
+}
+
 /** Получить файлы альбома */
 export async function getAlbumFiles(albumId: string, pageIndex = 1, pageSize = 50): Promise<IAlbumFile[]> {
-  const res = await apiClient.get<any>(`/api/media/albums/filesByAlbumId/${albumId}?pageIndex=${pageIndex}&pageSize=${pageSize}`);
-  const data = (res as any).result ?? res;
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.result)) return data.result;
-  if (Array.isArray(data?.items)) return data.items;
-  return [];
+  const page = await fetchAlbumFilesPage(albumId, pageIndex, pageSize);
+  return page.files;
+}
+
+/** Сколько фото в альбоме. pageSize=1: достаточно поля total. */
+export async function getAlbumFileCount(albumId: string): Promise<number> {
+  return limitAlbumCoverList(async () => {
+    const page = await fetchAlbumFilesPage(albumId, 1, 1);
+    return page.total;
+  });
+}
+
+/**
+ * Первые fileId и общее число фото одним запросом.
+ * Через очередь — на страницах со многими альбомами не роняем API/браузер.
+ */
+export async function getAlbumCoverPreview(
+  albumId: string,
+  limit = 4,
+): Promise<{ fileIds: string[]; total: number }> {
+  const safeLimit = Math.max(1, Math.min(limit, 4));
+  return limitAlbumCoverList(async () => {
+    const page = await fetchAlbumFilesPage(albumId, 1, safeLimit);
+    return {
+      fileIds: page.files.slice(0, safeLimit).map(file => file.fileId).filter(Boolean),
+      total: page.total,
+    };
+  });
+}
+
+/** Первые fileId для превью обложки/мозаики. */
+export async function getAlbumCoverFileIds(albumId: string, limit = 4): Promise<string[]> {
+  const preview = await getAlbumCoverPreview(albumId, limit);
+  return preview.fileIds;
 }

@@ -43,6 +43,21 @@ const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
 const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
 
+type CalMonth = 'prev' | 'cur' | 'next';
+interface CalCell { day: number; month: CalMonth }
+
+function cellDate(viewYear: number, viewMonth: number, cell: CalCell): Date {
+  if (cell.month === 'prev') return new Date(viewYear, viewMonth - 1, cell.day);
+  if (cell.month === 'next') return new Date(viewYear, viewMonth + 1, cell.day);
+  return new Date(viewYear, viewMonth, cell.day);
+}
+
+function sameCalendarDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
 // Колесо прокрутки для выбора часов/минут в попапе календаря
 function TimeWheel({ items, selected, onSelect, open }: {
   items: string[];
@@ -367,10 +382,14 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
     swipeStartX.current = null;
   };
 
-  const handleSelect = (day: number) => {
-    const d = new Date(viewYear, viewMonth, day);
+  const handleSelect = (cell: CalCell) => {
+    const d = cellDate(viewYear, viewMonth, cell);
     if (withTime) {
       d.setHours(parseInt(timeH, 10), parseInt(timeM, 10), 0, 0);
+    }
+    if (cell.month !== 'cur') {
+      setViewMonth(d.getMonth());
+      setViewYear(d.getFullYear());
     }
     setSelDate(d);
     if (!withTime) {
@@ -402,20 +421,19 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
   const offset   = firstDay === 0 ? 6 : firstDay - 1;
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const daysInPrev  = new Date(viewYear, viewMonth, 0).getDate();
-  const cells: { day: number; month: 'prev'|'cur'|'next' }[] = [];
+  const cells: CalCell[] = [];
   for (let i = offset - 1; i >= 0; i--) cells.push({ day: daysInPrev - i, month: 'prev' });
   for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: 'cur' });
   const needed = Math.ceil(cells.length / 7) * 7;
   for (let d = 1; cells.length < needed; d++) cells.push({ day: d, month: 'next' });
 
   const today = new Date();
-  const isToday    = (d: number) => d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
   const effectiveSel = selDate ?? (withTime ? today : null);
-  const isSelected = (d: number) => effectiveSel
-    ? d === effectiveSel.getDate() && viewMonth === effectiveSel.getMonth() && viewYear === effectiveSel.getFullYear()
-    : false;
-  const isDisabled = (d: number) => {
-    const dt = new Date(viewYear, viewMonth, d);
+  const isToday = (cell: CalCell) => sameCalendarDay(cellDate(viewYear, viewMonth, cell), today);
+  const isSelected = (cell: CalCell) =>
+    Boolean(effectiveSel && sameCalendarDay(cellDate(viewYear, viewMonth, cell), effectiveSel));
+  const isDisabled = (cell: CalCell) => {
+    const dt = cellDate(viewYear, viewMonth, cell);
     if (min) {
       const [my, mm, md] = min.split('-').map(Number);
       const minDt = new Date(my, mm - 1, md);
@@ -520,19 +538,22 @@ export function DatePicker({ value, onChange, withTime = false, placeholder, min
       <div className={styles.grid}
         onTouchStart={handleSwipeTouchStart}
         onTouchEnd={handleSwipeTouchEnd}>
-        {cells.map((c, i) => (
+        {cells.map((c, i) => {
+          const disabled = isDisabled(c);
+          return (
           <button key={i} type="button"
-            disabled={c.month !== 'cur' || isDisabled(c.day)}
-            onClick={() => c.month === 'cur' && !isDisabled(c.day) && handleSelect(c.day)}
+            disabled={disabled}
+            onClick={() => !disabled && handleSelect(c)}
             className={[
               styles.day,
-              c.month !== 'cur'                          ? styles.dayOther    : '',
-              c.month === 'cur' && isToday(c.day)        ? styles.dayToday    : '',
-              c.month === 'cur' && isSelected(c.day)     ? styles.daySelected : '',
-              c.month === 'cur' && isDisabled(c.day)     ? styles.dayDisabled : '',
+              c.month !== 'cur'      ? styles.dayOther    : '',
+              isToday(c)             ? styles.dayToday    : '',
+              isSelected(c)          ? styles.daySelected : '',
+              disabled               ? styles.dayDisabled : '',
             ].filter(Boolean).join(' ')}
           >{c.day}</button>
-        ))}
+          );
+        })}
       </div>
 
       {withTime && (

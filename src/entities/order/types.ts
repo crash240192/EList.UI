@@ -9,16 +9,36 @@ export type OrderStatus =
   | 'PartiallyRefunded'
   | 'Failed';
 
-export type TicketStatus = 'Issued' | 'Used' | 'Refunded' | 'Void';
+export type TicketStatus = 'Issued' | 'Used' | 'Refunded' | 'Void' | 'RefundPending';
+
+export type RefundStatus = 'Pending' | 'Succeeded' | 'Failed';
 
 export interface ITicket {
   id: string;
   orderId: string;
   eventId: string;
-  holderAccountId: string;
+  ticketTypeId?: string | null;
+  ticketTypeName?: string | null;
+  /** На desk может быть null при ticketDeskRevealHolder=false */
+  holderAccountId?: string | null;
+  holderLogin?: string | null;
+  holderDisplayName?: string | null;
   status: TicketStatus;
   code: string;
   issuedAt: string | null;
+  checkedInAt?: string | null;
+  checkedInByAccountId?: string | null;
+}
+
+export interface IRefund {
+  id: string;
+  orderId: string;
+  amount: number;
+  reason: string | null;
+  status: RefundStatus;
+  createDate: string;
+  providerRefundId: string | null;
+  ticketIds: string[];
 }
 
 export interface IOrder {
@@ -26,6 +46,8 @@ export interface IOrder {
   eventId: string;
   buyerAccountId: string;
   sellerOrganizationId: string | null;
+  ticketTypeId?: string | null;
+  ticketTypeName?: string | null;
   quantity: number;
   amountTotal: number;
   amountSeller: number;
@@ -39,6 +61,7 @@ export interface IOrder {
 
 export interface ICreateOrderRequest {
   eventId: string;
+  ticketTypeId?: string | null;
   quantity: number;
   idempotencyKey: string;
 }
@@ -65,6 +88,10 @@ export interface ICreateRefundRequest {
   orderId: string;
   ticketIds?: string[];
   reason?: string;
+}
+
+export interface ICancelRefundRequest {
+  refundId: string;
 }
 
 export interface ITicketCheckInRequest {

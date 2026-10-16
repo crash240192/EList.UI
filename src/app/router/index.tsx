@@ -5,13 +5,22 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
 import { RequireAuth } from '@/features/auth/RequireAuth';
-import { setApiErrorHandler } from '@/shared/api/client';
-import { isPublicAppRoute } from '@/shared/auth/unauthorized';
+import { reconcileClientAuthSession, setApiErrorHandler } from '@/shared/api/client';
+import {
+  isPublicAuthRoute,
+  requiresAuthRoute,
+} from '@/shared/auth/unauthorized';
 import { registerSessionUnauthorizedHandler } from '@/shared/auth/sessionUnauthorized';
 import { useAuthStore, useToastStore } from '@/app/store';
 import { ToastContainer } from '@/shared/ui/Toast/Toast';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { lazyWithRetry } from '@/shared/lib/lazyWithRetry';
+
+// Мёртвый auth-cookie (нет client hash / смена app version) → сразу гостевой режим,
+// до UserAgreementsGate и фоновых API, чтобы не всплывал ложный re-consent.
+if (reconcileClientAuthSession() === 'cleared') {
+  useAuthStore.getState().logout();
+}
 
 const HomePage        = lazyWithRetry(() => import('@/pages/home/HomePage'));
 const EventPage       = lazyWithRetry(() => import('@/pages/event/EventPage'));
@@ -25,7 +34,10 @@ const AdminPage       = lazyWithRetry(() => import('@/pages/admin/AdminPage'));
 const SettingsPage    = lazyWithRetry(() => import('@/pages/settings/SettingsPage'));
 const WalletPage      = lazyWithRetry(() => import('@/pages/wallet/WalletPage'));
 const MyTicketsPage   = lazyWithRetry(() => import('@/pages/my-tickets/MyTicketsPage'));
+const TicketsHubPage  = lazyWithRetry(() => import('@/pages/tickets/TicketsHubPage'));
+const TicketsDeskPage = lazyWithRetry(() => import('@/pages/tickets/TicketsDeskPage'));
 const PaymentsReturnPage = lazyWithRetry(() => import('@/pages/payments/PaymentsReturnPage'));
+
 const MyReportsPage   = lazyWithRetry(() => import('@/pages/my-reports/MyReportsPage'));
 const ReportsAgainstMePage = lazyWithRetry(() => import('@/pages/reports-against-me/ReportsAgainstMePage'));
 const CookiePolicyPage = lazyWithRetry(() => import('@/pages/legal/CookiePolicyPage'));
@@ -82,7 +94,10 @@ const router = createBrowserRouter([
       { path: 'settings',         element: <RequireAuth>{S(SettingsPage)}</RequireAuth> },
       { path: 'wallet',           element: <RequireAuth>{S(WalletPage)}</RequireAuth> },
       { path: 'my-tickets',       element: <RequireAuth>{S(MyTicketsPage)}</RequireAuth> },
+      { path: 'tickets',          element: <RequireAuth>{S(TicketsHubPage)}</RequireAuth> },
+      { path: 'tickets/desk',     element: <RequireAuth>{S(TicketsDeskPage)}</RequireAuth> },
       { path: 'payments/return',  element: <RequireAuth>{S(PaymentsReturnPage)}</RequireAuth> },
+
       { path: 'my-reports',       element: <RequireAuth>{S(MyReportsPage)}</RequireAuth> },
       { path: 'reports-against-me', element: <RequireAuth>{S(ReportsAgainstMePage)}</RequireAuth> },
       { path: 'cookies',          element: S(CookiePolicyPage) },
@@ -91,18 +106,31 @@ const router = createBrowserRouter([
   },
 ]);
 
-// 401 от API / WebSocket — сброс токена и редирект (кроме публичных auth-страниц)
+// 401 / протухший токен: сброс сессии.
+// С защищённых маршрутов — на главную (анонимный просмотр) + диалог входа,
+// а не жёстко на /login: базовый функционал должен оставаться доступен гостю.
 registerSessionUnauthorizedHandler(() => {
+  const path = window.location.pathname;
+  const mustPromptLogin = requiresAuthRoute(path);
   useAuthStore.getState().logout();
-  if (!isPublicAppRoute()) {
-    const loginPath = '/login';
-    router.navigate(loginPath, { replace: true });
-    // Если SPA-навигация не сработала (вызов из fetch/WS вне React) — жёсткий переход
+
+  if (mustPromptLogin) {
+    const from = `${path}${window.location.search}`;
+    router.navigate('/', { replace: true, state: { authRequiredFrom: from } });
     window.setTimeout(() => {
-      if (!isPublicAppRoute()) {
-        window.location.replace(loginPath);
+      if (requiresAuthRoute(window.location.pathname)) {
+        window.location.replace('/');
       }
     }, 150);
+    return;
+  }
+
+  // На публичных страницах не редиректим; подсказка, почему пропал «аватар».
+  if (!isPublicAuthRoute(path)) {
+    useToastStore.getState().add(
+      'Сессия истекла. Войдите снова, чтобы пользоваться личным кабинетом.',
+      'info',
+    );
   }
 });
 

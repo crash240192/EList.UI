@@ -2,15 +2,16 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { parseUserIdFromText } from '@/shared/lib/userId';
 import styles from './QrScanner.module.css';
 
 interface Props {
-  onDetected: (userId: string) => void;
+  onDetected: (value: string) => void;
   onClose: () => void;
+  /** Normalize/validate decoded text; return null to keep scanning. Default: trim non-empty. */
+  parse?: (decodedText: string) => string | null;
 }
 
-export function QrScanner({ onDetected, onClose }: Props) {
+export function QrScanner({ onDetected, onClose, parse }: Props) {
   const readerId = useId().replace(/:/g, '');
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,19 +22,25 @@ export function QrScanner({ onDetected, onClose }: Props) {
     const scanner = new Html5Qrcode(readerId);
     scannerRef.current = scanner;
 
+    const resolve = (decodedText: string): string | null => {
+      if (parse) return parse(decodedText);
+      const trimmed = decodedText.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
     const start = async () => {
       try {
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1 },
           (decodedText) => {
-            const userId = parseUserIdFromText(decodedText);
-            if (!userId) return;
+            const value = resolve(decodedText);
+            if (!value) return;
 
             void scanner.stop()
               .catch(() => {})
               .finally(() => {
-                if (!cancelled) onDetected(userId);
+                if (!cancelled) onDetected(value);
               });
           },
           () => {},
@@ -54,7 +61,7 @@ export function QrScanner({ onDetected, onClose }: Props) {
       }
       scannerRef.current = null;
     };
-  }, [readerId, onDetected]);
+  }, [readerId, onDetected, parse]);
 
   return (
     <div className={styles.wrap}>
