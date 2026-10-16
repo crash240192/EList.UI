@@ -3,6 +3,7 @@ import {
   getAlbumsByEvents,
   getAlbumsByOrganizationEvents,
   getAlbumCoverFileIds,
+  getAlbumFileCount,
   type IAlbum,
   type IEventAlbumsGroup,
 } from '@/entities/media/albumApi';
@@ -28,6 +29,15 @@ function albumCountLabel(count: number): string {
   return `${count} альбомов`;
 }
 
+function photoCountLabel(count: number): string {
+  const n = Math.abs(Math.trunc(count));
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} фотография`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} фотографии`;
+  return `${count} фотографий`;
+}
+
 function ClockIcon() {
   return (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -47,9 +57,11 @@ function ChevronUpIcon() {
 
 function EventGroupHeader({
   event,
+  photoTotal,
   onOpen,
 }: {
   event: EventListItemData;
+  photoTotal: number | null;
   onOpen: () => void;
 }) {
   const coverBg = getEventListCoverBackground(event);
@@ -77,10 +89,17 @@ function EventGroupHeader({
       </div>
       <div className={styles.eventInfo}>
         <div className={styles.eventName}>{event.name}</div>
-        {dateLabel && (
+        {(dateLabel || photoTotal != null) && (
           <div className={styles.eventDate}>
-            <ClockIcon />
-            {dateLabel}
+            {dateLabel && (
+              <>
+                <ClockIcon />
+                {dateLabel}
+              </>
+            )}
+            {photoTotal != null && (
+              <span className={styles.photoTotal}>{photoCountLabel(photoTotal)}</span>
+            )}
           </div>
         )}
       </div>
@@ -231,7 +250,23 @@ function EventGroupSection({
   onOpenEvent: (eventId: string) => void;
 }) {
   const { event, albums } = group;
+  const albumIdsKey = albums.map(album => album.id).join('\0');
+  const [photoTotal, setPhotoTotal] = useState<number | null>(null);
   const isMobile = useMediaQuery(media.mobile);
+
+  useEffect(() => {
+    let cancelled = false;
+    const ids = albumIdsKey ? albumIdsKey.split('\0') : [];
+    setPhotoTotal(null);
+    if (ids.length === 0) {
+      setPhotoTotal(0);
+      return;
+    }
+    Promise.all(ids.map(id => getAlbumFileCount(id).catch(() => 0))).then(counts => {
+      if (!cancelled) setPhotoTotal(counts.reduce((sum, count) => sum + count, 0));
+    });
+    return () => { cancelled = true; };
+  }, [albumIdsKey]);
   // Свёртка только на мобилке; на tablet/desktop всегда развёрнутые карточки.
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const expanded = !isMobile || mobileExpanded;
@@ -282,7 +317,7 @@ function EventGroupSection({
 
   return (
     <section className={styles.eventGroup}>
-      <EventGroupHeader event={event} onOpen={() => onOpenEvent(event.id)} />
+      <EventGroupHeader event={event} photoTotal={photoTotal} onOpen={() => onOpenEvent(event.id)} />
       <div className={gridClass}>
         {tiles}
       </div>

@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import {
   getEventAlbums,
   getAlbumFiles,
-  getAlbumCoverFileIds,
+  getAlbumCoverPreview,
   assignAlbumToEvent,
   deleteAlbum,
   type IAlbum,
@@ -107,6 +107,7 @@ interface AlbumCardProps {
 
 function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeRight = false, overflowCount = 0, onOpen, onEdit, onDelete }: AlbumCardProps) {
   const [coverIds, setCoverIds] = useState<string[]>([]);
+  const [photoCount, setPhotoCount] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const menuElRef = useRef<HTMLDivElement>(null);
@@ -118,9 +119,14 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
   useEffect(() => {
     let cancelled = false;
     setCoverIds([]);
-    getAlbumCoverFileIds(album.id, previewLimit).then(ids => {
-      if (!cancelled) setCoverIds(ids);
-    }).catch(() => {});
+    getAlbumCoverPreview(album.id, previewLimit).then(({ fileIds, total }) => {
+      if (!cancelled) {
+        setCoverIds(fileIds);
+        setPhotoCount(total);
+      }
+    }).catch(() => {
+      if (!cancelled) setPhotoCount(0);
+    });
     return () => { cancelled = true; };
   }, [album.id, coverVersion, previewLimit]);
 
@@ -201,6 +207,9 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
                 <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
             </div>
+          )}
+          {photoCount != null && (
+            <span className={styles.photoCount}>{photoCount}</span>
           )}
         </div>
         {!hideMeta && (
