@@ -110,12 +110,15 @@ export default function MyEventsPage() {
     startTime:  filters.startTime,
     endTime:    filters.endTime,
     price:      filters.price,
+    ageLimit:   filters.ageLimit,
+    adultOnly:  filters.adultOnly,
     // Галочка на всех вкладках: active: false включает отменённые в выдачу
     ...(showCancelled ? { active: false } : {}),
   // @ts-ignore
     _v:         searchVersion,
   }), [debouncedName, selectedCategories, selectedTypes,
        filters.startTime, filters.endTime, filters.price,
+       filters.ageLimit, filters.adultOnly,
        showCancelled, searchVersion]);
 
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useMyEvents({

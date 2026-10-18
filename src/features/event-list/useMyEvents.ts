@@ -43,7 +43,35 @@ function emptyLoading(): Record<EventsPhase, Record<OwnerFilter, boolean>> {
   };
 }
 
-// Параметры фильтра по вкладке
+/** Граница вкладки (сейчас) пересекается с «Дата от / до», не подменяя её. */
+function phaseTimeParams(
+  phase: EventsPhase,
+  extra: Partial<IEventsSearchParams>,
+  nowMs: number,
+): Pick<IEventsSearchParams, 'startTime' | 'endTime' | 'orderBy'> {
+  const userStartMs = extra.startTime ? Date.parse(extra.startTime) : NaN;
+  const userEndMs = extra.endTime ? Date.parse(extra.endTime) : NaN;
+  const hasStart = Number.isFinite(userStartMs);
+  const hasEnd = Number.isFinite(userEndMs);
+
+  if (phase === 'active') {
+    const startMs = hasStart ? Math.max(userStartMs, nowMs) : nowMs;
+    return {
+      startTime: new Date(startMs).toISOString(),
+      ...(hasEnd ? { endTime: new Date(userEndMs).toISOString() } : {}),
+      orderBy: 'StartTime',
+    };
+  }
+
+  const endMs = hasEnd ? Math.min(userEndMs, nowMs) : nowMs;
+  return {
+    ...(hasStart && userStartMs < nowMs ? { startTime: new Date(userStartMs).toISOString() } : {}),
+    endTime: new Date(endMs).toISOString(),
+    orderBy: 'EndTime DESC',
+  };
+}
+
+// Параметры фильтра по вкладке владельца
 function ownerParams(
   filter: OwnerFilter,
   accountId: string
@@ -98,6 +126,8 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     startTime:  extraParams.startTime,
     endTime:    extraParams.endTime,
     price:      extraParams.price,
+    ageLimit:   extraParams.ageLimit,
+    adultOnly:  extraParams.adultOnly === true,
     includeInactive: extraParams.active === false,
   });
   const prevFilterKey = useRef(filterKey);
@@ -146,15 +176,13 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     try {
       const result = await fetchEvents({
         ...ownerParams(filter, accountId),
-        // Активные: startTime = сейчас (ещё идут или впереди) — ближайшие сверху
-        // Прошедшие: endTime = сейчас — только что закончившиеся сверху (EndTime DESC)
-        ...(phase === 'active'
-          ? { startTime: new Date().toISOString(), orderBy: 'StartTime' }
-          : { endTime: new Date().toISOString(), orderBy: 'EndTime DESC' }),
+        ...phaseTimeParams(phase, extraParams, Date.now()),
         name:       extraParams.name       || undefined,
         categories: extraParams.categories || undefined,
         types:      extraParams.types      || undefined,
-        price:      extraParams.price      || undefined,
+        ...(extraParams.price != null ? { price: extraParams.price } : {}),
+        ...(extraParams.ageLimit != null ? { ageLimit: extraParams.ageLimit } : {}),
+        ...(extraParams.adultOnly ? { adultOnly: true } : {}),
         ...(includeInactive ? { active: false } : {}),
         pageIndex:  page,
         pageSize:   PAGE_SIZE,

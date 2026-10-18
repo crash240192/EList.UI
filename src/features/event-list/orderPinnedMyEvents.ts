@@ -13,7 +13,9 @@ export function myEventsQueryIsNarrowed(params: Partial<IEventsSearchParams>): b
     || (params.types && params.types.length > 0)
     || params.startTime
     || params.endTime
-    || params.price != null,
+    || params.price != null
+    || params.ageLimit != null
+    || params.adultOnly === true,
   );
 }
 
