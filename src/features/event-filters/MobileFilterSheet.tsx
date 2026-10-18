@@ -184,7 +184,7 @@ export function MobileFilterSheet({
 
           {/* Возраст */}
           <div className={styles.section}>
-            <div className={styles.sectionLabel}>Возраст от</div>
+            <div className={styles.sectionLabel}>Возраст, от</div>
             <Select
               value={ageSelectValue}
               onChange={(v) => { void setAgeFilterValue(v); }}

@@ -1,5 +1,5 @@
 // features/event-filters/ageFilter.ts
-// Значения фильтра «Возраст от» / «только 18+»
+// Значения фильтра «Возраст, от» / «только 18+»
 
 import type { IEventsSearchParams } from '@/entities/event';
 import { EVENT_AGE_LIMIT_OPTIONS } from '@/shared/lib/ageLimit';
