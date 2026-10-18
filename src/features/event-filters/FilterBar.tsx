@@ -548,7 +548,7 @@ export function FilterBar({
               onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
           </div>
           <div className={styles.epBlock}>
-            <span className={styles.epLabel}>Возраст, до</span>
+            <span className={styles.epLabel}>Возраст от</span>
             <Select
               className={styles.epAgeSelect}
               value={ageSelectValue}
