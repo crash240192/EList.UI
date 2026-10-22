@@ -65,10 +65,54 @@ export type {
 } from './eventExtrasApi';
 
 export {
+  fetchEventTicketStaff,
+  setEventTicketStaff,
+} from './ticketStaffApi';
+
+export type {
+  EventTicketStaffResponse,
+  EventTicketStaffItemRequest,
+} from './ticketStaffApi';
+
+export {
+  fetchEventTicketStats,
+  fetchOrganizationEventsTicketSummary,
+} from './ticketStatsApi';
+
+export type {
+  EventTicketStatsResponse,
+  EventTicketTypeStatsItem,
+  OrganizationEventTicketSummaryItem,
+} from './ticketStatsApi';
+
+export { fetchTicketDeskHub } from './ticketDeskHubApi';
+
+export type { TicketDeskHubItem } from './ticketDeskHubApi';
+
+export {
+  fetchEventTicketTypes,
+  createEmptyTicketTypeDraft,
+  ticketTypeDraftFromApi,
+  ticketTypeDraftCloneForSeed,
+  ticketTypeDraftFromRequest,
+  ticketTypeDraftsFromTemplateParams,
+  toTicketTypeRequests,
+  minActiveTicketTypePrice,
+  parseTicketTypePrice,
+} from './ticketTypesApi';
+
+export type {
+  IEventTicketType,
+  IEventTicketTypeRequest,
+  ITicketTypeDraft,
+} from './ticketTypesApi';
+
+export {
   fetchEventRating,
   voteEventRating,
   deleteEventRating,
   fetchOrganizerRating,
+  fetchOrganizationRating,
   RATING_COMMENT_MAX_LENGTH,
 } from './ratingApi';
 

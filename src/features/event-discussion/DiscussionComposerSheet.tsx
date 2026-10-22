@@ -13,7 +13,7 @@ interface DiscussionComposerSheetProps {
   onClose: () => void;
   replyingTo: string | null;
   onCancelReply: () => void;
-  onSubmit: (text: string) => Promise<void>;
+  onSubmit: (payload: { text: string; fileIds: string[] }) => Promise<void>;
   sheetRef?: RefObject<HTMLDivElement | null>;
   /** Колонка обсуждения в viewport — форма fixed внизу экрана с этой шириной */
   slot: DiscussionSlotRect;
@@ -54,10 +54,18 @@ export function DiscussionComposerSheet({
 
   if (!open) return null;
 
+  const narrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
+  const edge = narrow ? 4 : 8;
   const sheetStyle: CSSProperties = {
-    left: slot.width > 0 ? Math.max(8, slot.left) : 8,
-    width: slot.width > 0 ? Math.max(200, Math.min(slot.width, window.innerWidth - 16)) : Math.min(560, window.innerWidth - 16),
-    bottom: keyboardInset > 0 ? keyboardInset : 'max(12px, env(safe-area-inset-bottom, 0px))',
+    left: slot.width > 0 ? Math.max(edge, slot.left) : edge,
+    width: slot.width > 0
+      ? Math.max(200, Math.min(slot.width, window.innerWidth - edge * 2))
+      : Math.min(560, window.innerWidth - edge * 2),
+    bottom: keyboardInset > 0
+      ? keyboardInset
+      : (narrow
+        ? 'max(6px, env(safe-area-inset-bottom, 0px))'
+        : 'max(10px, env(safe-area-inset-bottom, 0px))'),
   };
 
   const dimStyle: CSSProperties = {};

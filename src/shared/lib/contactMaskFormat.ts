@@ -1,4 +1,12 @@
-// shared/lib/contactMaskFormat.ts — маски контактов (телефон, email) для визуального ввода
+// shared/lib/contactMaskFormat.ts
+//
+// Контракт с бэкендом:
+// - contact_types.mask в БД = regex ВАЛИДАЦИИ (не шаблон ввода).
+// - Визуальный ввод на фронте выбирается по kind (phone_ru | email | text).
+// - Перед отправкой значение приводится к канону, который проходит regex
+//   (для phone_ru — «+7 (XXX) XXX-XX-XX», как ContactValueNormalizer на API).
+
+export type ContactInputKind = 'phone_ru' | 'email' | 'text';
 
 export interface MaskSegment {
   type: 'filled' | 'ghost' | 'sep';
@@ -8,6 +16,8 @@ export interface MaskSegment {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_DIGIT_SLOTS = 10;
 const GHOST_CHAR = '_';
+/** Шаблон визуального ввода телефона (не путать с regex в БД). */
+export const PHONE_RU_INPUT_TEMPLATE = '+7 (###) ###-##-##';
 
 export function isRegexMask(mask: string): boolean {
   return (
@@ -20,23 +30,47 @@ export function isRegexMask(mask: string): boolean {
   );
 }
 
-/** Человекочитаемый шаблон или вывод из regex-маски API. */
-export function resolveContactMaskTemplate(mask: string | null, typeName = ''): string | null {
-  if (!mask) return null;
-
-  if (!isRegexMask(mask)) {
-    return mask;
-  }
-
+/** Определяет стратегию ввода/валидации по regex БД и имени типа. */
+export function resolveContactInputKind(mask: string | null, typeName = ''): ContactInputKind {
   const name = typeName.toLowerCase();
-  if (mask.includes('@') || name.includes('email') || name.includes('почт') || name.includes('mail')) {
-    return '_@_._';
+  if (
+    (mask?.includes('@') ?? false)
+    || name.includes('email')
+    || name.includes('почт')
+    || name.includes('mail')
+  ) {
+    return 'email';
   }
 
-  if (mask.includes('\\d') && !mask.includes('@')) {
-    return '+7 (###) ###-##-##';
+  if (
+    name.includes('телефон')
+    || name.includes('phone')
+    || name.includes('мобил')
+    || (mask != null && isPhoneValidationMask(mask))
+  ) {
+    return 'phone_ru';
   }
 
+  return 'text';
+}
+
+function isPhoneValidationMask(mask: string): boolean {
+  return (
+    isRegexMask(mask)
+    && mask.includes('\\d')
+    && !mask.includes('@')
+    && (mask.includes('+7') || mask.includes('\\+7'))
+  );
+}
+
+/**
+ * Шаблон визуальной маски (# = цифра) или null = обычный input.
+ * Email/text никогда не используют overlay-маску (на мобильных ломает caret/вёрстку).
+ */
+export function resolveContactMaskTemplate(mask: string | null, typeName = ''): string | null {
+  const kind = resolveContactInputKind(mask, typeName);
+  if (kind === 'phone_ru') return PHONE_RU_INPUT_TEMPLATE;
+  if (mask && !isRegexMask(mask) && mask.includes('#')) return mask;
   return null;
 }
 
@@ -48,10 +82,6 @@ function isPhoneTemplate(template: string): boolean {
   return template.includes('#');
 }
 
-function isEmailTemplate(template: string): boolean {
-  return template.includes('@') && template.includes('_');
-}
-
 export function phoneDigitsFromValue(value: string): string {
   const d = value.replace(/\D/g, '');
   if (d.startsWith('7') && d.length > 1) return d.slice(1, 11);
@@ -59,46 +89,54 @@ export function phoneDigitsFromValue(value: string): string {
   return d.slice(0, PHONE_DIGIT_SLOTS);
 }
 
-/** Маскированный формат для проверки regex API: +7 (XXX) XXX-XX-XX */
+/** Канон для API / regex БД: +7 (XXX) XXX-XX-XX */
 export function formatPhoneMasked(digits: string): string {
-  const d = digits.replace(/\D/g, '').slice(0, PHONE_DIGIT_SLOTS);
+  const d = phoneDigitsFromValue(digits);
   if (!d.length) return '';
   if (d.length < PHONE_DIGIT_SLOTS) return `+7${d}`;
   return `+7 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6, 8)}-${d.slice(8, 10)}`;
 }
 
-/** Компактный формат для отправки на API: +7XXXXXXXXXX */
+/** Компактный E.164-подобный: +7XXXXXXXXXX */
 export function phoneApiValue(digits: string): string {
-  const d = digits.replace(/\D/g, '').slice(0, PHONE_DIGIT_SLOTS);
+  const d = phoneDigitsFromValue(digits);
   return d.length ? `+7${d}` : '';
 }
 
-/** Сырые символы, которые вводит пользователь (без литералов маски). */
+/** Сырое значение поля формы (цифры для телефона, текст для остального). */
 export function extractRawFromValue(template: string, value: string): string {
   if (isPhoneTemplate(template)) {
-    if (value.startsWith('+') || value.startsWith('7') || value.startsWith('8')) {
-      return phoneDigitsFromValue(value);
-    }
-    return value.replace(/\D/g, '').slice(0, digitSlots(template));
-  }
-  if (isEmailTemplate(template)) {
-    return value.replace(/[^a-zA-Z0-9@._+-]/g, '');
+    return phoneDigitsFromValue(value);
   }
   return value;
 }
 
 /**
- * Собирает итоговую строку для отправки на API.
- * Вызывается при валидации и submit — не на каждый keystroke.
+ * Каноническое значение для API.
+ * phone_ru → masked под regex БД; остальное — trim.
  */
 export function composeContactValue(template: string, raw: string): string {
   if (isPhoneTemplate(template)) {
-    return phoneApiValue(raw);
+    return formatPhoneMasked(raw);
   }
-  if (isEmailTemplate(template)) {
-    return raw.replace(/[^a-zA-Z0-9@._+-]/g, '');
+  return raw.trim();
+}
+
+/** Канон по kind — единая точка для submit (без обязательного template). */
+export function canonicalizeContactValue(
+  value: string,
+  mask: string | null,
+  typeName = '',
+): string {
+  const kind = resolveContactInputKind(mask, typeName);
+  const trimmed = value.trim();
+  if (kind === 'phone_ru') {
+    return formatPhoneMasked(trimmed);
   }
-  return raw;
+  if (kind === 'email') {
+    return trimmed;
+  }
+  return trimmed;
 }
 
 export function processPhoneRaw(template: string, raw: string): string {
@@ -111,7 +149,7 @@ export function processEmailRaw(_template: string, raw: string): string {
 
 export function buildContactMaskSegments(template: string, raw: string): MaskSegment[] {
   if (isPhoneTemplate(template)) {
-    const digits = raw.replace(/\D/g, '').slice(0, digitSlots(template));
+    const digits = phoneDigitsFromValue(raw).slice(0, digitSlots(template));
     const segments: MaskSegment[] = [];
     let di = 0;
     for (const ch of template) {
@@ -128,16 +166,6 @@ export function buildContactMaskSegments(template: string, raw: string): MaskSeg
     return segments;
   }
 
-  if (isEmailTemplate(template)) {
-    if (!raw) {
-      return template.split('').map(ch => ({
-        type: ch === '_' ? 'ghost' : 'sep',
-        text: ch === '_' ? GHOST_CHAR : ch,
-      }));
-    }
-    return [{ type: 'filled', text: raw }];
-  }
-
   return raw
     ? [{ type: 'filled', text: raw }]
     : [{ type: 'ghost', text: GHOST_CHAR }];
@@ -147,10 +175,10 @@ export function buildContactDisplayValue(template: string, raw: string): string 
   return buildContactMaskSegments(template, raw).map(seg => seg.text).join('');
 }
 
-/** Позиция курсора в отображаемой строке — сразу после последнего введённого символа. */
+/** Курсор сразу после последней введённой цифры в шаблоне телефона. */
 export function getContactCaretIndex(template: string, raw: string): number {
   if (isPhoneTemplate(template)) {
-    const digits = raw.replace(/\D/g, '');
+    const digits = phoneDigitsFromValue(raw);
     let di = 0;
     let pos = 0;
     for (const ch of template) {
@@ -167,29 +195,31 @@ export function getContactCaretIndex(template: string, raw: string): number {
 
 export function validateContactValue(value: string, mask: string | null, typeName = ''): string | null {
   if (!value.trim()) return 'Введите контактные данные';
-  if (!mask) return null;
 
-  const template = resolveContactMaskTemplate(mask, typeName);
-  const raw = template ? extractRawFromValue(template, value) : value.trim();
-  const trimmed = template
-    ? (isPhoneTemplate(template) ? formatPhoneMasked(raw) : composeContactValue(template, raw))
-    : value.trim();
+  const kind = resolveContactInputKind(mask, typeName);
+  const canonical = canonicalizeContactValue(value, mask, typeName);
 
-  if (isRegexMask(mask)) {
+  if (kind === 'phone_ru') {
+    const digits = phoneDigitsFromValue(value);
+    if (digits.length !== PHONE_DIGIT_SLOTS) {
+      return 'Введите номер полностью: +7 (XXX) XXX-XX-XX';
+    }
+  }
+
+  if (kind === 'email') {
+    if (!EMAIL_REGEX.test(canonical)) {
+      return 'Введите корректный email';
+    }
+  }
+
+  // Regex из БД — источник истины для сервера; проверяем канон.
+  if (mask && isRegexMask(mask)) {
     try {
-      const regex = new RegExp(mask);
-      if (!regex.test(trimmed)) {
+      if (!new RegExp(mask).test(canonical)) {
         return 'Значение не соответствует требуемому формату';
       }
     } catch {
-      // невалидный regex
-    }
-    return null;
-  }
-
-  if (mask.includes('@')) {
-    if (!EMAIL_REGEX.test(trimmed)) {
-      return 'Значение не соответствует требуемому формату';
+      // битый regex в справочнике — не блокируем клиента сверх kind-проверок
     }
   }
 
@@ -200,9 +230,8 @@ export function getMaskInputMode(
   mask: string | null,
   typeName = '',
 ): 'search' | 'text' | 'none' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | undefined {
-  const template = resolveContactMaskTemplate(mask, typeName);
-  if (!template) return 'text';
-  if (template.includes('#')) return 'tel';
-  if (template.includes('@')) return 'email';
+  const kind = resolveContactInputKind(mask, typeName);
+  if (kind === 'email') return 'email';
+  if (kind === 'phone_ru') return 'tel';
   return 'text';
 }

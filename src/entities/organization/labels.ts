@@ -16,6 +16,7 @@ export function formatOrganizationRole(role: OrganizationRoleValue): string {
   switch (role) {
     case OrganizationRole.Owner: return 'Владелец';
     case OrganizationRole.Manager: return 'Администратор';
+    case OrganizationRole.TicketTaker: return 'Билетёр';
     default: return role;
   }
 }
@@ -53,11 +54,11 @@ export function formatRegistryStatus(status: string | null | undefined): string 
 
 export function formatOnboardingStatus(status: OrganizationOnboardingStatusValue | null | undefined): string {
   switch (status) {
-    case OrganizationOnboardingStatus.None: return 'Не начат';
-    case OrganizationOnboardingStatus.Pending: return 'В процессе';
-    case OrganizationOnboardingStatus.Active: return 'Активен';
-    case OrganizationOnboardingStatus.Rejected: return 'Отклонён';
-    default: return 'Не начат';
+    case OrganizationOnboardingStatus.None: return 'не начат';
+    case OrganizationOnboardingStatus.Pending: return 'в процессе';
+    case OrganizationOnboardingStatus.Active: return 'активен';
+    case OrganizationOnboardingStatus.Rejected: return 'отклонён';
+    default: return 'не начат';
   }
 }
 

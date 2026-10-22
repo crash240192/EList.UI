@@ -6,6 +6,28 @@
   align-items: center;
 }
 
+.rowFit {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  /* visible, чтобы тень плашки не срезалась прямоугольником ряда */
+  overflow: visible;
+  width: 100%;
+  min-width: 0;
+  /* chip ~22px + gap 5px between lines */
+  max-height: calc(22px * var(--fit-lines, 2) + 5px * (var(--fit-lines, 2) - 1));
+}
+
+.measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  display: flex;
+  gap: 5px;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+}
+
 .moreChip {
   display: inline-flex;
   align-items: center;
@@ -14,11 +36,11 @@
   height: 22px;
   padding: 0 8px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   font-family: inherit;
   line-height: 1;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -28,10 +50,9 @@
   background: rgba(0, 0, 0, 0.45);
   border: 0.5px solid rgba(255, 255, 255, 0.28);
   color: #fff;
-  backdrop-filter: blur(4px);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.45),
-    0 3px 10px rgba(0, 0, 0, 0.28);
+  filter:
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55))
+    drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
 }
 
 .moreOverlay:hover {

@@ -18,6 +18,9 @@ import {
 import styles from './MobileFilterSheet.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
+/** Согласовано с API MaxEventCost */
+const MAX_EVENT_COST = 1_000_000;
+
 interface MobileFilterSheetProps {
   open: boolean;
   onClose: () => void;
@@ -134,7 +137,7 @@ export function MobileFilterSheet({
                 const label = { today: 'Сегодня', tomorrow: 'Завтра', weekend: 'Выходные' }[key];
                 return (
                   <button key={key}
-                    className={`${styles.pill} ${quickDate === key ? styles.pillOn : ''}`}
+                    className={`noHoverGlow ${styles.pill} ${quickDate === key ? styles.pillOn : ''}`}
                     onClick={() => handleQuickDate(key)}>
                     {label}
                   </button>
@@ -143,12 +146,36 @@ export function MobileFilterSheet({
             </div>
           </div>
 
-          {/* Цена */}
+          {/* Стоимость */}
           <div className={styles.section}>
-            <div className={styles.sectionLabel}>Цена</div>
+            <div className={styles.sectionLabel}>Стоимость, до</div>
             <div className={styles.pills}>
+              <input
+                className={styles.priceInput}
+                type="number"
+                min={0}
+                max={MAX_EVENT_COST}
+                placeholder="Любая"
+                value={filters.price === 0 ? '' : (filters.price ?? '')}
+                disabled={filters.price === 0}
+                onFocus={e => e.currentTarget.select()}
+                onChange={e => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setFilter('price', undefined);
+                    return;
+                  }
+                  const n = Number(raw);
+                  if (!Number.isFinite(n)) {
+                    setFilter('price', undefined);
+                    return;
+                  }
+                  setFilter('price', Math.min(Math.max(n, 0), MAX_EVENT_COST));
+                }}
+              />
+              <span className={`${styles.priceRub} ${filters.price === 0 ? styles.priceRubOff : ''}`}>₽</span>
               <button
-                className={`${styles.pill} ${filters.price === 0 ? styles.pillOn : ''}`}
+                className={`noHoverGlow ${styles.pill} ${filters.price === 0 ? styles.pillOn : ''}`}
                 onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>
                 Бесплатно
               </button>
@@ -172,14 +199,14 @@ export function MobileFilterSheet({
             <div className={styles.pills}>
               {allTypes.slice(0, 5).map(t => (
                 <button key={t.id}
-                  className={`${styles.pill} ${draftTypes.includes(t.id) ? styles.pillOn : ''}`}
+                  className={`noHoverGlow ${styles.pill} ${draftTypes.includes(t.id) ? styles.pillOn : ''}`}
                   onClick={() => setDraftTypes(draftTypes.includes(t.id) ? draftTypes.filter(x => x !== t.id) : [...draftTypes, t.id])}>
                   {t.ico && <img src={icoToUrl(t.ico) ?? undefined} alt="" width={12} height={12} className="event-type-ico" style={{ objectFit: 'contain' }} />}
                   {t.name}
                 </button>
               ))}
               <button
-                className={`${styles.pill} ${(draftCats.length > 0 || draftTypes.length > allTypes.slice(0,5).filter(t => draftTypes.includes(t.id)).length) ? styles.pillOn : ''}`}
+                className={`noHoverGlow ${styles.pill} ${(draftCats.length > 0 || draftTypes.length > allTypes.slice(0,5).filter(t => draftTypes.includes(t.id)).length) ? styles.pillOn : ''}`}
                 onClick={() => setPickerOpen(true)}>
                 Все категории →
               </button>
@@ -207,13 +234,6 @@ export function MobileFilterSheet({
                 <span className={styles.fieldLabel}>Дата до</span>
                 <DatePicker withTime value={filters.endTime ?? ''} placeholder="Любая"
                   onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
-              </div>
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>Цена, ₽</span>
-                <input className={styles.input} type="number" min={0}
-                  placeholder="Любая" value={filters.price ?? ''}
-                  onFocus={e => e.currentTarget.select()}
-                  onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
               </div>
             </div>
           </div>

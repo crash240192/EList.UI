@@ -1,9 +1,10 @@
-// entities/organization/types.ts — модели по swagger EList API
+// entities/organization/types.ts — модели по swagger API
 
 /** Роль участника (OrganizationMemberRole) */
 export const OrganizationRole = {
   Owner: 'Owner',
   Manager: 'Manager',
+  TicketTaker: 'TicketTaker',
 } as const;
 
 export type OrganizationRoleValue = (typeof OrganizationRole)[keyof typeof OrganizationRole];
@@ -62,6 +63,11 @@ export interface OrganizationRequest {
 
 export interface AddOrganizationMemberRequest {
   accountId: string;
+}
+
+export interface UpdateOrganizationMemberRoleRequest {
+  accountId: string;
+  role: OrganizationRoleValue;
 }
 
 export interface TransferOwnershipRequest {
@@ -150,6 +156,13 @@ export interface OrganizationPayoutResponse {
   taxRegime?: string | null;
   provider?: PaymentProviderValue | null;
   onboardingStatus?: OrganizationOnboardingStatusValue | null;
+}
+
+export interface OrganizationProviderOnboardingResponse {
+  provider?: PaymentProviderValue | null;
+  providerSellerId?: string | null;
+  onboardingStatus: OrganizationOnboardingStatusValue;
+  confirmationUrl?: string | null;
 }
 
 export interface OrganizationResponse {

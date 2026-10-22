@@ -7,9 +7,17 @@
   flex-direction: column;
   height: 100%;
   height: 100svh; /* small viewport height — не меняется при появлении/скрытии адресной строки */
-  background: var(--bg);
+  background: transparent;
   color: var(--text-primary);
   overflow: hidden;
+}
+
+.appBg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--bg);
 }
 
 /* ---- Header ---- */
@@ -61,13 +69,23 @@
   display: flex; align-items: center;
   padding: 4px 2px; line-height: 1;
   transition: opacity var(--transition);
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
-.logo:hover { opacity: 0.8; }
+.logo:active { opacity: 0.8; }
+@media (hover: hover) {
+  .logo:hover { opacity: 0.8; }
+}
 .logoImg {
   width: 84px;
   height: 30px;
   object-fit: fill;
   display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 
 @media (max-width: 639px) {
@@ -295,6 +313,7 @@
   bottom: 0;
   overflow: hidden;
   left: var(--sidebar-icons);
+  z-index: 1;
   transition: left var(--transition);
 }
 

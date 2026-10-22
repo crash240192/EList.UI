@@ -2,6 +2,7 @@
 
 import { Link } from 'react-router-dom';
 import { usePageTitle } from '@/shared/hooks';
+import { BRAND_NAME } from '@/shared/config/brand';
 import styles from './LegalDocPage.module.css';
 
 export default function CookiePolicyPage() {
@@ -12,7 +13,7 @@ export default function CookiePolicyPage() {
       <article className={styles.card}>
         <h1 className={styles.title}>Политика использования cookies</h1>
         <p className={styles.lead}>
-          Сервис EList использует cookies и похожие технологии, чтобы обеспечивать
+          Сервис «{BRAND_NAME}» использует cookies и похожие технологии, чтобы обеспечивать
           вход в аккаунт, запоминать город и базовые настройки интерфейса.
         </p>
 

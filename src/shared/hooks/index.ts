@@ -1,6 +1,7 @@
 // shared/hooks/index.ts
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { BRAND_NAME, SITE_TITLE } from '@/shared/config/brand';
 
 // ---- useDebounce ----
 
@@ -15,12 +16,12 @@ export function useDebounce<T>(value: T, delay = 300): T {
 
 // ---- usePageTitle ----
 
-const BASE_TITLE = 'EList — События города';
+const BASE_TITLE = SITE_TITLE;
 
-/** Заголовок вкладки: «{title} — EList». Без аргумента / с пустым — базовый. */
+/** Заголовок вкладки: «{title} — Твой Спот». Без аргумента / с пустым — «События твоего города». */
 export function usePageTitle(title?: string | null) {
   useEffect(() => {
-    document.title = title ? `${title} — EList` : BASE_TITLE;
+    document.title = title ? `${title} — ${BRAND_NAME}` : BASE_TITLE;
     return () => { document.title = BASE_TITLE; };
   }, [title]);
 }
@@ -75,29 +76,46 @@ export function useLocalStorage<T>(
 
 // ---- useInfiniteScroll ----
 
+function scrollParent(el: HTMLElement): HTMLElement | null {
+  let cur = el.parentElement;
+  while (cur) {
+    const style = getComputedStyle(cur);
+    if (/(auto|scroll)/.test(style.overflowY)) return cur;
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
 export function useInfiniteScroll(
   callback: () => void,
   options: { threshold?: number; rootMargin?: string; enabled?: boolean } = {},
 ) {
   const { threshold = 0.1, rootMargin = '200px', enabled = true } = options;
-  const ref = useRef<HTMLDivElement | null>(null);
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  // Узел появляется и исчезает вместе с условием рендера (hasMore).
+  // Эффект на ref.current этот момент пропускает: ref ещё null, а повторно
+  // эффект не запускается, пока не сменится callback.
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    setNode(el);
+  }, []);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    if (!node) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && enabledRef.current) callback();
+        if (entries[0]?.isIntersecting && enabledRef.current) callbackRef.current();
       },
-      { threshold, rootMargin },
+      { threshold, rootMargin, root: scrollParent(node) },
     );
 
-    observer.observe(el);
+    observer.observe(node);
     return () => observer.disconnect();
-  }, [callback, threshold, rootMargin]);
+  }, [node, threshold, rootMargin, enabled]);
 
   return ref;
 }

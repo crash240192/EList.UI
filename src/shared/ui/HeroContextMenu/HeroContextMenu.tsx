@@ -9,6 +9,8 @@ interface HeroContextMenuProps {
   children: ReactNode;
   'aria-label'?: string;
   zIndexBase?: number;
+  /** Фиолетовая обводка, как у меню настроек пользователя. */
+  accent?: boolean;
 }
 
 export function HeroContextMenu({
@@ -18,6 +20,7 @@ export function HeroContextMenu({
   children,
   'aria-label': ariaLabel = 'Меню',
   zIndexBase = 300,
+  accent = false,
 }: HeroContextMenuProps) {
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
 
@@ -49,7 +52,7 @@ export function HeroContextMenu({
     <>
       <div className={styles.backdrop} style={{ zIndex: zIndexBase }} onClick={onClose} aria-hidden />
       <div
-        className={styles.menu}
+        className={accent ? `${styles.menu} ${styles.menuAccent}` : styles.menu}
         style={{ ...menuStyle, zIndex: zIndexBase + 1 }}
         role="menu"
         aria-label={ariaLabel}

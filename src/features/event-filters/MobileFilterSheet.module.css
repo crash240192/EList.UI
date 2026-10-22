@@ -65,7 +65,7 @@
 }
 
 /* Пресеты — таблетки */
-.pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .pill {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 7px 13px; border-radius: 20px; font-size: 13px;
@@ -73,8 +73,53 @@
   cursor: pointer; color: var(--text-secondary);
   transition: all .12s; white-space: nowrap;
 }
-.pillOn { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
-.pill:hover:not(.pillOn) { border-color: var(--accent); color: var(--accent); }
+.pill:hover,
+.pill:active,
+.pill:focus {
+  border-color: var(--border);
+  color: var(--text-secondary);
+  box-shadow: none;
+  background: none;
+}
+.pillOn,
+.pillOn:hover,
+.pillOn:active,
+.pillOn:focus {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+
+.priceInput {
+  width: 110px;
+  height: 34px;
+  box-sizing: border-box;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: inherit;
+  outline: none;
+  transition: border-color .15s, opacity .15s;
+}
+.priceInput:focus { border-color: var(--accent); }
+.priceInput:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+.priceRub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  user-select: none;
+  line-height: 34px;
+  padding: 0 1px;
+}
+.priceRubOff { opacity: 0.45; }
 
 /* Сетка параметров */
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

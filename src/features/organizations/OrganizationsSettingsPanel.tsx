@@ -17,6 +17,7 @@ import {
   OrganizationRole,
   OrganizationVerificationStatus,
   addOrganizationManager,
+  addOrganizationTicketTaker,
   createOrganization,
   fetchMyOrganizations,
   fetchOrganizationById,
@@ -36,6 +37,7 @@ import {
   removeOrganizationMember,
   saveOrganizationLegal,
   saveOrganizationPayout,
+  startOrganizationProviderOnboarding,
   setOrganizationActive,
   setOrganizationMemberActive,
   setOrganizationTicketsEnabled,
@@ -43,6 +45,7 @@ import {
   transferOrganizationOwnership,
   updateOrganization,
   updateOrganizationContact,
+  updateOrganizationMemberRole,
   type OrganizationLegalFormValue,
   type OrganizationLegalRequest,
   type OrganizationMemberResponse,
@@ -56,16 +59,24 @@ import type { IContactDataItem, IContactType } from '@/entities/user/profileApi'
 import type { IContactRequest } from '@/entities/user/settingsApi';
 import { fetchContactTypes } from '@/features/auth/registrationApi';
 import {
+  completeWalletDeposit,
+  createWalletDeposit,
   ensureOrganizationWallet,
+  fetchWalletDeposits,
+  fetchWalletTariffCharges,
   getWalletByOrganization,
   setWalletTariff,
   type IWallet,
+  type IWalletDeposit,
+  type IWalletTariffCharge,
 } from '@/entities/user/walletApi';
-import { tariffApi, type ITariff } from '@/entities/admin/adminApi';
+import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { AgreementDocumentModal } from '@/features/agreements';
 import { OrgAgreementAcceptDialog } from '@/features/agreements';
+import { TariffPlansPicker } from '@/features/wallet';
 import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
@@ -80,11 +91,30 @@ type View =
   | { kind: 'create' }
   | { kind: 'detail'; id: string };
 
-function formatOrgTariffLabel(t: ITariff): string {
-  const days = t.periodDays ?? t.period?.days;
-  const price = t.cost === 0 ? 'Бесплатно' : `${t.cost.toLocaleString('ru-RU')} ₽`;
-  const period = days != null ? `${days} дн.` : null;
-  return [t.name, price, period].filter(Boolean).join(' · ');
+type OrgDetailSection = 'profile' | 'members' | 'legal' | 'finance' | 'sales';
+
+function formatWalletDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/** Статус биллинга тарифа — та же логика, что на странице кошелька пользователя. */
+function orgTariffPeriodStatus(wallet: IWallet, tariff: ITariff | null): string | null {
+  if (wallet.tariffBillingStatus) return wallet.tariffBillingStatus;
+  if (!tariff) return null;
+  if (wallet.isSelectedTariffActive || tariff.cost <= 0) {
+    const next = wallet.nextChargeAt ? new Date(wallet.nextChargeAt).getTime() : NaN;
+    if (Number.isFinite(next) && next > Date.now()) {
+      return `Активен до ${formatWalletDateTime(wallet.nextChargeAt!)} · следующее списание`;
+    }
+    if (tariff.cost <= 0) return 'Бесплатный тариф активен';
+  }
+  return 'Выбранный тариф не активен — недостаточно средств. Действует бесплатный тариф по умолчанию.';
 }
 
 function statusClass(status: OrganizationResponse['verificationStatus']): string {
@@ -169,6 +199,19 @@ export function OrganizationsSettingsPanel({
   const [items, setItems] = useState<OrganizationResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -203,6 +246,7 @@ export function OrganizationsSettingsPanel({
   if (view.kind === 'create') {
     return (
       <OrganizationCreateView
+        ticketsEnabled={ticketsEnabled}
         onCancel={() => setView({ kind: 'list' })}
         onCreated={id => {
           void reload();
@@ -230,7 +274,9 @@ export function OrganizationsSettingsPanel({
           <div>
             <div className={styles.scardTitle}>Мои организации</div>
             <div className={styles.scardDesc}>
-              Создавайте организации, добавляйте администраторов и подключайте продажу билетов
+              {ticketsEnabled
+                ? 'Создавайте организации, добавляйте администраторов и подключайте продажу билетов'
+                : 'Создавайте организации и добавляйте администраторов для публикации анонсов'}
             </div>
           </div>
           {showHeaderCreate && (
@@ -246,7 +292,9 @@ export function OrganizationsSettingsPanel({
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>Организаций пока нет</p>
             <p className={styles.emptySub}>
-              Создайте организацию, чтобы публиковать анонсы от её имени и позже подключить продажу билетов
+              {ticketsEnabled
+                ? 'Создайте организацию, чтобы публиковать анонсы от её имени и позже подключить продажу билетов'
+                : 'Создайте организацию, чтобы публиковать анонсы от её имени'}
             </p>
             <Button onClick={() => setView({ kind: 'create' })}>Создать организацию</Button>
           </div>
@@ -271,7 +319,7 @@ export function OrganizationsSettingsPanel({
                       {!org.active && (
                         <span className={`${styles.badge} ${styles.badgeMute}`}>Неактивна</span>
                       )}
-                      {org.canSellTickets && (
+                      {ticketsEnabled && org.canSellTickets && (
                         <span className={`${styles.badge} ${styles.badgeOk}`}>Билеты</span>
                       )}
                     </div>
@@ -292,9 +340,11 @@ export function OrganizationsSettingsPanel({
 function OrganizationCreateView({
   onCancel,
   onCreated,
+  ticketsEnabled = false,
 }: {
   onCancel: () => void;
   onCreated: (id: string) => void;
+  ticketsEnabled?: boolean;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -367,7 +417,9 @@ function OrganizationCreateView({
         <div>
           <div className={styles.scardTitle}>Новая организация</div>
           <div className={styles.scardDesc}>
-            После создания вы станете владельцем. Продажа билетов подключается отдельно после верификации.
+            {ticketsEnabled
+              ? 'После создания вы станете владельцем. Продажа билетов подключается отдельно после верификации.'
+              : 'После создания вы станете владельцем и сможете публиковать анонсы от имени организации.'}
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onCancel}>Назад</Button>
@@ -465,7 +517,26 @@ function OrganizationDetailView({
   const [myAccountId, setMyAccountId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [section, setSection] = useState<'profile' | 'members' | 'legal' | 'requisites' | 'sales'>('profile');
+  const [section, setSection] = useState<OrgDetailSection>('profile');
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!ticketsEnabled && section === 'sales') {
+      setSection('profile');
+    }
+  }, [ticketsEnabled, section]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -546,8 +617,10 @@ function OrganizationDetailView({
               { id: 'profile' as const, label: 'Профиль' },
               { id: 'members' as const, label: 'Команда' },
               { id: 'legal' as const, label: 'Юридические данные' },
-              { id: 'requisites' as const, label: 'Реквизиты' },
-              { id: 'sales' as const, label: 'Продажа билетов' },
+              { id: 'finance' as const, label: 'Финансы' },
+              ...(ticketsEnabled
+                ? [{ id: 'sales' as const, label: 'Продажа билетов' }]
+                : []),
             ]
           ).map(t => (
             <button
@@ -580,6 +653,11 @@ function OrganizationDetailView({
             organizationId={organizationId}
             organizationName={org.name}
             isOwner={isOwner}
+            documentTypes={ORG_OFFER_DOCUMENT_TYPES}
+            title="Документы организации"
+            description={ticketsEnabled
+              ? 'Договор оферты с организацией. Соглашение на продажу билетов — на вкладке «Продажа билетов».'
+              : 'Договор оферты с организацией.'}
           />
         </>
       )}
@@ -588,11 +666,30 @@ function OrganizationDetailView({
           organizationId={organizationId}
           members={members}
           isOwner={isOwner}
+          canEdit={canEdit}
           myAccountId={myAccountId}
+          ticketsEnabled={ticketsEnabled}
           onChanged={reload}
         />
       )}
-      {(section === 'legal' || section === 'requisites' || section === 'sales') && (
+      {section === 'finance' && (
+        <>
+          <OrganizationWalletSection
+            organizationId={organizationId}
+            organizationName={org.name}
+            canEdit={canEdit}
+          />
+          <OrganizationBillingSection
+            view="finance"
+            organizationId={organizationId}
+            org={org}
+            isOwner={isOwner}
+            canEdit={canEdit}
+            onChanged={reload}
+          />
+        </>
+      )}
+      {(section === 'legal' || (section === 'sales' && ticketsEnabled)) && (
         <OrganizationBillingSection
           view={section}
           organizationId={organizationId}
@@ -631,13 +728,6 @@ function OrganizationProfileSection({
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const userCoords = getStoredUserCoords() ?? { lat: 55.7558, lng: 37.6173 };
 
-  const [wallet, setWallet] = useState<IWallet | null>(null);
-  const [orgTariffs, setOrgTariffs] = useState<ITariff[]>([]);
-  const [currentTariff, setCurrentTariff] = useState<ITariff | null>(null);
-  const [selectedTariffId, setSelectedTariffId] = useState('');
-  const [tariffLoading, setTariffLoading] = useState(true);
-  const [tariffSaving, setTariffSaving] = useState(false);
-
   useEffect(() => {
     setName(org.name);
     setDescription(org.description ?? '');
@@ -645,29 +735,6 @@ function OrganizationProfileSection({
     setLat(org.latitude ?? null);
     setLng(org.longitude ?? null);
   }, [org]);
-
-  const loadTariffState = useCallback(async () => {
-    setTariffLoading(true);
-    try {
-      const [w, tariffs] = await Promise.all([
-        getWalletByOrganization(org.id),
-        tariffApi.getAll(true).catch(() => [] as ITariff[]),
-      ]);
-      const sorted = [...tariffs].sort((a, b) => a.cost - b.cost);
-      setOrgTariffs(sorted);
-      setWallet(w);
-      const tariffId = w?.tariffId ?? null;
-      const matched = tariffId ? sorted.find(t => t.id === tariffId) ?? null : null;
-      setCurrentTariff(matched);
-      setSelectedTariffId(tariffId ?? '');
-    } finally {
-      setTariffLoading(false);
-    }
-  }, [org.id]);
-
-  useEffect(() => {
-    void loadTariffState();
-  }, [loadTariffState]);
 
   const handleSave = async () => {
     if (!canEdit || !name.trim()) return;
@@ -705,32 +772,7 @@ function OrganizationProfileSection({
     }
   };
 
-  const handleApplyTariff = async () => {
-    if (!canEdit || !selectedTariffId || selectedTariffId === currentTariff?.id) return;
-    setTariffSaving(true);
-    setMsg(null);
-    try {
-      const w = wallet?.id ? wallet : await ensureOrganizationWallet(org.id);
-      await setWalletTariff(w.id, selectedTariffId);
-      setWallet(w);
-      setMsg({ text: 'Тариф организации обновлён', ok: true });
-      await loadTariffState();
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Не удалось сменить тариф', ok: false });
-    } finally {
-      setTariffSaving(false);
-    }
-  };
-
   const initials = name.trim().slice(0, 2) || 'Орг';
-  const tariffOptions = orgTariffs.map(t => ({
-    value: t.id,
-    label: formatOrgTariffLabel(t),
-  }));
-  const canApplyTariff =
-    canEdit
-    && !!selectedTariffId
-    && selectedTariffId !== (currentTariff?.id ?? wallet?.tariffId ?? '');
 
   return (
     <div className={styles.scard}>
@@ -753,7 +795,10 @@ function OrganizationProfileSection({
           )}
           <div>
             <div className={styles.logoTitle}>Логотип</div>
-            <div className={styles.scardDesc}>JPG, PNG · до 5 МБ</div>
+            <div className={styles.scardDesc}>
+              JPG, PNG · до 5 МБ
+              {canEdit && <><br />Нажмите на логотип, чтобы выбрать кадр</>}
+            </div>
           </div>
         </div>
 
@@ -797,52 +842,6 @@ function OrganizationProfileSection({
               {lat != null && lng != null && (
                 <span className={styles.readonlyCoords}>{lat.toFixed(5)}, {lng.toFixed(5)}</span>
               )}
-            </div>
-          )}
-        </div>
-
-        <div className={styles.tariffBlock}>
-          <div className={styles.tariffCurrent}>
-            <span className={styles.tariffCurrentLabel}>Текущий тариф</span>
-            <span className={`${styles.tariffCurrentValue} ${!currentTariff ? styles.tariffCurrentMuted : ''}`}>
-              {tariffLoading
-                ? 'Загрузка...'
-                : currentTariff
-                  ? formatOrgTariffLabel(currentTariff)
-                  : wallet?.tariffId
-                    ? `Тариф выбран (id: ${wallet.tariffId.slice(0, 8)}…)`
-                    : 'Не выбран'}
-            </span>
-          </div>
-
-          <div className={styles.field}>
-            <span className={styles.fieldLabel}>Тариф организации</span>
-            {tariffLoading ? (
-              <div className={styles.tariffCurrentMuted}>Загрузка тарифов...</div>
-            ) : orgTariffs.length === 0 ? (
-              <div className={styles.tariffCurrentMuted}>
-                Нет доступных тарифов для организаций. Обратитесь к администратору.
-              </div>
-            ) : (
-              <Select
-                value={selectedTariffId}
-                disabled={!canEdit}
-                placeholder="Выберите тариф"
-                onChange={setSelectedTariffId}
-                options={tariffOptions}
-              />
-            )}
-          </div>
-
-          {canApplyTariff && (
-            <div className={styles.tariffApplyRow}>
-              <Button
-                size="sm"
-                loading={tariffSaving}
-                onClick={() => { void handleApplyTariff(); }}
-              >
-                Применить тариф
-              </Button>
             </div>
           )}
         </div>
@@ -1086,19 +1085,26 @@ function OrgContactForm({
   );
 }
 
-const ORG_DOCUMENT_TYPES: DocumentTypeValue[] = [
+const ORG_OFFER_DOCUMENT_TYPES: DocumentTypeValue[] = [
   DocumentType.OrganizationAgreement,
-  DocumentType.TicketingAgreement,
 ];
 
 function OrganizationAgreementsSection({
   organizationId,
   organizationName,
   isOwner,
+  documentTypes = ORG_OFFER_DOCUMENT_TYPES,
+  title = 'Документы организации',
+  description,
+  onChanged,
 }: {
   organizationId: string;
   organizationName: string;
   isOwner: boolean;
+  documentTypes?: DocumentTypeValue[];
+  title?: string;
+  description?: string;
+  onChanged?: () => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<{
@@ -1125,7 +1131,7 @@ function OrganizationAgreementsSection({
           document: IAgreementDocument | null;
           agreed: boolean | null;
         }[] = [];
-        for (const type of ORG_DOCUMENT_TYPES) {
+        for (const type of documentTypes) {
           const label =
             DOCUMENT_TYPE_LABELS.find(x => x.value === type)?.label ?? String(type);
           const [document, agreed] = await Promise.all([
@@ -1140,7 +1146,7 @@ function OrganizationAgreementsSection({
       }
     })();
     return () => { cancelled = true; };
-  }, [organizationId, reloadKey]);
+  }, [organizationId, reloadKey, documentTypes.join(',')]);
 
   const openRow = (row: (typeof rows)[number]) => {
     if (!row.document) return;
@@ -1155,11 +1161,8 @@ function OrganizationAgreementsSection({
   return (
     <div className={styles.scard}>
       <div className={styles.scardHead}>
-        <div className={styles.scardTitle}>Документы организации</div>
-        <div className={styles.scardDesc}>
-          Нажмите на документ, чтобы прочитать
-          {isOwner ? ' или принять согласие' : ''}
-        </div>
+        <div className={styles.scardTitle}>{title}</div>
+        {description && <div className={styles.scardDesc}>{description}</div>}
       </div>
       <div className={styles.formBody}>
         {loading ? (
@@ -1216,9 +1219,351 @@ function OrganizationAgreementsSection({
           onComplete={() => {
             setAcceptQueue([]);
             setReloadKey(k => k + 1);
+            onChanged?.();
           }}
         />
       )}
+    </div>
+  );
+}
+
+const TICKETING_DOCUMENT_TYPES: DocumentTypeValue[] = [
+  DocumentType.TicketingAgreement,
+];
+
+function OrganizationWalletSection({
+  organizationId,
+  organizationName,
+  canEdit,
+}: {
+  organizationId: string;
+  organizationName: string;
+  canEdit: boolean;
+}) {
+  const [wallet, setWallet] = useState<IWallet | null>(null);
+  const [orgTariffs, setOrgTariffs] = useState<ITariff[]>([]);
+  const [validators, setValidators] = useState<Record<string, ITariffValidator | null>>({});
+  const [selectedTariff, setSelectedTariff] = useState<ITariff | null>(null);
+  const [effectiveTariff, setEffectiveTariff] = useState<ITariff | null>(null);
+  const [pickedTariffId, setPickedTariffId] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpBusy, setTopUpBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [history, setHistory] = useState<{
+    id: string;
+    kind: 'in' | 'out' | 'tariff';
+    name: string;
+    meta: string;
+    amount: string;
+  }[]>([]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      let w = await getWalletByOrganization(organizationId);
+      if (!w) {
+        try {
+          w = await ensureOrganizationWallet(organizationId);
+        } catch {
+          w = null;
+        }
+      }
+      const tariffs = await tariffApi.getAll(true).catch(() => [] as ITariff[]);
+      const sorted = [...tariffs].sort((a, b) => a.cost - b.cost);
+      setOrgTariffs(sorted);
+      setWallet(w);
+      const selected = w?.tariffId ? sorted.find(t => t.id === w!.tariffId) ?? null : null;
+      const effective = w?.effectiveTariffId
+        ? sorted.find(t => t.id === w!.effectiveTariffId) ?? selected
+        : selected;
+      setSelectedTariff(selected);
+      setEffectiveTariff(effective);
+      setPickedTariffId(w?.tariffId ?? '');
+
+      const validatorEntries = await Promise.all(
+        sorted
+          .filter(t => t.validatorId)
+          .map(async t => {
+            const v = await tariffValidatorApi.getByTariff(t.id).catch(() => null);
+            return [t.id, v] as const;
+          }),
+      );
+      setValidators(Object.fromEntries(validatorEntries));
+
+      if (w?.id) {
+        const [deposits, charges] = await Promise.all([
+          fetchWalletDeposits(w.id).catch(() => [] as IWalletDeposit[]),
+          fetchWalletTariffCharges(w.id).catch(() => [] as IWalletTariffCharge[]),
+        ]);
+        const nameById = new Map(sorted.map(t => [t.id, t.name]));
+        const rows: {
+          id: string;
+          kind: 'in' | 'out' | 'tariff';
+          name: string;
+          meta: string;
+          amount: string;
+          sortAt: number;
+        }[] = [];
+        for (const d of deposits.filter(x => x.status === 'Succeeded')) {
+          const when = d.paidAt || d.createDate;
+          const sortAt = when ? new Date(when).getTime() : 0;
+          const balanceLabel = d.balanceAfter != null && Number.isFinite(d.balanceAfter)
+            ? `остаток ${d.balanceAfter.toLocaleString('ru-RU')} ₽`
+            : null;
+          rows.push({
+            id: `deposit-${d.id}`,
+            kind: 'in',
+            name: 'Пополнение тарифа',
+            meta: [when ? formatWalletDateTime(when) : '', 'Тариф организации', balanceLabel]
+              .filter(Boolean)
+              .join(' · '),
+            amount: `+ ${d.amount.toLocaleString('ru-RU')} ₽`,
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
+        for (const c of charges) {
+          const sortAt = c.chargedAt ? new Date(c.chargedAt).getTime() : 0;
+          const balanceLabel = Number.isFinite(c.balanceAfter)
+            ? `остаток ${c.balanceAfter.toLocaleString('ru-RU')} ₽`
+            : null;
+          rows.push({
+            id: `charge-${c.id}`,
+            kind: 'tariff',
+            name: nameById.get(c.tariffId)
+              ? `Тариф «${nameById.get(c.tariffId)}»`
+              : 'Списание тарифа',
+            meta: [c.chargedAt ? formatWalletDateTime(c.chargedAt) : '', 'Списание тарифа', balanceLabel]
+              .filter(Boolean)
+              .join(' · '),
+            amount: c.amount > 0
+              ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
+              : '0 ₽',
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
+        rows.sort((a, b) => b.sortAt - a.sortAt);
+        setHistory(rows.map(({ sortAt: _s, ...rest }) => rest));
+      } else {
+        setHistory([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [organizationId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleApplyTariff = async () => {
+    if (!canEdit || !pickedTariffId || pickedTariffId === wallet?.tariffId) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      const w = wallet?.id ? wallet : await ensureOrganizationWallet(organizationId);
+      const apiMsg = await setWalletTariff(w.id, pickedTariffId);
+      setMsg({ text: apiMsg || 'Тариф организации обновлён', ok: true });
+      await load();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось сменить тариф', ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTopUp = async () => {
+    if (!canEdit || topUpBusy) return;
+    const amount = Number(String(topUpAmount).replace(/\s/g, '').replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMsg({ text: 'Укажите сумму больше нуля', ok: false });
+      return;
+    }
+    setTopUpBusy(true);
+    setMsg(null);
+    try {
+      const w = wallet?.id ? wallet : await ensureOrganizationWallet(organizationId);
+      const returnUrl = `${window.location.origin}/payments/return`;
+      const result = await createWalletDeposit({
+        walletId: w.id,
+        amount,
+        returnUrl,
+      });
+      try {
+        sessionStorage.setItem('elist_pending_wallet_deposit', JSON.stringify({
+          depositId: result.deposit.id,
+          walletId: w.id,
+          providerPaymentId: result.providerPaymentId,
+          amount,
+        }));
+      } catch { /* ignore */ }
+
+      if (result.paidImmediately) {
+        setTopUpAmount('');
+        setMsg({ text: 'Баланс пополнен', ok: true });
+        await load();
+        return;
+      }
+
+      const confirmationUrl = result.confirmationUrl?.trim() || null;
+      if (confirmationUrl) {
+        let useInAppStub = false;
+        try {
+          const url = new URL(confirmationUrl, window.location.origin);
+          useInAppStub = url.searchParams.get('stub') === '1'
+            || url.pathname.includes('/payments/return');
+        } catch {
+          useInAppStub = false;
+        }
+        if (!useInAppStub) {
+          window.location.assign(confirmationUrl);
+          return;
+        }
+        window.location.assign(confirmationUrl.startsWith('http')
+          ? confirmationUrl
+          : `${window.location.origin}${confirmationUrl.startsWith('/') ? '' : '/'}${confirmationUrl}`);
+        return;
+      }
+
+      await completeWalletDeposit({
+        depositId: result.deposit.id,
+        providerPaymentId: result.providerPaymentId ?? undefined,
+      });
+      setTopUpAmount('');
+      setMsg({ text: 'Баланс пополнен', ok: true });
+      await load();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось создать пополнение', ok: false });
+    } finally {
+      setTopUpBusy(false);
+    }
+  };
+
+  const billingStatus = wallet
+    ? orgTariffPeriodStatus(wallet, selectedTariff)
+    : null;
+  const showFallback =
+    Boolean(wallet?.tariffId
+      && wallet.effectiveTariffId
+      && wallet.tariffId !== wallet.effectiveTariffId
+      && effectiveTariff);
+
+  if (loading) {
+    return (
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Баланс и тариф</div>
+        </div>
+        <div className={styles.formBody}>
+          <div className={styles.tariffCurrentMuted}>Загрузка...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.scard}>
+      <div className={styles.scardHead}>
+        <div className={styles.scardTitle}>Баланс и тариф</div>
+        <div className={styles.scardDesc}>
+          Тарифный кошелёк организации «{organizationName}» — та же логика, что у личного кошелька:
+          баланс только для оплаты тарифа платформы.
+        </div>
+      </div>
+      <div className={styles.formBody}>
+        <div className={styles.walletBalanceCard}>
+          <div className={styles.walletBalanceLabel}>Баланс</div>
+          <div className={styles.walletBalanceValue}>
+            {(wallet?.balance ?? 0).toLocaleString('ru-RU')}
+            <span className={styles.walletBalanceCurrency}>₽</span>
+          </div>
+          {billingStatus && (
+            <div className={styles.walletBalanceStatus}>{billingStatus}</div>
+          )}
+          {showFallback && effectiveTariff && (
+            <div className={styles.walletBalanceHint}>
+              Сейчас действуют лимиты тарифа «{effectiveTariff.name}»
+            </div>
+          )}
+        </div>
+
+        {canEdit && (
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Пополнение тарифа</span>
+            <div className={styles.topUpRow}>
+              <input
+                className={styles.input}
+                type="text"
+                inputMode="decimal"
+                placeholder="1 000"
+                value={topUpAmount}
+                disabled={topUpBusy}
+                onChange={e => setTopUpAmount(e.target.value)}
+                autoComplete="off"
+              />
+              <Button
+                size="sm"
+                loading={topUpBusy}
+                disabled={!topUpAmount.trim()}
+                onClick={() => { void handleTopUp(); }}
+              >
+                Пополнить
+              </Button>
+            </div>
+            <div className={styles.scardDesc}>
+              Пополнение не сдвигает период — списание при NextChargeAt и достаточном балансе (без минуса).
+            </div>
+          </div>
+        )}
+
+        <TariffPlansPicker
+          tariffs={orgTariffs}
+          validators={validators}
+          walletTariffId={wallet?.tariffId}
+          walletEffectiveTariffId={wallet?.effectiveTariffId}
+          isSelectedTariffActive={wallet?.isSelectedTariffActive}
+          pickedTariffId={pickedTariffId}
+          onPick={setPickedTariffId}
+          onCancel={() => setPickedTariffId(wallet?.tariffId ?? '')}
+          onConfirm={() => { void handleApplyTariff(); }}
+          confirming={saving}
+          disabled={!canEdit}
+          title="Тариф организации"
+          subtitle="Те же планы и ограничения, что у личного кошелька — карточки с преимуществами каждого тарифа"
+          emptyText="Нет доступных тарифов для организаций. Обратитесь к администратору."
+          confirmLabel="Применить тариф"
+        />
+
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>История операций</span>
+          {history.length === 0 ? (
+            <div className={styles.tariffCurrentMuted}>Пополнений и списаний пока нет</div>
+          ) : (
+            <ul className={styles.walletHistoryList}>
+              {history.slice(0, 12).map(row => (
+                <li key={row.id} className={styles.walletHistoryRow}>
+                  <div className={styles.walletHistoryInfo}>
+                    <span className={styles.walletHistoryName}>{row.name}</span>
+                    <span className={styles.walletHistoryMeta}>{row.meta}</span>
+                  </div>
+                  <span
+                    className={
+                      row.kind === 'in'
+                        ? styles.walletHistoryAmtIn
+                        : styles.walletHistoryAmtOut
+                    }
+                  >
+                    {row.amount}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {msg && <div className={msg.ok ? styles.bannerOk : styles.bannerErr}>{msg.text}</div>}
+      </div>
     </div>
   );
 }
@@ -1227,29 +1572,42 @@ function OrganizationMembersSection({
   organizationId,
   members,
   isOwner,
+  canEdit,
   myAccountId,
+  ticketsEnabled,
   onChanged,
 }: {
   organizationId: string;
   members: OrganizationMemberResponse[];
   isOwner: boolean;
+  canEdit: boolean;
   myAccountId: string;
+  ticketsEnabled: boolean;
   onChanged: () => Promise<void>;
 }) {
   const [accountId, setAccountId] = useState('');
+  const [addRole, setAddRole] = useState<OrganizationRoleValue>(
+    isOwner || !ticketsEnabled
+      ? OrganizationRole.Manager
+      : OrganizationRole.TicketTaker,
+  );
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [transferId, setTransferId] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const uuidFilled = accountId.trim().length > 0;
+  const canAddMembers = isOwner || (canEdit && ticketsEnabled);
   const existingMemberIds = useMemo(
     () => new Set(members.map(m => m.accountId)),
     [members],
   );
 
-  const addManagers = async (ids: string[]) => {
-    if (!isOwner || ids.length === 0) return;
+  const addMembers = async (ids: string[], role: OrganizationRoleValue) => {
+    if (!canAddMembers || ids.length === 0) return;
+    if (role === OrganizationRole.Manager && !isOwner) return;
+    if (role === OrganizationRole.TicketTaker && !ticketsEnabled) return;
+    if (role !== OrganizationRole.Manager && role !== OrganizationRole.TicketTaker) return;
     setBusy(true);
     setMsg(null);
     let added = 0;
@@ -1257,7 +1615,11 @@ function OrganizationMembersSection({
     for (const id of ids) {
       if (existingMemberIds.has(id)) continue;
       try {
-        await addOrganizationManager(organizationId, { accountId: id });
+        if (role === OrganizationRole.TicketTaker) {
+          await addOrganizationTicketTaker(organizationId, { accountId: id });
+        } else {
+          await addOrganizationManager(organizationId, { accountId: id });
+        }
         added += 1;
       } catch (e) {
         lastError = e instanceof Error ? e.message : 'Не удалось добавить';
@@ -1268,10 +1630,13 @@ function OrganizationMembersSection({
     } catch {
       // список мог не обновиться — сообщение всё равно покажем
     }
+    const roleLabel = formatOrganizationRole(role).toLowerCase();
     if (added > 0 && !lastError) {
       setAccountId('');
       setMsg({
-        text: added === 1 ? 'Администратор добавлен' : `Добавлено администраторов: ${added}`,
+        text: added === 1
+          ? `${formatOrganizationRole(role)} добавлен`
+          : `Добавлено (${roleLabel}): ${added}`,
         ok: true,
       });
     } else if (added > 0 && lastError) {
@@ -1283,17 +1648,33 @@ function OrganizationMembersSection({
   };
 
   const handleAdd = async () => {
-    if (!isOwner) return;
+    if (!canAddMembers) return;
     if (!uuidFilled) {
       setPickerOpen(true);
       return;
     }
-    await addManagers([accountId.trim()]);
+    await addMembers([accountId.trim()], addRole);
   };
 
   const handlePickFromSubscribers = (ids: string[]) => {
     setPickerOpen(false);
-    void addManagers(ids);
+    void addMembers(ids, addRole);
+  };
+
+  const handleSetRole = async (memberAccountId: string, role: OrganizationRoleValue) => {
+    if (!isOwner) return;
+    if (role !== OrganizationRole.Manager && role !== OrganizationRole.TicketTaker) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await updateOrganizationMemberRole(organizationId, { accountId: memberAccountId, role });
+      setMsg({ text: `Роль: ${formatOrganizationRole(role)}`, ok: true });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось сменить роль', ok: false });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleRemove = async (memberAccountId: string) => {
@@ -1349,7 +1730,9 @@ function OrganizationMembersSection({
         <div className={styles.scardHead}>
           <div className={styles.scardTitle}>Команда</div>
           <div className={styles.scardDesc}>
-            Администраторы могут редактировать профиль. Владелец управляет составом и продажами.
+            {ticketsEnabled
+              ? 'Администраторы редактируют профиль. Билетёры — только контроль входа на назначенных событиях. Владелец управляет составом и продажами.'
+              : 'Администраторы редактируют профиль. Владелец управляет составом.'}
           </div>
         </div>
         <ul className={styles.memberList}>
@@ -1376,6 +1759,25 @@ function OrganizationMembersSection({
                 </div>
                 {isOwner && !isMemberOwner && (
                   <div className={styles.memberActions}>
+                    {ticketsEnabled && m.role === OrganizationRole.TicketTaker ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy || !m.active}
+                        onClick={() => { void handleSetRole(m.accountId, OrganizationRole.Manager); }}
+                      >
+                        Сделать админом
+                      </Button>
+                    ) : ticketsEnabled && m.role !== OrganizationRole.TicketTaker ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy || !m.active}
+                        onClick={() => { void handleSetRole(m.accountId, OrganizationRole.TicketTaker); }}
+                      >
+                        Сделать билетёром
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1403,16 +1805,31 @@ function OrganizationMembersSection({
         </ul>
       </div>
 
-      {isOwner && (
+      {canAddMembers && (
         <div className={styles.scard}>
           <div className={styles.scardHead}>
-            <div className={styles.scardTitle}>Добавить администратора</div>
+            <div className={styles.scardTitle}>Добавить участника</div>
             <div className={styles.scardDesc}>
-              Введите UUID или выберите из подписчиков
+              {ticketsEnabled
+                ? (isOwner
+                  ? 'Администратор или билетёр — UUID либо выбор из подписчиков'
+                  : 'Билетёр — UUID либо выбор из подписчиков')
+                : 'Администратор — UUID либо выбор из подписчиков'}
             </div>
           </div>
           <div className={styles.formBody}>
             <div className={styles.inlineForm}>
+              {isOwner && ticketsEnabled && (
+                <select
+                  className={styles.input}
+                  value={addRole}
+                  onChange={e => setAddRole(e.target.value as OrganizationRoleValue)}
+                  aria-label="Роль нового участника"
+                >
+                  <option value={OrganizationRole.Manager}>Администратор</option>
+                  <option value={OrganizationRole.TicketTaker}>Билетёр</option>
+                </select>
+              )}
               <input
                 className={styles.input}
                 value={accountId}
@@ -1474,6 +1891,8 @@ function OrganizationMembersSection({
 interface ReadinessChecklistItem {
   label: string;
   ok: boolean;
+  /** Короткая расшифровка пункта (под подписью). */
+  detail?: string;
 }
 
 function OrganizationSalesReadinessCard({ items }: { items: ReadinessChecklistItem[] }) {
@@ -1489,7 +1908,10 @@ function OrganizationSalesReadinessCard({ items }: { items: ReadinessChecklistIt
         {items.map(item => (
           <li key={item.label} className={item.ok ? styles.checkOk : styles.checkNo}>
             <span className={styles.checkMark} aria-hidden>{item.ok ? '✓' : '·'}</span>
-            {item.label}
+            <span className={styles.checkText}>
+              <span className={styles.checkLabel}>{item.label}</span>
+              {item.detail && <span className={styles.checkDetail}>{item.detail}</span>}
+            </span>
           </li>
         ))}
       </ul>
@@ -1505,7 +1927,7 @@ function OrganizationBillingSection({
   canEdit,
   onChanged,
 }: {
-  view: 'legal' | 'requisites' | 'sales';
+  view: 'legal' | 'finance' | 'sales';
   organizationId: string;
   org: OrganizationResponse;
   isOwner: boolean;
@@ -1529,26 +1951,23 @@ function OrganizationBillingSection({
     OrganizationOnboardingStatus.None as string,
   );
   const [ticketingAgreed, setTicketingAgreed] = useState(false);
-  const [ticketingAccepted, setTicketingAccepted] = useState(false);
-  const [ticketingDoc, setTicketingDoc] = useState<IAgreementDocument | null>(null);
-  const [ticketingDocOpen, setTicketingDocOpen] = useState(false);
   const [innLookupOpen, setInnLookupOpen] = useState(false);
   const [confirmLegalSaveOpen, setConfirmLegalSaveOpen] = useState(false);
   const [registryBaseline, setRegistryBaseline] = useState<LegalFormSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [ticketingReloadKey, setTicketingReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const [legal, payout, agreed, doc] = await Promise.all([
+        const [legal, payout, agreed] = await Promise.all([
           fetchOrganizationLegal(organizationId),
           fetchOrganizationPayout(organizationId),
           checkOrganizationAgreement(organizationId, DocumentType.TicketingAgreement).catch(() => false),
-          fetchLastDocument(DocumentType.TicketingAgreement).catch(() => null),
         ]);
         if (cancelled) return;
         const L = legal ?? org.legal;
@@ -1571,14 +1990,12 @@ function OrganizationBillingSection({
           setOnboardingStatus(P.onboardingStatus ?? OrganizationOnboardingStatus.None);
         }
         setTicketingAgreed(agreed);
-        setTicketingAccepted(agreed);
-        setTicketingDoc(doc);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [organizationId, org.legal, org.payout]);
+  }, [organizationId, org.legal, org.payout, ticketingReloadKey]);
 
   const isSelfEmployed = legalForm === OrganizationLegalForm.SelfEmployed;
   const legalFilled = Boolean(inn.trim() && legalAddress.trim() && headName.trim() && !isSelfEmployed);
@@ -1599,7 +2016,7 @@ function OrganizationBillingSection({
   });
 
   const salesReady =
-    verified && onboardingActive && ticketingAgreed && legalFilled && payoutFilled;
+    verified && ticketingAgreed && legalFilled && payoutFilled;
 
   const checklist: ReadinessChecklistItem[] = [
     { ok: ticketingAgreed, label: 'Соглашение на продажу билетов принято' },
@@ -1608,7 +2025,13 @@ function OrganizationBillingSection({
     { ok: verified, label: 'Верификация пройдена' },
     {
       ok: onboardingActive,
-      label: `Подключение выплат (${formatOnboardingStatus(onboardingStatus as never)})`,
+      label: `Онбординг организации в платёжной системе (${formatOnboardingStatus(onboardingStatus as never)})`,
+      detail:
+        'Не путать с реквизитами: это регистрация организации как продавца в ЮKassa (split), '
+        + 'чтобы деньги за билеты поступали на ваш счёт. '
+        + (onboardingActive
+          ? 'Продавец подключён.'
+          : 'Запускается отдельно кнопкой на вкладке «Финансы» (сейчас — stub через DI, как платежи).'),
     },
     org.canSellTickets
       ? { ok: true, label: 'Продажа билетов включена' }
@@ -1616,21 +2039,6 @@ function OrganizationBillingSection({
         ? { ok: true, label: 'Продажа билетов отключена' }
         : { ok: false, label: 'Продажа билетов не подключена' },
   ];
-
-  const acceptTicketingAgreement = async () => {
-    if (!isOwner || !ticketingAccepted || ticketingAgreed) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      await agreeOrganizationDocument(organizationId, DocumentType.TicketingAgreement);
-      setTicketingAgreed(true);
-      setMsg({ text: 'Соглашение на продажу билетов принято', ok: true });
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Не удалось сохранить согласие', ok: false });
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const applyRegistryParty = (party: OrganizationRegistryParty) => {
     const next = partyToLegalSnapshot(party, legalForm, headBasis);
@@ -1720,6 +2128,38 @@ function OrganizationBillingSection({
     }
   };
 
+  const startProviderOnboarding = async () => {
+    if (!isOwner) return;
+    if (!payoutFilled) {
+      setMsg({ text: 'Сначала сохраните банковские реквизиты', ok: false });
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const result = await startOrganizationProviderOnboarding(
+        organizationId,
+        `${window.location.origin}/settings/organizations`,
+      );
+      setOnboardingStatus(result.onboardingStatus ?? OrganizationOnboardingStatus.None);
+      if (result.confirmationUrl?.trim()) {
+        window.location.assign(result.confirmationUrl);
+        return;
+      }
+      setMsg({
+        text: result.onboardingStatus === OrganizationOnboardingStatus.Active
+          ? 'Онбординг в платёжной системе завершён (stub ЮKassa)'
+          : 'Онбординг запущен',
+        ok: true,
+      });
+      await onChanged();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось запустить онбординг', ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitVerification = async () => {
     if (!isOwner) return;
     if (!ticketingAgreed) {
@@ -1769,70 +2209,29 @@ function OrganizationBillingSection({
         <>
           <OrganizationSalesReadinessCard items={checklist} />
 
-          <div className={styles.scard}>
-            <div className={styles.scardHead}>
-              <div className={styles.scardTitle}>Соглашение на продажу билетов</div>
-              <div className={styles.scardDesc}>
-                Согласие принимается от имени организации и требуется для подключения продаж
-              </div>
-            </div>
-            {ticketingAgreed ? (
-              <div className={styles.formBody}>
-                <div className={styles.bannerOk} style={{ margin: 0 }}>Соглашение принято</div>
-              </div>
-            ) : (
-              <>
-                <div className={styles.formBody}>
-                  <div className={styles.agreeRow}>
-                    <input
-                      id="ticketing-agree"
-                      type="checkbox"
-                      checked={ticketingAccepted}
-                      disabled={!isOwner}
-                      onChange={e => setTicketingAccepted(e.target.checked)}
-                    />
-                    <label htmlFor="ticketing-agree" className={styles.agreeLabel}>
-                      Принимаю{' '}
-                      <button
-                        type="button"
-                        className={styles.linkBtn}
-                        onClick={() => setTicketingDocOpen(true)}
-                        disabled={!ticketingDoc}
-                      >
-                        соглашение на продажу билетов
-                      </button>
-                      {!ticketingDoc && (
-                        <span className={styles.agreeHint}> (документ пока недоступен на сервере)</span>
-                      )}
-                    </label>
-                  </div>
-                </div>
-                {isOwner && (
-                  <div className={styles.scardFooter}>
-                    <div className={styles.footerSpacer} />
-                    <Button
-                      loading={busy}
-                      disabled={!ticketingAccepted}
-                      onClick={() => { void acceptTicketingAgreement(); }}
-                    >
-                      Принять соглашение
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          <OrganizationAgreementsSection
+            organizationId={organizationId}
+            organizationName={org.name}
+            isOwner={isOwner}
+            documentTypes={TICKETING_DOCUMENT_TYPES}
+            title="Документы для продажи билетов"
+            description="Согласие принимается от имени организации и требуется для подключения продаж."
+            onChanged={() => setTicketingReloadKey(k => k + 1)}
+          />
 
           <div className={styles.scard}>
             <div className={styles.scardHead}>
               <div className={styles.scardTitle}>Подключение продаж</div>
               <div className={styles.scardDesc}>
-                Включение продаж — после соглашения, верификации и подключения выплат (см. чеклист выше).
+                Включение продаж — после соглашения и успешной верификации.
+                Выплаты покупателей на ваши реквизиты через ЮKassa split появятся после
+                статуса «Онбординг организации в платёжной системе» = активен
+                (запуск — на вкладке «Финансы», сейчас stub через DI).
               </div>
             </div>
             {rejected && (
               <div className={styles.bannerWarn}>
-                Верификация отклонена. Исправьте данные на вкладках «Юридические данные» и «Реквизиты».
+                Верификация отклонена. Исправьте данные на вкладках «Юридические данные» и «Финансы».
               </div>
             )}
             {pending && (
@@ -1870,12 +2269,14 @@ function OrganizationBillingSection({
         </>
       )}
 
-      {view === 'requisites' && (
+      {view === 'finance' && (
         <div className={styles.scard}>
           <div className={styles.scardHead}>
-            <div className={styles.scardTitle}>Реквизиты</div>
+            <div className={styles.scardTitle}>Банковские реквизиты</div>
             <div className={styles.scardDesc}>
-              Банковские реквизиты для выплат · подключение к платёжному провайдеру: {formatOnboardingStatus(onboardingStatus as never)}
+              Реквизиты для получения оплаты за билеты (не путать с балансом тарифа выше).
+              Онбординг организации в платёжной системе (ЮKassa): {formatOnboardingStatus(onboardingStatus as never)}.
+              Сохранение счёта/БИК/банка само по себе статус не меняет — ниже отдельный шаг онбординга продавца.
             </div>
           </div>
           <div className={styles.formBody}>
@@ -1907,6 +2308,32 @@ function OrganizationBillingSection({
               </Button>
             </div>
           )}
+
+          <div className={styles.formBody} style={{ paddingTop: 0 }}>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Онбординг организации в платёжной системе</span>
+              <div className={styles.scardDesc}>
+                Регистрация организации как продавца в ЮKassa (split). Сейчас — DI-заглушка:
+                по кнопке статус сразу становится «активен», без редиректа в кабинет ЮKassa.
+              </div>
+              {isOwner && !onboardingActive && (
+                <div className={styles.tariffApplyRow}>
+                  <Button
+                    size="sm"
+                    loading={busy}
+                    disabled={!payoutFilled}
+                    title={!payoutFilled ? 'Сначала сохраните реквизиты' : undefined}
+                    onClick={() => { void startProviderOnboarding(); }}
+                  >
+                    Запустить онбординг (ЮKassa)
+                  </Button>
+                </div>
+              )}
+              {onboardingActive && (
+                <div className={styles.bannerOk}>Продавец подключён к платёжной системе</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -2036,13 +2463,6 @@ function OrganizationBillingSection({
           zIndex={630}
           onCancel={() => setConfirmLegalSaveOpen(false)}
           onConfirm={() => { void saveLegal(); }}
-        />
-      )}
-
-      {view === 'sales' && ticketingDocOpen && (
-        <AgreementDocumentModal
-          doc={ticketingDoc}
-          onClose={() => setTicketingDocOpen(false)}
         />
       )}
 

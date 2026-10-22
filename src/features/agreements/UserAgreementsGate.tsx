@@ -13,8 +13,10 @@ import {
   type IAgreementDocument,
 } from '@/entities/agreement';
 import { useAuthStore } from '@/app/store';
+import { getAuthToken } from '@/shared/api/client';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { AgreementDocumentHtml } from './AgreementDocumentHtml';
+import { agreementRevisionLabel } from './agreementRevisionLabel';
 import styles from './UserAgreementsGate.module.css';
 
 const CHECK_TYPES: DocumentTypeValue[] = [DocumentType.Consent, DocumentType.Agreement];
@@ -28,6 +30,11 @@ interface UserAgreementsGateProps {
   children?: React.ReactNode;
 }
 
+/**
+ * Re-consent Consent/Agreement только для авторизованных.
+ * Гостям (и «мёртвому» auth-cookie) модалки не показываем — 152-ФЗ согласия
+ * оформляются при регистрации / входе, не при анонимном просмотре.
+ */
 export function UserAgreementsGate({ children }: UserAgreementsGateProps) {
   const authenticated = useAuthStore(s => s.isAuthenticated());
   const activationRequired = useAuthStore(s => s.activationRequired);
@@ -40,7 +47,7 @@ export function UserAgreementsGate({ children }: UserAgreementsGateProps) {
   const [error, setError] = useState<string | null>(null);
 
   const runCheck = useCallback(async () => {
-    if (!authenticated || activationRequired) {
+    if (!authenticated || activationRequired || !getAuthToken()) {
       setQueue([]);
       setIndex(0);
       return;
@@ -50,8 +57,19 @@ export function UserAgreementsGate({ children }: UserAgreementsGateProps) {
       const outdated: PendingDoc[] = [];
       for (const type of CHECK_TYPES) {
         const ok = await checkUserAgreement(type);
+        // Протухший токен: getStatus → notifyUnauthorized; не тянем документы для модалки
+        if (!getAuthToken()) {
+          setQueue([]);
+          setIndex(0);
+          return;
+        }
         if (ok) continue;
         const document = await fetchLastDocument(type);
+        if (!getAuthToken()) {
+          setQueue([]);
+          setIndex(0);
+          return;
+        }
         if (!document) continue;
         outdated.push({ type, document });
       }
@@ -155,7 +173,9 @@ function ReconsentDialog({
 
   const consentLabel = item.type === DocumentType.Consent
     ? 'Согласен на обработку персональных данных'
-    : 'Согласен с условиями пользовательского соглашения';
+    : item.type === DocumentType.DistributionConsent
+      ? 'Согласен на распространение персональных данных'
+      : 'Согласен с условиями пользовательского соглашения';
 
   return createPortal(
     <>
@@ -171,6 +191,11 @@ function ReconsentDialog({
             <h2 id="reconsent-title" className={styles.title}>
               {item.document.header || 'Обновление соглашения'}
             </h2>
+            {agreementRevisionLabel(item.document.creationDate) && (
+              <p className={styles.revisionLabel}>
+                {agreementRevisionLabel(item.document.creationDate)}
+              </p>
+            )}
             {total > 1 && (
               <p className={styles.stepHint}>Документ {step} из {total}</p>
             )}
