@@ -1,6 +1,6 @@
 // app/router/index.tsx
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from '../providers/AppLayout';
 import { AuthGuard } from '@/features/auth/AuthGuard';
@@ -15,6 +15,7 @@ import { useAuthStore, useToastStore } from '@/app/store';
 import { ToastContainer } from '@/shared/ui/Toast/Toast';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { lazyWithRetry } from '@/shared/lib/lazyWithRetry';
+import { trackMetrikaHit } from '@/shared/lib/yandexMetrika';
 
 // Мёртвый auth-cookie (нет client hash / смена app version) → сразу гостевой режим,
 // до UserAgreementsGate и фоновых API, чтобы не всплывал ложный re-consent.
@@ -139,7 +140,23 @@ setApiErrorHandler((message) => {
   useToastStore.getState().add(message);
 });
 
+/** SPA: первый просмотр уже в ym init; дальше — hit на каждый client-side переход. */
+function useYandexMetrikaSpaHits(): void {
+  useEffect(() => {
+    let prevKey = router.state.location.key;
+    return router.subscribe((state) => {
+      const nextKey = state.location.key;
+      if (nextKey === prevKey) return;
+      prevKey = nextKey;
+      const { pathname, search, hash } = state.location;
+      trackMetrikaHit(`${pathname}${search}${hash}`);
+    });
+  }, []);
+}
+
 export function AppRouter() {
+  useYandexMetrikaSpaHits();
+
   return (
     <>
       <RouterProvider router={router} />
