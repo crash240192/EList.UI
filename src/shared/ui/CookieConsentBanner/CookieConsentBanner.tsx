@@ -34,7 +34,7 @@ export function CookieConsentBanner() {
     >
       <p className={styles.text}>
         Мы используем cookies для работы сайта и сбора статистики посещений
-        (Яндекс.Метрика). Подробнее — в{' '}
+        Подробнее — в{' '}
         <Link to="/cookies">политике cookies</Link>.
       </p>
       <button type="button" className={styles.okBtn} onClick={onOk}>
