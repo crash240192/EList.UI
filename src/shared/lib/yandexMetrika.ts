@@ -2,8 +2,8 @@
 
 import { cookies } from '@/shared/lib/cookies';
 
-/** Счётчик Яндекс.Метрики. */
-export const YANDEX_METRIKA_ID = 113735562;
+/** Счётчик Яндекс.Метрики (актуальный id из кабинета). */
+export const YANDEX_METRIKA_ID = 113787433;
 
 /** Локальное согласие на аналитические / необязательные cookies. */
 export const COOKIE_CONSENT_KEY = 'elist_cookie_consent';
