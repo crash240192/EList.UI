@@ -84,6 +84,48 @@ export interface ICreateTariffPurchaseResponse {
   wallet?: IWallet | null;
 }
 
+export type WalletTariffRefundStatus = 'Pending' | 'Succeeded' | 'Failed' | string;
+
+export interface ITariffCancelQuote {
+  walletId: string;
+  tariffId: string;
+  tariffName: string;
+  activeUntil: string | null;
+  remainingDays: number;
+  periodDays: number;
+  depositId: string | null;
+  amountPaid: number;
+  alreadyRefunded: number;
+  refundAmount: number;
+  currency: string;
+  fallbackTariffId: string | null;
+  fallbackTariffName: string | null;
+  message: string | null;
+}
+
+export interface IWalletTariffRefund {
+  id: string;
+  walletId: string;
+  depositId: string;
+  amount: number;
+  currency: string;
+  status: WalletTariffRefundStatus;
+  reason: string | null;
+  providerRefundId: string | null;
+  remainingDays: number;
+  periodDays: number;
+  createDate: string;
+  succeededAt: string | null;
+}
+
+export interface ICreateTariffCancelResponse {
+  refund: IWalletTariffRefund;
+  refundAmount: number;
+  paidImmediately: boolean;
+  wallet: IWallet | null;
+  message: string | null;
+}
+
 function asStr(v: unknown): string {
   return v == null ? '' : String(v);
 }
@@ -283,6 +325,86 @@ export async function createTariffPurchase(payload: {
     paidImmediately: Boolean(raw.paidImmediately ?? raw.PaidImmediately),
     wallet: walletRaw ? normalizeWallet(walletRaw) : null,
   };
+}
+
+function normalizeCancelQuote(raw: Record<string, unknown>): ITariffCancelQuote {
+  return {
+    walletId: asStr(raw.walletId ?? raw.WalletId),
+    tariffId: asStr(raw.tariffId ?? raw.TariffId),
+    tariffName: asStr(raw.tariffName ?? raw.TariffName),
+    activeUntil: nullableStr(raw.activeUntil ?? raw.ActiveUntil),
+    remainingDays: asNum(raw.remainingDays ?? raw.RemainingDays),
+    periodDays: asNum(raw.periodDays ?? raw.PeriodDays) || 30,
+    depositId: nullableStr(raw.depositId ?? raw.DepositId),
+    amountPaid: asNum(raw.amountPaid ?? raw.AmountPaid),
+    alreadyRefunded: asNum(raw.alreadyRefunded ?? raw.AlreadyRefunded),
+    refundAmount: asNum(raw.refundAmount ?? raw.RefundAmount),
+    currency: asStr(raw.currency ?? raw.Currency) || 'RUB',
+    fallbackTariffId: nullableStr(raw.fallbackTariffId ?? raw.FallbackTariffId),
+    fallbackTariffName: nullableStr(raw.fallbackTariffName ?? raw.FallbackTariffName),
+    message: nullableStr(raw.message ?? raw.Message),
+  };
+}
+
+function normalizeTariffRefund(raw: Record<string, unknown>): IWalletTariffRefund {
+  return {
+    id: asStr(raw.id ?? raw.Id),
+    walletId: asStr(raw.walletId ?? raw.WalletId),
+    depositId: asStr(raw.depositId ?? raw.DepositId),
+    amount: asNum(raw.amount ?? raw.Amount),
+    currency: asStr(raw.currency ?? raw.Currency) || 'RUB',
+    status: asStr(raw.status ?? raw.Status) || 'Pending',
+    reason: nullableStr(raw.reason ?? raw.Reason),
+    providerRefundId: nullableStr(raw.providerRefundId ?? raw.ProviderRefundId),
+    remainingDays: asNum(raw.remainingDays ?? raw.RemainingDays),
+    periodDays: asNum(raw.periodDays ?? raw.PeriodDays),
+    createDate: asStr(raw.createDate ?? raw.CreateDate),
+    succeededAt: nullableStr(raw.succeededAt ?? raw.SucceededAt),
+  };
+}
+
+/** POST /api/Wallets/tariffPurchases/cancel/quote */
+export async function quoteTariffCancel(payload: {
+  walletId: string;
+}): Promise<ITariffCancelQuote> {
+  const r = await apiClient.post<Record<string, unknown>>(
+    '/api/Wallets/tariffPurchases/cancel/quote',
+    payload,
+  );
+  return normalizeCancelQuote((r.result ?? {}) as Record<string, unknown>);
+}
+
+/** POST /api/Wallets/tariffPurchases/cancel */
+export async function cancelTariffPurchase(payload: {
+  walletId: string;
+  reason?: string;
+  idempotencyKey?: string;
+  confirmRefundAmount?: number;
+}): Promise<ICreateTariffCancelResponse> {
+  const r = await apiClient.post<Record<string, unknown>>('/api/Wallets/tariffPurchases/cancel', {
+    walletId: payload.walletId,
+    reason: payload.reason,
+    idempotencyKey: payload.idempotencyKey ?? newIdempotencyKey(),
+    confirmRefundAmount: payload.confirmRefundAmount,
+  });
+  const raw = (r.result ?? {}) as Record<string, unknown>;
+  const refundRaw = (raw.refund ?? raw.Refund ?? {}) as Record<string, unknown>;
+  const walletRaw = (raw.wallet ?? raw.Wallet) as Record<string, unknown> | null | undefined;
+  return {
+    refund: normalizeTariffRefund(refundRaw),
+    refundAmount: asNum(raw.refundAmount ?? raw.RefundAmount),
+    paidImmediately: Boolean(raw.paidImmediately ?? raw.PaidImmediately),
+    wallet: walletRaw ? normalizeWallet(walletRaw) : null,
+    message: nullableStr(raw.message ?? raw.Message),
+  };
+}
+
+/** GET /api/Wallets/{walletId}/tariffRefunds */
+export async function fetchWalletTariffRefunds(walletId: string): Promise<IWalletTariffRefund[]> {
+  const r = await apiClient.get<Record<string, unknown>[]>(
+    `/api/Wallets/${walletId}/tariffRefunds`,
+  );
+  return (r.result ?? []).map(row => normalizeTariffRefund(row as Record<string, unknown>));
 }
 
 /** @deprecated PeriodPurchase: используйте createTariffPurchase */

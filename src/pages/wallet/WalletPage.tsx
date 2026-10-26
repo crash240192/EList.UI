@@ -5,14 +5,19 @@ import {
   createWallet,
   getWalletByAccount,
   createTariffPurchase,
+  cancelTariffPurchase,
+  quoteTariffCancel,
   fetchWalletDeposits,
   fetchWalletTariffCharges,
+  fetchWalletTariffRefunds,
   purchaseKindLabel,
   walletActiveUntil,
   isPeriodPurchaseMode,
   type IWallet,
   type IWalletDeposit,
   type IWalletTariffCharge,
+  type IWalletTariffRefund,
+  type ITariffCancelQuote,
 } from '@/entities/user/walletApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
 import {
@@ -24,6 +29,7 @@ import {
 import { fetchEventById } from '@/entities/event';
 import { getOrFetchAccountId } from '@/entities/user/api';
 import { TariffPlansPicker } from '@/features/wallet';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { usePageTitle } from '@/shared/hooks';
 import styles from './WalletPage.module.css';
 
@@ -85,6 +91,8 @@ export default function WalletPage() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelQuote, setCancelQuote] = useState<ITariffCancelQuote | null>(null);
   const [ticketsEnabled, setTicketsEnabled] = useState(false);
 
   useEffect(() => {
@@ -116,9 +124,10 @@ export default function WalletPage() {
       if (currentTariff?.id) tariffNameById.set(currentTariff.id, currentTariff.name);
 
       if (currentWallet?.id) {
-        const [deposits, charges] = await Promise.all([
+        const [deposits, charges, refunds] = await Promise.all([
           fetchWalletDeposits(currentWallet.id).catch(() => [] as IWalletDeposit[]),
           fetchWalletTariffCharges(currentWallet.id).catch(() => [] as IWalletTariffCharge[]),
+          fetchWalletTariffRefunds(currentWallet.id).catch(() => [] as IWalletTariffRefund[]),
         ]);
 
         for (const d of deposits.filter(x => x.status === 'Succeeded')) {
@@ -164,6 +173,30 @@ export default function WalletPage() {
               sortAt: Number.isFinite(sortAt) ? sortAt : 0,
             });
           }
+        }
+
+        for (const rf of refunds.filter(x => {
+          const s = String(x.status);
+          return s === 'Succeeded' || s === 'Pending' || s === '1' || s === '0';
+        })) {
+          const when = rf.succeededAt || rf.createDate;
+          const sortAt = when ? new Date(when).getTime() : 0;
+          const dateLabel = when ? formatDateTime(when) : '';
+          const status = String(rf.status);
+          const pending = status === 'Pending' || status === '0';
+          rows.push({
+            id: `refund-${rf.id}`,
+            kind: 'in',
+            name: pending ? 'Возврат тарифа (в обработке)' : 'Возврат за отмену тарифа',
+            meta: [
+              dateLabel,
+              rf.remainingDays > 0 ? `~${Math.ceil(rf.remainingDays)} дн.` : null,
+            ].filter(Boolean).join(' · '),
+            amount: rf.amount > 0
+              ? `+ ${rf.amount.toLocaleString('ru-RU')} ₽`
+              : '0 ₽',
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
         }
       }
 
@@ -300,6 +333,45 @@ export default function WalletPage() {
     void handlePeriodPurchase(tariff.id);
   };
 
+  const openCancelDialog = async () => {
+    if (!wallet || cancelBusy) return;
+    setCancelBusy(true);
+    setMsg(null);
+    try {
+      const q = await quoteTariffCancel({ walletId: wallet.id });
+      setCancelQuote(q);
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось рассчитать возврат', ok: false });
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
+  const confirmCancel = async () => {
+    if (!wallet || !cancelQuote || cancelBusy) return;
+    setCancelBusy(true);
+    try {
+      const result = await cancelTariffPurchase({
+        walletId: wallet.id,
+        confirmRefundAmount: cancelQuote.refundAmount,
+        reason: 'user_cancel',
+      });
+      setCancelQuote(null);
+      setMsg({
+        text: result.message
+          || (result.refundAmount > 0
+            ? `Тариф отменён. Возврат ${result.refundAmount.toLocaleString('ru-RU')} ₽`
+            : 'Тариф отменён'),
+        ok: true,
+      });
+      await load();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось отменить тариф', ok: false });
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
   const activeUntil = walletActiveUntil(wallet);
   const left = activeUntil ? daysLeft(activeUntil) : null;
   const paidActive = Boolean(
@@ -346,17 +418,41 @@ export default function WalletPage() {
                   <button
                     type="button"
                     className={styles.planHeroCta}
-                    disabled={Boolean(purchasingId)}
+                    disabled={Boolean(purchasingId) || cancelBusy}
                     onClick={handleExtendCurrent}
                   >
                     {purchasingId === tariff.id
                       ? '…'
                       : `Продлить на ${tariff.periodDays ?? tariff.period?.days ?? 30} дн. · ${tariff.cost.toLocaleString('ru-RU')} ₽`}
                   </button>
+                  <button
+                    type="button"
+                    className={styles.planHeroCancel}
+                    disabled={Boolean(purchasingId) || cancelBusy}
+                    onClick={() => { void openCancelDialog(); }}
+                  >
+                    {cancelBusy && !cancelQuote ? '…' : 'Отменить и вернуть'}
+                  </button>
                 </div>
               )}
             </div>
           </div>
+        )}
+
+        {cancelQuote && (
+          <ConfirmDialog
+            title="Отменить тариф?"
+            message={
+              cancelQuote.refundAmount > 0
+                ? `Вернём ${cancelQuote.refundAmount.toLocaleString('ru-RU')} ₽ за ~${Math.ceil(cancelQuote.remainingDays)} дн. неиспользованного периода «${cancelQuote.tariffName}». Сразу перейдёте на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
+                : `Тариф «${cancelQuote.tariffName}» будет снят без возврата на карту. Переход на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
+            }
+            confirmLabel={cancelBusy ? '…' : (cancelQuote.refundAmount > 0 ? 'Отменить и вернуть' : 'Отменить тариф')}
+            cancelLabel="Оставить"
+            variant="danger"
+            onConfirm={() => { void confirmCancel(); }}
+            onCancel={() => { if (!cancelBusy) setCancelQuote(null); }}
+          />
         )}
 
         <div className={styles.walletBody}>
