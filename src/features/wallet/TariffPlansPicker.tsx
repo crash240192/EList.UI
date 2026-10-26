@@ -1,4 +1,4 @@
-// features/wallet/TariffPlansPicker.tsx — карточки тарифов (личный кошелёк и орг. финансы)
+// features/wallet/TariffPlansPicker.tsx — карточки тарифов (личный / орг)
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ITariff, ITariffValidator } from '@/entities/admin/adminApi';
@@ -6,6 +6,13 @@ import { formatTariffAgeCapability } from '@/shared/lib/ageLimit';
 import styles from './TariffPlansPicker.module.css';
 
 const TARIFF_CAROUSEL_MIN = 4;
+
+export type TariffPlanAction =
+  | { type: 'current' }
+  | { type: 'buy'; label: string }
+  | { type: 'extend'; label: string }
+  | { type: 'upgrade'; label: string }
+  | { type: 'locked'; label: string };
 
 export function formatValidatorRows(
   v: ITariffValidator,
@@ -45,6 +52,49 @@ export function formatValidatorRows(
       type: v.ageLimit == null ? 'ok' : v.ageLimit === 0 ? 'no' : 'warn',
     },
   ];
+}
+
+/** CTA для PeriodPurchase по отношению к текущему entitlement. */
+export function resolvePeriodPurchaseAction(
+  target: ITariff,
+  current: ITariff | null,
+  opts: {
+    isCurrentActive: boolean;
+    activeUntil?: string | null;
+  },
+): TariffPlanAction {
+  const days = (target as { periodDays?: number }).periodDays ?? target.period?.days ?? 30;
+  const price = `${target.cost.toLocaleString('ru-RU')} ₽`;
+  const untilLabel = opts.activeUntil
+    ? new Date(opts.activeUntil).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+    : null;
+
+  const currentActivePaid = Boolean(
+    opts.isCurrentActive && current && current.cost > 0,
+  );
+
+  if (target.cost <= 0) {
+    if (currentActivePaid) {
+      return { type: 'locked', label: untilLabel ? `После ${untilLabel}` : 'После окончания периода' };
+    }
+    if (current && current.id === target.id) {
+      return { type: 'current' };
+    }
+    return { type: 'current' };
+  }
+
+  if (currentActivePaid && current) {
+    if (current.id === target.id) {
+      return { type: 'extend', label: `Продлить · ${price}` };
+    }
+    if (target.cost > current.cost) {
+      return { type: 'upgrade', label: `Улучшить · от ${price}` };
+    }
+    return { type: 'locked', label: untilLabel ? `После ${untilLabel}` : 'После окончания периода' };
+  }
+
+  // free / expired → purchase
+  return { type: 'buy', label: `Купить · ${price} / ${days} дн.` };
 }
 
 function TariffPlansCarousel({ children, count }: { children: ReactNode; count: number }) {
@@ -122,6 +172,9 @@ function TariffCard({
   isEffectiveFallback,
   isPicked,
   onSelect,
+  periodAction,
+  onPeriodAction,
+  periodBusy,
 }: {
   tariff: ITariff;
   validator: ITariffValidator | null;
@@ -129,31 +182,40 @@ function TariffCard({
   isActive: boolean;
   isEffectiveFallback: boolean;
   isPicked: boolean;
-  onSelect: () => void;
+  onSelect?: () => void;
+  periodAction?: TariffPlanAction;
+  onPeriodAction?: () => void;
+  periodBusy?: boolean;
 }) {
   const days = (tariff as { periodDays?: number }).periodDays ?? tariff.period?.days ?? '?';
   const rows = validator ? formatValidatorRows(validator) : null;
+  const periodMode = Boolean(periodAction);
 
   const cardClass = [
     styles.tc,
     isActive ? styles.tcCurrent : '',
-    isSelectedPlan && !isActive ? styles.tcInactiveSelected : '',
+    !periodMode && isSelectedPlan && !isActive ? styles.tcInactiveSelected : '',
     isEffectiveFallback ? styles.tcFallback : '',
-    isPicked && !isSelectedPlan ? styles.tcSelected : '',
+    !periodMode && isPicked && !isSelectedPlan ? styles.tcSelected : '',
   ].filter(Boolean).join(' ');
+
+  const clickable = !periodMode && !(isSelectedPlan && isActive);
 
   return (
     <div
       className={cardClass}
-      onClick={isSelectedPlan && isActive ? undefined : onSelect}
-      role="button"
-      tabIndex={isSelectedPlan && isActive ? -1 : 0}
-      aria-pressed={isPicked}
-      aria-disabled={isSelectedPlan && isActive}
-      onKeyDown={e => { if (e.key === 'Enter' && !(isSelectedPlan && isActive)) onSelect(); }}
+      onClick={clickable && onSelect ? onSelect : undefined}
+      role={periodMode ? 'group' : 'button'}
+      tabIndex={clickable ? 0 : -1}
+      aria-pressed={!periodMode ? isPicked : undefined}
+      aria-disabled={!periodMode && isSelectedPlan && isActive}
+      onKeyDown={e => {
+        if (!clickable || !onSelect) return;
+        if (e.key === 'Enter') onSelect();
+      }}
     >
-      {isActive && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>Активен</div>}
-      {isSelectedPlan && !isActive && (
+      {isActive && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>Текущий</div>}
+      {!periodMode && isSelectedPlan && !isActive && (
         <div className={`${styles.tcBadge} ${styles.tcBadgeInactive}`}>Выбран · неактивен</div>
       )}
       {isEffectiveFallback && (
@@ -164,7 +226,7 @@ function TariffCard({
         {tariff.cost === 0 ? '0 ₽' : `${tariff.cost.toLocaleString('ru-RU')} ₽`}
       </div>
       <div className={styles.tcPeriod}>
-        {tariff.cost === 0 ? 'навсегда / fallback' : `в месяц · ${days} дн.`}
+        {tariff.cost === 0 ? 'базовый' : `${days} дн.`}
       </div>
       <div className={styles.tcDivider} />
       <div className={styles.tcFeat}>
@@ -179,6 +241,28 @@ function TariffCard({
           </div>
         ))}
       </div>
+
+      {periodAction && (
+        <div className={styles.tcAction}>
+          {periodAction.type === 'current' ? (
+            <span className={styles.tcActionMuted}>Текущий план</span>
+          ) : periodAction.type === 'locked' ? (
+            <span className={styles.tcActionMuted}>{periodAction.label}</span>
+          ) : (
+            <button
+              type="button"
+              className={styles.tcActionBtn}
+              disabled={periodBusy}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPeriodAction?.();
+              }}
+            >
+              {periodBusy ? '…' : periodAction.label}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -194,30 +278,41 @@ export function TariffPlansPicker({
   onConfirm,
   onCancel,
   confirming = false,
-  title = 'Тарифный план',
-  subtitle = 'Выберите план для доступа к расширенным возможностям создания событий',
+  title = 'Планы',
+  subtitle = 'Покупка на период. Upgrade учитывает остаток текущего.',
   emptyText = 'Тарифы пока не добавлены. Обратитесь к администратору.',
   confirmLabel = 'Подключить',
   disabled = false,
+  mode = 'periodPurchase',
+  currentTariff = null,
+  activeUntil = null,
+  onPeriodPurchase,
+  purchasingTariffId = null,
 }: {
   tariffs: ITariff[];
   validators: Record<string, ITariffValidator | null>;
   walletTariffId?: string | null;
   walletEffectiveTariffId?: string | null;
   isSelectedTariffActive?: boolean;
-  pickedTariffId: string;
-  onPick: (tariffId: string) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
+  pickedTariffId?: string;
+  onPick?: (tariffId: string) => void;
+  onConfirm?: () => void;
+  onCancel?: () => void;
   confirming?: boolean;
   title?: string;
   subtitle?: string;
   emptyText?: string;
   confirmLabel?: string;
   disabled?: boolean;
+  mode?: 'periodPurchase' | 'legacy';
+  currentTariff?: ITariff | null;
+  activeUntil?: string | null;
+  onPeriodPurchase?: (tariffId: string) => void;
+  purchasingTariffId?: string | null;
 }) {
   const selectedId = walletTariffId ?? null;
   const effectiveId = walletEffectiveTariffId ?? null;
+  const periodMode = mode === 'periodPurchase';
 
   return (
     <div>
@@ -233,29 +328,43 @@ export function TariffPlansPicker({
       ) : (
         <>
           <TariffPlansCarousel count={tariffs.length}>
-            {tariffs.map(t => (
-              <TariffCard
-                key={t.id}
-                tariff={t}
-                validator={validators[t.id] ?? null}
-                isSelectedPlan={selectedId === t.id}
-                isActive={Boolean(
-                  selectedId === t.id && (isSelectedTariffActive || t.cost <= 0),
-                )}
-                isEffectiveFallback={Boolean(
-                  effectiveId === t.id
-                  && selectedId
-                  && selectedId !== t.id,
-                )}
-                isPicked={pickedTariffId === t.id}
-                onSelect={() => {
-                  if (disabled) return;
-                  onPick(pickedTariffId === t.id ? '' : t.id);
-                }}
-              />
-            ))}
+            {tariffs.map(t => {
+              const isActive = Boolean(
+                selectedId === t.id && (isSelectedTariffActive || t.cost <= 0),
+              );
+              const periodAction = periodMode
+                ? resolvePeriodPurchaseAction(t, currentTariff, {
+                    isCurrentActive: Boolean(isSelectedTariffActive),
+                    activeUntil,
+                  })
+                : undefined;
+
+              return (
+                <TariffCard
+                  key={t.id}
+                  tariff={t}
+                  validator={validators[t.id] ?? null}
+                  isSelectedPlan={selectedId === t.id}
+                  isActive={isActive || (periodMode && periodAction?.type === 'current' && t.cost <= 0 && !currentTariff?.cost)}
+                  isEffectiveFallback={Boolean(
+                    !periodMode
+                    && effectiveId === t.id
+                    && selectedId
+                    && selectedId !== t.id,
+                  )}
+                  isPicked={pickedTariffId === t.id}
+                  onSelect={() => {
+                    if (disabled || periodMode || !onPick) return;
+                    onPick(pickedTariffId === t.id ? '' : t.id);
+                  }}
+                  periodAction={disabled ? { type: 'locked', label: 'Нет доступа' } : periodAction}
+                  onPeriodAction={() => onPeriodPurchase?.(t.id)}
+                  periodBusy={purchasingTariffId === t.id}
+                />
+              );
+            })}
           </TariffPlansCarousel>
-          {pickedTariffId && pickedTariffId !== selectedId && !disabled && (
+          {!periodMode && pickedTariffId && pickedTariffId !== selectedId && !disabled && (
             <div className={styles.selectActions}>
               <button type="button" className={styles.cancelBtn} onClick={onCancel}>
                 Отмена

@@ -19,6 +19,101 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* ── Current plan hero (heroBanner) ── */
+.planHero {
+  composes: heroBanner from '../../shared/styles/hero.module.css';
+  padding: 22px 24px;
+  gap: 10px;
+  min-height: 140px;
+}
+
+.planHeroStub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.planHeroTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.planHeroEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.planHeroPill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  position: relative;
+  z-index: 1;
+}
+
+.planHeroPillOk {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.planHeroPillMuted {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.planHeroName {
+  position: relative;
+  z-index: 1;
+  font-size: 26px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.planHeroMeta {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.68);
+  max-width: 28rem;
+}
+
+.planHeroActions {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+}
+
+.planHeroCta {
+  padding: 10px 16px;
+  background: #fff;
+  color: #1e1b4b;
+  border: none;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.planHeroCta:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.planHeroCta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .walletBody {
   padding: 20px 28px 48px;
   display: flex;

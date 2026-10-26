@@ -1,1 +1,6 @@
-export { TariffPlansPicker, formatValidatorRows } from './TariffPlansPicker';
+export {
+  TariffPlansPicker,
+  formatValidatorRows,
+  resolvePeriodPurchaseAction,
+  type TariffPlanAction,
+} from './TariffPlansPicker';

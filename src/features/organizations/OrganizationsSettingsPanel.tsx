@@ -59,13 +59,14 @@ import type { IContactDataItem, IContactType } from '@/entities/user/profileApi'
 import type { IContactRequest } from '@/entities/user/settingsApi';
 import { fetchContactTypes } from '@/features/auth/registrationApi';
 import {
-  completeWalletDeposit,
-  createWalletDeposit,
+  createTariffPurchase,
   ensureOrganizationWallet,
   fetchWalletDeposits,
   fetchWalletTariffCharges,
   getWalletByOrganization,
-  setWalletTariff,
+  isPeriodPurchaseMode,
+  purchaseKindLabel,
+  walletActiveUntil,
   type IWallet,
   type IWalletDeposit,
   type IWalletTariffCharge,
@@ -103,18 +104,23 @@ function formatWalletDateTime(iso: string): string {
   });
 }
 
-/** Статус биллинга тарифа — та же логика, что на странице кошелька пользователя. */
+/** Статус биллинга тарифа организации (PeriodPurchase). */
 function orgTariffPeriodStatus(wallet: IWallet, tariff: ITariff | null): string | null {
   if (wallet.tariffBillingStatus) return wallet.tariffBillingStatus;
   if (!tariff) return null;
+  const until = walletActiveUntil(wallet);
   if (wallet.isSelectedTariffActive || tariff.cost <= 0) {
-    const next = wallet.nextChargeAt ? new Date(wallet.nextChargeAt).getTime() : NaN;
-    if (Number.isFinite(next) && next > Date.now()) {
-      return `Активен до ${formatWalletDateTime(wallet.nextChargeAt!)} · следующее списание`;
+    if (until) {
+      const end = new Date(until).getTime();
+      if (Number.isFinite(end) && end > Date.now()) {
+        return tariff.cost > 0
+          ? `Активен до ${formatWalletDateTime(until)} · без автопродления`
+          : `Базовый тариф · до ${formatWalletDateTime(until)}`;
+      }
     }
-    if (tariff.cost <= 0) return 'Бесплатный тариф активен';
+    if (tariff.cost <= 0) return 'Базовый тариф активен';
   }
-  return 'Выбранный тариф не активен — недостаточно средств. Действует бесплатный тариф по умолчанию.';
+  return 'Платный тариф не активен. Действует базовый тариф.';
 }
 
 function statusClass(status: OrganizationResponse['verificationStatus']): string {
@@ -1243,13 +1249,9 @@ function OrganizationWalletSection({
   const [wallet, setWallet] = useState<IWallet | null>(null);
   const [orgTariffs, setOrgTariffs] = useState<ITariff[]>([]);
   const [validators, setValidators] = useState<Record<string, ITariffValidator | null>>({});
-  const [selectedTariff, setSelectedTariff] = useState<ITariff | null>(null);
-  const [effectiveTariff, setEffectiveTariff] = useState<ITariff | null>(null);
-  const [pickedTariffId, setPickedTariffId] = useState('');
+  const [currentTariff, setCurrentTariff] = useState<ITariff | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [topUpAmount, setTopUpAmount] = useState('');
-  const [topUpBusy, setTopUpBusy] = useState(false);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [history, setHistory] = useState<{
     id: string;
@@ -1274,13 +1276,8 @@ function OrganizationWalletSection({
       const sorted = [...tariffs].sort((a, b) => a.cost - b.cost);
       setOrgTariffs(sorted);
       setWallet(w);
-      const selected = w?.tariffId ? sorted.find(t => t.id === w!.tariffId) ?? null : null;
-      const effective = w?.effectiveTariffId
-        ? sorted.find(t => t.id === w!.effectiveTariffId) ?? selected
-        : selected;
-      setSelectedTariff(selected);
-      setEffectiveTariff(effective);
-      setPickedTariffId(w?.tariffId ?? '');
+      const current = w?.tariffId ? sorted.find(t => t.id === w!.tariffId) ?? null : null;
+      setCurrentTariff(current);
 
       const validatorEntries = await Promise.all(
         sorted
@@ -1309,39 +1306,55 @@ function OrganizationWalletSection({
         for (const d of deposits.filter(x => x.status === 'Succeeded')) {
           const when = d.paidAt || d.createDate;
           const sortAt = when ? new Date(when).getTime() : 0;
-          const balanceLabel = d.balanceAfter != null && Number.isFinite(d.balanceAfter)
-            ? `остаток ${d.balanceAfter.toLocaleString('ru-RU')} ₽`
-            : null;
+          const planName = d.tariffId ? nameById.get(d.tariffId) : null;
+          const kindLabel = purchaseKindLabel(d.purchaseKind);
+          const name = planName ? `${kindLabel} «${planName}»` : kindLabel;
           rows.push({
             id: `deposit-${d.id}`,
-            kind: 'in',
-            name: 'Пополнение тарифа',
-            meta: [when ? formatWalletDateTime(when) : '', 'Тариф организации', balanceLabel]
-              .filter(Boolean)
-              .join(' · '),
-            amount: `+ ${d.amount.toLocaleString('ru-RU')} ₽`,
-            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
-          });
-        }
-        for (const c of charges) {
-          const sortAt = c.chargedAt ? new Date(c.chargedAt).getTime() : 0;
-          const balanceLabel = Number.isFinite(c.balanceAfter)
-            ? `остаток ${c.balanceAfter.toLocaleString('ru-RU')} ₽`
-            : null;
-          rows.push({
-            id: `charge-${c.id}`,
             kind: 'tariff',
-            name: nameById.get(c.tariffId)
-              ? `Тариф «${nameById.get(c.tariffId)}»`
-              : 'Списание тарифа',
-            meta: [c.chargedAt ? formatWalletDateTime(c.chargedAt) : '', 'Списание тарифа', balanceLabel]
+            name,
+            meta: [
+              when ? formatWalletDateTime(when) : '',
+              d.periodEnd
+                ? `до ${new Date(d.periodEnd).toLocaleDateString('ru-RU', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}`
+                : null,
+            ]
               .filter(Boolean)
               .join(' · '),
-            amount: c.amount > 0
-              ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
+            amount: d.amount > 0
+              ? `− ${d.amount.toLocaleString('ru-RU')} ₽`
               : '0 ₽',
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
+        }
+        const hasPurchaseDeposits = deposits.some(
+          d => d.status === 'Succeeded'
+            && d.purchaseKind != null
+            && d.purchaseKind !== 'TopUp'
+            && d.purchaseKind !== 0,
+        );
+        if (!hasPurchaseDeposits) {
+          for (const c of charges) {
+            const sortAt = c.chargedAt ? new Date(c.chargedAt).getTime() : 0;
+            rows.push({
+              id: `charge-${c.id}`,
+              kind: 'tariff',
+              name: nameById.get(c.tariffId)
+                ? `Тариф «${nameById.get(c.tariffId)}»`
+                : 'Списание тарифа',
+              meta: [c.chargedAt ? formatWalletDateTime(c.chargedAt) : '', 'Списание']
+                .filter(Boolean)
+                .join(' · '),
+              amount: c.amount > 0
+                ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
+                : '0 ₽',
+              sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+            });
+          }
         }
         rows.sort((a, b) => b.sortAt - a.sortAt);
         setHistory(rows.map(({ sortAt: _s, ...rest }) => rest));
@@ -1357,37 +1370,24 @@ function OrganizationWalletSection({
     void load();
   }, [load]);
 
-  const handleApplyTariff = async () => {
-    if (!canEdit || !pickedTariffId || pickedTariffId === wallet?.tariffId) return;
-    setSaving(true);
-    setMsg(null);
-    try {
-      const w = wallet?.id ? wallet : await ensureOrganizationWallet(organizationId);
-      const apiMsg = await setWalletTariff(w.id, pickedTariffId);
-      setMsg({ text: apiMsg || 'Тариф организации обновлён', ok: true });
-      await load();
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Не удалось сменить тариф', ok: false });
-    } finally {
-      setSaving(false);
-    }
+  const redirectToPayment = (confirmationUrl: string) => {
+    window.location.assign(
+      confirmationUrl.startsWith('http')
+        ? confirmationUrl
+        : `${window.location.origin}${confirmationUrl.startsWith('/') ? '' : '/'}${confirmationUrl}`,
+    );
   };
 
-  const handleTopUp = async () => {
-    if (!canEdit || topUpBusy) return;
-    const amount = Number(String(topUpAmount).replace(/\s/g, '').replace(',', '.'));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setMsg({ text: 'Укажите сумму больше нуля', ok: false });
-      return;
-    }
-    setTopUpBusy(true);
+  const handlePeriodPurchase = async (tariffId: string) => {
+    if (!canEdit || purchasingId) return;
+    setPurchasingId(tariffId);
     setMsg(null);
     try {
       const w = wallet?.id ? wallet : await ensureOrganizationWallet(organizationId);
       const returnUrl = `${window.location.origin}/payments/return`;
-      const result = await createWalletDeposit({
+      const result = await createTariffPurchase({
         walletId: w.id,
-        amount,
+        tariffId,
         returnUrl,
       });
       try {
@@ -1395,65 +1395,45 @@ function OrganizationWalletSection({
           depositId: result.deposit.id,
           walletId: w.id,
           providerPaymentId: result.providerPaymentId,
-          amount,
+          purpose: 'tariff',
         }));
       } catch { /* ignore */ }
 
       if (result.paidImmediately) {
-        setTopUpAmount('');
-        setMsg({ text: 'Баланс пополнен', ok: true });
+        setMsg({ text: 'Тариф активирован', ok: true });
         await load();
         return;
       }
 
       const confirmationUrl = result.confirmationUrl?.trim() || null;
       if (confirmationUrl) {
-        let useInAppStub = false;
-        try {
-          const url = new URL(confirmationUrl, window.location.origin);
-          useInAppStub = url.searchParams.get('stub') === '1'
-            || url.pathname.includes('/payments/return');
-        } catch {
-          useInAppStub = false;
-        }
-        if (!useInAppStub) {
-          window.location.assign(confirmationUrl);
-          return;
-        }
-        window.location.assign(confirmationUrl.startsWith('http')
-          ? confirmationUrl
-          : `${window.location.origin}${confirmationUrl.startsWith('/') ? '' : '/'}${confirmationUrl}`);
+        redirectToPayment(confirmationUrl);
         return;
       }
 
-      await completeWalletDeposit({
-        depositId: result.deposit.id,
-        providerPaymentId: result.providerPaymentId ?? undefined,
-      });
-      setTopUpAmount('');
-      setMsg({ text: 'Баланс пополнен', ok: true });
+      setMsg({ text: 'Платёж создан, ожидание подтверждения', ok: true });
       await load();
     } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Не удалось создать пополнение', ok: false });
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось оформить тариф', ok: false });
     } finally {
-      setTopUpBusy(false);
+      setPurchasingId(null);
     }
   };
 
   const billingStatus = wallet
-    ? orgTariffPeriodStatus(wallet, selectedTariff)
+    ? orgTariffPeriodStatus(wallet, currentTariff)
     : null;
-  const showFallback =
-    Boolean(wallet?.tariffId
-      && wallet.effectiveTariffId
-      && wallet.tariffId !== wallet.effectiveTariffId
-      && effectiveTariff);
+  const activeUntil = walletActiveUntil(wallet);
+  const periodMode = isPeriodPurchaseMode(wallet);
+  const paidActive = Boolean(
+    currentTariff && currentTariff.cost > 0 && wallet?.isSelectedTariffActive && activeUntil,
+  );
 
   if (loading) {
     return (
       <div className={styles.scard}>
         <div className={styles.scardHead}>
-          <div className={styles.scardTitle}>Баланс и тариф</div>
+          <div className={styles.scardTitle}>Тариф</div>
         </div>
         <div className={styles.formBody}>
           <div className={styles.tariffCurrentMuted}>Загрузка...</div>
@@ -1465,80 +1445,47 @@ function OrganizationWalletSection({
   return (
     <div className={styles.scard}>
       <div className={styles.scardHead}>
-        <div className={styles.scardTitle}>Баланс и тариф</div>
+        <div className={styles.scardTitle}>Тариф</div>
         <div className={styles.scardDesc}>
-          Тарифный кошелёк организации «{organizationName}» — та же логика, что у личного кошелька:
-          баланс только для оплаты тарифа платформы.
+          Тариф организации «{organizationName}» — покупка на период, как у личного тарифа.
+          Upgrade учитывает остаток текущего.
         </div>
       </div>
       <div className={styles.formBody}>
         <div className={styles.walletBalanceCard}>
-          <div className={styles.walletBalanceLabel}>Баланс</div>
+          <div className={styles.walletBalanceLabel}>Текущий план</div>
           <div className={styles.walletBalanceValue}>
-            {(wallet?.balance ?? 0).toLocaleString('ru-RU')}
-            <span className={styles.walletBalanceCurrency}>₽</span>
+            {currentTariff?.name ?? 'Базовый'}
           </div>
-          {billingStatus && (
-            <div className={styles.walletBalanceStatus}>{billingStatus}</div>
-          )}
-          {showFallback && effectiveTariff && (
-            <div className={styles.walletBalanceHint}>
-              Сейчас действуют лимиты тарифа «{effectiveTariff.name}»
-            </div>
-          )}
+          <div className={styles.walletBalanceStatus}>
+            {billingStatus
+              ?? (paidActive && activeUntil
+                ? `до ${formatWalletDateTime(activeUntil)} · без автопродления`
+                : 'Базовые лимиты · платные планы ниже')}
+          </div>
         </div>
 
-        {canEdit && (
-          <div className={styles.field}>
-            <span className={styles.fieldLabel}>Пополнение тарифа</span>
-            <div className={styles.topUpRow}>
-              <input
-                className={styles.input}
-                type="text"
-                inputMode="decimal"
-                placeholder="1 000"
-                value={topUpAmount}
-                disabled={topUpBusy}
-                onChange={e => setTopUpAmount(e.target.value)}
-                autoComplete="off"
-              />
-              <Button
-                size="sm"
-                loading={topUpBusy}
-                disabled={!topUpAmount.trim()}
-                onClick={() => { void handleTopUp(); }}
-              >
-                Пополнить
-              </Button>
-            </div>
-            <div className={styles.scardDesc}>
-              Пополнение не сдвигает период — списание при NextChargeAt и достаточном балансе (без минуса).
-            </div>
-          </div>
-        )}
-
         <TariffPlansPicker
+          mode={periodMode ? 'periodPurchase' : 'legacy'}
           tariffs={orgTariffs}
           validators={validators}
           walletTariffId={wallet?.tariffId}
           walletEffectiveTariffId={wallet?.effectiveTariffId}
           isSelectedTariffActive={wallet?.isSelectedTariffActive}
-          pickedTariffId={pickedTariffId}
-          onPick={setPickedTariffId}
-          onCancel={() => setPickedTariffId(wallet?.tariffId ?? '')}
-          onConfirm={() => { void handleApplyTariff(); }}
-          confirming={saving}
+          currentTariff={currentTariff}
+          activeUntil={activeUntil}
+          onPeriodPurchase={(id) => { void handlePeriodPurchase(id); }}
+          purchasingTariffId={purchasingId}
           disabled={!canEdit}
-          title="Тариф организации"
-          subtitle="Те же планы и ограничения, что у личного кошелька — карточки с преимуществами каждого тарифа"
+          title="Планы организации"
+          subtitle="Покупка на период. Upgrade учитывает остаток текущего."
           emptyText="Нет доступных тарифов для организаций. Обратитесь к администратору."
-          confirmLabel="Применить тариф"
         />
 
         <div className={styles.field}>
-          <span className={styles.fieldLabel}>История операций</span>
+          <span className={styles.fieldLabel}>История</span>
           {history.length === 0 ? (
-            <div className={styles.tariffCurrentMuted}>Пополнений и списаний пока нет</div>
+            <div className={styles.tariffCurrentMuted}>Операций пока нет</div>
           ) : (
             <ul className={styles.walletHistoryList}>
               {history.slice(0, 12).map(row => (
@@ -1547,13 +1494,7 @@ function OrganizationWalletSection({
                     <span className={styles.walletHistoryName}>{row.name}</span>
                     <span className={styles.walletHistoryMeta}>{row.meta}</span>
                   </div>
-                  <span
-                    className={
-                      row.kind === 'in'
-                        ? styles.walletHistoryAmtIn
-                        : styles.walletHistoryAmtOut
-                    }
-                  >
+                  <span className={styles.walletHistoryAmtOut}>
                     {row.amount}
                   </span>
                 </li>

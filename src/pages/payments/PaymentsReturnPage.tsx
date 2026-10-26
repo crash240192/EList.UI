@@ -158,42 +158,42 @@ export default function PaymentsReturnPage() {
 
         if (!depositId && !providerPaymentId) {
           setPhase('error');
-          setMessage('Не найдено пополнение для подтверждения оплаты');
+          setMessage('Не найден платёж тарифа для подтверждения оплаты');
           return;
         }
 
-        // Stub ЮKassa: фронт сам завершает пополнение.
+        // Stub: фронт сам завершает платёж тарифа.
         if (isStub) {
           try {
             await completeWalletDeposit({ depositId, providerPaymentId });
             try { sessionStorage.removeItem(PENDING_WALLET_KEY); } catch { /* ignore */ }
             setPhase('ok');
-            setMessage('Баланс тарифного кошелька пополнен.');
-            toast('Пополнение подтверждено', 'success');
+            setMessage('Тариф активирован.');
+            toast('Тариф активирован', 'success');
           } catch (e) {
             setPhase('error');
-            setMessage(e instanceof Error ? e.message : 'Не удалось подтвердить пополнение');
+            setMessage(e instanceof Error ? e.message : 'Не удалось подтвердить оплату тарифа');
           }
           return;
         }
 
-        // T-Bank: webhook зачисляет баланс; UI ждёт Succeeded.
+        // T-Bank: webhook активирует тариф; UI ждёт Succeeded.
         // depositId из SuccessURL достаточно (GET /deposits/{id}); walletId — опциональный fallback.
         if (!depositId && !walletId) {
           setPhase('error');
           setMessage(
-            'Не найден depositId для проверки статуса пополнения. '
-            + 'Если списание прошло, обновите кошелёк чуть позже.',
+            'Не найден depositId для проверки статуса оплаты тарифа. '
+            + 'Если списание прошло, откройте раздел «Тариф» чуть позже.',
           );
           return;
         }
 
-        setMessage('Ожидаем подтверждение пополнения от банка…');
+        setMessage('Ожидаем подтверждение оплаты тарифа от банка…');
         const result = await waitForWalletDepositTerminal(
           { walletId, depositId, providerPaymentId },
           status => {
             if (status === 'Pending') {
-              setMessage('Ожидаем подтверждение пополнения от банка…');
+              setMessage('Ожидаем подтверждение оплаты тарифа от банка…');
             }
           },
         );
@@ -201,21 +201,21 @@ export default function PaymentsReturnPage() {
         if (result === 'ok') {
           try { sessionStorage.removeItem(PENDING_WALLET_KEY); } catch { /* ignore */ }
           setPhase('ok');
-          setMessage('Баланс тарифного кошелька пополнен.');
-          toast('Пополнение подтверждено', 'success');
+          setMessage('Тариф активирован.');
+          toast('Тариф активирован', 'success');
           return;
         }
 
         if (result === 'fail') {
           setPhase('error');
-          setMessage('Пополнение не прошло или было отменено.');
+          setMessage('Оплата тарифа не прошла или была отменена.');
           return;
         }
 
         setPhase('error');
         setMessage(
-          'Не дождались подтверждения пополнения. Если списание прошло, баланс обновится '
-          + 'после уведомления от банка — откройте кошелёк чуть позже.',
+          'Не дождались подтверждения оплаты тарифа. Если списание прошло, тариф активируется '
+          + 'после уведомления от банка — откройте раздел «Тариф» чуть позже.',
         );
         return;
       }
@@ -306,7 +306,7 @@ export default function PaymentsReturnPage() {
                 )}
               >
                 {kind === 'wallet'
-                  ? 'В кошелёк'
+                  ? 'К тарифу'
                   : (ticketsEnabled ? 'Мои билеты' : 'На главную')}
               </Button>
               {(kind === 'wallet' || ticketsEnabled) && (

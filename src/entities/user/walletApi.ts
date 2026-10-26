@@ -6,23 +6,26 @@ export interface IWallet {
   id: string;
   accountId?: string | null;
   organizationId?: string | null;
-  /** Выбранный тариф (сохраняется даже если период не оплачен). */
+  /** Текущий тариф entitlement (PeriodPurchase: без лимбо). */
   tariffId: string | null;
   balance: number;
   createdAt?: string;
   paidDate?: string | null;
   lastChargeDate?: string | null;
-  /** Следующее списание тарифа; null = выбранный платный не активен / ждёт средств */
+  /** Legacy next charge / PeriodPurchase activeUntil. */
   nextChargeAt?: string | null;
-  /** Тариф, чьи лимиты сейчас действуют (выбранный или free default). */
+  /** Синоним nextChargeAt в PeriodPurchase. */
+  activeUntil?: string | null;
   effectiveTariffId?: string | null;
-  /** Выбранный тариф сейчас активен (оплаченный период или cost=0). */
   isSelectedTariffActive?: boolean;
-  /** Статус биллинга с бэка. */
   tariffBillingStatus?: string | null;
+  /** PeriodPurchase | WalletAutoRenew */
+  billingMode?: string | null;
 }
 
 export type WalletDepositStatus = 'Pending' | 'Succeeded' | 'Canceled' | 'Failed';
+
+export type WalletTariffPurchaseKind = 'TopUp' | 'Purchase' | 'Extend' | 'Upgrade' | number;
 
 export interface IWalletDeposit {
   id: string;
@@ -33,8 +36,12 @@ export interface IWalletDeposit {
   providerPaymentId: string | null;
   createDate: string;
   paidAt: string | null;
-  /** Баланс сразу после зачисления (до возможного автосписания тарифа). */
   balanceAfter?: number | null;
+  tariffId?: string | null;
+  purchaseKind?: WalletTariffPurchaseKind;
+  creditApplied?: number;
+  periodStart?: string | null;
+  periodEnd?: string | null;
 }
 
 export interface IWalletTariffCharge {
@@ -55,6 +62,28 @@ export interface ICreateWalletDepositResponse {
   paidImmediately: boolean;
 }
 
+export interface ITariffPurchaseQuote {
+  walletId: string;
+  tariffId: string;
+  tariffName: string;
+  kind: string;
+  listPrice: number;
+  credit: number;
+  amountDue: number;
+  periodDays: number;
+  currentActiveUntil: string | null;
+  newActiveUntil: string;
+  message: string | null;
+}
+
+export interface ICreateTariffPurchaseResponse {
+  deposit: IWalletDeposit;
+  confirmationUrl: string | null;
+  providerPaymentId: string | null;
+  paidImmediately: boolean;
+  wallet?: IWallet | null;
+}
+
 function asStr(v: unknown): string {
   return v == null ? '' : String(v);
 }
@@ -62,6 +91,18 @@ function asStr(v: unknown): string {
 function asNum(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function nullableStr(v: unknown): string | null {
+  if (v == null || v === '') return null;
+  return String(v);
+}
+
+function normalizePurchaseKind(raw: unknown): WalletTariffPurchaseKind {
+  if (typeof raw === 'number') return raw;
+  const s = asStr(raw);
+  if (!s) return 'TopUp';
+  return s as WalletTariffPurchaseKind;
 }
 
 function normalizeDeposit(raw: Record<string, unknown>): IWalletDeposit {
@@ -85,18 +126,20 @@ function normalizeDeposit(raw: Record<string, unknown>): IWalletDeposit {
       const n = Number(v);
       return Number.isFinite(n) ? n : null;
     })(),
+    tariffId: nullableStr(raw.tariffId ?? raw.TariffId),
+    purchaseKind: normalizePurchaseKind(raw.purchaseKind ?? raw.PurchaseKind),
+    creditApplied: asNum(raw.creditApplied ?? raw.CreditApplied),
+    periodStart: nullableStr(raw.periodStart ?? raw.PeriodStart),
+    periodEnd: nullableStr(raw.periodEnd ?? raw.PeriodEnd),
   };
-}
-
-function nullableStr(v: unknown): string | null {
-  if (v == null || v === '') return null;
-  return String(v);
 }
 
 function normalizeWallet(raw: Record<string, unknown> | null | undefined): IWallet | null {
   if (!raw || typeof raw !== 'object') return null;
   const id = asStr(raw.id ?? raw.Id);
   if (!id) return null;
+  const next = nullableStr(raw.nextChargeAt ?? raw.NextChargeAt);
+  const active = nullableStr(raw.activeUntil ?? raw.ActiveUntil) ?? next;
   return {
     id,
     accountId: nullableStr(raw.accountId ?? raw.AccountId),
@@ -106,10 +149,12 @@ function normalizeWallet(raw: Record<string, unknown> | null | undefined): IWall
     createdAt: nullableStr(raw.createdAt ?? raw.CreatedAt) ?? undefined,
     paidDate: nullableStr(raw.paidDate ?? raw.PaidDate),
     lastChargeDate: nullableStr(raw.lastChargeDate ?? raw.LastChargeDate),
-    nextChargeAt: nullableStr(raw.nextChargeAt ?? raw.NextChargeAt),
+    nextChargeAt: next,
+    activeUntil: active,
     effectiveTariffId: nullableStr(raw.effectiveTariffId ?? raw.EffectiveTariffId),
     isSelectedTariffActive: Boolean(raw.isSelectedTariffActive ?? raw.IsSelectedTariffActive),
     tariffBillingStatus: nullableStr(raw.tariffBillingStatus ?? raw.TariffBillingStatus),
+    billingMode: nullableStr(raw.billingMode ?? raw.BillingMode),
   };
 }
 
@@ -126,7 +171,23 @@ function normalizeTariffCharge(raw: Record<string, unknown>): IWalletTariffCharg
   };
 }
 
-/** GET /api/Wallets/create — создать кошелёк (без тела) */
+function normalizeQuote(raw: Record<string, unknown>): ITariffPurchaseQuote {
+  return {
+    walletId: asStr(raw.walletId ?? raw.WalletId),
+    tariffId: asStr(raw.tariffId ?? raw.TariffId),
+    tariffName: asStr(raw.tariffName ?? raw.TariffName),
+    kind: asStr(raw.kind ?? raw.Kind) || 'Purchase',
+    listPrice: asNum(raw.listPrice ?? raw.ListPrice),
+    credit: asNum(raw.credit ?? raw.Credit),
+    amountDue: asNum(raw.amountDue ?? raw.AmountDue),
+    periodDays: asNum(raw.periodDays ?? raw.PeriodDays) || 30,
+    currentActiveUntil: nullableStr(raw.currentActiveUntil ?? raw.CurrentActiveUntil),
+    newActiveUntil: asStr(raw.newActiveUntil ?? raw.NewActiveUntil),
+    message: nullableStr(raw.message ?? raw.Message),
+  };
+}
+
+/** GET /api/Wallets/create */
 export async function createWallet(): Promise<IWallet | null> {
   try {
     const r = await apiClient.get<Record<string, unknown>>('/api/Wallets/create');
@@ -142,10 +203,7 @@ export async function getWalletByAccount(accountId: string): Promise<IWallet | n
   } catch { return null; }
 }
 
-/**
- * GET /api/Wallets/byOrganization/{organizationId}
- * Кошелёк организации (с tariffId текущего тарифа).
- */
+/** GET /api/Wallets/byOrganization/{organizationId} */
 export async function getWalletByOrganization(organizationId: string): Promise<IWallet | null> {
   try {
     const r = await apiClient.get<Record<string, unknown>>(`/api/Wallets/byOrganization/${organizationId}`);
@@ -153,11 +211,7 @@ export async function getWalletByOrganization(organizationId: string): Promise<I
   } catch { return null; }
 }
 
-/**
- * POST /api/Wallets/byOrganization/create
- * Создаёт кошелёк для организации. В теле передаём organizationId
- * (поле может отсутствовать в урезанной swagger-модели Wallet).
- */
+/** POST /api/Wallets/byOrganization/create */
 export async function createOrganizationWallet(organizationId: string): Promise<string | null> {
   const r = await apiClient.post<string | null>('/api/Wallets/byOrganization/create', {
     organizationId,
@@ -165,7 +219,6 @@ export async function createOrganizationWallet(organizationId: string): Promise<
   return r.result ?? null;
 }
 
-/** Получить или создать кошелёк организации */
 export async function ensureOrganizationWallet(organizationId: string): Promise<IWallet> {
   const existing = await getWalletByOrganization(organizationId);
   if (existing?.id) return existing;
@@ -178,11 +231,7 @@ export async function ensureOrganizationWallet(organizationId: string): Promise<
   return created;
 }
 
-/**
- * PUT /api/Wallets/setTariff?walletId=...&tariffId=...
- * query-параметры
- */
-/** PUT /api/Wallets/setTariff?walletId=...&tariffId=... */
+/** PUT /api/Wallets/setTariff — только free в PeriodPurchase */
 export async function setWalletTariff(walletId: string, tariffId: string): Promise<string | null> {
   const r = await apiClient.put<unknown>(`/api/Wallets/setTariff?walletId=${walletId}&tariffId=${tariffId}`, {});
   const msg = (r as { message?: string | null }).message;
@@ -196,7 +245,47 @@ function newIdempotencyKey(): string {
   return `wd-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** POST /api/Wallets/deposits — пополнение тарифного кошелька (stub/ЮKassa) */
+/** POST /api/Wallets/tariffPurchases/quote */
+export async function quoteTariffPurchase(payload: {
+  walletId: string;
+  tariffId: string;
+}): Promise<ITariffPurchaseQuote> {
+  const r = await apiClient.post<Record<string, unknown>>('/api/Wallets/tariffPurchases/quote', payload);
+  return normalizeQuote((r.result ?? {}) as Record<string, unknown>);
+}
+
+/** POST /api/Wallets/tariffPurchases */
+export async function createTariffPurchase(payload: {
+  walletId: string;
+  tariffId: string;
+  returnUrl?: string;
+  idempotencyKey?: string;
+}): Promise<ICreateTariffPurchaseResponse> {
+  const r = await apiClient.post<Record<string, unknown>>('/api/Wallets/tariffPurchases', {
+    walletId: payload.walletId,
+    tariffId: payload.tariffId,
+    returnUrl: payload.returnUrl,
+    idempotencyKey: payload.idempotencyKey ?? newIdempotencyKey(),
+  });
+  const raw = (r.result ?? {}) as Record<string, unknown>;
+  const depositRaw = (raw.deposit ?? raw.Deposit ?? {}) as Record<string, unknown>;
+  const walletRaw = (raw.wallet ?? raw.Wallet) as Record<string, unknown> | null | undefined;
+  return {
+    deposit: normalizeDeposit(depositRaw),
+    confirmationUrl: (() => {
+      const v = raw.confirmationUrl ?? raw.ConfirmationUrl;
+      return v == null || v === '' ? null : String(v);
+    })(),
+    providerPaymentId: (() => {
+      const v = raw.providerPaymentId ?? raw.ProviderPaymentId;
+      return v == null || v === '' ? null : String(v);
+    })(),
+    paidImmediately: Boolean(raw.paidImmediately ?? raw.PaidImmediately),
+    wallet: walletRaw ? normalizeWallet(walletRaw) : null,
+  };
+}
+
+/** @deprecated PeriodPurchase: используйте createTariffPurchase */
 export async function createWalletDeposit(payload: {
   walletId: string;
   amount: number;
@@ -227,7 +316,6 @@ export async function createWalletDeposit(payload: {
   };
 }
 
-/** POST /api/Wallets/deposits/complete — stub подтверждение пополнения */
 export async function completeWalletDeposit(payload: {
   depositId?: string;
   providerPaymentId?: string;
@@ -236,16 +324,11 @@ export async function completeWalletDeposit(payload: {
   return normalizeDeposit((r.result ?? {}) as Record<string, unknown>);
 }
 
-/** GET /api/Wallets/{walletId}/deposits */
 export async function fetchWalletDeposits(walletId: string): Promise<IWalletDeposit[]> {
   const r = await apiClient.get<Record<string, unknown>[]>(`/api/Wallets/${walletId}/deposits`);
   return (r.result ?? []).map(row => normalizeDeposit(row as Record<string, unknown>));
 }
 
-/**
- * Найти пополнение в списке кошелька (для poll после T-Bank return).
- * Предпочтительно по depositId, иначе по providerPaymentId.
- */
 export async function fetchWalletDeposit(params: {
   walletId?: string;
   depositId?: string;
@@ -256,7 +339,7 @@ export async function fetchWalletDeposit(params: {
       const byId = await fetchWalletDepositById(params.depositId);
       if (byId) return byId;
     } catch {
-      // fallback to list if walletId known
+      // fallback
     }
   }
 
@@ -274,7 +357,6 @@ export async function fetchWalletDeposit(params: {
   return null;
 }
 
-/** GET /api/Wallets/deposits/{depositId} — одно пополнение (return poll без walletId). */
 export async function fetchWalletDepositById(depositId: string): Promise<IWalletDeposit | null> {
   try {
     const r = await apiClient.get<Record<string, unknown>>(
@@ -286,8 +368,27 @@ export async function fetchWalletDepositById(depositId: string): Promise<IWallet
   }
 }
 
-/** GET /api/Wallets/{walletId}/tariffCharges — ledger списаний тарифа */
 export async function fetchWalletTariffCharges(walletId: string): Promise<IWalletTariffCharge[]> {
   const r = await apiClient.get<Record<string, unknown>[]>(`/api/Wallets/${walletId}/tariffCharges`);
   return (r.result ?? []).map(row => normalizeTariffCharge(row as Record<string, unknown>));
+}
+
+export function purchaseKindLabel(kind: WalletTariffPurchaseKind | undefined): string {
+  const k = kind;
+  if (k === 'Purchase' || k === 1) return 'Покупка тарифа';
+  if (k === 'Extend' || k === 2) return 'Продление тарифа';
+  if (k === 'Upgrade' || k === 3) return 'Upgrade тарифа';
+  if (k === 'TopUp' || k === 0) return 'Пополнение баланса';
+  return 'Платёж тарифа';
+}
+
+export function walletActiveUntil(wallet: IWallet | null | undefined): string | null {
+  if (!wallet) return null;
+  return wallet.activeUntil || wallet.nextChargeAt || null;
+}
+
+export function isPeriodPurchaseMode(wallet: IWallet | null | undefined): boolean {
+  const mode = wallet?.billingMode?.trim();
+  if (!mode) return true; // API default PeriodPurchase
+  return mode.toLowerCase() === 'periodpurchase';
 }

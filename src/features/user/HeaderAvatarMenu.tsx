@@ -159,7 +159,7 @@ export function HeaderAvatarMenu() {
             }}
           >
             <WalletIcon />
-            <span>Баланс</span>
+            <span>Тариф</span>
           </button>
 
           <button

@@ -1,20 +1,19 @@
-// pages/wallet/WalletPage.tsx — макет examples/elist_settings_wallet.html
+// pages/wallet/WalletPage.tsx — страница «Тариф» (PeriodPurchase)
 
 import { useState, useEffect, useCallback } from 'react';
-import { BRAND_NAME } from '@/shared/config/brand';
 import {
   createWallet,
   getWalletByAccount,
-  setWalletTariff,
-  createWalletDeposit,
-  completeWalletDeposit,
+  createTariffPurchase,
   fetchWalletDeposits,
   fetchWalletTariffCharges,
+  purchaseKindLabel,
+  walletActiveUntil,
+  isPeriodPurchaseMode,
   type IWallet,
   type IWalletDeposit,
   type IWalletTariffCharge,
 } from '@/entities/user/walletApi';
-import { getMyPersonInfo } from '@/entities/user/settingsApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
 import {
   fetchMyOrders,
@@ -61,40 +60,31 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function formatBalanceAfter(balance: number | null | undefined): string | null {
-  if (balance == null || !Number.isFinite(balance)) return null;
-  return `остаток ${balance.toLocaleString('ru-RU')} ₽`;
+function formatDateShort(iso: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
-/** Статус биллинга: предпочитаем текст с API, иначе локальный fallback. */
-function tariffPeriodStatus(wallet: IWallet, tariff: ITariff | null): string | null {
-  if (wallet.tariffBillingStatus) return wallet.tariffBillingStatus;
-  if (!tariff) return null;
-  if (wallet.isSelectedTariffActive || tariff.cost <= 0) {
-    const next = wallet.nextChargeAt ? new Date(wallet.nextChargeAt).getTime() : NaN;
-    if (Number.isFinite(next) && next > Date.now()) {
-      return `Активен до ${formatDateTime(wallet.nextChargeAt!)} · следующее списание`;
-    }
-    if (tariff.cost <= 0) return 'Бесплатный тариф активен';
-  }
-  return 'Выбранный тариф не активен — недостаточно средств. Действует бесплатный тариф по умолчанию.';
+function daysLeft(iso: string): number | null {
+  const end = new Date(iso).getTime();
+  if (!Number.isFinite(end)) return null;
+  return Math.max(0, Math.ceil((end - Date.now()) / (24 * 60 * 60 * 1000)));
 }
 
 export default function WalletPage() {
-  usePageTitle('Кошелёк');
+  usePageTitle('Тариф');
   const [wallet, setWallet] = useState<IWallet | null>(null);
   const [tariff, setTariff] = useState<ITariff | null>(null);
-  const [holderName, setHolderName] = useState('');
   const [allTariffs, setAllTariffs] = useState<ITariff[]>([]);
   const [validators, setValidators] = useState<Record<string, ITariffValidator | null>>({});
   const [loading, setLoading] = useState(true);
-  const [selectedTariffId, setSelectedTariffId] = useState('');
-  const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [topUpAmount, setTopUpAmount] = useState('');
-  const [topUpBusy, setTopUpBusy] = useState(false);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [ticketsEnabled, setTicketsEnabled] = useState(false);
 
   useEffect(() => {
@@ -118,8 +108,6 @@ export default function WalletPage() {
   ) => {
     setHistoryLoading(true);
     try {
-      // Единая лента: депозиты + ledger списаний тарифа (+ билеты при включённом модуле).
-      // Баланс карточки при этом остаётся только тарифным.
       const rows: HistoryRow[] = [];
       const tariffNameById = new Map<string, string>();
       for (const t of tariffsCatalog) {
@@ -137,34 +125,45 @@ export default function WalletPage() {
           const when = d.paidAt || d.createDate;
           const sortAt = when ? new Date(when).getTime() : 0;
           const dateLabel = when ? formatDateTime(when) : '';
-          const balanceLabel = formatBalanceAfter(d.balanceAfter);
+          const planName = d.tariffId ? tariffNameById.get(d.tariffId) : null;
+          const kindLabel = purchaseKindLabel(d.purchaseKind);
+          const name = planName ? `${kindLabel} «${planName}»` : kindLabel;
           rows.push({
             id: `deposit-${d.id}`,
-            kind: 'in',
-            name: 'Пополнение тарифа',
-            meta: [dateLabel, 'Тариф платформы', balanceLabel].filter(Boolean).join(' · '),
-            amount: `+ ${d.amount.toLocaleString('ru-RU')} ₽`,
+            kind: 'tariff',
+            name,
+            meta: [dateLabel, d.periodEnd ? `до ${formatDateShort(d.periodEnd)}` : null]
+              .filter(Boolean)
+              .join(' · '),
+            amount: d.amount > 0
+              ? `− ${d.amount.toLocaleString('ru-RU')} ₽`
+              : '0 ₽',
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
         }
 
-        for (const c of charges) {
-          const sortAt = c.chargedAt ? new Date(c.chargedAt).getTime() : 0;
-          const dateLabel = c.chargedAt ? formatDateTime(c.chargedAt) : '';
-          const name = tariffNameById.get(c.tariffId)
-            ? `Тариф «${tariffNameById.get(c.tariffId)}»`
-            : 'Списание тарифа';
-          const balanceLabel = formatBalanceAfter(c.balanceAfter);
-          rows.push({
-            id: `charge-${c.id}`,
-            kind: 'tariff',
-            name,
-            meta: [dateLabel, 'Списание тарифа', balanceLabel].filter(Boolean).join(' · '),
-            amount: c.amount > 0
-              ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
-              : '0 ₽',
-            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
-          });
+        // Legacy charges only if no purchase-kind deposits cover the story
+        const hasPurchaseDeposits = deposits.some(
+          d => d.status === 'Succeeded' && d.purchaseKind != null && d.purchaseKind !== 'TopUp' && d.purchaseKind !== 0,
+        );
+        if (!hasPurchaseDeposits) {
+          for (const c of charges) {
+            const sortAt = c.chargedAt ? new Date(c.chargedAt).getTime() : 0;
+            const dateLabel = c.chargedAt ? formatDateTime(c.chargedAt) : '';
+            const name = tariffNameById.get(c.tariffId)
+              ? `Тариф «${tariffNameById.get(c.tariffId)}»`
+              : 'Списание тарифа';
+            rows.push({
+              id: `charge-${c.id}`,
+              kind: 'tariff',
+              name,
+              meta: [dateLabel, 'Списание'].filter(Boolean).join(' · '),
+              amount: c.amount > 0
+                ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
+                : '0 ₽',
+              sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+            });
+          }
         }
       }
 
@@ -191,7 +190,7 @@ export default function WalletPage() {
             id: `order-${order.id}`,
             kind: isRefund ? 'in' : 'out',
             name: nameById.get(order.eventId) || 'Билет на мероприятие',
-            meta: `${dateLabel}${qty} · ${status} · ЮKassa`,
+            meta: `${dateLabel}${qty} · ${status}`,
             amount: isRefund ? `+ ${amountAbs}` : `− ${amountAbs}`,
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
@@ -213,19 +212,13 @@ export default function WalletPage() {
       if (!w) w = await createWallet();
       setWallet(w);
 
-      const [tariffs, person, features] = await Promise.all([
+      const [tariffs, features] = await Promise.all([
         tariffApi.getAll(false).catch(() => []),
-        getMyPersonInfo().catch(() => null),
         import('@/shared/api/featuresApi').then(m => m.fetchAppFeatures()).catch(() => null),
       ]);
       const ticketsOn = Boolean(features?.ticketsEnabled);
       setTicketsEnabled(ticketsOn);
       setAllTariffs([...tariffs].sort((a, b) => a.cost - b.cost));
-
-      if (person) {
-        const name = [person.firstName, person.lastName].filter(Boolean).join(' ');
-        if (name) setHolderName(name);
-      }
 
       if (w?.tariffId) {
         const t = tariffs.find(x => x.id === w!.tariffId) ?? null;
@@ -250,103 +243,76 @@ export default function WalletPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
 
-  const handleSetTariff = async () => {
-    if (!wallet || !selectedTariffId) return;
-    setSaving(true);
-    setMsg(null);
-    try {
-      const apiMsg = await setWalletTariff(wallet.id, selectedTariffId);
-      setMsg({ text: apiMsg || 'Тариф подключён', ok: true });
-      setSelectedTariffId('');
-      await load();
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
-    } finally {
-      setSaving(false);
-    }
+  const redirectToPayment = (confirmationUrl: string) => {
+    window.location.assign(
+      confirmationUrl.startsWith('http')
+        ? confirmationUrl
+        : `${window.location.origin}${confirmationUrl.startsWith('/') ? '' : '/'}${confirmationUrl}`,
+    );
   };
 
-  const scrollToTopUp = () => {
-    document.getElementById('wallet-top-up')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const handleTopUp = async () => {
-    if (!wallet || topUpBusy) return;
-    const amount = Number(String(topUpAmount).replace(/\s/g, '').replace(',', '.'));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setMsg({ text: 'Укажите сумму больше нуля', ok: false });
-      return;
-    }
-    setTopUpBusy(true);
+  const handlePeriodPurchase = async (tariffId: string) => {
+    if (!wallet || purchasingId) return;
+    setPurchasingId(tariffId);
     setMsg(null);
     try {
       const returnUrl = `${window.location.origin}/payments/return`;
-      const result = await createWalletDeposit({
+      const result = await createTariffPurchase({
         walletId: wallet.id,
-        amount,
+        tariffId,
         returnUrl,
       });
 
-      const pending = {
-        depositId: result.deposit.id,
-        walletId: wallet.id,
-        providerPaymentId: result.providerPaymentId,
-        amount,
-      };
       try {
-        sessionStorage.setItem('elist_pending_wallet_deposit', JSON.stringify(pending));
+        sessionStorage.setItem('elist_pending_wallet_deposit', JSON.stringify({
+          depositId: result.deposit.id,
+          walletId: wallet.id,
+          providerPaymentId: result.providerPaymentId,
+          purpose: 'tariff',
+        }));
       } catch { /* ignore */ }
 
       if (result.paidImmediately) {
-        setTopUpAmount('');
-        setMsg({ text: 'Баланс пополнен', ok: true });
+        setMsg({ text: 'Тариф активирован', ok: true });
         await load();
         return;
       }
 
       const confirmationUrl = result.confirmationUrl?.trim() || null;
       if (confirmationUrl) {
-        let useInAppStub = false;
-        try {
-          const url = new URL(confirmationUrl, window.location.origin);
-          useInAppStub = url.searchParams.get('stub') === '1'
-            || url.pathname.includes('/payments/return');
-        } catch {
-          useInAppStub = false;
-        }
-        if (!useInAppStub) {
-          window.location.assign(confirmationUrl);
-          return;
-        }
-        // Stub: подтверждаем через return-страницу / complete API.
-        window.location.assign(confirmationUrl.startsWith('http')
-          ? confirmationUrl
-          : `${window.location.origin}${confirmationUrl.startsWith('/') ? '' : '/'}${confirmationUrl}`);
+        redirectToPayment(confirmationUrl);
         return;
       }
 
-      await completeWalletDeposit({
-        depositId: result.deposit.id,
-        providerPaymentId: result.providerPaymentId ?? undefined,
-      });
-      setTopUpAmount('');
-      setMsg({ text: 'Баланс пополнен', ok: true });
+      setMsg({ text: 'Платёж создан, ожидание подтверждения', ok: true });
       await load();
     } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Не удалось создать пополнение', ok: false });
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось оформить тариф', ok: false });
     } finally {
-      setTopUpBusy(false);
+      setPurchasingId(null);
     }
   };
+
+  const handleExtendCurrent = () => {
+    if (!tariff?.id) return;
+    void handlePeriodPurchase(tariff.id);
+  };
+
+  const activeUntil = walletActiveUntil(wallet);
+  const left = activeUntil ? daysLeft(activeUntil) : null;
+  const paidActive = Boolean(
+    tariff && tariff.cost > 0 && wallet?.isSelectedTariffActive && activeUntil,
+  );
+  const periodMode = isPeriodPurchaseMode(wallet);
 
   if (loading) {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
           <div className={styles.cardHead}>
-            <div className={`${styles.bankCard} ${styles.bankCardStub}`}>
+            <div className={`${styles.planHero} ${styles.planHeroStub}`}>
               <div className={styles.loader}>Загрузка...</div>
             </div>
           </div>
@@ -360,64 +326,35 @@ export default function WalletPage() {
       <div className={styles.card}>
         {wallet && (
           <div className={styles.cardHead}>
-            <div className={styles.bankCard}>
-              <div className={styles.cardTop}>
-                <div className={styles.cardBrand}>{BRAND_NAME} Pay</div>
-                <div className={styles.cardChip}>
-                  <div className={styles.chipLine} />
-                  <div className={styles.chipLine} />
-                  <div className={styles.chipLine} />
+            <div className={styles.planHero}>
+              <div className={styles.planHeroTop}>
+                <span className={styles.planHeroEyebrow}>Тариф</span>
+                <span className={`${styles.planHeroPill} ${paidActive ? styles.planHeroPillOk : styles.planHeroPillMuted}`}>
+                  {paidActive ? 'Активен' : 'Базовый'}
+                </span>
+              </div>
+              <div className={styles.planHeroName}>
+                {tariff?.name ?? 'Бесплатный'}
+              </div>
+              <div className={styles.planHeroMeta}>
+                {paidActive && activeUntil
+                  ? `до ${formatDateShort(activeUntil)}${left != null ? ` · осталось ${left} дн.` : ''} · без автопродления`
+                  : 'Базовые лимиты · платные планы ниже'}
+              </div>
+              {paidActive && tariff && (
+                <div className={styles.planHeroActions}>
+                  <button
+                    type="button"
+                    className={styles.planHeroCta}
+                    disabled={Boolean(purchasingId)}
+                    onClick={handleExtendCurrent}
+                  >
+                    {purchasingId === tariff.id
+                      ? '…'
+                      : `Продлить на ${tariff.periodDays ?? tariff.period?.days ?? 30} дн. · ${tariff.cost.toLocaleString('ru-RU')} ₽`}
+                  </button>
                 </div>
-              </div>
-              <div className={styles.cardMid}>
-                <div className={styles.cardLabel}>Баланс</div>
-                <div className={styles.cardBalance}>
-                  {(wallet.balance ?? 0).toLocaleString('ru-RU')}
-                  <span className={styles.cardCurrency}>₽</span>
-                </div>
-                {tariff && (
-                  <div className={styles.cardTariffStatus}>
-                    {tariffPeriodStatus(wallet, tariff)}
-                  </div>
-                )}
-              </div>
-              <div className={styles.cardBottom}>
-                <div>
-                  {holderName && (
-                    <>
-                      <div className={styles.cardHolder}>Владелец</div>
-                      <div className={styles.cardHolderName}>{holderName}</div>
-                    </>
-                  )}
-                </div>
-                {wallet.id && (
-                  <div className={styles.cardId}>ID: {wallet.id.slice(0, 8)}...</div>
-                )}
-              </div>
-
-              <div className={styles.cardActionsRow}>
-                <button type="button" className={styles.cardActionBtn} onClick={scrollToTopUp}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <polyline points="19 12 12 19 5 12" />
-                  </svg>
-                  Пополнить
-                </button>
-                <button type="button" className={styles.cardActionBtn} disabled title="Недоступно: кошелёк только для тарифа">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <line x1="12" y1="19" x2="12" y2="5" />
-                    <polyline points="5 12 12 5 19 12" />
-                  </svg>
-                  Вывести
-                </button>
-                <button type="button" className={styles.cardActionBtn} disabled title="Недоступно">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <rect x="5" y="2" width="14" height="20" rx="2" />
-                    <line x1="12" y1="18" x2="12.01" y2="18" />
-                  </svg>
-                  Реквизиты
-                </button>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -431,68 +368,31 @@ export default function WalletPage() {
 
           {wallet && (
             <>
-              <div className={styles.topUpSection} id="wallet-top-up">
-                <div className={styles.sectionTitle}>Пополнение тарифа</div>
-                <div className={styles.topUpStub}>
-                  <div className={styles.topUpStubForm}>
-                    <label className={styles.topUpLabel}>
-                      Сумма пополнения
-                      <div className={styles.topUpInputRow}>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          className={styles.topUpInput}
-                          placeholder="1 000"
-                          value={topUpAmount}
-                          onChange={e => setTopUpAmount(e.target.value)}
-                          disabled={topUpBusy}
-                          autoComplete="off"
-                        />
-                        <span className={styles.topUpCurrency}>₽</span>
-                      </div>
-                    </label>
-                    <button
-                      type="button"
-                      className={styles.topUpBtn}
-                      disabled={topUpBusy || !topUpAmount.trim()}
-                      onClick={() => { void handleTopUp(); }}
-                    >
-                      {topUpBusy ? '…' : 'Перейти к оплате'}
-                    </button>
-                  </div>
-                  <p className={styles.topUpHint}>
-                    Баланс только для оплаты тарифа платформы. Пополнение не сдвигает активный период —
-                    списание происходит при наступлении NextChargeAt и достаточном балансе (без минуса).
-                    {ticketsEnabled
-                      ? ' Билеты идут через ЮKassa (сплит). Сейчас оплата — stub, как у билетов.'
-                      : ' Сейчас оплата пополнения — stub.'}
-                  </p>
-                </div>
-              </div>
-
               <div>
                 <TariffPlansPicker
+                  mode={periodMode ? 'periodPurchase' : 'legacy'}
                   tariffs={allTariffs}
                   validators={validators}
-                  walletTariffId={wallet?.tariffId}
-                  walletEffectiveTariffId={wallet?.effectiveTariffId}
-                  isSelectedTariffActive={wallet?.isSelectedTariffActive}
-                  pickedTariffId={selectedTariffId}
-                  onPick={setSelectedTariffId}
-                  onCancel={() => setSelectedTariffId('')}
-                  onConfirm={() => { void handleSetTariff(); }}
-                  confirming={saving}
+                  walletTariffId={wallet.tariffId}
+                  walletEffectiveTariffId={wallet.effectiveTariffId}
+                  isSelectedTariffActive={wallet.isSelectedTariffActive}
+                  currentTariff={tariff}
+                  activeUntil={activeUntil}
+                  onPeriodPurchase={(id) => { void handlePeriodPurchase(id); }}
+                  purchasingTariffId={purchasingId}
+                  title="Планы"
+                  subtitle="Покупка на период. Upgrade учитывает остаток текущего."
                 />
               </div>
 
               <div className={styles.historySection}>
                 <div className={styles.tariffHeader}>
                   <div>
-                    <div className={styles.sectionTitle}>История операций</div>
+                    <div className={styles.sectionTitle}>История</div>
                     <div className={styles.sectionSubtitle}>
                       {ticketsEnabled
-                        ? 'Пополнения и списания тарифа, плюс билеты (ЮKassa). Баланс выше — только тариф.'
-                        : 'Пополнения и списания тарифа. Баланс выше — только тариф.'}
+                        ? 'Платежи тарифа и билеты'
+                        : 'Платежи тарифа'}
                     </div>
                   </div>
                 </div>
