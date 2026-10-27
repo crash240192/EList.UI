@@ -89,7 +89,10 @@ export function resolvePeriodPurchaseAction(
 
   if (target.cost <= 0) {
     if (currentActivePaid) {
-      return { type: 'locked', label: untilLabel ? `После ${untilLabel}` : 'После окончания периода' };
+      return {
+        type: 'locked',
+        label: untilLabel ? `Будет доступен ${untilLabel}` : 'Будет доступен после окончания периода',
+      };
     }
     if (current && current.id === target.id) {
       return { type: 'current' };
@@ -104,7 +107,10 @@ export function resolvePeriodPurchaseAction(
     if (target.cost > current.cost) {
       return { type: 'upgrade', label: `Улучшить · от ${price}` };
     }
-    return { type: 'locked', label: untilLabel ? `После ${untilLabel}` : 'После окончания периода' };
+    return {
+      type: 'locked',
+      label: untilLabel ? `Будет доступен ${untilLabel}` : 'Будет доступен после окончания периода',
+    };
   }
 
   return { type: 'buy', label: `Купить · ${price} / ${periodLabel}` };

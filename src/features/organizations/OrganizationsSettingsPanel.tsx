@@ -1333,9 +1333,7 @@ function OrganizationWalletSection({
             ]
               .filter(Boolean)
               .join(' · '),
-            amount: d.amount > 0
-              ? `− ${d.amount.toLocaleString('ru-RU')} ₽`
-              : '0 ₽',
+            amount: `${d.amount.toLocaleString('ru-RU')} ₽`,
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
         }
@@ -1357,9 +1355,7 @@ function OrganizationWalletSection({
               meta: [c.chargedAt ? formatWalletDateTime(c.chargedAt) : '', 'Списание']
                 .filter(Boolean)
                 .join(' · '),
-              amount: c.amount > 0
-                ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
-                : '0 ₽',
+              amount: `${Number(c.amount).toLocaleString('ru-RU')} ₽`,
               sortAt: Number.isFinite(sortAt) ? sortAt : 0,
             });
           }
@@ -1380,9 +1376,7 @@ function OrganizationWalletSection({
               when ? formatWalletDateTime(when) : '',
               rf.remainingDays > 0 ? `~${Math.ceil(rf.remainingDays)} дн.` : null,
             ].filter(Boolean).join(' · '),
-            amount: rf.amount > 0
-              ? `+ ${rf.amount.toLocaleString('ru-RU')} ₽`
-              : '0 ₽',
+            amount: `${rf.amount.toLocaleString('ru-RU')} ₽`,
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
         }

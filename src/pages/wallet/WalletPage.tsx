@@ -170,9 +170,7 @@ export default function WalletPage() {
             meta: [dateLabel, d.periodEnd ? `до ${formatDateShort(d.periodEnd)}` : null]
               .filter(Boolean)
               .join(' · '),
-            amount: d.amount > 0
-              ? `− ${d.amount.toLocaleString('ru-RU')} ₽`
-              : '0 ₽',
+            amount: `${d.amount.toLocaleString('ru-RU')} ₽`,
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
         }
@@ -193,9 +191,7 @@ export default function WalletPage() {
               kind: 'tariff',
               name,
               meta: [dateLabel, 'Списание'].filter(Boolean).join(' · '),
-              amount: c.amount > 0
-                ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
-                : '0 ₽',
+              amount: `${Number(c.amount).toLocaleString('ru-RU')} ₽`,
               sortAt: Number.isFinite(sortAt) ? sortAt : 0,
             });
           }
@@ -218,9 +214,7 @@ export default function WalletPage() {
               dateLabel,
               rf.remainingDays > 0 ? `~${Math.ceil(rf.remainingDays)} дн.` : null,
             ].filter(Boolean).join(' · '),
-            amount: rf.amount > 0
-              ? `+ ${rf.amount.toLocaleString('ru-RU')} ₽`
-              : '0 ₽',
+            amount: `${rf.amount.toLocaleString('ru-RU')} ₽`,
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
         }
@@ -250,7 +244,7 @@ export default function WalletPage() {
             kind: isRefund ? 'in' : 'out',
             name: nameById.get(order.eventId) || 'Билет на мероприятие',
             meta: `${dateLabel}${qty} · ${status}`,
-            amount: isRefund ? `+ ${amountAbs}` : `− ${amountAbs}`,
+            amount: amountAbs,
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
         }
