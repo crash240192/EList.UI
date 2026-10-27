@@ -7,6 +7,7 @@ import { fetchOrganizerRating } from '@/entities/event';
 import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
+import { loadHeaderBlurPercent, peekHeaderBlurPercent } from '@/entities/user/headerApi';
 import { useUserProfileEvents } from '@/features/event-list/useUserProfileEvents';
 import { useInfiniteScroll, usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
@@ -33,6 +34,8 @@ import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { useAuthStore } from '@/app/store';
 import { UserShareMenu } from '@/features/user/UserShareMenu';
+import { HeaderPhotoDialog, type HeaderPhotoValue } from '@/features/user/HeaderPhotoDialog/HeaderPhotoDialog';
+import { HeaderPhotoIcon } from '@/features/user/HeaderPhotoDialog/HeaderPhotoIcon';
 import {
   InviteBlockedDialog,
   ProfileEventInviteModal,
@@ -61,6 +64,8 @@ import {
   type UserEventsScope,
 } from './userPageUtils';
 import { formatAge, pluralYears } from '@/shared/lib/datetime';
+import { coverFocusFromEvent, coverFocusImgStyle, DEFAULT_COVER_FOCUS } from '@/shared/lib/coverFocus';
+import { HEADER_BLUR_FALLBACK_PERCENT, headerBlurFilter } from '@/shared/lib/headerPhoto';
 import styles from './UserPage.module.css';
 
 type MainTab = UserEventsScope | 'albums';
@@ -80,16 +85,36 @@ const MAIN_TABS: { key: MainTab; label: string }[] = [
 function UserCoverBackground({
   accountId,
   avatarId,
+  headerImageId,
+  headerFocus,
+  headerBlurPercent,
 }: {
   accountId: string;
   avatarId: string | null;
+  headerImageId: string | null;
+  headerFocus: { x: number; y: number } | null;
+  headerBlurPercent: number;
 }) {
   const fileId = useAvatar(accountId, avatarId);
+  const headerBlur = headerImageId ? headerBlurFilter(headerBlurPercent) : undefined;
 
   return (
     <div className={styles.coverBg}>
       <div className={styles.coverBgGradient} aria-hidden />
-      {fileId ? (
+      {headerImageId ? (
+        <AuthImage
+          fileId={headerImageId}
+          fullSize
+          imageFit="cover"
+          alt=""
+          className={styles.coverHeaderImg}
+          style={{
+            ...coverFocusImgStyle(headerFocus),
+            background: 'transparent',
+            ...(headerBlur ? { filter: headerBlur, transform: 'scale(1.08)' } : {}),
+          }}
+        />
+      ) : fileId ? (
         <AuthImage
           fileId={fileId}
           alt=""
@@ -329,6 +354,43 @@ export default function UserPage() {
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
   const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
+  const [headerEditorOpen, setHeaderEditorOpen] = useState(false);
+  const [headerBlurPercent, setHeaderBlurPercent] = useState(0);
+
+  const headerImageId = profile?.account.headerImageId ?? null;
+  const headerBlurOn = profile?.account.headerBlur === true;
+
+  useEffect(() => {
+    if (!headerImageId || !headerBlurOn) {
+      setHeaderBlurPercent(0);
+      return;
+    }
+    const cached = peekHeaderBlurPercent(headerImageId);
+    if (cached != null) {
+      setHeaderBlurPercent(cached);
+      return;
+    }
+    let cancelled = false;
+    setHeaderBlurPercent(HEADER_BLUR_FALLBACK_PERCENT);
+    void loadHeaderBlurPercent(headerImageId).then(percent => {
+      if (!cancelled) setHeaderBlurPercent(percent ?? HEADER_BLUR_FALLBACK_PERCENT);
+    });
+    return () => { cancelled = true; };
+  }, [headerImageId, headerBlurOn]);
+
+  const applyHeaderPhoto = (next: HeaderPhotoValue) => {
+    setHeaderBlurPercent(next.imageId ? next.blurPercent : 0);
+    setProfile(prev => prev ? {
+      ...prev,
+      account: {
+        ...prev.account,
+        headerImageId: next.imageId,
+        headerFocusX: next.imageId ? next.focus.x : null,
+        headerFocusY: next.imageId ? next.focus.y : null,
+        headerBlur: Boolean(next.imageId) && next.blurPercent > 0,
+      },
+    } : prev);
+  };
 
   const { scopes: eventScopes, upcomingScopes, scopeTotals } = useUserProfileEvents(
     profileAccountId || null,
@@ -556,8 +618,14 @@ export default function UserPage() {
           <UserCoverBackground
             accountId={profileAccountId}
             avatarId={account.avatarId ?? null}
+            headerImageId={account.headerImageId ?? null}
+            headerFocus={coverFocusFromEvent({
+              coverFocusX: account.headerFocusX,
+              coverFocusY: account.headerFocusY,
+            })}
+            headerBlurPercent={headerBlurPercent}
           />
-          <div className={styles.coverOverlay} />
+          <div className={`${styles.coverOverlay} ${account.headerImageId ? styles.coverOverlayPhoto : ''}`} />
 
           <div className={styles.heroTop}>
             <HeroBackButton onClick={goBack} />
@@ -572,15 +640,26 @@ export default function UserPage() {
                 <ShareIcon />
               </button>
               {isOwnProfile && (
-                <button
-                  type="button"
-                  className={`${heroStyles.heroBtn} noHoverGlow`}
-                  onClick={() => navigate('/settings')}
-                  aria-label="Настройки"
-                  title="Настройки"
-                >
-                  <SettingsIcon />
-                </button>
+                <div className={styles.heroSettingsCol}>
+                  <button
+                    type="button"
+                    className={`${heroStyles.heroBtn} noHoverGlow`}
+                    onClick={() => navigate('/settings')}
+                    aria-label="Настройки"
+                    title="Настройки"
+                  >
+                    <SettingsIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className={`${heroStyles.heroBtn} noHoverGlow`}
+                    onClick={() => setHeaderEditorOpen(true)}
+                    aria-label="Изменить фото шапки"
+                    title="Изменить фото шапки"
+                  >
+                    <HeaderPhotoIcon />
+                  </button>
+                </div>
               )}
               {!isOwnProfile && authenticated && (
                 <>
@@ -939,6 +1018,19 @@ export default function UserPage() {
               setReportedPhotoIds(prev => new Set(prev).add(reportTarget.id));
             }
           }}
+        />
+      )}
+
+      {headerEditorOpen && profile?.account && isOwnProfile && (
+        <HeaderPhotoDialog
+          imageId={profile.account.headerImageId ?? null}
+          focus={{
+            x: profile.account.headerFocusX ?? DEFAULT_COVER_FOCUS.x,
+            y: profile.account.headerFocusY ?? DEFAULT_COVER_FOCUS.y,
+          }}
+          blurPercent={headerBlurPercent}
+          onClose={() => setHeaderEditorOpen(false)}
+          onApply={applyHeaderPhoto}
         />
       )}
 

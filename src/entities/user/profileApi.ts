@@ -2,6 +2,7 @@
 
 import { apiClient } from '@/shared/api/client';
 import { getStoredAccountId } from '@/entities/user/api';
+import { clampCoverFocusValue } from '@/shared/lib/coverFocus';
 import type { Gender } from '@/shared/api/types';
 
 export interface IAccountData {
@@ -10,6 +11,12 @@ export interface IAccountData {
   avatarId?: string | null;
   /** Город по координатам аккаунта (если разрешено locationVisibility) */
   profileCity?: string | null;
+  /** Файл шапки. Пусто — на обложке размытый аватар. */
+  headerImageId?: string | null;
+  headerFocusX?: number | null;
+  headerFocusY?: number | null;
+  /** Сервер хранит только вкл/выкл. Процент шкалы лежит в контексте файла. */
+  headerBlur?: boolean;
 }
 
 export interface IContactType {
@@ -62,6 +69,10 @@ function normalizeAccount(raw: IAccountData | null | undefined): IAccountData {
   const r = raw as IAccountData & Record<string, unknown>;
   const city = r.profileCity ?? (r as Record<string, unknown>).ProfileCity;
   const avatarRaw = r.avatarId ?? r.AvatarId;
+  const headerRaw = r.headerImageId ?? r.HeaderImageId;
+  const focusX = r.headerFocusX ?? r.HeaderFocusX;
+  const focusY = r.headerFocusY ?? r.HeaderFocusY;
+  const blurRaw = r.headerBlur ?? r.HeaderBlur;
   return {
     id: String(r.id ?? r.Id ?? ''),
     login: String(r.login ?? r.Login ?? ''),
@@ -69,6 +80,12 @@ function normalizeAccount(raw: IAccountData | null | undefined): IAccountData {
       ? null
       : String(avatarRaw)),
     profileCity: typeof city === 'string' && city.trim() ? city.trim() : null,
+    headerImageId: (headerRaw === null || headerRaw === undefined || headerRaw === ''
+      ? null
+      : String(headerRaw)),
+    headerFocusX: focusX == null || focusX === '' ? null : clampCoverFocusValue(focusX),
+    headerFocusY: focusY == null || focusY === '' ? null : clampCoverFocusValue(focusY),
+    headerBlur: blurRaw === true,
   };
 }
 
