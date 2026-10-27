@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
+  albumHasNewContent,
   getAlbumsByEvents,
   getAlbumsByOrganizationEvents,
   getAlbumCoverFileIds,
   getAlbumFileCount,
+  markAlbumViewed,
+  presentAlbumGroupsFreshFirst,
   type IAlbum,
   type IEventAlbumsGroup,
 } from '@/entities/media/albumApi';
@@ -183,9 +186,11 @@ function AlbumTile({
   onOpen: () => void;
 }) {
   const iconSize = compact ? 16 : 24;
+  const fresh = albumHasNewContent(album);
   const className = [
     styles.albumCard,
     compact ? styles.albumCardThumb : '',
+    fresh ? styles.albumCardFresh : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -195,6 +200,7 @@ function AlbumTile({
       onClick={onOpen}
       aria-label={compact ? album.name : undefined}
       title={compact ? album.name : undefined}
+      data-fresh={fresh ? 'true' : undefined}
     >
       <AlbumCover album={album} iconSize={iconSize} mosaic={!compact} />
       {!compact && (
@@ -217,14 +223,16 @@ function AlbumStack({
   onOpen: () => void;
 }) {
   const layers = albums.slice(0, STACK_LAYER_MAX).reverse();
+  const fresh = albums.some(albumHasNewContent);
 
   return (
     <button
       type="button"
-      className={styles.stackThumb}
+      className={fresh ? `${styles.stackThumb} ${styles.stackThumbFresh}` : styles.stackThumb}
       onClick={onOpen}
       aria-label={`Ещё ${albumCountLabel(extraCount)}`}
       title={`Ещё ${albumCountLabel(extraCount)}`}
+      data-fresh={fresh ? 'true' : undefined}
     >
       <span className={styles.stackThumbLayers}>
         {layers.map(album => (
@@ -364,6 +372,7 @@ export function EventAlbumsGroupsPanel({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gridAlbum, setGridAlbum] = useState<IAlbum | null>(null);
+  const [seenAlbumIds, setSeenAlbumIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const scopeKey = organizationId ? `org:${organizationId}` : `acc:${accountId ?? ''}`;
   const hasScope = Boolean(organizationId || accountId);
@@ -375,6 +384,7 @@ export function EventAlbumsGroupsPanel({
       ? await getAlbumsByOrganizationEvents(organizationId, idx, PAGE_SIZE)
       : await getAlbumsByEvents(accountId!, idx, PAGE_SIZE);
     setGroups(prev => append ? [...prev, ...data.result] : data.result);
+    if (!append) setSeenAlbumIds(new Set());
     setTotal(data.total);
     onTotalChange?.(data.total);
     setPageIndex(idx);
@@ -406,6 +416,25 @@ export function EventAlbumsGroupsPanel({
 
   const sentinelRef = useInfiniteScroll(loadMore, { enabled: hasMore && !loading && !loadingMore });
 
+  const displayGroups = useMemo(
+    () => presentAlbumGroupsFreshFirst(groups, seenAlbumIds, gridAlbum?.id ?? null),
+    [groups, seenAlbumIds, gridAlbum],
+  );
+
+  const rememberSeen = useCallback((albumId: string) => {
+    setSeenAlbumIds(prev => {
+      if (prev.has(albumId)) return prev;
+      const next = new Set(prev);
+      next.add(albumId);
+      return next;
+    });
+  }, []);
+
+  const openAlbum = useCallback((album: IAlbum) => {
+    setGridAlbum(album);
+    void markAlbumViewed(album.id).then(() => rememberSeen(album.id)).catch(() => {});
+  }, [rememberSeen]);
+
   return (
     <>
       <div className={`${styles.panel} ${className ?? ''}`}>
@@ -426,11 +455,11 @@ export function EventAlbumsGroupsPanel({
           </div>
         )}
 
-        {!loading && groups.map(group => (
+        {!loading && displayGroups.map(group => (
           <EventGroupSection
             key={group.event.id}
             group={group}
-            onOpenAlbum={setGridAlbum}
+            onOpenAlbum={openAlbum}
             onOpenEvent={onOpenEvent}
           />
         ))}

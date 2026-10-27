@@ -28,6 +28,59 @@ export interface IAlbum {
   organizationId?: string;
   wallpaperId?: string;
   parameters?: IAlbumParams;
+  /** Когда в альбом последний раз добавили фото. */
+  lastContentAt?: string;
+  /** Когда текущий пользователь последний раз открывал альбом. */
+  lastViewedAt?: string;
+  /** Сервер уже сравнил даты. Если поля нет — считаем по lastContentAt / lastViewedAt. */
+  hasNewContent?: boolean;
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
+/** Новые фото после последнего просмотра. Старый API без полей — не новый. */
+export function albumHasNewContent(
+  album: Pick<IAlbum, 'hasNewContent' | 'lastContentAt' | 'lastViewedAt'>,
+): boolean {
+  if (typeof album.hasNewContent === 'boolean') return album.hasNewContent;
+  const content = album.lastContentAt ? Date.parse(album.lastContentAt) : NaN;
+  if (!Number.isFinite(content)) return false;
+  const viewed = album.lastViewedAt ? Date.parse(album.lastViewedAt) : NaN;
+  if (!Number.isFinite(viewed)) return true;
+  return content > viewed;
+}
+
+/** Свежие элементы впереди, исходный порядок среди равных сохраняется. */
+export function orderFreshFirst<T>(items: readonly T[], isFresh: (item: T) => boolean): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const freshRank = Number(isFresh(b.item)) - Number(isFresh(a.item));
+      if (freshRank !== 0) return freshRank;
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
+
+/**
+ * Копия списка для показа: просмотренные альбомы больше не свежие,
+ * открытый альбом остаётся на месте, пока модалка не закрыта.
+ */
+export function presentAlbumsFreshFirst(
+  albums: readonly IAlbum[],
+  seenIds: ReadonlySet<string>,
+  openAlbumId: string | null,
+): IAlbum[] {
+  const viewedAt = new Date().toISOString();
+  const shown = albums.map(album => {
+    if (album.id === openAlbumId || !seenIds.has(album.id)) return album;
+    return { ...album, hasNewContent: false, lastViewedAt: viewedAt };
+  });
+  return orderFreshFirst(shown, albumHasNewContent);
 }
 
 export function isSystemAlbum(album: IAlbum | null | undefined): boolean {
@@ -101,7 +154,17 @@ function normalizeAlbum(raw: unknown): IAlbum {
       ? String(r.wallpaperId ?? r.WallpaperId)
       : undefined,
     parameters: params,
+    lastContentAt: readOptionalString(r.lastContentAt ?? r.LastContentAt),
+    lastViewedAt: readOptionalString(r.lastViewedAt ?? r.LastViewedAt),
+    hasNewContent: typeof (r.hasNewContent ?? r.HasNewContent) === 'boolean'
+      ? (r.hasNewContent ?? r.HasNewContent) as boolean
+      : undefined,
   };
+}
+
+/** Сбросить HasNewContent у текущего пользователя. Тело запроса пустое. */
+export async function markAlbumViewed(albumId: string): Promise<void> {
+  await apiClient.post(`/api/media/albums/${albumId}/markViewed`);
 }
 
 /** Получить альбомы события */
@@ -114,6 +177,19 @@ export async function getEventAlbums(eventId: string): Promise<IAlbum[]> {
 export interface IEventAlbumsGroup {
   event: EventListItemData;
   albums: IAlbum[];
+}
+
+/** События со свежими альбомами поднимаются, внутри события свежие альбомы — первыми. */
+export function presentAlbumGroupsFreshFirst(
+  groups: readonly IEventAlbumsGroup[],
+  seenIds: ReadonlySet<string>,
+  openAlbumId: string | null,
+): IEventAlbumsGroup[] {
+  const shown = groups.map(group => ({
+    ...group,
+    albums: presentAlbumsFreshFirst(group.albums, seenIds, openAlbumId),
+  }));
+  return orderFreshFirst(shown, group => group.albums.some(albumHasNewContent));
 }
 
 function normalizeAlbumsGroup(raw: unknown): IEventAlbumsGroup {
