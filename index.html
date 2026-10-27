@@ -33,14 +33,9 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
-    <!--
-      Яндекс РСЯ (Рекламная Сеть Яндекса).
-      Раскомментировать после одобрения сайта на partner.yandex.ru.
-      Скрипт один на весь сайт, блоки рендерятся через Ya.Context.AdvManager.render()
-    -->
-    <!--
-    <script src="https://an.yandex.ru/system/context.js" async></script>
-    -->
+    <!-- Yandex.RTB — загрузчик один на весь сайт; блоки через Ya.Context.AdvManager.render() -->
+    <script>window.yaContextCb=window.yaContextCb||[]</script>
+    <script src="https://yandex.ru/ads/system/context.js" async></script>
   </head>
   <body>
     <!-- Яндекс.Метрика грузится после согласия на cookies (CookieConsentBanner). -->
