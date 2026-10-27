@@ -1,19 +1,23 @@
 // pages/event/EventAlbums.tsx
 // Блок альбомов на странице мероприятия
 
-import { useState, useEffect, useCallback, useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  albumHasNewContent,
   getEventAlbums,
   getAlbumFiles,
   getAlbumCoverPreview,
   assignAlbumToEvent,
   deleteAlbum,
+  markAlbumViewed,
+  presentAlbumsFreshFirst,
   type IAlbum,
 } from '@/entities/media/albumApi';
 import { canManageAlbum } from '@/entities/media/albumPermissions';
 import { AlbumFormModal } from '@/features/media/AlbumFormModal';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
+import { syncUnseenAlbums } from '@/features/media/albumFreshStore';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
@@ -172,11 +176,17 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
 
   const coverCount = coverIds.length;
   const showMosaic = !hideMeta && coverCount > 1;
+  const fresh = albumHasNewContent(album);
 
   return (
     <div className={styles.albumTile}>
-      <div className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : ''} ${fadeRight ? styles.albumCardFadeRight : ''}`}>
+      <div
+        className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : ''} ${fadeRight ? styles.albumCardFadeRight : ''} ${fresh ? styles.albumCardFresh : ''}`}
+        data-fresh={fresh ? 'true' : undefined}
+        data-album-name={album.name}
+      >
       <div className={styles.albumCardBody} onClick={onOpen} role="button" tabIndex={0}
+        aria-label={album.name}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}>
         <div className={styles.albumCover}>
           {showMosaic ? (
@@ -321,6 +331,7 @@ export function EventAlbums({
   const [checkingPhotos, setCheckingPhotos] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [coverVersionByAlbumId, setCoverVersionByAlbumId] = useState<Record<string, number>>({});
+  const [seenAlbumIds, setSeenAlbumIds] = useState<ReadonlySet<string>>(() => new Set());
   const [albumsExpanded, setAlbumsExpanded] = useState(false);
   const isMobile = useMediaQuery(media.mobile);
   // Свёртка ряда альбомов — только на мобилке; на tablet/desktop всегда развёрнуто.
@@ -339,6 +350,7 @@ export function EventAlbums({
     try {
       const list = await getEventAlbums(eventId);
       setAlbums(list);
+      setSeenAlbumIds(new Set());
     } catch (e: unknown) {
       if (isAccessDeniedError(e)) setAccessDenied(true);
       else setAlbums([]);
@@ -349,9 +361,27 @@ export function EventAlbums({
 
   useEffect(() => { void loadAlbums(); }, [loadAlbums]);
 
+  const rememberSeen = useCallback((albumId: string) => {
+    setSeenAlbumIds(prev => {
+      if (prev.has(albumId)) return prev;
+      const next = new Set(prev);
+      next.add(albumId);
+      return next;
+    });
+  }, []);
+
   const openAlbum = (album: IAlbum) => {
     setGridAlbum(album);
+    void markAlbumViewed(album.id).then(() => {
+      rememberSeen(album.id);
+      syncUnseenAlbums();
+    }).catch(() => {});
   };
+
+  const displayAlbums = useMemo(
+    () => presentAlbumsFreshFirst(albums, seenAlbumIds, gridAlbum?.id ?? null),
+    [albums, seenAlbumIds, gridAlbum],
+  );
 
   const handleAlbumSaved = async (album: IAlbum) => {
     // Assign для новых альбомов делает AlbumFormModal (до привязки файлов).
@@ -503,7 +533,7 @@ export function EventAlbums({
     const hasAlbums = albums.length > 0;
     // Организатор видит 3 обложки и кнопку «добавить». Остальные — 4 обложки.
     const collapsedLimit = canManage ? 3 : 4;
-    const collapsedAlbums = albums.slice(0, collapsedLimit);
+    const collapsedAlbums = displayAlbums.slice(0, collapsedLimit);
     const hiddenAlbumCount = Math.max(0, albums.length - collapsedAlbums.length);
     return (
       <div className={styles.albumsSection}>
@@ -554,7 +584,7 @@ export function EventAlbums({
                 album={a}
                 canManage={canManageAlbum(a, { isOrganizer: canManage })}
                 hideMeta
-                fadeRight={hiddenAlbumCount > 0 && index === collapsedAlbums.length - 1}
+                fadeRight={hiddenAlbumCount > 0 && index === collapsedAlbums.length - 1 && !albumHasNewContent(a)}
                 overflowCount={hiddenAlbumCount > 0 && index === collapsedAlbums.length - 1 ? hiddenAlbumCount : 0}
                 coverVersion={coverVersionByAlbumId[a.id] ?? 0}
                 onOpen={() => openAlbum(a)}
@@ -566,7 +596,7 @@ export function EventAlbums({
           </div>
         )}
         {(showExpandedAlbums || (!hasAlbums && canManage)) && (
-          renderGrid(albums, true)
+          renderGrid(displayAlbums, true)
         )}
         {modals}
       </div>
@@ -579,7 +609,7 @@ export function EventAlbums({
         <h3 className={styles.title}>Фотоальбомы</h3>
         {albums.length > 0 && <span className={styles.count}>{albums.length}</span>}
       </div>
-      {renderGrid(albums)}
+      {renderGrid(displayAlbums)}
       {modals}
     </div>
   );
