@@ -59,17 +59,22 @@ import type { IContactDataItem, IContactType } from '@/entities/user/profileApi'
 import type { IContactRequest } from '@/entities/user/settingsApi';
 import { fetchContactTypes } from '@/features/auth/registrationApi';
 import {
+  cancelTariffPurchase,
   createTariffPurchase,
   ensureOrganizationWallet,
   fetchWalletDeposits,
   fetchWalletTariffCharges,
+  fetchWalletTariffRefunds,
   getWalletByOrganization,
   isPeriodPurchaseMode,
   purchaseKindLabel,
+  quoteTariffCancel,
   walletActiveUntil,
+  type ITariffCancelQuote,
   type IWallet,
   type IWalletDeposit,
   type IWalletTariffCharge,
+  type IWalletTariffRefund,
 } from '@/entities/user/walletApi';
 import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
@@ -1252,6 +1257,8 @@ function OrganizationWalletSection({
   const [currentTariff, setCurrentTariff] = useState<ITariff | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelQuote, setCancelQuote] = useState<ITariffCancelQuote | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [history, setHistory] = useState<{
     id: string;
@@ -1290,9 +1297,10 @@ function OrganizationWalletSection({
       setValidators(Object.fromEntries(validatorEntries));
 
       if (w?.id) {
-        const [deposits, charges] = await Promise.all([
+        const [deposits, charges, refunds] = await Promise.all([
           fetchWalletDeposits(w.id).catch(() => [] as IWalletDeposit[]),
           fetchWalletTariffCharges(w.id).catch(() => [] as IWalletTariffCharge[]),
+          fetchWalletTariffRefunds(w.id).catch(() => [] as IWalletTariffRefund[]),
         ]);
         const nameById = new Map(sorted.map(t => [t.id, t.name]));
         const rows: {
@@ -1325,9 +1333,7 @@ function OrganizationWalletSection({
             ]
               .filter(Boolean)
               .join(' · '),
-            amount: d.amount > 0
-              ? `− ${d.amount.toLocaleString('ru-RU')} ₽`
-              : '0 ₽',
+            amount: `${d.amount.toLocaleString('ru-RU')} ₽`,
             sortAt: Number.isFinite(sortAt) ? sortAt : 0,
           });
         }
@@ -1349,12 +1355,30 @@ function OrganizationWalletSection({
               meta: [c.chargedAt ? formatWalletDateTime(c.chargedAt) : '', 'Списание']
                 .filter(Boolean)
                 .join(' · '),
-              amount: c.amount > 0
-                ? `− ${Number(c.amount).toLocaleString('ru-RU')} ₽`
-                : '0 ₽',
+              amount: `${Number(c.amount).toLocaleString('ru-RU')} ₽`,
               sortAt: Number.isFinite(sortAt) ? sortAt : 0,
             });
           }
+        }
+        for (const rf of refunds.filter(x => {
+          const s = String(x.status);
+          return s === 'Succeeded' || s === 'Pending' || s === '1' || s === '0';
+        })) {
+          const when = rf.succeededAt || rf.createDate;
+          const sortAt = when ? new Date(when).getTime() : 0;
+          const status = String(rf.status);
+          const pending = status === 'Pending' || status === '0';
+          rows.push({
+            id: `refund-${rf.id}`,
+            kind: 'in',
+            name: pending ? 'Возврат тарифа (в обработке)' : 'Возврат за отмену тарифа',
+            meta: [
+              when ? formatWalletDateTime(when) : '',
+              rf.remainingDays > 0 ? `~${Math.ceil(rf.remainingDays)} дн.` : null,
+            ].filter(Boolean).join(' · '),
+            amount: `${rf.amount.toLocaleString('ru-RU')} ₽`,
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
         }
         rows.sort((a, b) => b.sortAt - a.sortAt);
         setHistory(rows.map(({ sortAt: _s, ...rest }) => rest));
@@ -1420,6 +1444,45 @@ function OrganizationWalletSection({
     }
   };
 
+  const openCancelDialog = async () => {
+    if (!canEdit || !wallet || cancelBusy) return;
+    setCancelBusy(true);
+    setMsg(null);
+    try {
+      const q = await quoteTariffCancel({ walletId: wallet.id });
+      setCancelQuote(q);
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось рассчитать возврат', ok: false });
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
+  const confirmCancel = async () => {
+    if (!wallet || !cancelQuote || cancelBusy) return;
+    setCancelBusy(true);
+    try {
+      const result = await cancelTariffPurchase({
+        walletId: wallet.id,
+        confirmRefundAmount: cancelQuote.refundAmount,
+        reason: 'org_cancel',
+      });
+      setCancelQuote(null);
+      setMsg({
+        text: result.message
+          || (result.refundAmount > 0
+            ? `Тариф отменён. Возврат ${result.refundAmount.toLocaleString('ru-RU')} ₽`
+            : 'Тариф отменён'),
+        ok: true,
+      });
+      await load();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось отменить тариф', ok: false });
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
   const billingStatus = wallet
     ? orgTariffPeriodStatus(wallet, currentTariff)
     : null;
@@ -1463,7 +1526,36 @@ function OrganizationWalletSection({
                 ? `до ${formatWalletDateTime(activeUntil)} · без автопродления`
                 : 'Базовые лимиты · платные планы ниже')}
           </div>
+          {canEdit && paidActive && (
+            <div className={styles.tariffApplyRow}>
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={cancelBusy && !cancelQuote}
+                disabled={Boolean(purchasingId) || cancelBusy}
+                onClick={() => { void openCancelDialog(); }}
+              >
+                Отказаться от тарифа
+              </Button>
+            </div>
+          )}
         </div>
+
+        {cancelQuote && (
+          <ConfirmDialog
+            title="Отказаться от тарифа организации?"
+            message={
+              cancelQuote.refundAmount > 0
+                ? `Вернём ${cancelQuote.refundAmount.toLocaleString('ru-RU')} ₽ за неиспользованный остаток «${cancelQuote.tariffName}». Организация перейдёт на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
+                : `Тариф «${cancelQuote.tariffName}» будет снят без возврата на карту. Переход на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
+            }
+            confirmLabel={cancelBusy ? '…' : (cancelQuote.refundAmount > 0 ? 'Отказаться и вернуть' : 'Отказаться')}
+            cancelLabel="Оставить"
+            variant="danger"
+            onConfirm={() => { void confirmCancel(); }}
+            onCancel={() => { if (!cancelBusy) setCancelQuote(null); }}
+          />
+        )}
 
         <TariffPlansPicker
           mode={periodMode ? 'periodPurchase' : 'legacy'}
@@ -1478,12 +1570,11 @@ function OrganizationWalletSection({
           purchasingTariffId={purchasingId}
           disabled={!canEdit}
           title="Планы организации"
-          subtitle="Покупка на период. Upgrade учитывает остаток текущего."
           emptyText="Нет доступных тарифов для организаций. Обратитесь к администратору."
         />
 
         <div className={styles.field}>
-          <span className={styles.fieldLabel}>История</span>
+          <span className={styles.fieldLabel}>История операций</span>
           {history.length === 0 ? (
             <div className={styles.tariffCurrentMuted}>Операций пока нет</div>
           ) : (
@@ -1494,7 +1585,13 @@ function OrganizationWalletSection({
                     <span className={styles.walletHistoryName}>{row.name}</span>
                     <span className={styles.walletHistoryMeta}>{row.meta}</span>
                   </div>
-                  <span className={styles.walletHistoryAmtOut}>
+                  <span
+                    className={
+                      row.kind === 'in'
+                        ? styles.walletHistoryAmtIn
+                        : styles.walletHistoryAmtOut
+                    }
+                  >
                     {row.amount}
                   </span>
                 </li>
