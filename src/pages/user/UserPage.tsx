@@ -65,7 +65,7 @@ import {
 } from './userPageUtils';
 import { formatAge, pluralYears } from '@/shared/lib/datetime';
 import { coverFocusFromEvent, coverFocusImgStyle, DEFAULT_COVER_FOCUS } from '@/shared/lib/coverFocus';
-import { HEADER_BLUR_FALLBACK_PERCENT, headerBlurFilter } from '@/shared/lib/headerPhoto';
+import { HEADER_BLUR_FALLBACK_PERCENT, HEADER_BLUR_FRAME_SCALE, headerBlurFilter } from '@/shared/lib/headerPhoto';
 import styles from './UserPage.module.css';
 
 type MainTab = UserEventsScope | 'albums';
@@ -111,7 +111,7 @@ function UserCoverBackground({
           style={{
             ...coverFocusImgStyle(headerFocus),
             background: 'transparent',
-            ...(headerBlur ? { filter: headerBlur, transform: 'scale(1.08)' } : {}),
+            ...(headerBlur ? { filter: headerBlur, transform: `scale(${HEADER_BLUR_FRAME_SCALE})` } : {}),
           }}
         />
       ) : fileId ? (
@@ -356,6 +356,8 @@ export default function UserPage() {
   const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
   const [headerEditorOpen, setHeaderEditorOpen] = useState(false);
   const [headerBlurPercent, setHeaderBlurPercent] = useState(0);
+  const [headerAspect, setHeaderAspect] = useState<number | undefined>(undefined);
+  const coverRef = useRef<HTMLDivElement>(null);
 
   const headerImageId = profile?.account.headerImageId ?? null;
   const headerBlurOn = profile?.account.headerBlur === true;
@@ -377,6 +379,23 @@ export default function UserPage() {
     });
     return () => { cancelled = true; };
   }, [headerImageId, headerBlurOn]);
+
+  const coverReady = !loading && profile != null;
+  useEffect(() => {
+    if (!coverReady) return;
+    const el = coverRef.current;
+    if (!el) return;
+    const update = () => {
+      const { width, height } = el.getBoundingClientRect();
+      if (width <= 0 || height <= 0) return;
+      const next = width / height;
+      setHeaderAspect(prev => (prev != null && Math.abs(prev - next) < 0.001 ? prev : next));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [coverReady]);
 
   const applyHeaderPhoto = (next: HeaderPhotoValue) => {
     setHeaderBlurPercent(next.imageId ? next.blurPercent : 0);
@@ -614,7 +633,7 @@ export default function UserPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.cover}>
+        <div className={styles.cover} ref={coverRef}>
           <UserCoverBackground
             accountId={profileAccountId}
             avatarId={account.avatarId ?? null}
@@ -1029,6 +1048,7 @@ export default function UserPage() {
             y: profile.account.headerFocusY ?? DEFAULT_COVER_FOCUS.y,
           }}
           blurPercent={headerBlurPercent}
+          aspectRatio={headerAspect}
           onClose={() => setHeaderEditorOpen(false)}
           onApply={applyHeaderPhoto}
         />

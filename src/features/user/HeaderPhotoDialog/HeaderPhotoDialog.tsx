@@ -14,6 +14,7 @@ import {
 } from '@/shared/lib/coverFocus';
 import {
   clampHeaderBlurPercent,
+  HEADER_BLUR_FRAME_SCALE,
   HEADER_BLUR_MAX_PERCENT,
   headerBlurFilter,
 } from '@/shared/lib/headerPhoto';
@@ -32,6 +33,8 @@ interface HeaderPhotoDialogProps {
   imageId: string | null;
   focus: CoverFocus;
   blurPercent: number;
+  /** Ширина/высота живой шапки. Превью держит ту же пропорцию, чтобы object-position совпал. */
+  aspectRatio?: number;
   onClose: () => void;
   onApply: (next: HeaderPhotoValue) => void;
 }
@@ -42,6 +45,7 @@ export function HeaderPhotoDialog({
   imageId: savedImageId,
   focus: savedFocus,
   blurPercent: savedBlur,
+  aspectRatio,
   onClose,
   onApply,
 }: HeaderPhotoDialogProps) {
@@ -87,8 +91,9 @@ export function HeaderPhotoDialog({
   const frameStyle = {
     objectFit: 'cover' as const,
     objectPosition: coverObjectPosition(focus),
-    ...(blurFilter ? { filter: blurFilter, transform: 'scale(1.06)' } : {}),
+    ...(blurFilter ? { filter: blurFilter, transform: `scale(${HEADER_BLUR_FRAME_SCALE})` } : {}),
   };
+  const zoneStyle = aspectRatio && aspectRatio > 0 ? { aspectRatio } : undefined;
 
   const replacePreview = (next: string | null) => {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
@@ -277,6 +282,7 @@ export function HeaderPhotoDialog({
         <div className={styles.editorRow}>
           <div
             ref={zoneRef}
+            style={zoneStyle}
             className={`${styles.zone} ${hasImage ? styles.zoneFilled : ''} ${draggingFile ? styles.zoneDrag : ''} ${panning ? styles.zonePanning : ''}`}
             onClick={() => { if (!hasImage) openPicker(); }}
             onDragOver={e => { e.preventDefault(); setDraggingFile(true); }}
@@ -322,7 +328,7 @@ export function HeaderPhotoDialog({
 
           <div className={styles.blurCol}>
             <div className={styles.blurName}>Блюр</div>
-            <div className={styles.blurEnd}>80%</div>
+            <div className={styles.blurEnd}>{HEADER_BLUR_MAX_PERCENT}%</div>
             <div
               ref={scaleRef}
               className={`${styles.blurScale} ${!hasImage ? styles.blurScaleOff : ''}`}
@@ -351,7 +357,7 @@ export function HeaderPhotoDialog({
         {error && <p className={styles.error}>{error}</p>}
 
         <div className={styles.actions}>
-          <Button variant="secondary" fullWidth disabled={saving} onClick={onClose}>Отменить</Button>
+          <Button variant="secondary" className={styles.cancelBtn} fullWidth disabled={saving} onClick={onClose}>Отменить</Button>
           <Button variant="primary" fullWidth loading={saving} disabled={!hasImage} onClick={() => void onConfirm()}>
             Подтвердить
           </Button>

@@ -36,10 +36,11 @@
 
 .zone {
   position: relative;
-  flex: 1;
+  flex: 1 1 0;
+  align-self: flex-start;
   min-width: 0;
-  height: 180px;
-  border: 2px dashed var(--border);
+  /* Рамка не входит в бокс: пропорция совпадает с живой шапкой. */
+  border: none;
   border-radius: 12px;
   overflow: hidden;
   background: var(--surface-2);
@@ -48,15 +49,30 @@
   align-items: center;
   justify-content: center;
   touch-action: none;
+  aspect-ratio: var(--header-zone-aspect, 880 / 180);
+  isolation: isolate;
+}
+
+.zone::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border: 2px dashed var(--border);
+  border-radius: inherit;
+  pointer-events: none;
 }
 
 .zoneFilled {
-  border-style: solid;
-  border-width: 1px;
   cursor: grab;
 }
 
-.zoneDrag { border-color: var(--accent); }
+.zoneFilled::after {
+  border-style: solid;
+  border-width: 1px;
+}
+
+.zoneDrag::after { border-color: var(--accent); }
 .zonePanning { cursor: grabbing; }
 
 .zone .frame {
@@ -94,7 +110,7 @@
   left: 50%;
   bottom: 10px;
   transform: translateX(-50%);
-  z-index: 2;
+  z-index: 6;
   max-width: calc(100% - 24px);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -114,7 +130,7 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  z-index: 3;
+  z-index: 6;
   color: #fff;
   font-size: 12px;
   font-weight: 500;
@@ -129,7 +145,7 @@
 .busy {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 7;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -236,6 +252,18 @@
 
 .actions > * { flex: 1; }
 
+.actions .cancelBtn {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--surface-2);
+}
+
+.actions .cancelBtn:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-2));
+}
+
 .error {
   margin: 10px 0 0;
   font-size: 12px;
@@ -258,8 +286,6 @@
     width: calc(100% - 20px);
     padding: 16px 14px 14px;
   }
-
-  .zone { height: 148px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -11,6 +11,8 @@
 /* ── Cover ── */
 .cover {
   composes: hero from '../../shared/styles/hero.module.css';
+  /* Слой фото (z-index внутри AuthImage) остаётся внутри шапки и не перекрывает аватар. */
+  isolation: isolate;
 }
 
 .coverBg {
