@@ -16,6 +16,7 @@ import {
   useInvitationsNotViewedCount,
   useInvitationsStore,
 } from '@/features/invitations/invitationsStore';
+import { useAlbumFreshStore, useUnseenAlbumsIndicator } from '@/features/media/albumFreshStore';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { useActivationRedirect } from '@/features/auth/useActivationRedirect';
 import { UserAgreementsGate, UserAgreementsInfoButton } from '@/features/agreements';
@@ -63,6 +64,8 @@ export function AppLayout() {
   const clearPlatformRole = usePlatformRoleStore(s => s.clear);
   const notViewedInvitations = useInvitationsStore(s => s.notViewedCount);
   useInvitationsNotViewedCount(authenticated);
+  const hasFreshAlbums = useAlbumFreshStore(s => s.hasFresh);
+  useUnseenAlbumsIndicator(authenticated);
   const moderationCount = usePlatformModerationCount(authenticated && hasPlatformAccess);
   const { filters } = useFiltersStore();
   const navigate = useNavigate();
@@ -224,6 +227,9 @@ export function AppLayout() {
                   <span className={styles.navCountBadge} aria-label={`Непросмотренных: ${notViewedInvitations}`}>
                     {notViewedInvitations > 99 ? '99+' : notViewedInvitations}
                   </span>
+                )}
+                {authenticated && to === '/event-albums' && hasFreshAlbums && (
+                  <span className={styles.navFreshDot} aria-label="Есть новые фото" />
                 )}
               </span>
               <span className={styles.navLabel}>{label}</span>

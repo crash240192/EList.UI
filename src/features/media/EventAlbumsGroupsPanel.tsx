@@ -16,6 +16,7 @@ import {
   type EventListItemData,
 } from '@/entities/event/lib/eventListItemUtils';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
+import { syncUnseenAlbums } from '@/features/media/albumFreshStore';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { media } from '@/shared/lib/breakpoints';
@@ -432,7 +433,10 @@ export function EventAlbumsGroupsPanel({
 
   const openAlbum = useCallback((album: IAlbum) => {
     setGridAlbum(album);
-    void markAlbumViewed(album.id).then(() => rememberSeen(album.id)).catch(() => {});
+    void markAlbumViewed(album.id).then(() => {
+      rememberSeen(album.id);
+      syncUnseenAlbums();
+    }).catch(() => {});
   }, [rememberSeen]);
 
   return (

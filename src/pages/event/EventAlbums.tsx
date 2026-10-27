@@ -17,6 +17,7 @@ import {
 import { canManageAlbum } from '@/entities/media/albumPermissions';
 import { AlbumFormModal } from '@/features/media/AlbumFormModal';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
+import { syncUnseenAlbums } from '@/features/media/albumFreshStore';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
@@ -371,7 +372,10 @@ export function EventAlbums({
 
   const openAlbum = (album: IAlbum) => {
     setGridAlbum(album);
-    void markAlbumViewed(album.id).then(() => rememberSeen(album.id)).catch(() => {});
+    void markAlbumViewed(album.id).then(() => {
+      rememberSeen(album.id);
+      syncUnseenAlbums();
+    }).catch(() => {});
   };
 
   const displayAlbums = useMemo(

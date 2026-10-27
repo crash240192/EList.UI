@@ -239,17 +239,43 @@ export async function getAlbumsByEvents(
   accountId: string,
   pageIndex = 0,
   pageSize = 10,
+  options?: { enrichParameters?: boolean },
 ): Promise<PagedList<IEventAlbumsGroup>> {
   const res = await apiClient.get<PagedList<IEventAlbumsGroup>>(
     `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}`,
   );
   const data = ((res as { result?: PagedList<IEventAlbumsGroup> }).result ?? res) as PagedList<IEventAlbumsGroup>;
   const groups = Array.isArray(data.result) ? data.result.map(normalizeAlbumsGroup) : [];
-  const enriched = await enrichAlbumGroupsWithParameters(groups);
+  const result = options?.enrichParameters === false
+    ? groups
+    : await enrichAlbumGroupsWithParameters(groups);
   return {
     ...data,
-    result: enriched,
+    result,
   };
+}
+
+const UNSEEN_ALBUM_PAGE_SIZE = 20;
+const UNSEEN_ALBUM_PAGE_CAP = 20;
+
+/** Есть ли среди альбомов аккаунта хотя бы один с непросмотренными фото. */
+export async function accountHasUnseenAlbums(accountId: string): Promise<boolean> {
+  let pageIndex = 0;
+  let loaded = 0;
+  let total = Number.POSITIVE_INFINITY;
+
+  while (loaded < total && pageIndex < UNSEEN_ALBUM_PAGE_CAP) {
+    const page = await getAlbumsByEvents(accountId, pageIndex, UNSEEN_ALBUM_PAGE_SIZE, {
+      enrichParameters: false,
+    });
+    if (page.result.some(group => group.albums.some(albumHasNewContent))) return true;
+    if (page.result.length === 0) return false;
+    loaded += page.result.length;
+    total = Number.isFinite(page.total) ? page.total : loaded;
+    pageIndex += 1;
+  }
+
+  return false;
 }
 
 /**
