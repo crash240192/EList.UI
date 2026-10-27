@@ -19,7 +19,13 @@ import {
   type IWalletTariffRefund,
   type ITariffCancelQuote,
 } from '@/entities/user/walletApi';
-import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
+import {
+  formatTariffPeriod,
+  tariffApi,
+  tariffValidatorApi,
+  type ITariff,
+  type ITariffValidator,
+} from '@/entities/admin/adminApi';
 import {
   fetchMyOrders,
   formatMoney,
@@ -28,7 +34,7 @@ import {
 } from '@/entities/order';
 import { fetchEventById } from '@/entities/event';
 import { getOrFetchAccountId } from '@/entities/user/api';
-import { TariffPlansPicker } from '@/features/wallet';
+import { formatValidatorRows, TariffPlansPicker } from '@/features/wallet';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { usePageTitle } from '@/shared/hooks';
 import styles from './WalletPage.module.css';
@@ -74,10 +80,30 @@ function formatDateShort(iso: string): string {
   });
 }
 
-function daysLeft(iso: string): number | null {
-  const end = new Date(iso).getTime();
-  if (!Number.isFinite(end)) return null;
-  return Math.max(0, Math.ceil((end - Date.now()) / (24 * 60 * 60 * 1000)));
+function formatActiveUntil(iso: string): string {
+  const end = new Date(iso);
+  const ms = end.getTime() - Date.now();
+  if (ms < 48 * 60 * 60 * 1000) {
+    return end.toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  return formatDateShort(iso);
+}
+
+function formatTimeLeft(iso: string): string | null {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return null;
+  if (ms <= 0) return 'истёк';
+  const mins = Math.max(1, Math.ceil(ms / 60_000));
+  if (mins < 60) return `осталось ${mins} мин.`;
+  const hours = Math.ceil(ms / 3_600_000);
+  if (hours < 48) return `осталось ${hours} ч.`;
+  const days = Math.ceil(ms / 86_400_000);
+  return `осталось ${days} дн.`;
 }
 
 export default function WalletPage() {
@@ -373,11 +399,13 @@ export default function WalletPage() {
   };
 
   const activeUntil = walletActiveUntil(wallet);
-  const left = activeUntil ? daysLeft(activeUntil) : null;
+  const timeLeft = activeUntil ? formatTimeLeft(activeUntil) : null;
   const paidActive = Boolean(
     tariff && tariff.cost > 0 && wallet?.isSelectedTariffActive && activeUntil,
   );
   const periodMode = isPeriodPurchaseMode(wallet);
+  const currentValidator = tariff?.id ? validators[tariff.id] : null;
+  const heroFeatures = currentValidator ? formatValidatorRows(currentValidator) : null;
 
   if (loading) {
     return (
@@ -410,9 +438,28 @@ export default function WalletPage() {
               </div>
               <div className={styles.planHeroMeta}>
                 {paidActive && activeUntil
-                  ? `до ${formatDateShort(activeUntil)}${left != null ? ` · осталось ${left} дн.` : ''} · без автопродления`
+                  ? `до ${formatActiveUntil(activeUntil)}${timeLeft ? ` · ${timeLeft}` : ''}`
                   : 'Базовые лимиты · платные планы ниже'}
               </div>
+              {heroFeatures && heroFeatures.length > 0 && (
+                <div className={styles.planHeroFeatures}>
+                  {heroFeatures.map(row => (
+                    <div key={row.label} className={styles.planHeroFeatRow}>
+                      <span
+                        className={`${styles.planHeroFeatIcon} ${
+                          row.type === 'ok'
+                            ? styles.planHeroFeatOk
+                            : row.type === 'warn'
+                              ? styles.planHeroFeatWarn
+                              : styles.planHeroFeatNo
+                        }`}
+                        aria-hidden
+                      />
+                      <span>{row.label}: {row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {paidActive && tariff && (
                 <div className={styles.planHeroActions}>
                   <button
@@ -423,7 +470,7 @@ export default function WalletPage() {
                   >
                     {purchasingId === tariff.id
                       ? '…'
-                      : `Продлить на ${tariff.periodDays ?? tariff.period?.days ?? 30} дн. · ${tariff.cost.toLocaleString('ru-RU')} ₽`}
+                      : `Продлить на ${formatTariffPeriod(tariff)} · ${tariff.cost.toLocaleString('ru-RU')} ₽`}
                   </button>
                   <button
                     type="button"
@@ -431,7 +478,7 @@ export default function WalletPage() {
                     disabled={Boolean(purchasingId) || cancelBusy}
                     onClick={() => { void openCancelDialog(); }}
                   >
-                    {cancelBusy && !cancelQuote ? '…' : 'Отменить и вернуть'}
+                    {cancelBusy && !cancelQuote ? '…' : 'Отказаться от тарифа'}
                   </button>
                 </div>
               )}
@@ -441,13 +488,13 @@ export default function WalletPage() {
 
         {cancelQuote && (
           <ConfirmDialog
-            title="Отменить тариф?"
+            title="Отказаться от тарифа?"
             message={
               cancelQuote.refundAmount > 0
-                ? `Вернём ${cancelQuote.refundAmount.toLocaleString('ru-RU')} ₽ за ~${Math.ceil(cancelQuote.remainingDays)} дн. неиспользованного периода «${cancelQuote.tariffName}». Сразу перейдёте на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
+                ? `Вернём ${cancelQuote.refundAmount.toLocaleString('ru-RU')} ₽ за неиспользованный остаток «${cancelQuote.tariffName}». Сразу перейдёте на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
                 : `Тариф «${cancelQuote.tariffName}» будет снят без возврата на карту. Переход на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
             }
-            confirmLabel={cancelBusy ? '…' : (cancelQuote.refundAmount > 0 ? 'Отменить и вернуть' : 'Отменить тариф')}
+            confirmLabel={cancelBusy ? '…' : (cancelQuote.refundAmount > 0 ? 'Отказаться и вернуть' : 'Отказаться')}
             cancelLabel="Оставить"
             variant="danger"
             onConfirm={() => { void confirmCancel(); }}
@@ -477,19 +524,13 @@ export default function WalletPage() {
                   onPeriodPurchase={(id) => { void handlePeriodPurchase(id); }}
                   purchasingTariffId={purchasingId}
                   title="Планы"
-                  subtitle="Покупка на период. Upgrade учитывает остаток текущего."
                 />
               </div>
 
               <div className={styles.historySection}>
                 <div className={styles.tariffHeader}>
                   <div>
-                    <div className={styles.sectionTitle}>История</div>
-                    <div className={styles.sectionSubtitle}>
-                      {ticketsEnabled
-                        ? 'Платежи тарифа и билеты'
-                        : 'Платежи тарифа'}
-                    </div>
+                    <div className={styles.sectionTitle}>История операций</div>
                   </div>
                 </div>
                 {historyLoading ? (

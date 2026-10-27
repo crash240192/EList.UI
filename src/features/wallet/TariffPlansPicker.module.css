@@ -29,7 +29,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 18px 16px;
+  padding: 16px 14px 16px 16px;
   display: flex;
   flex-direction: column;
   cursor: pointer;
@@ -87,7 +87,7 @@
 }
 
 .tariffCarouselTrack .tc {
-  flex: 0 0 min(280px, calc(100% - 8px));
+  flex: 0 0 min(240px, calc(100% - 8px));
   scroll-snap-align: start;
 }
 
@@ -148,14 +148,23 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.tcPriceRow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 5px 0 0;
 }
 
 .tcPrice {
   font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 10px 0 4px;
+  margin: 0;
+  line-height: 1.15;
 }
 
 .tcPriceFree {
@@ -163,8 +172,9 @@
 }
 
 .tcPeriod {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
+  line-height: 1.2;
 }
 
 .tcDivider {
@@ -324,7 +334,7 @@
   }
 
   .tariffCarouselTrack .tc {
-    flex-basis: min(100%, 300px);
+    flex-basis: min(100%, 260px);
   }
 }
 

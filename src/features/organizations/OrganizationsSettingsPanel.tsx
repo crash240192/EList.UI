@@ -1541,7 +1541,7 @@ function OrganizationWalletSection({
                 disabled={Boolean(purchasingId) || cancelBusy}
                 onClick={() => { void openCancelDialog(); }}
               >
-                Отменить и вернуть
+                Отказаться от тарифа
               </Button>
             </div>
           )}
@@ -1549,13 +1549,13 @@ function OrganizationWalletSection({
 
         {cancelQuote && (
           <ConfirmDialog
-            title="Отменить тариф организации?"
+            title="Отказаться от тарифа организации?"
             message={
               cancelQuote.refundAmount > 0
-                ? `Вернём ${cancelQuote.refundAmount.toLocaleString('ru-RU')} ₽ за ~${Math.ceil(cancelQuote.remainingDays)} дн. неиспользованного периода «${cancelQuote.tariffName}». Организация перейдёт на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
+                ? `Вернём ${cancelQuote.refundAmount.toLocaleString('ru-RU')} ₽ за неиспользованный остаток «${cancelQuote.tariffName}». Организация перейдёт на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
                 : `Тариф «${cancelQuote.tariffName}» будет снят без возврата на карту. Переход на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
             }
-            confirmLabel={cancelBusy ? '…' : (cancelQuote.refundAmount > 0 ? 'Отменить и вернуть' : 'Отменить тариф')}
+            confirmLabel={cancelBusy ? '…' : (cancelQuote.refundAmount > 0 ? 'Отказаться и вернуть' : 'Отказаться')}
             cancelLabel="Оставить"
             variant="danger"
             onConfirm={() => { void confirmCancel(); }}
@@ -1576,12 +1576,11 @@ function OrganizationWalletSection({
           purchasingTariffId={purchasingId}
           disabled={!canEdit}
           title="Планы организации"
-          subtitle="Покупка на период. Upgrade учитывает остаток текущего."
           emptyText="Нет доступных тарифов для организаций. Обратитесь к администратору."
         />
 
         <div className={styles.field}>
-          <span className={styles.fieldLabel}>История</span>
+          <span className={styles.fieldLabel}>История операций</span>
           {history.length === 0 ? (
             <div className={styles.tariffCurrentMuted}>Операций пока нет</div>
           ) : (

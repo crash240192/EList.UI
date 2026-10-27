@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ITariff, ITariffValidator } from '@/entities/admin/adminApi';
+import { formatTariffPeriod } from '@/entities/admin/adminApi';
 import { formatTariffAgeCapability } from '@/shared/lib/ageLimit';
 import styles from './TariffPlansPicker.module.css';
 
@@ -54,6 +55,21 @@ export function formatValidatorRows(
   ];
 }
 
+function formatUntilShort(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const end = new Date(iso);
+  const ms = end.getTime() - Date.now();
+  if (ms < 48 * 60 * 60 * 1000) {
+    return end.toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  return end.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+}
+
 /** CTA для PeriodPurchase по отношению к текущему entitlement. */
 export function resolvePeriodPurchaseAction(
   target: ITariff,
@@ -63,11 +79,9 @@ export function resolvePeriodPurchaseAction(
     activeUntil?: string | null;
   },
 ): TariffPlanAction {
-  const days = (target as { periodDays?: number }).periodDays ?? target.period?.days ?? 30;
+  const periodLabel = formatTariffPeriod(target);
   const price = `${target.cost.toLocaleString('ru-RU')} ₽`;
-  const untilLabel = opts.activeUntil
-    ? new Date(opts.activeUntil).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
-    : null;
+  const untilLabel = formatUntilShort(opts.activeUntil);
 
   const currentActivePaid = Boolean(
     opts.isCurrentActive && current && current.cost > 0,
@@ -93,8 +107,7 @@ export function resolvePeriodPurchaseAction(
     return { type: 'locked', label: untilLabel ? `После ${untilLabel}` : 'После окончания периода' };
   }
 
-  // free / expired → purchase
-  return { type: 'buy', label: `Купить · ${price} / ${days} дн.` };
+  return { type: 'buy', label: `Купить · ${price} / ${periodLabel}` };
 }
 
 function TariffPlansCarousel({ children, count }: { children: ReactNode; count: number }) {
@@ -175,6 +188,7 @@ function TariffCard({
   periodAction,
   onPeriodAction,
   periodBusy,
+  showPeriodCta,
 }: {
   tariff: ITariff;
   validator: ITariffValidator | null;
@@ -186,8 +200,9 @@ function TariffCard({
   periodAction?: TariffPlanAction;
   onPeriodAction?: () => void;
   periodBusy?: boolean;
+  showPeriodCta?: boolean;
 }) {
-  const days = (tariff as { periodDays?: number }).periodDays ?? tariff.period?.days ?? '?';
+  const periodLabel = formatTariffPeriod(tariff);
   const rows = validator ? formatValidatorRows(validator) : null;
   const periodMode = Boolean(periodAction);
 
@@ -196,22 +211,24 @@ function TariffCard({
     isActive ? styles.tcCurrent : '',
     !periodMode && isSelectedPlan && !isActive ? styles.tcInactiveSelected : '',
     isEffectiveFallback ? styles.tcFallback : '',
-    !periodMode && isPicked && !isSelectedPlan ? styles.tcSelected : '',
+    (!periodMode && isPicked && !isSelectedPlan) || (periodMode && isPicked) ? styles.tcSelected : '',
   ].filter(Boolean).join(' ');
 
-  const clickable = !periodMode && !(isSelectedPlan && isActive);
+  const clickable = Boolean(onSelect);
 
   return (
     <div
       className={cardClass}
-      onClick={clickable && onSelect ? onSelect : undefined}
-      role={periodMode ? 'group' : 'button'}
+      onClick={clickable ? onSelect : undefined}
+      role={clickable ? 'button' : 'group'}
       tabIndex={clickable ? 0 : -1}
-      aria-pressed={!periodMode ? isPicked : undefined}
-      aria-disabled={!periodMode && isSelectedPlan && isActive}
+      aria-pressed={isPicked || undefined}
       onKeyDown={e => {
         if (!clickable || !onSelect) return;
-        if (e.key === 'Enter') onSelect();
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
       }}
     >
       {isActive && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>Текущий</div>}
@@ -222,11 +239,13 @@ function TariffCard({
         <div className={`${styles.tcBadge} ${styles.tcBadgeFallback}`}>По умолчанию</div>
       )}
       <div className={styles.tcName}>{tariff.name}</div>
-      <div className={`${styles.tcPrice} ${tariff.cost === 0 ? styles.tcPriceFree : ''}`}>
-        {tariff.cost === 0 ? '0 ₽' : `${tariff.cost.toLocaleString('ru-RU')} ₽`}
-      </div>
-      <div className={styles.tcPeriod}>
-        {tariff.cost === 0 ? 'базовый' : `${days} дн.`}
+      <div className={styles.tcPriceRow}>
+        <span className={`${styles.tcPrice} ${tariff.cost === 0 ? styles.tcPriceFree : ''}`}>
+          {tariff.cost === 0 ? '0 ₽' : `${tariff.cost.toLocaleString('ru-RU')} ₽`}
+        </span>
+        <span className={styles.tcPeriod}>
+          {tariff.cost === 0 ? 'базовый' : periodLabel}
+        </span>
       </div>
       <div className={styles.tcDivider} />
       <div className={styles.tcFeat}>
@@ -242,7 +261,7 @@ function TariffCard({
         ))}
       </div>
 
-      {periodAction && (
+      {periodAction && showPeriodCta && (
         <div className={styles.tcAction}>
           {periodAction.type === 'current' ? (
             <span className={styles.tcActionMuted}>Текущий план</span>
@@ -279,7 +298,7 @@ export function TariffPlansPicker({
   onCancel,
   confirming = false,
   title = 'Планы',
-  subtitle = 'Покупка на период. Upgrade учитывает остаток текущего.',
+  subtitle,
   emptyText = 'Тарифы пока не добавлены. Обратитесь к администратору.',
   confirmLabel = 'Подключить',
   disabled = false,
@@ -313,13 +332,18 @@ export function TariffPlansPicker({
   const selectedId = walletTariffId ?? null;
   const effectiveId = walletEffectiveTariffId ?? null;
   const periodMode = mode === 'periodPurchase';
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFocusedId(null);
+  }, [walletTariffId, tariffs.length]);
 
   return (
     <div>
       <div className={styles.tariffHeader}>
         <div>
           <div className={styles.sectionTitle}>{title}</div>
-          <div className={styles.sectionSubtitle}>{subtitle}</div>
+          {subtitle ? <div className={styles.sectionSubtitle}>{subtitle}</div> : null}
         </div>
       </div>
 
@@ -338,6 +362,9 @@ export function TariffPlansPicker({
                     activeUntil,
                   })
                 : undefined;
+              const isFocused = periodMode
+                ? focusedId === t.id
+                : pickedTariffId === t.id;
 
               return (
                 <TariffCard
@@ -352,14 +379,20 @@ export function TariffPlansPicker({
                     && selectedId
                     && selectedId !== t.id,
                   )}
-                  isPicked={pickedTariffId === t.id}
+                  isPicked={isFocused}
                   onSelect={() => {
-                    if (disabled || periodMode || !onPick) return;
+                    if (disabled) return;
+                    if (periodMode) {
+                      setFocusedId(prev => (prev === t.id ? null : t.id));
+                      return;
+                    }
+                    if (!onPick) return;
                     onPick(pickedTariffId === t.id ? '' : t.id);
                   }}
                   periodAction={disabled ? { type: 'locked', label: 'Нет доступа' } : periodAction}
                   onPeriodAction={() => onPeriodPurchase?.(t.id)}
                   periodBusy={purchasingTariffId === t.id}
+                  showPeriodCta={periodMode && isFocused}
                 />
               );
             })}
