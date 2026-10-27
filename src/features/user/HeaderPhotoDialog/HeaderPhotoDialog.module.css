@@ -236,6 +236,18 @@
 
 .actions > * { flex: 1; }
 
+.actions .cancelBtn {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--surface-2);
+}
+
+.actions .cancelBtn:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-2));
+}
+
 .error {
   margin: 10px 0 0;
   font-size: 12px;

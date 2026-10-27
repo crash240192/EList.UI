@@ -351,7 +351,7 @@ export function HeaderPhotoDialog({
         {error && <p className={styles.error}>{error}</p>}
 
         <div className={styles.actions}>
-          <Button variant="secondary" fullWidth disabled={saving} onClick={onClose}>Отменить</Button>
+          <Button variant="secondary" className={styles.cancelBtn} fullWidth disabled={saving} onClick={onClose}>Отменить</Button>
           <Button variant="primary" fullWidth loading={saving} disabled={!hasImage} onClick={() => void onConfirm()}>
             Подтвердить
           </Button>
