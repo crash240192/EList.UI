@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
+  albumCoverFileIdsFromMeta,
+  albumHasCoverPreview,
   albumHasNewContent,
   getAlbumsByEvents,
   getAlbumsByOrganizationEvents,
@@ -125,17 +127,23 @@ function AlbumCover({
   /** Развёрнутая карточка: сетка до 4 первых фото */
   mosaic?: boolean;
 }) {
-  const [coverIds, setCoverIds] = useState<string[]>([]);
   const previewLimit = mosaic ? 4 : 1;
+  const [coverIds, setCoverIds] = useState<string[]>(() => (
+    albumHasCoverPreview(album) ? albumCoverFileIdsFromMeta(album, previewLimit) : []
+  ));
 
   useEffect(() => {
     let cancelled = false;
+    if (albumHasCoverPreview(album)) {
+      setCoverIds(albumCoverFileIdsFromMeta(album, previewLimit));
+      return;
+    }
     setCoverIds([]);
-    getAlbumCoverFileIds(album.id, previewLimit).then(ids => {
+    getAlbumCoverFileIds(album.id, previewLimit, album).then(ids => {
       if (!cancelled) setCoverIds(ids);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [album.id, previewLimit]);
+  }, [album, previewLimit]);
 
   const coverCount = coverIds.length;
   const showMosaic = mosaic && coverCount > 1;
@@ -281,11 +289,20 @@ function EventGroupSection({
       publish(0);
       return;
     }
-    Promise.all(ids.map(id => getAlbumFileCount(id).catch(() => 0))).then(counts => {
+    // Если byEvents уже отдал photoCount — без N× filesByAlbumId.
+    if (albums.every(album => album.photoCount != null)) {
+      publish(albums.reduce((sum, album) => sum + (album.photoCount ?? 0), 0));
+      return;
+    }
+    Promise.all(ids.map(id => {
+      const album = albums.find(item => item.id === id);
+      if (album?.photoCount != null) return Promise.resolve(album.photoCount);
+      return getAlbumFileCount(id).catch(() => 0);
+    })).then(counts => {
       publish(counts.reduce((sum, count) => sum + count, 0));
     });
     return () => { cancelled = true; };
-  }, [albumIdsKey, event.id]);
+  }, [albumIdsKey, albums, event.id]);
   // Свёртка только на мобилке; на tablet/desktop всегда развёрнутые карточки.
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const expanded = !isMobile || mobileExpanded;

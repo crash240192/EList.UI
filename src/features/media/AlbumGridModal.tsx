@@ -194,7 +194,7 @@ export function AlbumGridModal({
 
     void (async () => {
       try {
-        const list = await getAlbumFiles(album.id, 1, 200);
+        const list = await getAlbumFiles(album.id, 0, 200);
         if (!cancelled) setFiles(list);
       } catch {
         if (!cancelled) setFiles([]);

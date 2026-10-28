@@ -123,7 +123,7 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
   useEffect(() => {
     let cancelled = false;
     setCoverIds([]);
-    getAlbumCoverPreview(album.id, previewLimit).then(({ fileIds, total }) => {
+    getAlbumCoverPreview(album.id, previewLimit, album).then(({ fileIds, total }) => {
       if (!cancelled) {
         setCoverIds(fileIds);
         setPhotoCount(total);
@@ -132,7 +132,7 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
       if (!cancelled) setPhotoCount(0);
     });
     return () => { cancelled = true; };
-  }, [album.id, coverVersion, previewLimit]);
+  }, [album, coverVersion, previewLimit]);
 
   useLayoutEffect(() => {
     if (!menuOpen) {
@@ -423,7 +423,7 @@ export function EventAlbums({
     setCheckingPhotos(true);
     let hasPhotos = false;
     try {
-      const files = await getAlbumFiles(deleteTarget.id, 1, 1);
+      const files = await getAlbumFiles(deleteTarget.id, 0, 1);
       hasPhotos = files.length > 0;
     } catch { /* если проверку не удалось выполнить — удаляем напрямую */ }
     finally { setCheckingPhotos(false); }

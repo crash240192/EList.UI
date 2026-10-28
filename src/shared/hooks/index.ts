@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BRAND_NAME, SITE_TITLE } from '@/shared/config/brand';
 
+export { useInView } from './useInView';
+export type { UseInViewOptions } from './useInView';
+
 // ---- useDebounce ----
 
 export function useDebounce<T>(value: T, delay = 300): T {

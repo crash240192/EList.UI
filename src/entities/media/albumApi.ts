@@ -10,6 +10,9 @@ import { createConcurrencyLimiter } from '@/shared/lib/concurrencyLimit';
 
 /** Параллельные filesByAlbumId на ленте мозаик — не больше 4. */
 const limitAlbumCoverList = createConcurrencyLimiter(4);
+/** Параллельные eventParameters / byEvent при обогащении ленты. */
+const limitAlbumFeedEnrich = createConcurrencyLimiter(4);
+
 export interface IAlbumParams {
   albumId?: string;
   headAlbum?: boolean;
@@ -34,6 +37,10 @@ export interface IAlbum {
   lastViewedAt?: string;
   /** Сервер уже сравнил даты. Если поля нет — считаем по lastContentAt / lastViewedAt. */
   hasNewContent?: boolean;
+  /** Число фото с byEvents/byEvent — без отдельного filesByAlbumId. */
+  photoCount?: number;
+  /** Первые fileId для мозаики/обложки с byEvents/byEvent. */
+  coverFileIds?: string[];
 }
 
 function readOptionalString(value: unknown): string | undefined {
@@ -159,7 +166,56 @@ function normalizeAlbum(raw: unknown): IAlbum {
     hasNewContent: typeof (r.hasNewContent ?? r.HasNewContent) === 'boolean'
       ? (r.hasNewContent ?? r.HasNewContent) as boolean
       : undefined,
+    photoCount: readOptionalNonNegInt(r.photoCount ?? r.PhotoCount),
+    coverFileIds: readGuidList(r.coverFileIds ?? r.CoverFileIds),
   };
+}
+
+function readOptionalNonNegInt(value: unknown): number | undefined {
+  const n = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim() !== ''
+      ? Number(value)
+      : NaN;
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.trunc(n);
+}
+
+function readGuidList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const ids = value
+    .map(item => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        const row = item as Record<string, unknown>;
+        const raw = row.fileId ?? row.FileId ?? row.id ?? row.Id;
+        return raw != null ? String(raw).trim() : '';
+      }
+      return item != null ? String(item).trim() : '';
+    })
+    .filter(Boolean);
+  return ids.length ? ids : [];
+}
+
+/** Есть ли серверные cover/count — тогда filesByAlbumId на ленте не нужен. */
+export function albumHasCoverPreview(album: Pick<IAlbum, 'photoCount' | 'coverFileIds' | 'wallpaperId'>): boolean {
+  return album.photoCount != null || (album.coverFileIds != null && album.coverFileIds.length > 0)
+    || Boolean(album.wallpaperId);
+}
+
+export function albumCoverFileIdsFromMeta(
+  album: Pick<IAlbum, 'coverFileIds' | 'wallpaperId'>,
+  limit = 4,
+): string[] {
+  const safeLimit = Math.max(1, Math.min(limit, 4));
+  const ids: string[] = [];
+  if (album.wallpaperId) ids.push(album.wallpaperId);
+  for (const id of album.coverFileIds ?? []) {
+    if (!id || ids.includes(id)) continue;
+    ids.push(id);
+    if (ids.length >= safeLimit) break;
+  }
+  return ids.slice(0, safeLimit);
 }
 
 /** Сбросить HasNewContent у текущего пользователя. Тело запроса пустое. */
@@ -211,7 +267,10 @@ async function enrichAlbumGroupsWithParameters(groups: IEventAlbumsGroup[]): Pro
   const paramsByEvent = new Map<string, Awaited<ReturnType<typeof fetchEventParameters>>>();
 
   await Promise.all(eventIds.map(async eventId => {
-    paramsByEvent.set(eventId, await fetchEventParameters(eventId));
+    paramsByEvent.set(
+      eventId,
+      await limitAlbumFeedEnrich(() => fetchEventParameters(eventId)),
+    );
   }));
 
   return groups.map(group => {
@@ -305,14 +364,14 @@ export async function getAlbumsByOrganizationEvents(
     if (batch.length === 0) break;
 
     const groups = await Promise.all(
-      batch.map(async (event) => {
+      batch.map(async (event) => limitAlbumFeedEnrich(async () => {
         const albums = await getEventAlbums(event.id).catch(() => [] as IAlbum[]);
         if (!albums.length) return null;
         return {
           event: normalizeEventListItem(event),
           albums,
         } satisfies IEventAlbumsGroup;
-      }),
+      })),
     );
 
     for (const g of groups) {
@@ -389,8 +448,8 @@ async function fetchAlbumFilesPage(albumId: string, pageIndex: number, pageSize:
   return parseAlbumFilesPage(res);
 }
 
-/** Получить файлы альбома */
-export async function getAlbumFiles(albumId: string, pageIndex = 1, pageSize = 50): Promise<IAlbumFile[]> {
+/** Получить файлы альбома (pageIndex 0-based, как byEvents). */
+export async function getAlbumFiles(albumId: string, pageIndex = 0, pageSize = 50): Promise<IAlbumFile[]> {
   const page = await fetchAlbumFilesPage(albumId, pageIndex, pageSize);
   return page.files;
 }
@@ -398,7 +457,7 @@ export async function getAlbumFiles(albumId: string, pageIndex = 1, pageSize = 5
 /** Сколько фото в альбоме. pageSize=1: достаточно поля total. */
 export async function getAlbumFileCount(albumId: string): Promise<number> {
   return limitAlbumCoverList(async () => {
-    const page = await fetchAlbumFilesPage(albumId, 1, 1);
+    const page = await fetchAlbumFilesPage(albumId, 0, 1);
     return page.total;
   });
 }
@@ -406,14 +465,23 @@ export async function getAlbumFileCount(albumId: string): Promise<number> {
 /**
  * Первые fileId и общее число фото одним запросом.
  * Через очередь — на страницах со многими альбомами не роняем API/браузер.
+ * Если у альбома уже есть photoCount/coverFileIds с byEvents — сеть не дергаем.
  */
 export async function getAlbumCoverPreview(
   albumId: string,
   limit = 4,
+  meta?: Pick<IAlbum, 'photoCount' | 'coverFileIds' | 'wallpaperId'>,
 ): Promise<{ fileIds: string[]; total: number }> {
   const safeLimit = Math.max(1, Math.min(limit, 4));
+  if (meta && albumHasCoverPreview(meta)) {
+    const fileIds = albumCoverFileIdsFromMeta(meta, safeLimit);
+    return {
+      fileIds,
+      total: meta.photoCount ?? fileIds.length,
+    };
+  }
   return limitAlbumCoverList(async () => {
-    const page = await fetchAlbumFilesPage(albumId, 1, safeLimit);
+    const page = await fetchAlbumFilesPage(albumId, 0, safeLimit);
     return {
       fileIds: page.files.slice(0, safeLimit).map(file => file.fileId).filter(Boolean),
       total: page.total,
@@ -422,7 +490,11 @@ export async function getAlbumCoverPreview(
 }
 
 /** Первые fileId для превью обложки/мозаики. */
-export async function getAlbumCoverFileIds(albumId: string, limit = 4): Promise<string[]> {
-  const preview = await getAlbumCoverPreview(albumId, limit);
+export async function getAlbumCoverFileIds(
+  albumId: string,
+  limit = 4,
+  meta?: Pick<IAlbum, 'photoCount' | 'coverFileIds' | 'wallpaperId'>,
+): Promise<string[]> {
+  const preview = await getAlbumCoverPreview(albumId, limit, meta);
   return preview.fileIds;
 }
