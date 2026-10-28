@@ -37,7 +37,7 @@
   border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--border));
   border-radius: 12px;
   box-shadow: 0 0 28px rgba(139, 92, 246, 0.75);
-  padding: 6px 0 12px;
+  padding: 6px 0;
 }
 
 .options {
@@ -88,24 +88,3 @@
   border-color: var(--accent);
 }
 
-.actions {
-  display: flex;
-  gap: 8px;
-  padding: 12px 12px 0;
-}
-
-.actions > * {
-  flex: 1;
-}
-
-.actions .cancelBtn {
-  color: var(--danger);
-  border-color: var(--danger);
-  background: var(--surface-2);
-}
-
-.actions .cancelBtn:hover:not(:disabled) {
-  color: var(--danger);
-  border-color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 8%, var(--surface-2));
-}

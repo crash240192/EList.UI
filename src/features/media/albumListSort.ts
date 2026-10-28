@@ -64,15 +64,23 @@ function compareGroups(
   return right - left;
 }
 
-/** Не меняет альбомы внутри плитки. При равенстве оставляет прежний порядок. */
+/**
+ * Не меняет альбомы внутри плитки. При равенстве оставляет прежний порядок.
+ * `pinFirst` держит такие плитки выше остальных и тоже сортирует их между собой.
+ */
 export function sortEventAlbumGroups(
   groups: readonly IEventAlbumsGroup[],
   sort: AlbumListSort,
   photoTotals: Readonly<Record<string, number | undefined>> = {},
+  pinFirst?: (group: IEventAlbumsGroup) => boolean,
 ): IEventAlbumsGroup[] {
   return groups
     .map((group, index) => ({ group, index }))
     .sort((a, b) => {
+      if (pinFirst) {
+        const pinned = Number(pinFirst(b.group)) - Number(pinFirst(a.group));
+        if (pinned !== 0) return pinned;
+      }
       const diff = compareGroups(a.group, b.group, sort, photoTotals);
       if (diff !== 0) return diff;
       return a.index - b.index;

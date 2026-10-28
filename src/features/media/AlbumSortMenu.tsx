@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from '@/shared/ui/Button';
 import {
   ALBUM_LIST_SORT_OPTIONS,
   type AlbumListSort,
@@ -9,7 +8,7 @@ import styles from './AlbumSortMenu.module.css';
 
 interface AlbumSortMenuProps {
   value: AlbumListSort;
-  onApply: (next: AlbumListSort) => void;
+  onChange: (next: AlbumListSort) => void;
 }
 
 function CheckIcon() {
@@ -20,9 +19,8 @@ function CheckIcon() {
   );
 }
 
-export function AlbumSortMenu({ value, onApply }: AlbumSortMenuProps) {
+export function AlbumSortMenu({ value, onChange }: AlbumSortMenuProps) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<AlbumListSort>(value);
   const [dropStyle, setDropStyle] = useState<CSSProperties>({});
   const btnRef = useRef<HTMLButtonElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -35,7 +33,7 @@ export function AlbumSortMenu({ value, onApply }: AlbumSortMenuProps) {
     const rect = el.getBoundingClientRect();
     const width = Math.min(300, window.innerWidth - 16);
     const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
-    const estimatedHeight = 248;
+    const estimatedHeight = 176;
     const spaceBelow = window.innerHeight - rect.bottom;
     const showAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
     setDropStyle({
@@ -51,7 +49,6 @@ export function AlbumSortMenu({ value, onApply }: AlbumSortMenuProps) {
 
   useEffect(() => {
     if (!open) return;
-    setDraft(value);
     let frame = 0;
     let last = '';
     const follow = () => {
@@ -90,7 +87,7 @@ export function AlbumSortMenu({ value, onApply }: AlbumSortMenuProps) {
       document.removeEventListener('mousedown', onPointer);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open, value, computePos, close]);
+  }, [open, computePos, close]);
 
   return (
     <div className={styles.wrap}>
@@ -127,7 +124,7 @@ export function AlbumSortMenu({ value, onApply }: AlbumSortMenuProps) {
         >
           <div className={styles.options} role="radiogroup" aria-label="Порядок плиток">
             {ALBUM_LIST_SORT_OPTIONS.map(option => {
-              const selected = draft === option.id;
+              const selected = value === option.id;
               return (
                 <button
                   key={option.id}
@@ -135,28 +132,16 @@ export function AlbumSortMenu({ value, onApply }: AlbumSortMenuProps) {
                   role="radio"
                   aria-checked={selected}
                   className={`${styles.option} ${selected ? styles.optionOn : ''}`}
-                  onClick={() => setDraft(option.id)}
+                  onClick={() => {
+                    onChange(option.id);
+                    close();
+                  }}
                 >
                   <span className={styles.box}>{selected && <CheckIcon />}</span>
                   {option.label}
                 </button>
               );
             })}
-          </div>
-          <div className={styles.actions}>
-            <Button variant="secondary" className={styles.cancelBtn} fullWidth onClick={close}>
-              Отменить
-            </Button>
-            <Button
-              variant="primary"
-              fullWidth
-              onClick={() => {
-                onApply(draft);
-                close();
-              }}
-            >
-              Применить
-            </Button>
           </div>
         </div>,
         document.body,

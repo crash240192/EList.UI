@@ -19,7 +19,7 @@ export default function EventAlbumsPage() {
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <h1 className={styles.cardTitle}>Альбомы мероприятий</h1>
-            {accountId && <AlbumSortMenu value={sort} onApply={setSort} />}
+            {accountId && <AlbumSortMenu value={sort} onChange={setSort} />}
           </div>
 
           <div className={styles.cardBody}>

@@ -433,7 +433,14 @@ export function EventAlbumsGroupsPanel({
 
   const displayGroups = useMemo(() => {
     const presented = presentAlbumGroupsFreshFirst(groups, seenAlbumIds, gridAlbum?.id ?? null);
-    return sort ? sortEventAlbumGroups(presented, sort, photoTotals) : presented;
+    return sort
+      ? sortEventAlbumGroups(
+          presented,
+          sort,
+          photoTotals,
+          group => group.albums.some(albumHasNewContent),
+        )
+      : presented;
   }, [groups, seenAlbumIds, gridAlbum, sort, photoTotals]);
 
   const handlePhotoTotal = useCallback((eventId: string, total: number) => {
