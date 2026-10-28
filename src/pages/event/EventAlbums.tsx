@@ -457,6 +457,7 @@ export function EventAlbums({
   const modals = (
     <>
       <AlbumGridModal
+        key={gridAlbum?.id ?? 'closed'}
         open={gridAlbum !== null}
         album={gridAlbum}
         canManage={gridAlbum ? canManageAlbum(gridAlbum, { isOrganizer: canManage }) : false}

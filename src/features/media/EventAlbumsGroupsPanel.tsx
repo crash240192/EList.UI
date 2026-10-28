@@ -516,6 +516,7 @@ export function EventAlbumsGroupsPanel({
       </div>
 
       <AlbumGridModal
+        key={gridAlbum?.id ?? 'closed'}
         open={gridAlbum !== null}
         album={gridAlbum}
         canManage={false}

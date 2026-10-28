@@ -180,21 +180,48 @@ export function AlbumGridModal({
   useModalBackButton(handleClose, open);
 
   useEffect(() => {
+    uploadingRef.current = uploadingItems;
+  }, [uploadingItems]);
+
+  // layout: сброс до paint — иначе один кадр со старыми фото предыдущего альбома.
+  useLayoutEffect(() => {
     if (!open || !album) {
-      if (!open) loadedForAlbumIdRef.current = null;
+      if (!open) {
+        loadedForAlbumIdRef.current = null;
+        setFiles([]);
+        setInitialLoading(false);
+        setLightboxIdx(null);
+        setSelectMode(false);
+        setSelectedIds(new Set());
+        setDeleteConfirm(false);
+        setReportFileId(null);
+        setUploadError(null);
+        revokeUploadingPreviews(uploadingRef.current);
+        setUploadingItems([]);
+        dirtyRef.current = false;
+      }
       return;
     }
 
     if (loadedForAlbumIdRef.current === album.id) return;
 
-    let cancelled = false;
-    loadedForAlbumIdRef.current = album.id;
+    const albumId = album.id;
+    loadedForAlbumIdRef.current = albumId;
+    setFiles([]);
     setInitialLoading(true);
     setUploadError(null);
+    setLightboxIdx(null);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setDeleteConfirm(false);
+    setReportFileId(null);
+    revokeUploadingPreviews(uploadingRef.current);
+    setUploadingItems([]);
 
+    let cancelled = false;
     void (async () => {
       try {
-        const list = await getAlbumFiles(album.id, 0, 200);
+        const list = await getAlbumFiles(albumId, 0, 200);
         if (!cancelled) setFiles(list);
       } catch {
         if (!cancelled) setFiles([]);
@@ -204,23 +231,7 @@ export function AlbumGridModal({
     })();
 
     return () => { cancelled = true; };
-  }, [open, album?.id]);
-
-  useEffect(() => {
-    uploadingRef.current = uploadingItems;
-  }, [uploadingItems]);
-
-  useEffect(() => {
-    if (open) return;
-    setLightboxIdx(null);
-    setSelectMode(false);
-    setSelectedIds(new Set());
-    setDeleteConfirm(false);
-    revokeUploadingPreviews(uploadingRef.current);
-    setUploadingItems([]);
-    setUploadError(null);
-    dirtyRef.current = false;
-  }, [open, revokeUploadingPreviews]);
+  }, [open, album?.id, revokeUploadingPreviews]);
 
   useEffect(() => () => revokeUploadingPreviews(uploadingRef.current), [revokeUploadingPreviews]);
 
@@ -320,7 +331,8 @@ export function AlbumGridModal({
 
   const hasGridContent = files.length > 0 || uploadingItems.length > 0;
   const uploadingCount = uploadingItems.filter(u => !u.error).length;
-  const showSkeleton = initialLoading && uploadingItems.length === 0 && files.length === 0;
+  // Не ждём files.length===0: при смене альбома старые fileId уже сброшены в layout-эффекте.
+  const showSkeleton = initialLoading && uploadingItems.length === 0;
   const fileIds = files.map(f => f.fileId);
   const selectedCount = selectedIds.size;
   const canSelectPhotos = canManage && files.length > 0;
