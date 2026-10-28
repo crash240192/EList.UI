@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   albumHasNewContent,
   getAlbumsByEvents,
@@ -16,6 +16,7 @@ import {
   type EventListItemData,
 } from '@/entities/event/lib/eventListItemUtils';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
+import { sortEventAlbumGroups, type AlbumListSort } from '@/features/media/albumListSort';
 import { syncUnseenAlbums } from '@/features/media/albumFreshStore';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
@@ -253,29 +254,38 @@ function EventGroupSection({
   group,
   onOpenAlbum,
   onOpenEvent,
+  onPhotoTotal,
 }: {
   group: IEventAlbumsGroup;
   onOpenAlbum: (album: IAlbum) => void;
   onOpenEvent: (eventId: string) => void;
+  onPhotoTotal?: (eventId: string, total: number) => void;
 }) {
   const { event, albums } = group;
   const albumIdsKey = albums.map(album => album.id).join('\0');
   const [photoTotal, setPhotoTotal] = useState<number | null>(null);
+  const onPhotoTotalRef = useRef(onPhotoTotal);
+  onPhotoTotalRef.current = onPhotoTotal;
   const isMobile = useMediaQuery(media.mobile);
 
   useEffect(() => {
     let cancelled = false;
     const ids = albumIdsKey ? albumIdsKey.split('\0') : [];
     setPhotoTotal(null);
+    const publish = (total: number) => {
+      if (cancelled) return;
+      setPhotoTotal(total);
+      onPhotoTotalRef.current?.(event.id, total);
+    };
     if (ids.length === 0) {
-      setPhotoTotal(0);
+      publish(0);
       return;
     }
     Promise.all(ids.map(id => getAlbumFileCount(id).catch(() => 0))).then(counts => {
-      if (!cancelled) setPhotoTotal(counts.reduce((sum, count) => sum + count, 0));
+      publish(counts.reduce((sum, count) => sum + count, 0));
     });
     return () => { cancelled = true; };
-  }, [albumIdsKey]);
+  }, [albumIdsKey, event.id]);
   // Свёртка только на мобилке; на tablet/desktop всегда развёрнутые карточки.
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const expanded = !isMobile || mobileExpanded;
@@ -352,6 +362,8 @@ interface EventAlbumsGroupsPanelProps {
   organizationId?: string;
   onOpenEvent: (eventId: string) => void;
   onTotalChange?: (total: number) => void;
+  /** Если задан — плитки мероприятий идут в этом порядке, а не «свежие сверху». */
+  sort?: AlbumListSort;
   emptyTitle?: string;
   emptySub?: string;
   className?: string;
@@ -362,6 +374,7 @@ export function EventAlbumsGroupsPanel({
   organizationId,
   onOpenEvent,
   onTotalChange,
+  sort,
   emptyTitle = 'Альбомов пока нет',
   emptySub = 'Здесь появятся фотоальбомы мероприятий, к которым есть доступ',
   className,
@@ -373,6 +386,7 @@ export function EventAlbumsGroupsPanel({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gridAlbum, setGridAlbum] = useState<IAlbum | null>(null);
+  const [photoTotals, setPhotoTotals] = useState<Record<string, number>>({});
   const [seenAlbumIds, setSeenAlbumIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const scopeKey = organizationId ? `org:${organizationId}` : `acc:${accountId ?? ''}`;
@@ -417,10 +431,14 @@ export function EventAlbumsGroupsPanel({
 
   const sentinelRef = useInfiniteScroll(loadMore, { enabled: hasMore && !loading && !loadingMore });
 
-  const displayGroups = useMemo(
-    () => presentAlbumGroupsFreshFirst(groups, seenAlbumIds, gridAlbum?.id ?? null),
-    [groups, seenAlbumIds, gridAlbum],
-  );
+  const displayGroups = useMemo(() => {
+    const presented = presentAlbumGroupsFreshFirst(groups, seenAlbumIds, gridAlbum?.id ?? null);
+    return sort ? sortEventAlbumGroups(presented, sort, photoTotals) : presented;
+  }, [groups, seenAlbumIds, gridAlbum, sort, photoTotals]);
+
+  const handlePhotoTotal = useCallback((eventId: string, total: number) => {
+    setPhotoTotals(prev => (prev[eventId] === total ? prev : { ...prev, [eventId]: total }));
+  }, []);
 
   const rememberSeen = useCallback((albumId: string) => {
     setSeenAlbumIds(prev => {
@@ -465,6 +483,7 @@ export function EventAlbumsGroupsPanel({
             group={group}
             onOpenAlbum={openAlbum}
             onOpenEvent={onOpenEvent}
+            onPhotoTotal={sort ? handlePhotoTotal : undefined}
           />
         ))}
 

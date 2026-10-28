@@ -1,0 +1,166 @@
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
+import { Button } from '@/shared/ui/Button';
+import {
+  ALBUM_LIST_SORT_OPTIONS,
+  type AlbumListSort,
+} from '@/features/media/albumListSort';
+import styles from './AlbumSortMenu.module.css';
+
+interface AlbumSortMenuProps {
+  value: AlbumListSort;
+  onApply: (next: AlbumListSort) => void;
+}
+
+function CheckIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+export function AlbumSortMenu({ value, onApply }: AlbumSortMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<AlbumListSort>(value);
+  const [dropStyle, setDropStyle] = useState<CSSProperties>({});
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  const close = useCallback(() => setOpen(false), []);
+
+  const computePos = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const width = Math.min(300, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+    const estimatedHeight = 248;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const showAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+    setDropStyle({
+      position: 'fixed',
+      left,
+      width,
+      zIndex: 600,
+      ...(showAbove
+        ? { bottom: window.innerHeight - rect.top + 6 }
+        : { top: rect.bottom + 6 }),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(value);
+    let frame = 0;
+    let last = '';
+    const follow = () => {
+      const el = btnRef.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const key = [
+          Math.round(rect.left),
+          Math.round(rect.top),
+          Math.round(rect.right),
+          Math.round(rect.bottom),
+          window.innerWidth,
+          window.innerHeight,
+        ].join('|');
+        if (key !== last) {
+          last = key;
+          computePos();
+        }
+      }
+      frame = requestAnimationFrame(follow);
+    };
+    follow();
+
+    const onPointer = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (btnRef.current?.contains(target) || dropRef.current?.contains(target)) return;
+      close();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, value, computePos, close]);
+
+  return (
+    <div className={styles.wrap}>
+      <button
+        ref={btnRef}
+        type="button"
+        className={`${styles.trigger} ${open ? styles.triggerOpen : ''} noHoverGlow`}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(current => !current)}
+      >
+        Сортировка
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`}
+          aria-hidden
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={dropRef}
+          className={styles.menu}
+          style={dropStyle}
+          role="dialog"
+          aria-label="Сортировка"
+        >
+          <div className={styles.options} role="radiogroup" aria-label="Порядок плиток">
+            {ALBUM_LIST_SORT_OPTIONS.map(option => {
+              const selected = draft === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  className={`${styles.option} ${selected ? styles.optionOn : ''}`}
+                  onClick={() => setDraft(option.id)}
+                >
+                  <span className={styles.box}>{selected && <CheckIcon />}</span>
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className={styles.actions}>
+            <Button variant="secondary" className={styles.cancelBtn} fullWidth onClick={close}>
+              Отменить
+            </Button>
+            <Button
+              variant="primary"
+              fullWidth
+              onClick={() => {
+                onApply(draft);
+                close();
+              }}
+            >
+              Применить
+            </Button>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
