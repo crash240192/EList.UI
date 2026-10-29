@@ -31,15 +31,12 @@ export function AlbumSortMenu({ value, onChange }: AlbumSortMenuProps) {
     const el = btnRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const width = Math.min(300, window.innerWidth - 16);
-    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
     const estimatedHeight = 176;
     const spaceBelow = window.innerHeight - rect.bottom;
     const showAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
     setDropStyle({
       position: 'fixed',
-      left,
-      width,
+      right: Math.max(8, window.innerWidth - rect.right),
       zIndex: 600,
       ...(showAbove
         ? { bottom: window.innerHeight - rect.top + 6 }
