@@ -205,6 +205,60 @@
 .frow:first-child { padding-top: 16px; }
 .frow:last-child { padding-bottom: 16px; }
 
+/* Личная информация: подпись над полем, две колонки. Отчество на всю ширину. */
+.personalFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+.personalFields .frow {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  gap: 4px;
+  min-width: 0;
+}
+
+.personalFields .frow:first-child,
+.personalFields .frow:last-child {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.personalFields .frowLabel {
+  width: auto;
+}
+
+.patronymic {
+  grid-column: 1 / -1;
+}
+
+.aboutField {
+  width: 100%;
+  min-height: 96px;
+  padding: 8px 11px;
+  resize: vertical;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: var(--font-sm);
+  font-family: inherit;
+  line-height: 1.45;
+  outline: none;
+}
+
+.aboutField:focus {
+  border-color: var(--accent);
+}
+
+.aboutField::placeholder {
+  color: var(--text-muted);
+}
+
 .frowLabel {
   font-size: var(--font-sm);
   color: var(--text-secondary);

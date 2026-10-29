@@ -219,6 +219,7 @@ export default function SettingsPage() {
           {tab === 'profile' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <ProfileTab />
+              <ProfileAboutSection />
               <CitySection />
             </div>
           )}
@@ -345,7 +346,7 @@ function ProfileTab() {
         <div className={styles.scardHead}>
           <div className={styles.scardTitle}>Личная информация</div>
         </div>
-        <div className={`${styles.scardBody} ${styles.scardBodyPad0}`}>
+        <div className={`${styles.scardBody} ${styles.scardBodyPad0} ${styles.personalFields}`}>
           <div className={styles.frow}>
             <label className={styles.frowLabel}>Имя</label>
             <div className={styles.frowControl}>
@@ -360,7 +361,7 @@ function ProfileTab() {
                 onFocus={e => e.target.select()} />
             </div>
           </div>
-          <div className={styles.frow}>
+          <div className={`${styles.frow} ${styles.patronymic}`}>
             <label className={styles.frowLabel}>Отчество</label>
             <div className={styles.frowControl}>
               <input className={styles.input} value={form.patronymic} onChange={set('patronymic')} placeholder="Отчество (необязательно)"
@@ -397,6 +398,28 @@ function ProfileTab() {
         </div>
       </div>
     </>
+  );
+}
+
+function ProfileAboutSection() {
+  const [about, setAbout] = useState('');
+
+  return (
+    <div className={styles.scard}>
+      <div className={styles.scardHead}>
+        <div className={styles.scardTitle}>Информация о профиле</div>
+      </div>
+      <div className={styles.scardBody}>
+        <textarea
+          className={styles.aboutField}
+          value={about}
+          onChange={e => setAbout(e.target.value)}
+          placeholder="Здесь вы можете рассказать о себе и о том, чем занимаетесь"
+          rows={4}
+          aria-label="Информация о профиле"
+        />
+      </div>
+    </div>
   );
 }
 
