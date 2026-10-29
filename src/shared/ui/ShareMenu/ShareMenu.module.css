@@ -112,17 +112,6 @@
   color: var(--accent);
 }
 
-.linkGlyph {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  display: block;
-  background: currentColor;
-  color: var(--accent);
-  -webkit-mask: url('./copy-link.png') center / contain no-repeat;
-  mask: url('./copy-link.png') center / contain no-repeat;
-}
-
 .qrWrap {
   display: flex;
   justify-content: center;
