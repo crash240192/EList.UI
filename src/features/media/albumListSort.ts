@@ -61,7 +61,8 @@ function compareGroups(
   if (left == null && right == null) return 0;
   if (left == null) return 1;
   if (right == null) return -1;
-  return right - left;
+  // Сверху более ранняя дата.
+  return left - right;
 }
 
 /**
