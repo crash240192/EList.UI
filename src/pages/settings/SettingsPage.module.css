@@ -519,4 +519,29 @@
   .frowLabel {
     width: auto;
   }
+
+  /* Личная информация: две колонки, отчество на всю ширину. Десктоп не трогаем. */
+  .personalFields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 10px;
+    padding: 12px 14px 14px;
+  }
+
+  .personalFields .frow {
+    padding: 0;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .personalFields .frow:first-child,
+  .personalFields .frow:last-child {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .patronymic {
+    grid-column: 1 / -1;
+  }
 }
