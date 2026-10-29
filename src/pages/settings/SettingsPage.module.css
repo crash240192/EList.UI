@@ -259,6 +259,13 @@
   color: var(--text-muted);
 }
 
+.profileSave {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .frowLabel {
   font-size: var(--font-sm);
   color: var(--text-secondary);

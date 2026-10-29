@@ -218,9 +218,7 @@ export default function SettingsPage() {
         <div className={styles.scontent}>
           {tab === 'profile' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
-              <ProfileTab />
-              <ProfileAboutSection />
-              <CitySection />
+              <ProfileDataTab />
             </div>
           )}
           {tab === 'privacy' && (
@@ -255,12 +253,13 @@ export default function SettingsPage() {
   );
 }
 
-function ProfileTab() {
+function ProfileDataTab() {
   const [form, setForm] = useState({
     firstName: '', lastName: '', patronymic: '',
     gender: '' as 'Male' | 'Female' | '',
     birthDate: '',
   });
+  const [about, setAbout] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -269,6 +268,10 @@ function ProfileTab() {
   const accountId = getStoredAccountId() ?? '';
   const { fileId: myAvatarFileId, refresh: refreshAvatar } = useMyAvatar();
   const displayName = [form.firstName, form.lastName].filter(Boolean).join(' ') || 'Профиль';
+
+  const { coords } = useUserLocation();
+  const { detectedCity, loading: geoLoading } = useGeoCity();
+  const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
 
   useEffect(() => {
     getMyPersonInfo().then(p => {
@@ -281,6 +284,30 @@ function ProfileTab() {
       });
     }).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    let nearest: ICity | null = null;
+    let minDist = Infinity;
+    for (const city of POPULAR_CITIES) {
+      const d = Math.hypot(city.lat - coords.lat, city.lng - coords.lng);
+      if (d < minDist) { minDist = d; nearest = city; }
+    }
+    if (nearest && minDist < 3) setSelectedCity(nearest);
+  }, [coords]);
+
+  const handleAutoDetect = () => {
+    const source = detectedCity
+      ? { lat: detectedCity.lat, lng: detectedCity.lng }
+      : coords;
+
+    let nearest: ICity | null = null;
+    let minDist = Infinity;
+    for (const city of POPULAR_CITIES) {
+      const d = Math.hypot(city.lat - source.lat, city.lng - source.lng);
+      if (d < minDist) { minDist = d; nearest = city; }
+    }
+    if (nearest) setSelectedCity(nearest);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -305,6 +332,26 @@ function ProfileTab() {
         gender: form.gender || undefined,
         birthDate: birthDateToApiIso(form.birthDate),
       });
+      if (selectedCity) {
+        await updateLocation(selectedCity.lat, selectedCity.lng);
+        cookies.set('elist_user_lat', String(selectedCity.lat), 30);
+        cookies.set('elist_user_lng', String(selectedCity.lng), 30);
+        cookies.set('elist_acct_lat', String(selectedCity.lat), 30);
+        cookies.set('elist_acct_lng', String(selectedCity.lng), 30);
+        cookies.delete('elist_city_decided');
+        const cityName = selectedCity.shortName ?? selectedCity.name;
+        cookies.set('elist_home_city_name', cityName, 30);
+        cookies.set('elist_city_name', cityName, 30);
+        window.dispatchEvent(new CustomEvent('elist:homeCityChanged', {
+          detail: { lat: selectedCity.lat, lng: selectedCity.lng, name: cityName },
+        }));
+        const store = useFiltersStore.getState();
+        store.setMapCenter([selectedCity.lat, selectedCity.lng]);
+        store.setMapZoom(12);
+        store.setFilter('latitude', selectedCity.lat);
+        store.setFilter('longitude', selectedCity.lng);
+        cookies.set('elist_city_decided', '1', 30);
+      }
       setMsg({ text: 'Изменения сохранены', ok: true });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
@@ -391,134 +438,59 @@ function ProfileTab() {
             </div>
           </div>
         </div>
-        <div className={styles.scardFooter}>
-          {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
-          {!msg && <span />}
-          <Button onClick={handleSave} loading={saving}>Сохранить</Button>
+      </div>
+
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Информация о профиле</div>
+        </div>
+        <div className={styles.scardBody}>
+          <textarea
+            className={styles.aboutField}
+            value={about}
+            onChange={e => setAbout(e.target.value)}
+            placeholder="Здесь вы можете рассказать о себе и о том, чем занимаетесь"
+            rows={4}
+            aria-label="Информация о профиле"
+          />
         </div>
       </div>
-    </>
-  );
-}
 
-function ProfileAboutSection() {
-  const [about, setAbout] = useState('');
-
-  return (
-    <div className={styles.scard}>
-      <div className={styles.scardHead}>
-        <div className={styles.scardTitle}>Информация о профиле</div>
-      </div>
-      <div className={styles.scardBody}>
-        <textarea
-          className={styles.aboutField}
-          value={about}
-          onChange={e => setAbout(e.target.value)}
-          placeholder="Здесь вы можете рассказать о себе и о том, чем занимаетесь"
-          rows={4}
-          aria-label="Информация о профиле"
-        />
-      </div>
-    </div>
-  );
-}
-
-function CitySection() {
-  const { coords } = useUserLocation();
-  const { detectedCity, loading: geoLoading } = useGeoCity();
-  const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
-
-  useEffect(() => {
-    let nearest: ICity | null = null;
-    let minDist = Infinity;
-    for (const city of POPULAR_CITIES) {
-      const d = Math.hypot(city.lat - coords.lat, city.lng - coords.lng);
-      if (d < minDist) { minDist = d; nearest = city; }
-    }
-    if (nearest && minDist < 3) setSelectedCity(nearest);
-  }, [coords]);
-
-  const handleAutoDetect = () => {
-    const source = detectedCity
-      ? { lat: detectedCity.lat, lng: detectedCity.lng }
-      : coords;
-
-    let nearest: ICity | null = null;
-    let minDist = Infinity;
-    for (const city of POPULAR_CITIES) {
-      const d = Math.hypot(city.lat - source.lat, city.lng - source.lng);
-      if (d < minDist) { minDist = d; nearest = city; }
-    }
-    if (nearest) setSelectedCity(nearest);
-  };
-
-  const handleSave = async () => {
-    if (!selectedCity) return;
-    setSaving(true);
-    setMsg(null);
-    try {
-      await updateLocation(selectedCity.lat, selectedCity.lng);
-      cookies.set('elist_user_lat', String(selectedCity.lat), 30);
-      cookies.set('elist_user_lng', String(selectedCity.lng), 30);
-      cookies.set('elist_acct_lat', String(selectedCity.lat), 30);
-      cookies.set('elist_acct_lng', String(selectedCity.lng), 30);
-      cookies.delete('elist_city_decided');
-      const displayName = selectedCity.shortName ?? selectedCity.name;
-      cookies.set('elist_home_city_name', displayName, 30);
-      cookies.set('elist_city_name', displayName, 30);
-      window.dispatchEvent(new CustomEvent('elist:homeCityChanged', {
-        detail: { lat: selectedCity.lat, lng: selectedCity.lng, name: displayName },
-      }));
-      const store = useFiltersStore.getState();
-      store.setMapCenter([selectedCity.lat, selectedCity.lng]);
-      store.setMapZoom(12);
-      store.setFilter('latitude', selectedCity.lat);
-      store.setFilter('longitude', selectedCity.lng);
-      cookies.set('elist_city_decided', '1', 30);
-      setMsg({ text: `Город изменён на ${selectedCity.name}`, ok: true });
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className={styles.scard}>
-      <div className={styles.scardHead}>
-        <div className={styles.scardTitle}>Текущий город</div>
-        <div className={styles.scardDesc}>Используется для поиска событий поблизости</div>
-      </div>
-      {selectedCity && (
-        <div className={styles.cityBlock}>
-          <div>
-            <div className={styles.cityName}>{selectedCity.name}</div>
-            <div className={styles.citySub}>
-              {selectedCity.lat.toFixed(4)}° N, {selectedCity.lng.toFixed(4)}° E
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Текущий город</div>
+          <div className={styles.scardDesc}>Используется для поиска событий поблизости</div>
+        </div>
+        {selectedCity && (
+          <div className={styles.cityBlock}>
+            <div>
+              <div className={styles.cityName}>{selectedCity.name}</div>
+              <div className={styles.citySub}>
+                {selectedCity.lat.toFixed(4)}° N, {selectedCity.lng.toFixed(4)}° E
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      <div className={styles.scardBody}>
-        <CitySearch
-          value={selectedCity?.name ?? ''}
-          onSelect={setSelectedCity}
-          geoLoading={geoLoading}
-          detectedCoords={coords}
-          onAutoDetect={handleAutoDetect}
-        />
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-          Или введите название города вручную
+        )}
+        <div className={styles.scardBody}>
+          <CitySearch
+            value={selectedCity?.name ?? ''}
+            onSelect={setSelectedCity}
+            geoLoading={geoLoading}
+            detectedCoords={coords}
+            onAutoDetect={handleAutoDetect}
+          />
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+            Или введите название города вручную
+          </div>
         </div>
       </div>
-      <div className={styles.scardFooter}>
+
+      <div className={styles.profileSave}>
         {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
         {!msg && <span />}
-        <Button onClick={handleSave} loading={saving} disabled={!selectedCity}>Сохранить</Button>
+        <Button onClick={() => void handleSave()} loading={saving}>Сохранить</Button>
       </div>
-    </div>
+    </>
   );
 }
 
