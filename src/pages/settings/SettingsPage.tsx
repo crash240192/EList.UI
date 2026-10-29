@@ -465,7 +465,7 @@ function CitySection() {
   return (
     <div className={styles.scard}>
       <div className={styles.scardHead}>
-        <div className={styles.scardTitle}>Текущий город</div>
+        <div className={styles.scardTitle}>Текущее местоположение</div>
         <div className={styles.scardDesc}>Используется для поиска событий поблизости</div>
       </div>
       {selectedCity && (
@@ -740,7 +740,7 @@ function PrivacySection() {
           </div>
         </div>
         <div className={styles.frow}>
-          <label className={styles.frowLabel}>Кто видит город</label>
+          <label className={styles.frowLabel}>Кто видит местоположение</label>
           <div className={styles.frowControl}>
             <Select
               value={pendingAudience?.key === 'locationVisibility' ? pendingAudience.value : settings.locationVisibility}
@@ -804,7 +804,7 @@ function PrivacySection() {
                     : prev));
                 }}
               />
-              Показывать акцент в день рождения
+              Показывать отметку &quot;День рождения&quot; в шапке профиля
             </label>
           </div>
         </div>

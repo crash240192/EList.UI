@@ -112,7 +112,7 @@ export function ShareMenu({
             </button>
           ))}
           <button type="button" className={styles.optionBtn} onClick={handleCopyLink}>
-            <CopyIcon />
+            <CopyLinkIcon />
             <span>Скопировать ссылку</span>
           </button>
           <button type="button" className={styles.optionBtn} onClick={handleShareLink}>
@@ -127,6 +127,10 @@ export function ShareMenu({
       </div>
     </>
   );
+}
+
+function CopyLinkIcon() {
+  return <span className={styles.linkGlyph} aria-hidden />;
 }
 
 function CopyIcon() {
