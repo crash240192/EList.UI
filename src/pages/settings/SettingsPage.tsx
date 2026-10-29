@@ -219,6 +219,7 @@ export default function SettingsPage() {
           {tab === 'profile' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <ProfileTab />
+              <ProfileAboutSection />
               <CitySection />
             </div>
           )}
@@ -397,6 +398,28 @@ function ProfileTab() {
         </div>
       </div>
     </>
+  );
+}
+
+function ProfileAboutSection() {
+  const [about, setAbout] = useState('');
+
+  return (
+    <div className={styles.scard}>
+      <div className={styles.scardHead}>
+        <div className={styles.scardTitle}>Информация о профиле</div>
+      </div>
+      <div className={styles.scardBody}>
+        <textarea
+          className={styles.aboutField}
+          value={about}
+          onChange={e => setAbout(e.target.value)}
+          placeholder="Здесь вы можете рассказать о себе и о том, чем занимаетесь"
+          rows={4}
+          aria-label="Информация о профиле"
+        />
+      </div>
+    </div>
   );
 }
 
