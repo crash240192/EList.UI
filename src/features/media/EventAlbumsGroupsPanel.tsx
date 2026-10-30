@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import {
   albumCoverFileIdsFromMeta,
   albumHasCoverPreview,
@@ -37,6 +37,107 @@ const COLLAPSED_MAX = 5;
 const STACK_LAYER_MAX = 4;
 /** Слои фото внутри одной миниатюры альбома (M1). */
 const PHOTO_STACK_LAYERS = 3;
+/** FLIP: разлёт миниатюр → крупные карточки (и обратно). */
+const FLIP_MS = 420;
+const FLIP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const FLIP_STACK_ID = '__stack__';
+
+type FlipRect = { left: number; top: number; width: number; height: number };
+type FlipRects = Map<string, FlipRect>;
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function captureFlipRects(root: HTMLElement): FlipRects {
+  const map: FlipRects = new Map();
+  root.querySelectorAll<HTMLElement>('[data-album-flip-id]').forEach(el => {
+    const id = el.dataset.albumFlipId;
+    if (!id) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return;
+    map.set(id, { left: r.left, top: r.top, width: r.width, height: r.height });
+  });
+  return map;
+}
+
+/** First → Last: invert transform, затем play к identity. */
+function playFlipScatter(
+  root: HTMLElement,
+  first: FlipRects,
+  albumOrder: readonly string[],
+): Promise<void> {
+  if (prefersReducedMotion() || first.size === 0) return Promise.resolve();
+
+  const lasts = captureFlipRects(root);
+  const stackFirst = first.get(FLIP_STACK_ID);
+  const animations: Animation[] = [];
+
+  albumOrder.forEach((id, index) => {
+    const last = lasts.get(id);
+    if (!last) return;
+    const f = first.get(id) ?? stackFirst;
+    if (!f) return;
+
+    const el = root.querySelector<HTMLElement>(
+      `[data-album-flip-id="${CSS.escape(id)}"]`,
+    );
+    if (!el) return;
+
+    const dx = f.left - last.left;
+    const dy = f.top - last.top;
+    const sx = f.width / last.width;
+    const sy = f.height / last.height;
+    if (
+      Math.abs(dx) < 0.5
+      && Math.abs(dy) < 0.5
+      && Math.abs(sx - 1) < 0.02
+      && Math.abs(sy - 1) < 0.02
+    ) {
+      return;
+    }
+
+    const fromStack = !first.has(id) && Boolean(stackFirst);
+    const delay = Math.min(index * 28, 160);
+
+    el.style.transformOrigin = 'top left';
+    el.style.zIndex = String(20 + index);
+
+    const anim = el.animate(
+      [
+        {
+          transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`,
+          opacity: fromStack ? 0.35 : 1,
+        },
+        {
+          transform: 'translate(0px, 0px) scale(1, 1)',
+          opacity: 1,
+        },
+      ],
+      {
+        duration: FLIP_MS,
+        delay,
+        easing: FLIP_EASING,
+        fill: 'both',
+      },
+    );
+    animations.push(anim);
+  });
+
+  if (animations.length === 0) return Promise.resolve();
+
+  return Promise.all(animations.map(a => a.finished.catch(() => undefined))).then(() => {
+    albumOrder.forEach(id => {
+      const el = root.querySelector<HTMLElement>(
+        `[data-album-flip-id="${CSS.escape(id)}"]`,
+      );
+      if (!el) return;
+      el.style.transformOrigin = '';
+      el.style.zIndex = '';
+    });
+  });
+}
 
 function albumCountLabel(count: number): string {
   if (count === 1) return '1 альбом';
@@ -234,6 +335,7 @@ function AlbumPhotoStackThumb({
       onClick={onOpen}
       aria-label={album.name}
       title={album.name}
+      data-album-flip-id={album.id}
       data-fresh={fresh ? 'true' : undefined}
     >
       <span className={styles.photoStackLayers} data-count={layers.length}>
@@ -272,6 +374,7 @@ function AlbumTile({
       onClick={onOpen}
       aria-label={album.name}
       title={album.name}
+      data-album-flip-id={album.id}
       data-fresh={fresh ? 'true' : undefined}
     >
       <AlbumCoverMosaic album={album} iconSize={24} />
@@ -304,6 +407,7 @@ function AlbumStack({
       onClick={onOpen}
       aria-label={`Ещё ${albumCountLabel(extraCount)}`}
       title={`Ещё ${albumCountLabel(extraCount)}`}
+      data-album-flip-id={FLIP_STACK_ID}
       data-fresh={fresh ? 'true' : undefined}
     >
       <span className={styles.photoStackLayers} data-count={Math.min(coverByAlbum.length, PHOTO_STACK_LAYERS)}>
@@ -337,6 +441,9 @@ function EventGroupSection({
   const albumIdsKey = albums.map(album => album.id).join('\0');
   const [photoTotal, setPhotoTotal] = useState<number | null>(null);
   const isMobile = useMediaQuery(media.mobile);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const pendingFlipRef = useRef<FlipRects | null>(null);
+  const [flipBusy, setFlipBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -363,13 +470,44 @@ function EventGroupSection({
     });
     return () => { cancelled = true; };
   }, [albumIdsKey, albums]);
+
   // Свёртка только на мобилке; на tablet/desktop всегда развёрнутые карточки.
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const expanded = !isMobile || mobileExpanded;
   const showStack = !expanded && albums.length > COLLAPSED_MAX;
-  const expand = () => setMobileExpanded(true);
 
-  const gridClass = expanded ? styles.albumGrid : styles.albumGridCollapsed;
+  useLayoutEffect(() => {
+    const first = pendingFlipRef.current;
+    const root = gridRef.current;
+    if (!first || !root) return;
+    pendingFlipRef.current = null;
+    setFlipBusy(true);
+    const order = albums.map(a => a.id);
+    void playFlipScatter(root, first, order).finally(() => setFlipBusy(false));
+  }, [expanded, albums]);
+
+  const expand = () => {
+    if (flipBusy || mobileExpanded) return;
+    const root = gridRef.current;
+    if (root && !prefersReducedMotion()) {
+      pendingFlipRef.current = captureFlipRects(root);
+    }
+    setMobileExpanded(true);
+  };
+
+  const collapse = () => {
+    if (flipBusy || !mobileExpanded) return;
+    const root = gridRef.current;
+    if (root && !prefersReducedMotion()) {
+      pendingFlipRef.current = captureFlipRects(root);
+    }
+    setMobileExpanded(false);
+  };
+
+  const gridClass = [
+    expanded ? styles.albumGrid : styles.albumGridCollapsed,
+    flipBusy ? styles.albumGridFlip : '',
+  ].filter(Boolean).join(' ');
 
   let tiles;
   if (expanded) {
@@ -412,14 +550,15 @@ function EventGroupSection({
   return (
     <section className={styles.eventGroup}>
       <EventGroupHeader event={event} photoTotal={photoTotal} onOpen={() => onOpenEvent(event.id)} />
-      <div className={gridClass}>
+      <div ref={gridRef} className={gridClass}>
         {tiles}
       </div>
       {isMobile && mobileExpanded && (
         <button
           type="button"
           className={`${styles.collapseBtn} noHoverGlow`}
-          onClick={() => setMobileExpanded(false)}
+          onClick={collapse}
+          disabled={flipBusy}
         >
           <ChevronUpIcon />
           <span className={styles.collapseTitle}>Свернуть</span>
