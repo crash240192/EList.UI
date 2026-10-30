@@ -388,7 +388,9 @@ export function HeaderPhotoDialog({
                 <div className={styles.blurFill} style={{ height: `${(blurPercent / HEADER_BLUR_MAX_PERCENT) * 100}%` }} />
               </div>
               <div className={styles.blurThumb} style={{ bottom: `${(blurPercent / HEADER_BLUR_MAX_PERCENT) * 100}%` }}>
-                <span className={styles.blurVal}>{blurPercent}%</span>
+                {blurPercent > 0 && blurPercent < HEADER_BLUR_MAX_PERCENT && (
+                  <span className={styles.blurVal}>{blurPercent}%</span>
+                )}
               </div>
             </div>
             <div className={styles.blurEnd}>0%</div>
