@@ -122,20 +122,6 @@ export function CoverUpload({
     if (!loading) inputRef.current?.click();
   };
 
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!hasStoredCover || loading || !onFocusChange) return;
-    if ((e.target as HTMLElement).closest('button')) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = {
-      pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      focus,
-      moved: false,
-    };
-    setPanning(true);
-  };
-
   const rememberNat = (e: React.SyntheticEvent<HTMLImageElement>) => {
     natRef.current = {
       w: e.currentTarget.naturalWidth,
@@ -143,38 +129,52 @@ export function CoverUpload({
     };
   };
 
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId || !onFocusChange) return;
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!hasStoredCover || loading || !onFocusChange) return;
+    if ((e.target as HTMLElement).closest('button')) return;
     const zone = zoneRef.current;
     if (!zone) return;
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
-    const rect = zone.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-    onFocusChange(panCoverFocus(
-      drag.focus,
-      dx,
-      dy,
-      rect.width,
-      rect.height,
-      natRef.current.w,
-      natRef.current.h,
-    ));
-  };
-
-  const endPan = (e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    dragRef.current = null;
-    setPanning(false);
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* already released */
-    }
-    if (!drag.moved && !hasStoredCover) openPicker();
+    zone.setPointerCapture(e.pointerId);
+    const drag = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      focus,
+      moved: false,
+    };
+    dragRef.current = drag;
+    setPanning(true);
+    const apply = onFocusChange;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      const dx = ev.clientX - drag.startX;
+      const dy = ev.clientY - drag.startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
+      const rect = zone.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      apply(panCoverFocus(
+        drag.focus,
+        dx,
+        dy,
+        rect.width,
+        rect.height,
+        natRef.current.w,
+        natRef.current.h,
+      ));
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (dragRef.current?.pointerId === drag.pointerId) dragRef.current = null;
+      setPanning(false);
+      try { zone.releasePointerCapture(ev.pointerId); } catch { /* already released */ }
+      if (!drag.moved && !hasStoredCover) openPicker();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
 
   const onZoneClick = () => {
@@ -194,9 +194,6 @@ export function CoverUpload({
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endPan}
-      onPointerCancel={endPan}
     >
       {displayUrl ? (
         <img

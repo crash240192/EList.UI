@@ -217,50 +217,49 @@ export function HeaderPhotoDialog({
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!hasImage || saving) return;
     if ((e.target as HTMLElement).closest('button, [data-header-blur]')) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = {
+    const zone = zoneRef.current;
+    if (!zone) return;
+    zone.setPointerCapture(e.pointerId);
+    const drag = {
       pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       focus,
       moved: false,
     };
+    dragRef.current = drag;
     setPanning(true);
-  };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    const zone = zoneRef.current;
-    if (!zone) return;
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
-    const rect = zone.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
     const scale = headerBlurFilter(blurPercent) ? HEADER_BLUR_FRAME_SCALE : 1;
-    setFocus(panCoverFocus(
-      drag.focus,
-      dx,
-      dy,
-      rect.width,
-      rect.height,
-      natRef.current.w,
-      natRef.current.h,
-      scale,
-    ));
-  };
-
-  const endPan = (e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    dragRef.current = null;
-    setPanning(false);
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* already released */
-    }
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      const dx = ev.clientX - drag.startX;
+      const dy = ev.clientY - drag.startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
+      const rect = zone.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      setFocus(panCoverFocus(
+        drag.focus,
+        dx,
+        dy,
+        rect.width,
+        rect.height,
+        natRef.current.w,
+        natRef.current.h,
+        scale,
+      ));
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (dragRef.current?.pointerId === drag.pointerId) dragRef.current = null;
+      setPanning(false);
+      try { zone.releasePointerCapture(ev.pointerId); } catch { /* already released */ }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
 
   const setBlurFromPointer = (clientY: number) => {
@@ -329,9 +328,6 @@ export function HeaderPhotoDialog({
               if (next) takeFile(next);
             }}
             onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={endPan}
-            onPointerCancel={endPan}
           >
             {previewUrl ? (
               <img src={previewUrl} alt="" className={styles.frame} style={frameStyle} draggable={false} onLoad={rememberNat} />
