@@ -446,7 +446,7 @@ function ProfileDataTab() {
 
       <div className={styles.scard}>
         <div className={styles.scardHead}>
-          <div className={styles.scardTitle}>Информация о профиле</div>
+          <div className={styles.scardTitle}>Немного о себе</div>
         </div>
         <div className={styles.scardBody}>
           <textarea
@@ -456,7 +456,7 @@ function ProfileDataTab() {
             placeholder="Здесь вы можете рассказать о себе и о том, чем занимаетесь"
             rows={4}
             maxLength={2000}
-            aria-label="Информация о профиле"
+            aria-label="Немного о себе"
           />
         </div>
       </div>
