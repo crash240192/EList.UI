@@ -65,7 +65,7 @@ function useDelayedVisible(active: boolean, delayMs: number): boolean {
 function ImagePreloader() {
   return (
     <div className={styles.preloaderSlot} aria-hidden>
-      <AppPreloader variant="onDark" role="presentation" layout="inline" />
+      <AppPreloader variant="onDark" role="presentation" layout="inline" size="sm" />
     </div>
   );
 }

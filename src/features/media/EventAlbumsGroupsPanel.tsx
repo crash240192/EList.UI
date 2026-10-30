@@ -25,6 +25,7 @@ import {
 } from '@/features/media/albumListSort';
 import { syncUnseenAlbums } from '@/features/media/albumFreshStore';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { media } from '@/shared/lib/breakpoints';
 import { useInfiniteScroll, useMediaQuery } from '@/shared/hooks';
@@ -579,8 +580,25 @@ export function EventAlbumsGroupsPanel({
           />
         ))}
 
-        {hasMore && !loading && <div ref={sentinelRef} className={styles.sentinel} aria-hidden />}
-        {loadingMore && <div className={styles.loadingMore}>Загрузка...</div>}
+        {/* Пагинация: прелоадер/скелетон внизу ленты, где появятся новые группы */}
+        {hasMore && !loading && (
+          <div
+            ref={sentinelRef}
+            className={loadingMore ? styles.loadMoreZone : styles.sentinel}
+            aria-busy={loadingMore || undefined}
+          >
+            {loadingMore && (
+              <>
+                <div className={styles.skeletonGroup} aria-hidden />
+                <AppPreloader
+                  layout="block"
+                  size="sm"
+                  aria-label="Загрузка альбомов"
+                />
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <AlbumGridModal
