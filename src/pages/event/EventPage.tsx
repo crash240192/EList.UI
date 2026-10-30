@@ -1,6 +1,6 @@
 // pages/event/EventPage.tsx
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { IEvent, IEventOrganizator, IParticipantView } from '@/entities/event';
 import {
@@ -26,6 +26,11 @@ import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import { SimilarEventDialog } from './SimilarEventDialog';
+import {
+  captureScrollAnchor,
+  restoreScrollAnchor,
+  type ScrollAnchorSnapshot,
+} from '@/shared/lib/scrollAnchor';
 import {
   buildSimilarEventSeed,
   saveSimilarEventSeed,
@@ -222,6 +227,8 @@ export default function EventPage() {
   const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
   const [inviteModalOpen,       setInviteModalOpen]       = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
+  const descSectionRef = useRef<HTMLDivElement>(null);
+  const pendingDescScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
   const [descTogglePressed, setDescTogglePressed] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [similarOpen, setSimilarOpen] = useState(false);
@@ -265,6 +272,13 @@ export default function EventPage() {
   const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
 
   usePageTitle(event?.name ?? null);
+
+  useLayoutEffect(() => {
+    const snap = pendingDescScrollRef.current;
+    if (!snap) return;
+    pendingDescScrollRef.current = null;
+    restoreScrollAnchor(snap, descSectionRef.current);
+  }, [descExpanded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1206,7 +1220,7 @@ export default function EventPage() {
         <div className={styles.mainGrid}>
 
           {/* Описание — на мобилке первым, на десктопе справа сверху */}
-          <div className={styles.descSection}>
+          <div ref={descSectionRef} className={styles.descSection}>
             <div className={styles.secLabel}>О мероприятии</div>
             <p className={`${styles.desc} ${descExpanded ? '' : styles.descClamped}`}>
               {event.description ?? 'Описание отсутствует'}
@@ -1220,6 +1234,7 @@ export default function EventPage() {
                 onPointerCancel={() => setDescTogglePressed(false)}
                 onPointerLeave={() => setDescTogglePressed(false)}
                 onClick={e => {
+                  pendingDescScrollRef.current = captureScrollAnchor(descSectionRef.current);
                   setDescExpanded(v => !v);
                   setDescTogglePressed(false);
                   e.currentTarget.blur();

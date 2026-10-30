@@ -92,16 +92,20 @@ export function MessageReplies({
 
   const remaining = Math.max(0, total - items.length);
 
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
   const fetchTreeRange = useCallback(
     async (
       fromPage: number,
       toPage: number,
       generation: number,
-      mode: 'replace' | 'append',
+      mode: 'replace' | 'append' | 'soft-replace',
     ) => {
       if (toPage < fromPage) return;
       if (mode === 'replace') setLoading(true);
-      else setLoadingMore(true);
+      else if (mode === 'append') setLoadingMore(true);
+      // soft-replace: оставляем текущие сообщения на экране — без скелетона/мигания
 
       try {
         const localAcc: IMessage[] = [];
@@ -121,10 +125,10 @@ export function MessageReplies({
 
         if (generation !== requestGen.current) return;
 
-        if (mode === 'replace') {
-          setItems(mergeById([], localAcc));
-        } else {
+        if (mode === 'append') {
           setItems((prev) => mergeById(prev, localAcc));
+        } else {
+          setItems(mergeById([], localAcc));
         }
         setTotal(nextTotal);
         onTotalLoaded?.(nextTotal);
@@ -148,8 +152,8 @@ export function MessageReplies({
     [parent.id, onTotalLoaded],
   );
 
-  const loadFlat = useCallback(async (generation: number) => {
-    setLoading(true);
+  const loadFlat = useCallback(async (generation: number, soft: boolean) => {
+    if (!soft) setLoading(true);
     try {
       const descendants = await loadDescendantReplies(parent.id);
       if (generation !== requestGen.current) return;
@@ -161,8 +165,10 @@ export function MessageReplies({
     } catch (e) {
       if (generation !== requestGen.current) return;
       setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов');
-      setItems([]);
-      setLoadedThroughPage(-1);
+      if (!soft) {
+        setItems([]);
+        setLoadedThroughPage(-1);
+      }
     } finally {
       if (generation === requestGen.current) setLoading(false);
     }
@@ -171,12 +177,14 @@ export function MessageReplies({
   useEffect(() => {
     requestGen.current += 1;
     const generation = requestGen.current;
+    // При смене вида (дерево↔лента) не сбрасываем список в скелетон — мягкая подмена.
+    const soft = itemsRef.current.length > 0;
     setLoadedThroughPage(-1);
     if (viewMode === 'flat') {
-      void loadFlat(generation);
+      void loadFlat(generation, soft);
     } else {
       const through = Math.max(0, focusThroughPageRef.current);
-      void fetchTreeRange(0, through, generation, 'replace');
+      void fetchTreeRange(0, through, generation, soft ? 'soft-replace' : 'replace');
     }
     // refreshKey намеренно не в deps: отправка ответа не должна сбрасывать список
     // (новая запись приходит через useDiscussionAppend).
@@ -264,7 +272,8 @@ export function MessageReplies({
 
   const showRepliesSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
 
-  if (loading) {
+  // Скелетон только на первичной загрузке; при смене вида список остаётся на экране.
+  if (loading && items.length === 0) {
     return (
       <div className={styles.skeletonRoot} role="status" aria-label="Загрузка ответов">
         <DiscussionMessageSkeleton variant="replies" showSpinner={showRepliesSpinner} />

@@ -147,7 +147,7 @@ function AlbumCard({
 
   useEffect(() => {
     let cancelled = false;
-    setCoverIds([]);
+    // Не очищаем обложки при росте previewLimit (свёртка→разворот) — иначе моргание.
     getAlbumCoverPreview(album.id, previewLimit, album).then(({ fileIds, total }) => {
       if (!cancelled) {
         setCoverIds(fileIds);
@@ -158,6 +158,12 @@ function AlbumCard({
     });
     return () => { cancelled = true; };
   }, [album, coverVersion, previewLimit]);
+
+  useEffect(() => {
+    // Смена альбома / версии обложки — сброс до прихода новых превью.
+    setCoverIds([]);
+    setPhotoCount(null);
+  }, [album.id, coverVersion]);
 
   useLayoutEffect(() => {
     if (!menuOpen) {
@@ -451,11 +457,8 @@ export function EventAlbums({
     const scrollSnap = pendingScrollRef.current;
     if (scrollSnap) {
       pendingScrollRef.current = null;
-      // Якорим блок обсуждений (ниже альбомов) — при свёртке у низа страницы нет рывка.
-      const anchor =
-        document.getElementById('event-discussions')
-        ?? sectionRef.current;
-      restoreScrollAnchor(scrollSnap, anchor);
+      // Верхний край секции альбомов — разворот растёт вниз, а не «всплывает» вверх.
+      restoreScrollAnchor(scrollSnap, sectionRef.current);
     }
 
     const first = pendingFlipRef.current;
@@ -469,10 +472,7 @@ export function EventAlbums({
 
   const captureLayoutAnchors = useCallback(() => {
     const root = gridRef.current;
-    const scrollAnchor =
-      document.getElementById('event-discussions')
-      ?? sectionRef.current;
-    pendingScrollRef.current = captureScrollAnchor(scrollAnchor);
+    pendingScrollRef.current = captureScrollAnchor(sectionRef.current);
     if (root && !prefersReducedMotion()) {
       pendingFlipRef.current = captureFlipRects(root);
     }
@@ -697,7 +697,7 @@ export function EventAlbums({
           ))}
           {showOverflow && overflowCover && (
             <AlbumCard
-              key={`overflow-${overflowCover.id}`}
+              key={overflowCover.id}
               album={overflowCover}
               canManage={false}
               hideMeta
