@@ -37,6 +37,11 @@ import {
   prefersReducedMotion,
   type FlipRects,
 } from '@/features/media/albumFlip';
+import {
+  captureScrollAnchor,
+  restoreScrollAnchor,
+  type ScrollAnchorSnapshot,
+} from '@/shared/lib/scrollAnchor';
 import styles from './EventAlbumsGroupsPanel.module.css';
 
 const PAGE_SIZE = 10;
@@ -348,8 +353,10 @@ function EventGroupSection({
   const albumIdsKey = albums.map(album => album.id).join('\0');
   const [photoTotal, setPhotoTotal] = useState<number | null>(null);
   const isMobile = useMediaQuery(media.mobile);
+  const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const pendingFlipRef = useRef<FlipRects | null>(null);
+  const pendingScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
   const [flipBusy, setFlipBusy] = useState(false);
 
   useEffect(() => {
@@ -384,6 +391,12 @@ function EventGroupSection({
   const showStack = !expanded && albums.length > COLLAPSED_MAX;
 
   useLayoutEffect(() => {
+    const scrollSnap = pendingScrollRef.current;
+    if (scrollSnap) {
+      pendingScrollRef.current = null;
+      restoreScrollAnchor(scrollSnap, sectionRef.current);
+    }
+
     const first = pendingFlipRef.current;
     const root = gridRef.current;
     if (!first || !root) return;
@@ -393,21 +406,23 @@ function EventGroupSection({
     void playFlipScatter(root, first, order).finally(() => setFlipBusy(false));
   }, [expanded, albums]);
 
-  const expand = () => {
-    if (flipBusy || mobileExpanded) return;
+  const captureLayoutAnchors = () => {
+    pendingScrollRef.current = captureScrollAnchor(sectionRef.current);
     const root = gridRef.current;
     if (root && !prefersReducedMotion()) {
       pendingFlipRef.current = captureFlipRects(root);
     }
+  };
+
+  const expand = () => {
+    if (flipBusy || mobileExpanded) return;
+    captureLayoutAnchors();
     setMobileExpanded(true);
   };
 
   const collapse = () => {
     if (flipBusy || !mobileExpanded) return;
-    const root = gridRef.current;
-    if (root && !prefersReducedMotion()) {
-      pendingFlipRef.current = captureFlipRects(root);
-    }
+    captureLayoutAnchors();
     setMobileExpanded(false);
   };
 
@@ -455,7 +470,7 @@ function EventGroupSection({
   }
 
   return (
-    <section className={styles.eventGroup}>
+    <section ref={sectionRef} className={styles.eventGroup}>
       <EventGroupHeader event={event} photoTotal={photoTotal} onOpen={() => onOpenEvent(event.id)} />
       <div ref={gridRef} className={gridClass}>
         {tiles}

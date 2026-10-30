@@ -1,7 +1,7 @@
 // pages/event/EventAlbums.tsx
 // Блок альбомов на странице мероприятия
 
-import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
   albumHasNewContent,
@@ -25,6 +25,11 @@ import {
   prefersReducedMotion,
   type FlipRects,
 } from '@/features/media/albumFlip';
+import {
+  captureScrollAnchor,
+  restoreScrollAnchor,
+  type ScrollAnchorSnapshot,
+} from '@/shared/lib/scrollAnchor';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
@@ -386,8 +391,10 @@ export function EventAlbums({
   const [seenAlbumIds, setSeenAlbumIds] = useState<ReadonlySet<string>>(() => new Set());
   const [albumsExpanded, setAlbumsExpanded] = useState(false);
   const [flipBusy, setFlipBusy] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const pendingFlipRef = useRef<FlipRects | null>(null);
+  const pendingScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
   const isMobile = useMediaQuery(media.mobile);
   // Свёртка ряда альбомов — только на мобилке; на tablet/desktop всегда развёрнуто.
   const showExpandedAlbums = !isMobile || albumsExpanded;
@@ -440,6 +447,17 @@ export function EventAlbums({
 
   useLayoutEffect(() => {
     if (!compact) return;
+
+    const scrollSnap = pendingScrollRef.current;
+    if (scrollSnap) {
+      pendingScrollRef.current = null;
+      // Якорим блок обсуждений (ниже альбомов) — при свёртке у низа страницы нет рывка.
+      const anchor =
+        document.getElementById('event-discussions')
+        ?? sectionRef.current;
+      restoreScrollAnchor(scrollSnap, anchor);
+    }
+
     const first = pendingFlipRef.current;
     const root = gridRef.current;
     if (!first || !root) return;
@@ -449,23 +467,28 @@ export function EventAlbums({
     void playFlipScatter(root, first, order).finally(() => setFlipBusy(false));
   }, [compact, showExpandedAlbums, displayAlbums]);
 
-  const expandAlbums = useCallback(() => {
-    if (flipBusy || albumsExpanded) return;
+  const captureLayoutAnchors = useCallback(() => {
     const root = gridRef.current;
+    const scrollAnchor =
+      document.getElementById('event-discussions')
+      ?? sectionRef.current;
+    pendingScrollRef.current = captureScrollAnchor(scrollAnchor);
     if (root && !prefersReducedMotion()) {
       pendingFlipRef.current = captureFlipRects(root);
     }
+  }, []);
+
+  const expandAlbums = useCallback(() => {
+    if (flipBusy || albumsExpanded) return;
+    captureLayoutAnchors();
     setAlbumsExpanded(true);
-  }, [flipBusy, albumsExpanded]);
+  }, [flipBusy, albumsExpanded, captureLayoutAnchors]);
 
   const collapseAlbums = useCallback(() => {
     if (flipBusy || !albumsExpanded) return;
-    const root = gridRef.current;
-    if (root && !prefersReducedMotion()) {
-      pendingFlipRef.current = captureFlipRects(root);
-    }
+    captureLayoutAnchors();
     setAlbumsExpanded(false);
-  }, [flipBusy, albumsExpanded]);
+  }, [flipBusy, albumsExpanded, captureLayoutAnchors]);
 
   const toggleAlbumsExpanded = useCallback(() => {
     if (albumsExpanded) collapseAlbums();
@@ -524,21 +547,14 @@ export function EventAlbums({
     }
   };
 
-  const renderGrid = (items: IAlbum[], useCompactGrid = false, withFlip = false) => (
-    <div
-      ref={withFlip ? gridRef : undefined}
-      className={[
-        useCompactGrid ? styles.gridCompact : styles.grid,
-        withFlip && flipBusy ? styles.gridFlip : '',
-      ].filter(Boolean).join(' ')}
-    >
+  const renderGrid = (items: IAlbum[], useCompactGrid = false) => (
+    <div className={useCompactGrid ? styles.gridCompact : styles.grid}>
       {items.map(a => (
         <AlbumCard
           key={a.id}
           album={a}
           canManage={canManageAlbum(a, { isOrganizer: canManage })}
           coverVersion={coverVersionByAlbumId[a.id] ?? 0}
-          flipId={withFlip ? a.id : undefined}
           onOpen={() => openAlbum(a)}
           onEdit={() => setFormAlbum(a)}
           onDelete={() => setDeleteTarget(a)}
@@ -639,9 +655,68 @@ export function EventAlbums({
       ? Math.max(0, albums.length - collapsedLimit)
       : 0;
     const overflowCover = overflowAlbums[0];
+    const gridClass = [
+      showExpandedAlbums || (!hasAlbums && canManage) ? styles.gridCompact : styles.gridCollapsed,
+      flipBusy ? styles.gridFlip : '',
+    ].filter(Boolean).join(' ');
+
+    let tiles: ReactNode = null;
+    if (showExpandedAlbums || (!hasAlbums && canManage)) {
+      tiles = (
+        <>
+          {displayAlbums.map(a => (
+            <AlbumCard
+              key={a.id}
+              album={a}
+              canManage={canManageAlbum(a, { isOrganizer: canManage })}
+              coverVersion={coverVersionByAlbumId[a.id] ?? 0}
+              flipId={a.id}
+              onOpen={() => openAlbum(a)}
+              onEdit={() => setFormAlbum(a)}
+              onDelete={() => setDeleteTarget(a)}
+            />
+          ))}
+          {canManage && <AddAlbumCard onClick={() => setFormAlbum(null)} />}
+        </>
+      );
+    } else if (hasAlbums) {
+      tiles = (
+        <>
+          {collapsedHead.map(a => (
+            <AlbumCard
+              key={a.id}
+              album={a}
+              canManage={canManageAlbum(a, { isOrganizer: canManage })}
+              hideMeta
+              flipId={a.id}
+              coverVersion={coverVersionByAlbumId[a.id] ?? 0}
+              onOpen={expandAlbums}
+              onEdit={() => setFormAlbum(a)}
+              onDelete={() => setDeleteTarget(a)}
+            />
+          ))}
+          {showOverflow && overflowCover && (
+            <AlbumCard
+              key={`overflow-${overflowCover.id}`}
+              album={overflowCover}
+              canManage={false}
+              hideMeta
+              fadeRight={!albumHasNewContent(overflowCover)}
+              overflowCount={hiddenAlbumCount}
+              flipId={FLIP_STACK_ID}
+              coverVersion={coverVersionByAlbumId[overflowCover.id] ?? 0}
+              onOpen={expandAlbums}
+              onEdit={() => {}}
+              onDelete={() => {}}
+            />
+          )}
+          {canManage && <AddAlbumThumb onClick={() => setFormAlbum(null)} />}
+        </>
+      );
+    }
 
     return (
-      <div className={styles.albumsSection}>
+      <div ref={sectionRef} className={styles.albumsSection}>
         <div className={styles.header}>
           <div className={styles.title}>Фотоальбомы</div>
           {hasAlbums && isMobile && (
@@ -674,44 +749,10 @@ export function EventAlbums({
             <span className={styles.count}>{albums.length}</span>
           )}
         </div>
-        {hasAlbums && !showExpandedAlbums && (
-          <div
-            ref={gridRef}
-            className={`${styles.gridCollapsed}${flipBusy ? ` ${styles.gridFlip}` : ''}`}
-          >
-            {collapsedHead.map(a => (
-              <AlbumCard
-                key={a.id}
-                album={a}
-                canManage={canManageAlbum(a, { isOrganizer: canManage })}
-                hideMeta
-                flipId={a.id}
-                coverVersion={coverVersionByAlbumId[a.id] ?? 0}
-                onOpen={expandAlbums}
-                onEdit={() => setFormAlbum(a)}
-                onDelete={() => setDeleteTarget(a)}
-              />
-            ))}
-            {showOverflow && overflowCover && (
-              <AlbumCard
-                key={`overflow-${overflowCover.id}`}
-                album={overflowCover}
-                canManage={false}
-                hideMeta
-                fadeRight={!albumHasNewContent(overflowCover)}
-                overflowCount={hiddenAlbumCount}
-                flipId={FLIP_STACK_ID}
-                coverVersion={coverVersionByAlbumId[overflowCover.id] ?? 0}
-                onOpen={expandAlbums}
-                onEdit={() => {}}
-                onDelete={() => {}}
-              />
-            )}
-            {canManage && <AddAlbumThumb onClick={() => setFormAlbum(null)} />}
+        {(hasAlbums || canManage) && (
+          <div ref={gridRef} className={gridClass}>
+            {tiles}
           </div>
-        )}
-        {(showExpandedAlbums || (!hasAlbums && canManage)) && (
-          renderGrid(displayAlbums, true, true)
         )}
         {modals}
       </div>

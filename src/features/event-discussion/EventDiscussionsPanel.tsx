@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { IConversation } from '@/entities/conversation';
 import { fetchEventConversations } from '@/entities/conversation';
@@ -17,6 +17,11 @@ import { DISCUSSION_PRELOADER_DELAY_MS } from './discussionUiConstants';
 import { EventDiscussionsPanelSkeleton } from './EventDiscussionsPanelSkeleton';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
+import {
+  captureScrollAnchor,
+  restoreScrollAnchor,
+  type ScrollAnchorSnapshot,
+} from '@/shared/lib/scrollAnchor';
 import styles from './EventDiscussionsPanel.module.css';
 
 interface EventDiscussionsPanelProps {
@@ -57,12 +62,26 @@ export function EventDiscussionsPanel({
     if (focusMessageId) setFocusTreeLock(true);
   }, [focusMessageId]);
   const threadViewMode: DiscussionViewMode = focusTreeLock ? 'tree' : safeViewMode;
+  const layoutBoundsRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const pendingScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+
   const handleViewModeChange = useCallback((next: DiscussionViewMode) => {
+    // Якорим верх панели обсуждений — смена «дерево/лента» не дёргает низ страницы.
+    pendingScrollRef.current = captureScrollAnchor(
+      layoutBoundsRef.current ?? panelRef.current,
+    );
     setFocusTreeLock(false);
     setViewMode(next);
   }, [setViewMode]);
-  const layoutBoundsRef = useRef<HTMLDivElement>(null);
-  const tabsRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const snap = pendingScrollRef.current;
+    if (!snap) return;
+    pendingScrollRef.current = null;
+    restoreScrollAnchor(snap, layoutBoundsRef.current ?? panelRef.current);
+  }, [threadViewMode]);
   const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
 
   /**
@@ -202,7 +221,7 @@ export function EventDiscussionsPanel({
       : null;
 
   return (
-    <div className={styles.panel}>
+    <div ref={panelRef} className={styles.panel}>
       <div className={styles.tabsRow}>
         <div className={styles.tabsWrap}>
           <div ref={tabsRef} className={styles.tabs} role="tablist">
@@ -259,7 +278,7 @@ export function EventDiscussionsPanel({
       {active ? (
         <div ref={layoutBoundsRef} className={styles.body} role="tabpanel">
           <MessageThread
-            key={`${active.id}:${threadViewMode}`}
+            key={active.id}
             conversationId={active.id}
             currentAccountId={currentAccountId}
             layoutBoundsRef={layoutBoundsRef}
