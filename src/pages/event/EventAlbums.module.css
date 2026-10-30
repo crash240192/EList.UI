@@ -25,17 +25,23 @@
   font-family: inherit;
 }
 button.count {
+  box-sizing: border-box;
   margin: 0;
-  line-height: inherit;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  line-height: 1;
   cursor: pointer;
-  border-radius: 20px;
+  border-radius: 10px;
+  justify-content: center;
+}
+button.count:disabled {
+  opacity: 0.7;
+  cursor: default;
 }
 button.count.countOverflow {
   width: 36px;
-  height: 36px;
   padding: 0;
-  border-radius: 10px;
-  justify-content: center;
   font-weight: 700;
   font-size: 13px;
   color: var(--text-primary);
@@ -87,6 +93,20 @@ button.count.countOverflow {
   width: 56px;
   flex: 0 0 56px;
   height: 56px;
+}
+
+/* Во время FLIP не мешаем WAAPI hover/transition */
+.gridFlip {
+  pointer-events: none;
+}
+.gridFlip .albumCard,
+.gridFlip .albumTile {
+  transition: none !important;
+}
+.gridFlip .albumCard:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border);
 }
 
 @media (max-width: 639px) {

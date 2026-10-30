@@ -18,6 +18,13 @@ import { canManageAlbum } from '@/entities/media/albumPermissions';
 import { AlbumFormModal } from '@/features/media/AlbumFormModal';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
 import { syncUnseenAlbums } from '@/features/media/albumFreshStore';
+import {
+  FLIP_STACK_ID,
+  captureFlipRects,
+  playFlipScatter,
+  prefersReducedMotion,
+  type FlipRects,
+} from '@/features/media/albumFlip';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
@@ -104,12 +111,25 @@ interface AlbumCardProps {
   fadeRight?: boolean;
   /** Сколько альбомов не влезло — подпись «+N» поверх этой плитки. */
   overflowCount?: number;
+  /** FLIP id (album.id или FLIP_STACK_ID). */
+  flipId?: string;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeRight = false, overflowCount = 0, onOpen, onEdit, onDelete }: AlbumCardProps) {
+function AlbumCard({
+  album,
+  canManage,
+  coverVersion = 0,
+  hideMeta = false,
+  fadeRight = false,
+  overflowCount = 0,
+  flipId,
+  onOpen,
+  onEdit,
+  onDelete,
+}: AlbumCardProps) {
   const [coverIds, setCoverIds] = useState<string[]>([]);
   const [photoCount, setPhotoCount] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -183,7 +203,10 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
     .reverse();
 
   return (
-    <div className={styles.albumTile}>
+    <div
+      className={styles.albumTile}
+      data-album-flip-id={flipId}
+    >
       <div
         className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : styles.albumCardD1} ${fadeRight ? styles.albumCardFadeRight : ''} ${fresh ? styles.albumCardFresh : ''}`}
         data-fresh={fresh ? 'true' : undefined}
@@ -362,6 +385,9 @@ export function EventAlbums({
   const [coverVersionByAlbumId, setCoverVersionByAlbumId] = useState<Record<string, number>>({});
   const [seenAlbumIds, setSeenAlbumIds] = useState<ReadonlySet<string>>(() => new Set());
   const [albumsExpanded, setAlbumsExpanded] = useState(false);
+  const [flipBusy, setFlipBusy] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const pendingFlipRef = useRef<FlipRects | null>(null);
   const isMobile = useMediaQuery(media.mobile);
   // Свёртка ряда альбомов — только на мобилке; на tablet/desktop всегда развёрнуто.
   const showExpandedAlbums = !isMobile || albumsExpanded;
@@ -411,6 +437,40 @@ export function EventAlbums({
     () => presentAlbumsFreshFirst(albums, seenAlbumIds, gridAlbum?.id ?? null),
     [albums, seenAlbumIds, gridAlbum],
   );
+
+  useLayoutEffect(() => {
+    if (!compact) return;
+    const first = pendingFlipRef.current;
+    const root = gridRef.current;
+    if (!first || !root) return;
+    pendingFlipRef.current = null;
+    setFlipBusy(true);
+    const order = displayAlbums.map(a => a.id);
+    void playFlipScatter(root, first, order).finally(() => setFlipBusy(false));
+  }, [compact, showExpandedAlbums, displayAlbums]);
+
+  const expandAlbums = useCallback(() => {
+    if (flipBusy || albumsExpanded) return;
+    const root = gridRef.current;
+    if (root && !prefersReducedMotion()) {
+      pendingFlipRef.current = captureFlipRects(root);
+    }
+    setAlbumsExpanded(true);
+  }, [flipBusy, albumsExpanded]);
+
+  const collapseAlbums = useCallback(() => {
+    if (flipBusy || !albumsExpanded) return;
+    const root = gridRef.current;
+    if (root && !prefersReducedMotion()) {
+      pendingFlipRef.current = captureFlipRects(root);
+    }
+    setAlbumsExpanded(false);
+  }, [flipBusy, albumsExpanded]);
+
+  const toggleAlbumsExpanded = useCallback(() => {
+    if (albumsExpanded) collapseAlbums();
+    else expandAlbums();
+  }, [albumsExpanded, collapseAlbums, expandAlbums]);
 
   const handleAlbumSaved = async (album: IAlbum) => {
     // Assign для новых альбомов делает AlbumFormModal (до привязки файлов).
@@ -464,14 +524,21 @@ export function EventAlbums({
     }
   };
 
-  const renderGrid = (items: IAlbum[], useCompactGrid = false) => (
-    <div className={useCompactGrid ? styles.gridCompact : styles.grid}>
+  const renderGrid = (items: IAlbum[], useCompactGrid = false, withFlip = false) => (
+    <div
+      ref={withFlip ? gridRef : undefined}
+      className={[
+        useCompactGrid ? styles.gridCompact : styles.grid,
+        withFlip && flipBusy ? styles.gridFlip : '',
+      ].filter(Boolean).join(' ')}
+    >
       {items.map(a => (
         <AlbumCard
           key={a.id}
           album={a}
           canManage={canManageAlbum(a, { isOrganizer: canManage })}
           coverVersion={coverVersionByAlbumId[a.id] ?? 0}
+          flipId={withFlip ? a.id : undefined}
           onOpen={() => openAlbum(a)}
           onEdit={() => setFormAlbum(a)}
           onDelete={() => setDeleteTarget(a)}
@@ -563,43 +630,44 @@ export function EventAlbums({
     const hasAlbums = albums.length > 0;
     // Организатор видит 3 обложки и кнопку «добавить». Остальные — 4 обложки.
     const collapsedLimit = canManage ? 3 : 4;
-    const collapsedAlbums = displayAlbums.slice(0, collapsedLimit);
-    const hiddenAlbumCount = Math.max(0, albums.length - collapsedAlbums.length);
+    const showOverflow = hasAlbums && !showExpandedAlbums && albums.length > collapsedLimit;
+    const collapsedHead = showOverflow
+      ? displayAlbums.slice(0, collapsedLimit - 1)
+      : displayAlbums.slice(0, collapsedLimit);
+    const overflowAlbums = showOverflow ? displayAlbums.slice(collapsedLimit - 1) : [];
+    const hiddenAlbumCount = showOverflow
+      ? Math.max(0, albums.length - collapsedLimit)
+      : 0;
+    const overflowCover = overflowAlbums[0];
+
     return (
       <div className={styles.albumsSection}>
         <div className={styles.header}>
           <div className={styles.title}>Фотоальбомы</div>
-          {hasAlbums && isMobile && !showExpandedAlbums && hiddenAlbumCount > 0 && (
+          {hasAlbums && isMobile && (
             <button
               type="button"
-              className={`${styles.count} ${styles.countOverflow}`}
-              aria-expanded={false}
-              aria-label={`Альбомы: ${albums.length}`}
-              onClick={() => setAlbumsExpanded(true)}
-            >
-              {albums.length}
-            </button>
-          )}
-          {hasAlbums && isMobile && (showExpandedAlbums || hiddenAlbumCount === 0) && (
-            <button
-              type="button"
-              className={styles.count}
+              className={`${styles.count}${hiddenAlbumCount > 0 && !showExpandedAlbums ? ` ${styles.countOverflow}` : ''}`}
               aria-expanded={showExpandedAlbums}
-              onClick={() => setAlbumsExpanded(v => !v)}
+              aria-label={`Альбомы: ${albums.length}`}
+              disabled={flipBusy}
+              onClick={toggleAlbumsExpanded}
             >
               {albums.length}
-              <svg
-                className={`${styles.countChevron} ${showExpandedAlbums ? styles.countChevronOpen : ''}`}
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                aria-hidden
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
+              {(showExpandedAlbums || hiddenAlbumCount === 0) && (
+                <svg
+                  className={`${styles.countChevron} ${showExpandedAlbums ? styles.countChevronOpen : ''}`}
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  aria-hidden
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              )}
             </button>
           )}
           {hasAlbums && !isMobile && (
@@ -607,26 +675,43 @@ export function EventAlbums({
           )}
         </div>
         {hasAlbums && !showExpandedAlbums && (
-          <div className={styles.gridCollapsed}>
-            {collapsedAlbums.map((a, index) => (
+          <div
+            ref={gridRef}
+            className={`${styles.gridCollapsed}${flipBusy ? ` ${styles.gridFlip}` : ''}`}
+          >
+            {collapsedHead.map(a => (
               <AlbumCard
                 key={a.id}
                 album={a}
                 canManage={canManageAlbum(a, { isOrganizer: canManage })}
                 hideMeta
-                fadeRight={hiddenAlbumCount > 0 && index === collapsedAlbums.length - 1 && !albumHasNewContent(a)}
-                overflowCount={hiddenAlbumCount > 0 && index === collapsedAlbums.length - 1 ? hiddenAlbumCount : 0}
+                flipId={a.id}
                 coverVersion={coverVersionByAlbumId[a.id] ?? 0}
-                onOpen={() => openAlbum(a)}
+                onOpen={expandAlbums}
                 onEdit={() => setFormAlbum(a)}
                 onDelete={() => setDeleteTarget(a)}
               />
             ))}
+            {showOverflow && overflowCover && (
+              <AlbumCard
+                key={`overflow-${overflowCover.id}`}
+                album={overflowCover}
+                canManage={false}
+                hideMeta
+                fadeRight={!albumHasNewContent(overflowCover)}
+                overflowCount={hiddenAlbumCount}
+                flipId={FLIP_STACK_ID}
+                coverVersion={coverVersionByAlbumId[overflowCover.id] ?? 0}
+                onOpen={expandAlbums}
+                onEdit={() => {}}
+                onDelete={() => {}}
+              />
+            )}
             {canManage && <AddAlbumThumb onClick={() => setFormAlbum(null)} />}
           </div>
         )}
         {(showExpandedAlbums || (!hasAlbums && canManage)) && (
-          renderGrid(displayAlbums, true)
+          renderGrid(displayAlbums, true, true)
         )}
         {modals}
       </div>

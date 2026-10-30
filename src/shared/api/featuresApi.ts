@@ -5,6 +5,8 @@ import { getAppVersion, getClientPlatform, getOrCreateClientHash } from '@/share
 export interface IAppFeatures {
   /** Создание организаций и сбор legal/payout/verification. */
   organizationsEnabled: boolean;
+  /** Показ рекламных блоков (РСЯ / плейсхолдеры). */
+  adsEnabled: boolean;
   /** Весь билетный модуль (заказы, desk, check-in, my-tickets). */
   ticketsEnabled: boolean;
   /** Платные продажи (имеет смысл только при ticketsEnabled). */
@@ -20,6 +22,7 @@ let inflight: Promise<IAppFeatures> | null = null;
 
 const DISABLED: IAppFeatures = {
   organizationsEnabled: false,
+  adsEnabled: false,
   ticketsEnabled: false,
   ticketSalesEnabled: false,
   ticketDeskRevealHolder: false,
@@ -47,6 +50,9 @@ export async function fetchAppFeatures(force = false): Promise<IAppFeatures> {
       cached = {
         organizationsEnabled: Boolean(
           raw.organizationsEnabled ?? raw.OrganizationsEnabled ?? false,
+        ),
+        adsEnabled: Boolean(
+          raw.adsEnabled ?? raw.AdsEnabled ?? false,
         ),
         ticketsEnabled,
         // На всякий случай: продажи не могут быть шире модуля билетов.

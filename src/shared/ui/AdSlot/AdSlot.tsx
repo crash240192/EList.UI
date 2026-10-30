@@ -2,13 +2,14 @@
 // Рекламный блок Яндекс РСЯ, стилизованный под карточку события.
 // Документация: https://yandex.ru/support/partner2/web/products-rtb/before-start.html
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AD_PLACEHOLDER_TEXT,
   YANDEX_AD_BLOCK_ID,
   enqueueYandexAdRender,
   shouldRenderLiveAd,
 } from '@/shared/lib/adConfig';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import styles from './AdSlot.module.css';
 
 interface AdSlotProps {
@@ -23,16 +24,32 @@ let counter = 0;
 export function AdSlot({ blockId = YANDEX_AD_BLOCK_ID, variant = 'card' }: AdSlotProps) {
   const idRef = useRef(`yandex_rtb_${blockId}_${++counter}`);
   const initialized = useRef(false);
+  const [adsEnabled, setAdsEnabled] = useState<boolean | null>(null);
   const live = shouldRenderLiveAd(blockId);
 
   useEffect(() => {
-    if (!live || initialized.current || !blockId) return;
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setAdsEnabled(f.adsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setAdsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!adsEnabled || !live || initialized.current || !blockId) return;
     initialized.current = true;
     enqueueYandexAdRender({
       blockId,
       renderTo: idRef.current,
     });
-  }, [blockId, live]);
+  }, [adsEnabled, blockId, live]);
+
+  // Пока флаг не известен или выключен — ничего не показываем.
+  if (adsEnabled !== true) return null;
 
   if (!live) {
     if (variant === 'sidebar') {
