@@ -67,13 +67,26 @@ button.count.countOverflow {
   max-width: 100%;
 }
 
-/* Compact свёрнутый ряд: до 4 плиток в ряд, остальные переносятся */
+/*
+ * Compact свёрнутый ряд (M1): фиксированные 56px-стопки, как в GroupsPanel.
+ * Не долю ширины грида — иначе 1fr раздувает миниатюры до размера D1.
+ */
 .gridCollapsed {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: flex-start;
   width: 100%;
   max-width: 100%;
+}
+.gridCollapsed .albumTile {
+  width: 56px;
+  flex: 0 0 56px;
+}
+.gridCollapsed .addAlbumThumb {
+  width: 56px;
+  flex: 0 0 56px;
+  height: 56px;
 }
 
 @media (max-width: 639px) {
@@ -109,29 +122,64 @@ button.count.countOverflow {
     0 0 12px 3px rgba(255, 122, 24, 0.55),
     0 0 22px 6px rgba(255, 122, 24, 0.28);
 }
-.albumCardThumb.albumCardFresh {
-  box-shadow:
-    0 0 0 1px rgba(255, 138, 30, 0.85),
-    0 0 8px 2px rgba(255, 122, 24, 0.55),
-    0 0 14px 4px rgba(255, 122, 24, 0.28);
-}
-.albumCardFresh:hover,
-.albumCardThumb.albumCardFresh:hover {
+.albumCardFresh:hover {
   border-color: #ff8a1e;
   box-shadow:
     0 0 0 1px rgba(255, 138, 30, 0.95),
     0 0 14px 4px rgba(255, 122, 24, 0.65),
     0 0 24px 7px rgba(255, 122, 24, 0.32);
 }
+/* M1 fresh: свечение на переднем кадре стопки, не на прозрачной обёртке */
+.albumCardThumb.albumCardFresh {
+  box-shadow: none;
+}
+.albumCardThumb.albumCardFresh .photoStackLayer:last-child {
+  border-color: #ff8a1e;
+  box-shadow:
+    0 0 0 1px rgba(255, 138, 30, 0.85),
+    0 0 8px 2px rgba(255, 122, 24, 0.55),
+    0 0 14px 4px rgba(255, 122, 24, 0.28);
+}
+.albumCardThumb.albumCardFresh:hover {
+  border-color: transparent;
+  box-shadow: none;
+}
+.albumCardThumb.albumCardFresh:hover .photoStackLayer:last-child {
+  border-color: #ff8a1e;
+  box-shadow:
+    0 0 0 1px rgba(255, 138, 30, 0.95),
+    0 0 10px 3px rgba(255, 122, 24, 0.65),
+    0 0 16px 5px rgba(255, 122, 24, 0.32);
+}
+
+/* D1: квадрат, мозаика на весь кадр, подпись поверх */
+.albumCardD1 {
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+.albumCardD1 .albumCardBody {
+  height: 100%;
+}
+.albumCardD1 .albumCover {
+  height: 100%;
+}
+
 .albumCardThumb {
   border-radius: 10px;
-}
-.albumCardThumb .albumCover {
-  height: auto;
+  border: none;
+  background: transparent;
+  overflow: visible;
   aspect-ratio: 1;
+}
+.albumCardThumb:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: transparent;
 }
 .albumCardThumb .albumCardBody {
   border-radius: 10px;
+  height: 100%;
+  position: relative;
 }
 .albumCardFadeRight {
   -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 42%, transparent 100%);
@@ -198,15 +246,20 @@ button.count.countOverflow {
   justify-content: center;
   color: var(--accent);
   flex-shrink: 0;
+  margin-bottom: 18px;
 }
-.addAlbumCard .albumName {
+.addAlbumCard .albumCaption {
+  background: linear-gradient(
+    to top,
+    rgba(99, 102, 241, 0.18) 0%,
+    rgba(99, 102, 241, 0.06) 55%,
+    transparent 100%
+  );
+}
+.addAlbumCard .albumCaptionName {
   color: var(--accent);
-  font-weight: 600;
+  text-shadow: none;
   text-align: center;
-  font-size: 12px;
-}
-.addAlbumCard .albumMeta {
-  background: rgba(99, 102, 241, 0.04);
 }
 .addAlbumThumb {
   display: flex;
@@ -296,7 +349,9 @@ button.count.countOverflow {
 .dialogDelete:disabled { opacity: .6; cursor: not-allowed; }
 
 .albumCover {
-  height: 120px; position: relative;
+  position: relative;
+  width: 100%;
+  height: 100%;
   background: var(--surface-2);
   overflow: hidden;
 }
@@ -305,6 +360,7 @@ button.count.countOverflow {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted);
+  background: var(--surface-2);
 }
 
 /* Мозаика превью: 2 / 3 / 4 первых фото на развёрнутой карточке */
@@ -343,46 +399,102 @@ button.count.countOverflow {
 }
 
 .privateBadge {
-  position: absolute; top: 6px; left: 6px;
+  position: absolute; top: 6px; left: 6px; z-index: 3;
   background: rgba(0,0,0,0.55); color: #fff;
   border-radius: 6px; padding: 3px 5px;
   display: flex; align-items: center;
 }
 
-.photoCount {
+/* Счётчик кадров — правый верхний угол (D1); с меню — чуть левее */
+.photoCountBadge {
   position: absolute;
-  left: 6px;
-  bottom: 6px;
+  top: 6px;
+  right: 6px;
   z-index: 3;
-  padding: 2px 6px;
+  min-width: 22px;
+  padding: 2px 7px;
   border-radius: 6px;
-  background: rgba(92, 94, 106, 0.92);
+  background: rgba(0, 0, 0, 0.62);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.35;
+  text-align: center;
+  letter-spacing: 0.01em;
   pointer-events: none;
 }
-.albumCardThumb .photoCount {
-  left: 4px;
-  bottom: 4px;
-  padding: 1px 5px;
-  font-size: 11px;
+.albumTile:has(.albumMenuWrap) .photoCountBadge {
+  right: 36px;
 }
 
-.albumMeta { padding: 8px 10px; min-width: 0; overflow: hidden; }
-.albumName {
-  font-size: 13px; font-weight: 500; color: var(--text-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* Подпись поверх низа + градиент/тень */
+.albumCaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 28px 10px 8px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.78) 0%,
+    rgba(0, 0, 0, 0.42) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
-.albumDesc {
-  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+.albumCaptionName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  line-height: 1.35;
-  word-break: break-word;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.45);
+}
+
+/* M1: диагональная стопка на свёрнутой миниатюре */
+.photoStackLayers {
+  position: absolute;
+  inset: 0;
+}
+.photoStackLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 6px;
+  bottom: 6px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+}
+.photoStackLayers[data-count="1"] .photoStackLayer:nth-last-child(1),
+.photoStackLayers[data-count="2"] .photoStackLayer:nth-last-child(1),
+.photoStackLayers[data-count="3"] .photoStackLayer:nth-last-child(1) {
+  transform: none;
+  opacity: 1;
+  z-index: 3;
+}
+.photoStackLayers[data-count="2"] .photoStackLayer:nth-last-child(2),
+.photoStackLayers[data-count="3"] .photoStackLayer:nth-last-child(2) {
+  transform: translate(3px, 3px);
+  opacity: 0.78;
+  z-index: 2;
+}
+.photoStackLayers[data-count="3"] .photoStackLayer:nth-last-child(3) {
+  transform: translate(6px, 6px);
+  opacity: 0.55;
+  z-index: 1;
+}
+.albumCardThumb .privateBadge {
+  top: 4px;
+  left: 4px;
+  padding: 2px 3px;
+}
+.albumCardThumb:hover .photoStackLayer:last-child {
+  border-color: var(--accent);
 }
 
 /* ── Спиннер картинки ── */
@@ -404,7 +516,11 @@ button.count.countOverflow {
 /* ── Скелетон ── */
 .loading { display: flex; gap: 12px; }
 .skeleton {
-  flex: 1; height: 160px; border-radius: 12px;
+  flex: 1;
+  max-width: 160px;
+  aspect-ratio: 1;
+  height: auto;
+  border-radius: 12px;
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%);
   background-size: 400% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
