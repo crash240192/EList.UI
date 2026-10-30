@@ -294,12 +294,12 @@ function AlbumCoverMosaic({
         >
           {coverIds.slice(0, 4).map((fileId, i) => (
             <div key={`${fileId}-${i}`} className={styles.albumCoverMosaicCell}>
-              <AuthImage fileId={fileId} alt="" className={styles.albumCoverImg} />
+              <AuthImage fileId={fileId} alt="" className={styles.albumCoverImg} preloader={false} />
             </div>
           ))}
         </div>
       ) : coverCount > 0 ? (
-        <AuthImage fileId={coverIds[0]} alt="" className={styles.albumCoverImg} />
+        <AuthImage fileId={coverIds[0]} alt="" className={styles.albumCoverImg} preloader={false} />
       ) : (
         <CoverEmpty iconSize={iconSize} />
       )}
@@ -342,7 +342,7 @@ function AlbumPhotoStackThumb({
         {layers.map((fileId, i) => (
           <span key={fileId ?? `empty-${i}`} className={styles.photoStackLayer}>
             {fileId ? (
-              <AuthImage fileId={fileId} alt="" className={styles.albumCoverImg} />
+              <AuthImage fileId={fileId} alt="" className={styles.albumCoverImg} preloader={false} />
             ) : (
               <CoverEmpty iconSize={16} />
             )}
@@ -414,7 +414,7 @@ function AlbumStack({
         {coverByAlbum.slice(0, PHOTO_STACK_LAYERS).reverse().map(({ album, ids }) => (
           <span key={album.id} className={styles.photoStackLayer}>
             {ids[0] ? (
-              <AuthImage fileId={ids[0]} alt="" className={styles.albumCoverImg} />
+              <AuthImage fileId={ids[0]} alt="" className={styles.albumCoverImg} preloader={false} />
             ) : (
               <CoverEmpty iconSize={14} />
             )}

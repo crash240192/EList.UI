@@ -511,13 +511,17 @@
   width: 100%;
 }
 
-/* Место под следующую страницу: скелетон + прелоадер внизу, не по центру экрана */
+/* Место под следующую страницу: скелетон + прелоадер внизу ленты */
 .loadMoreZone {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
   width: 100%;
-  padding: 4px 0 12px;
-  min-height: 120px;
+  padding: 8px 0 16px;
+  min-height: 140px;
+}
+
+.loadMoreZone :global([role='status']) {
+  margin: 0 auto;
 }

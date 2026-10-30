@@ -79,6 +79,11 @@ interface AuthImageProps {
   /** Показывать прелоадер только если загрузка дольше этого порога (мс) */
   preloaderDelayMs?: number;
   /**
+   * Крутилка в слоте. false — тихий placeholder (лента альбомов: спиннер только
+   * в зоне пагинации внизу, не в каждой обложке).
+   */
+  preloader?: boolean;
+  /**
    * Качать файл только когда слот рядом с viewport.
    * По умолчанию true — иначе лента альбомов штормит filestorage.
    * false — сразу (лайтбокс / критичные обложки).
@@ -108,6 +113,7 @@ function AuthImageSingle({
   fileId,
   fullSize = false,
   lazy = true,
+  preloader = true,
   preloaderDelayMs = DEFAULT_PRELOADER_DELAY_MS,
   alt,
   className,
@@ -122,7 +128,10 @@ function AuthImageSingle({
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(() => !blobCache.has(key));
   const [attempt, setAttempt] = useState(0);
-  const showPreloader = useDelayedVisible(loading && !src && !error && ready, preloaderDelayMs);
+  const showPreloader = useDelayedVisible(
+    preloader && loading && !src && !error && ready,
+    preloaderDelayMs,
+  );
   const maxAttempts = 4;
 
   useEffect(() => {
@@ -180,8 +189,15 @@ function AuthImageSingle({
 
   if (error) return <>{fallback ?? null}</>;
   if (!src) {
+    // pendingShell даёт containing block для absolute-прелоадера;
+    // иначе inset:0 привязывается к viewport → спиннер по центру страницы.
     return (
-      <div ref={ref as React.RefCallback<HTMLDivElement>} className={className} style={style} aria-hidden>
+      <div
+        ref={ref as React.RefCallback<HTMLDivElement>}
+        className={`${styles.pendingShell} ${className ?? ''}`}
+        style={style}
+        aria-hidden
+      >
         {showPreloader ? <ImagePreloader /> : (fallback ?? null)}
       </div>
     );
