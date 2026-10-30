@@ -38,9 +38,9 @@ import {
   type FlipRects,
 } from '@/features/media/albumFlip';
 import {
-  captureScrollTop,
-  restoreScrollTop,
-  type ScrollTopSnapshot,
+  captureScrollAnchor,
+  restoreScrollAnchor,
+  type ScrollAnchorSnapshot,
 } from '@/shared/lib/scrollAnchor';
 import styles from './EventAlbumsGroupsPanel.module.css';
 
@@ -356,7 +356,7 @@ function EventGroupSection({
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const pendingFlipRef = useRef<FlipRects | null>(null);
-  const pendingScrollRef = useRef<ScrollTopSnapshot | null>(null);
+  const pendingScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
   const [flipBusy, setFlipBusy] = useState(false);
 
   useEffect(() => {
@@ -394,7 +394,7 @@ function EventGroupSection({
     const scrollSnap = pendingScrollRef.current;
     if (scrollSnap) {
       pendingScrollRef.current = null;
-      restoreScrollTop(scrollSnap);
+      restoreScrollAnchor(scrollSnap, sectionRef.current);
     }
 
     const first = pendingFlipRef.current;
@@ -407,7 +407,7 @@ function EventGroupSection({
   }, [expanded, albums]);
 
   const captureLayoutAnchors = () => {
-    pendingScrollRef.current = captureScrollTop(sectionRef.current);
+    pendingScrollRef.current = captureScrollAnchor(sectionRef.current);
     const root = gridRef.current;
     if (root && !prefersReducedMotion()) {
       pendingFlipRef.current = captureFlipRects(root);

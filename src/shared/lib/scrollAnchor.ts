@@ -1,20 +1,42 @@
 /**
- * Якорение скролла на странице мероприятия.
+ * Скролл и якорение на странице мероприятия
+ * =========================================
  *
- * Важно: скроллит НЕ document, а контейнер `.page` (overflow-y: auto внутри
- * AppLayout с overflow:hidden). Правка document.scrollTop — no-op.
+ * Иерархия (единственный scrollport — `.page`):
  *
- * Для разворота блоков (альбомы, описание) надёжнее **заморозить scrollTop**:
- * контент растёт вниз в потоке, верхняя кромка секции остаётся на месте.
- * getBoundingClientRect-якорь ломается, если найден неверный scroller или если
- * scroll-handler хиро меняет высоту hero в ответ на программный scrollTop.
+ *   AppLayout.root (100svh, overflow:hidden)
+ *     main (overflow:hidden)
+ *       EventPage .page [data-page-scroll]  ← scrollTop / scroll events
+ *         .card
+ *           Hero              DYNAMIC height = f(scrollTop)  ← влияет на ВСЁ ниже
+ *           mainGrid
+ *             descSection     DYNAMIC expand/collapse
+ *             sidePanel
+ *               EventAlbums   DYNAMIC expand/collapse (+ FLIP transform)
+ *               …статичные блоки (органы, участники)
+ *             discussions     DYNAMIC высота (дерево↔лента, вкладки)
+ *
+ * Цепочка при скролле:
+ *   1) user/program → page.scrollTop
+ *   2) onScroll → heroCollapse → CSS --event-hero-height
+ *   3) высота hero меняет document flow → блоки ниже сдвигаются в viewport
+ *   4) если не компенсировать Δhero в scrollTop, контент «прыгает»
+ *
+ * Цепочка при expand/collapse блока (альбомы / описание):
+ *   1) capture: top секции (getBoundingClientRect) + scroller
+ *   2) React commit (высота секции изменилась)
+ *   3) restore: scrollTop += (topAfter − topBefore) → верх секции на месте,
+ *      блок растёт/сжимается вниз
+ *   4) возможный clamp maxScroll и/или реакция hero → второй проход в rAF
+ *
+ * НЕ использовать data-scroll-lock, глушащий onScroll: hero тогда «замирает».
+ * НЕ замораживать абсолютный scrollTop при collapse у низа: maxScroll падает,
+ * значение clamp’ится → разовый уезд вверх.
  */
 
 const PAGE_SCROLL_ATTR = 'data-page-scroll';
-const SCROLL_LOCK_ATTR = 'data-scroll-lock';
 
 export function findPageScroller(from?: Element | null): HTMLElement | null {
-  const scope = from instanceof Element ? from : document;
   const marked =
     (from instanceof Element ? from.closest(`[${PAGE_SCROLL_ATTR}]`) : null)
     ?? document.querySelector(`[${PAGE_SCROLL_ATTR}]`);
@@ -33,61 +55,19 @@ export function findPageScroller(from?: Element | null): HTMLElement | null {
   return null;
 }
 
-/** Пометить контейнер как page-scroller (вызывать на EventPage .page). */
+/** Пометить контейнер как page-scroller (EventPage .page). */
 export function markPageScroller(el: HTMLElement | null): void {
   if (!el) return;
   el.setAttribute(PAGE_SCROLL_ATTR, 'true');
 }
 
-export function isScrollLocked(scroller: HTMLElement | null): boolean {
-  return scroller?.getAttribute(SCROLL_LOCK_ATTR) === '1';
-}
-
-export function lockPageScroll(scroller: HTMLElement | null): void {
-  if (!scroller) return;
-  scroller.setAttribute(SCROLL_LOCK_ATTR, '1');
-}
-
-export function unlockPageScroll(scroller: HTMLElement | null): void {
-  if (!scroller) return;
-  scroller.removeAttribute(SCROLL_LOCK_ATTR);
-}
-
-export type ScrollTopSnapshot = {
-  scroller: HTMLElement;
-  scrollTop: number;
-};
-
-/** Запомнить scrollTop page-scroller (предпочтительно для expand/collapse). */
-export function captureScrollTop(from: Element | null): ScrollTopSnapshot | null {
-  const scroller = findPageScroller(from);
-  if (!scroller) return null;
-  return { scroller, scrollTop: scroller.scrollTop };
-}
-
-/**
- * Восстановить scrollTop и кратко залочить scroller, чтобы scroll-handler
- * хиро не менял высоту hero в том же кадре.
- */
-export function restoreScrollTop(snapshot: ScrollTopSnapshot | null): void {
-  if (!snapshot) return;
-  const { scroller, scrollTop } = snapshot;
-  if (Math.abs(scroller.scrollTop - scrollTop) < 0.5) return;
-  lockPageScroll(scroller);
-  scroller.scrollTop = scrollTop;
-  // Снять lock после paint — hero синхронизируется уже с финальным scrollTop.
-  requestAnimationFrame(() => {
-    unlockPageScroll(scroller);
-    scroller.dispatchEvent(new Event('scroll'));
-  });
-}
-
 export type ScrollAnchorSnapshot = {
   scroller: HTMLElement;
+  /** getBoundingClientRect().top якоря до изменения layout */
   top: number;
 };
 
-/** Снимок якоря по getBoundingClientRect (для смены вида обсуждений и т.п.). */
+/** Снимок верхнего края якоря (секция, которая меняет высоту). */
 export function captureScrollAnchor(anchor: HTMLElement | null): ScrollAnchorSnapshot | null {
   if (!anchor) return null;
   const scroller = findPageScroller(anchor);
@@ -95,18 +75,44 @@ export function captureScrollAnchor(anchor: HTMLElement | null): ScrollAnchorSna
   return { scroller, top: anchor.getBoundingClientRect().top };
 }
 
+function applyAnchorDelta(snapshot: ScrollAnchorSnapshot, anchor: HTMLElement): number {
+  const after = anchor.getBoundingClientRect().top;
+  const delta = after - snapshot.top;
+  if (Math.abs(delta) < 0.5) return 0;
+  snapshot.scroller.scrollTop += delta;
+  return delta;
+}
+
+/**
+ * Восстановить визуальную позицию якоря после layout.
+ * Два прохода: сразу + rAF (после возможной реакции hero / overflow-anchor).
+ */
 export function restoreScrollAnchor(
   snapshot: ScrollAnchorSnapshot | null,
   anchor: HTMLElement | null,
 ): void {
   if (!snapshot || !anchor) return;
-  const after = anchor.getBoundingClientRect().top;
-  const delta = after - snapshot.top;
-  if (Math.abs(delta) < 0.5) return;
-  lockPageScroll(snapshot.scroller);
-  snapshot.scroller.scrollTop += delta;
+  applyAnchorDelta(snapshot, anchor);
   requestAnimationFrame(() => {
-    unlockPageScroll(snapshot.scroller);
-    snapshot.scroller.dispatchEvent(new Event('scroll'));
+    if (!anchor.isConnected) return;
+    applyAnchorDelta(snapshot, anchor);
   });
+}
+
+/**
+ * Компенсация изменения высоты hero: чтобы контент ниже не прыгал
+ * при scroll-linked collapse. Вызывать из useLayoutEffect([heroHeight]).
+ */
+export function compensateScrollerForHeightDelta(
+  scroller: HTMLElement | null,
+  prevHeight: number | null,
+  nextHeight: number,
+): number {
+  if (!scroller || prevHeight == null) return nextHeight;
+  const delta = nextHeight - prevHeight;
+  if (Math.abs(delta) < 0.5) return nextHeight;
+  // У самого верха рост hero не компенсируем — иначе уезжаем вниз.
+  if (scroller.scrollTop <= 0 && delta > 0) return nextHeight;
+  scroller.scrollTop += delta;
+  return nextHeight;
 }

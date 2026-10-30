@@ -178,8 +178,8 @@ export function MessageReplies({
     [parent.id, onTotalLoaded, writeModeCache],
   );
 
-  const loadFlat = useCallback(async (generation: number, soft: boolean) => {
-    if (!soft) setLoading(true);
+  const loadFlat = useCallback(async (generation: number) => {
+    setLoading(true);
     try {
       const descendants = await loadDescendantReplies(parent.id);
       if (generation !== requestGen.current) return;
@@ -196,15 +196,43 @@ export function MessageReplies({
     } catch (e) {
       if (generation !== requestGen.current) return;
       setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов');
-      if (!soft) {
-        setItems([]);
-        setLoadedThroughPage(-1);
-        writeModeCache('flat', emptyCache());
-      }
+      setItems([]);
+      setLoadedThroughPage(-1);
+      writeModeCache('flat', emptyCache());
     } finally {
       if (generation === requestGen.current) setLoading(false);
     }
   }, [parent.id, onTotalLoaded, writeModeCache]);
+
+  /** Прогрев кэша противоположного вида — переключение без мерцания чужого layout. */
+  const prefetchOppositeMode = useCallback((fromMode: DiscussionViewMode) => {
+    if (fromMode === 'tree') {
+      if (flatCacheRef.current && flatCacheRef.current.loadedThroughPage >= 0) return;
+      void loadDescendantReplies(parent.id)
+        .then((descendants) => {
+          if (cacheParentIdRef.current !== parent.id) return;
+          flatCacheRef.current = {
+            items: descendants,
+            total: descendants.length,
+            loadedThroughPage: 0,
+          };
+        })
+        .catch(() => { /* prefetch best-effort */ });
+      return;
+    }
+    if (treeCacheRef.current && treeCacheRef.current.loadedThroughPage >= 0) return;
+    void fetchMessageReplies(parent.id, 0, DISCUSSION_TREE_SIBLING_PAGE_SIZE)
+      .then((paged) => {
+        if (cacheParentIdRef.current !== parent.id) return;
+        const items = paged.result ?? [];
+        treeCacheRef.current = {
+          items,
+          total: paged.total ?? items.length,
+          loadedThroughPage: 0,
+        };
+      })
+      .catch(() => { /* prefetch best-effort */ });
+  }, [parent.id]);
 
   useEffect(() => {
     if (cacheParentIdRef.current !== parent.id) {
@@ -217,21 +245,32 @@ export function MessageReplies({
     const generation = requestGen.current;
     const cached = viewMode === 'flat' ? flatCacheRef.current : treeCacheRef.current;
     if (cached && cached.loadedThroughPage >= 0) {
+      // Мгновенная подмена из кэша — без чужого layout и без скелетона.
       applyCache(cached);
+      prefetchOppositeMode(viewMode);
       return;
     }
 
-    // Первая загрузка выбранного вида: без скелетона, если на экране ещё виден другой вид.
-    const soft = itemsRef.current.length > 0;
+    // Нет кэша: сбрасываем предыдущий вид ДО fetch — иначе дерево мигает в ленте и наоборот.
+    setItems([]);
+    setTotal(0);
+    setLoadedThroughPage(-1);
+    setError(null);
+    setLoading(true);
+
     if (viewMode === 'flat') {
-      void loadFlat(generation, soft);
+      void loadFlat(generation).then(() => {
+        if (generation === requestGen.current) prefetchOppositeMode('flat');
+      });
     } else {
       const through = Math.max(0, focusThroughPageRef.current);
-      void fetchTreeRange(0, through, generation, soft ? 'soft-replace' : 'replace');
+      void fetchTreeRange(0, through, generation, 'replace').then(() => {
+        if (generation === requestGen.current) prefetchOppositeMode('tree');
+      });
     }
     // refreshKey намеренно не в deps: отправка ответа не должна сбрасывать список
     // (новая запись приходит через useDiscussionAppend).
-  }, [loadFlat, fetchTreeRange, parent.id, viewMode, applyCache]);
+  }, [loadFlat, fetchTreeRange, parent.id, viewMode, applyCache, prefetchOppositeMode]);
 
   useDiscussionAppend(parent.id, (message) => {
     setItems((prev) => {

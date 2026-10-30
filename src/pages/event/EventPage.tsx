@@ -27,11 +27,11 @@ import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import { SimilarEventDialog } from './SimilarEventDialog';
 import {
-  captureScrollTop,
-  restoreScrollTop,
-  isScrollLocked,
+  captureScrollAnchor,
+  restoreScrollAnchor,
+  compensateScrollerForHeightDelta,
   markPageScroller,
-  type ScrollTopSnapshot,
+  type ScrollAnchorSnapshot,
 } from '@/shared/lib/scrollAnchor';
 import {
   buildSimilarEventSeed,
@@ -230,7 +230,8 @@ export default function EventPage() {
   const [inviteModalOpen,       setInviteModalOpen]       = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
   const descSectionRef = useRef<HTMLDivElement>(null);
-  const pendingDescScrollRef = useRef<ScrollTopSnapshot | null>(null);
+  const pendingDescScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
+  const prevHeroHeightRef = useRef<number | null>(null);
   const [descTogglePressed, setDescTogglePressed] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [similarOpen, setSimilarOpen] = useState(false);
@@ -283,7 +284,7 @@ export default function EventPage() {
     const snap = pendingDescScrollRef.current;
     if (!snap) return;
     pendingDescScrollRef.current = null;
-    restoreScrollTop(snap);
+    restoreScrollAnchor(snap, descSectionRef.current);
   }, [descExpanded]);
 
   useEffect(() => {
@@ -425,6 +426,22 @@ export default function EventPage() {
   const isParticipating = !!accountId && participants.some(p => p.accountId === accountId);
 
   const hasCover = !!(event?.coverImageId || event?.coverUrl);
+  const collapsedHeroHeight = calcEventPageCollapsedHeroHeight(heroWidth, hasCover);
+  const heroHeight = calcEventPageHeroHeight(
+    expandedHeroHeight,
+    hasCover ? heroCollapse : 1,
+    collapsedHeroHeight,
+  );
+
+  // Hero height ↔ scrollTop: без компенсации контент ниже прыгает при сжатии обложки.
+  // Хуки — до early return (loading / denied).
+  useLayoutEffect(() => {
+    prevHeroHeightRef.current = compensateScrollerForHeightDelta(
+      pageRef.current,
+      prevHeroHeightRef.current,
+      heroHeight,
+    );
+  }, [heroHeight]);
 
   const handleCoverLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -465,9 +482,6 @@ export default function EventPage() {
 
     const onScroll = () => {
       setShowScrollTop(el.scrollTop > 360);
-      // Во время программного restore scrollTop не трогаем hero —
-      // иначе высота обложки пляшет и ломает якорение альбомов/описания.
-      if (isScrollLocked(el)) return;
       const t = scrollToHeroCollapse(el.scrollTop);
       setHeroCollapse(t);
     };
@@ -802,12 +816,6 @@ export default function EventPage() {
   };
 
   const coverFocusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
-  const collapsedHeroHeight = calcEventPageCollapsedHeroHeight(heroWidth, hasCover);
-  const heroHeight = calcEventPageHeroHeight(
-    expandedHeroHeight,
-    hasCover ? heroCollapse : 1,
-    collapsedHeroHeight,
-  );
 
   // Участники: текущий пользователь — первым
   const sortedParticipants = [
@@ -1244,7 +1252,7 @@ export default function EventPage() {
                 onPointerCancel={() => setDescTogglePressed(false)}
                 onPointerLeave={() => setDescTogglePressed(false)}
                 onClick={e => {
-                  pendingDescScrollRef.current = captureScrollTop(descSectionRef.current);
+                  pendingDescScrollRef.current = captureScrollAnchor(descSectionRef.current);
                   setDescExpanded(v => !v);
                   setDescTogglePressed(false);
                   e.currentTarget.blur();

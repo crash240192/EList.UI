@@ -26,9 +26,9 @@ import {
   type FlipRects,
 } from '@/features/media/albumFlip';
 import {
-  captureScrollTop,
-  restoreScrollTop,
-  type ScrollTopSnapshot,
+  captureScrollAnchor,
+  restoreScrollAnchor,
+  type ScrollAnchorSnapshot,
 } from '@/shared/lib/scrollAnchor';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
@@ -400,7 +400,7 @@ export function EventAlbums({
   const sectionRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const pendingFlipRef = useRef<FlipRects | null>(null);
-  const pendingScrollRef = useRef<ScrollTopSnapshot | null>(null);
+  const pendingScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
   const isMobile = useMediaQuery(media.mobile);
   // Свёртка ряда альбомов — только на мобилке; на tablet/desktop всегда развёрнуто.
   const showExpandedAlbums = !isMobile || albumsExpanded;
@@ -457,8 +457,8 @@ export function EventAlbums({
     const scrollSnap = pendingScrollRef.current;
     if (scrollSnap) {
       pendingScrollRef.current = null;
-      // Заморозка scrollTop у .page — секция растёт вниз, без уезда вверх.
-      restoreScrollTop(scrollSnap);
+      // Верх секции на месте — рост/сжатие вниз (не абсолютный scrollTop).
+      restoreScrollAnchor(scrollSnap, sectionRef.current);
     }
 
     const first = pendingFlipRef.current;
@@ -472,7 +472,7 @@ export function EventAlbums({
 
   const captureLayoutAnchors = useCallback(() => {
     const root = gridRef.current;
-    pendingScrollRef.current = captureScrollTop(sectionRef.current);
+    pendingScrollRef.current = captureScrollAnchor(sectionRef.current);
     if (root && !prefersReducedMotion()) {
       pendingFlipRef.current = captureFlipRects(root);
     }
