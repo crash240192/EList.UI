@@ -1,16 +1,68 @@
-import type { IEventAlbumsGroup } from '@/entities/media/albumApi';
+import { albumHasNewContent, type IAlbum, type IEventAlbumsGroup } from '@/entities/media/albumApi';
 
-/** Порядок плиток на странице «Альбомы мероприятий». */
+/**
+ * Порядок плиток на «Альбомы мероприятий».
+ *
+ * Флоу:
+ * 1) Сортировка задаёт порядок мероприятий.
+ * 2) Тумблер «Сначала непросмотренные» (по умолчанию вкл.) поднимает события
+ *    с новыми фото наверх, внутри каждой корзины остаётся выбранная сортировка.
+ * 3) Подсветка/glow непросмотренных работает всегда — это не сортировка.
+ * 4) Дефолт — «по последним фото»: страница про активность в альбомах.
+ */
 export type AlbumListSort = 'date' | 'latestPhotos' | 'name' | 'photoCount';
 
-export const ALBUM_LIST_SORT_OPTIONS: { id: AlbumListSort; label: string }[] = [
-  { id: 'date', label: 'По дате мероприятия' },
-  { id: 'latestPhotos', label: 'По последним фотографиям' },
+export const ALBUM_LIST_SORT_OPTIONS: { id: AlbumListSort; label: string; hint?: string }[] = [
+  { id: 'latestPhotos', label: 'По последним фотографиям', hint: 'Свежие загрузки выше' },
+  { id: 'date', label: 'По дате мероприятия', hint: 'Сначала более ранние' },
   { id: 'name', label: 'По названию' },
-  { id: 'photoCount', label: 'По количеству фотографий' },
+  { id: 'photoCount', label: 'По количеству фотографий', hint: 'Сначала больше фото' },
 ];
 
-export const DEFAULT_ALBUM_LIST_SORT: AlbumListSort = 'date';
+/** Страница про фотоактивность, не про календарь событий. */
+export const DEFAULT_ALBUM_LIST_SORT: AlbumListSort = 'latestPhotos';
+
+export const ALBUM_LIST_SORT_STORAGE_KEY = 'elist_album_list_sort';
+export const ALBUM_LIST_PIN_UNREAD_STORAGE_KEY = 'elist_album_list_pin_unread';
+
+export function readStoredAlbumListSort(): AlbumListSort {
+  try {
+    const raw = localStorage.getItem(ALBUM_LIST_SORT_STORAGE_KEY);
+    if (ALBUM_LIST_SORT_OPTIONS.some(option => option.id === raw)) {
+      return raw as AlbumListSort;
+    }
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_ALBUM_LIST_SORT;
+}
+
+export function writeStoredAlbumListSort(sort: AlbumListSort): void {
+  try {
+    localStorage.setItem(ALBUM_LIST_SORT_STORAGE_KEY, sort);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function readStoredPinUnread(defaultValue = true): boolean {
+  try {
+    const raw = localStorage.getItem(ALBUM_LIST_PIN_UNREAD_STORAGE_KEY);
+    if (raw === '0' || raw === 'false') return false;
+    if (raw === '1' || raw === 'true') return true;
+  } catch {
+    /* ignore */
+  }
+  return defaultValue;
+}
+
+export function writeStoredPinUnread(pin: boolean): void {
+  try {
+    localStorage.setItem(ALBUM_LIST_PIN_UNREAD_STORAGE_KEY, pin ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}
 
 function timeMs(value: string | null | undefined): number | null {
   if (!value) return null;
@@ -28,6 +80,19 @@ function latestPhotoMs(group: IEventAlbumsGroup): number | null {
   return best;
 }
 
+/** Сумма photoCount с API; иначе fallback из асинхронного подсчёта. */
+export function resolveGroupPhotoTotal(
+  group: IEventAlbumsGroup,
+  photoTotals: Readonly<Record<string, number | undefined>> = {},
+): number | null {
+  const albums = group.albums;
+  if (albums.length > 0 && albums.every(album => album.photoCount != null)) {
+    return albums.reduce((sum, album) => sum + (album.photoCount ?? 0), 0);
+  }
+  const total = photoTotals[group.event.id];
+  return total == null ? null : total;
+}
+
 function compareGroups(
   a: IEventAlbumsGroup,
   b: IEventAlbumsGroup,
@@ -39,8 +104,8 @@ function compareGroups(
   }
 
   if (sort === 'photoCount') {
-    const left = photoTotals[a.event.id];
-    const right = photoTotals[b.event.id];
+    const left = resolveGroupPhotoTotal(a, photoTotals);
+    const right = resolveGroupPhotoTotal(b, photoTotals);
     if (left == null && right == null) return 0;
     if (left == null) return 1;
     if (right == null) return -1;
@@ -87,4 +152,15 @@ export function sortEventAlbumGroups(
       return a.index - b.index;
     })
     .map(({ group }) => group);
+}
+
+/** Есть ли у группы непросмотренные альбомы (после present*). */
+export function groupHasUnreadAlbums(group: IEventAlbumsGroup): boolean {
+  return group.albums.some(albumHasNewContent);
+}
+
+/** Для тестов/подсказок: суммарный photoCount известных альбомов. */
+export function sumAlbumPhotoCounts(albums: readonly Pick<IAlbum, 'photoCount'>[]): number | null {
+  if (!albums.length || albums.some(album => album.photoCount == null)) return null;
+  return albums.reduce((sum, album) => sum + (album.photoCount ?? 0), 0);
 }

@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { AlbumSortMenu } from '@/features/media/AlbumSortMenu';
-import { DEFAULT_ALBUM_LIST_SORT, type AlbumListSort } from '@/features/media/albumListSort';
+import {
+  readStoredAlbumListSort,
+  readStoredPinUnread,
+  writeStoredAlbumListSort,
+  writeStoredPinUnread,
+  type AlbumListSort,
+} from '@/features/media/albumListSort';
 import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
 import { usePageTitle } from '@/shared/hooks';
 import styles from './EventAlbumsPage.module.css';
@@ -11,7 +17,8 @@ export default function EventAlbumsPage() {
   usePageTitle('Альбомы мероприятий');
   const navigate = useNavigate();
   const { accountId, loading } = useAccountId();
-  const [sort, setSort] = useState<AlbumListSort>(DEFAULT_ALBUM_LIST_SORT);
+  const [sort, setSort] = useState<AlbumListSort>(() => readStoredAlbumListSort());
+  const [pinUnread, setPinUnread] = useState(() => readStoredPinUnread(true));
 
   return (
     <div className={styles.page}>
@@ -19,7 +26,20 @@ export default function EventAlbumsPage() {
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <h1 className={styles.cardTitle}>Альбомы мероприятий</h1>
-            {accountId && <AlbumSortMenu value={sort} onChange={setSort} />}
+            {accountId && (
+              <AlbumSortMenu
+                value={sort}
+                onChange={next => {
+                  setSort(next);
+                  writeStoredAlbumListSort(next);
+                }}
+                pinUnread={pinUnread}
+                onPinUnreadChange={next => {
+                  setPinUnread(next);
+                  writeStoredPinUnread(next);
+                }}
+              />
+            )}
           </div>
 
           <div className={styles.cardBody}>
@@ -35,6 +55,7 @@ export default function EventAlbumsPage() {
                 accountId={accountId}
                 onOpenEvent={eventId => navigate(`/event/${eventId}`)}
                 sort={sort}
+                pinUnread={pinUnread}
               />
             )}
           </div>

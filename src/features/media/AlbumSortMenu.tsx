@@ -9,6 +9,9 @@ import styles from './AlbumSortMenu.module.css';
 interface AlbumSortMenuProps {
   value: AlbumListSort;
   onChange: (next: AlbumListSort) => void;
+  /** Поднимать события с непросмотренными альбомами наверх. */
+  pinUnread: boolean;
+  onPinUnreadChange: (next: boolean) => void;
 }
 
 function CheckIcon() {
@@ -19,7 +22,12 @@ function CheckIcon() {
   );
 }
 
-export function AlbumSortMenu({ value, onChange }: AlbumSortMenuProps) {
+export function AlbumSortMenu({
+  value,
+  onChange,
+  pinUnread,
+  onPinUnreadChange,
+}: AlbumSortMenuProps) {
   const [open, setOpen] = useState(false);
   const [dropStyle, setDropStyle] = useState<CSSProperties>({});
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -31,7 +39,7 @@ export function AlbumSortMenu({ value, onChange }: AlbumSortMenuProps) {
     const el = btnRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const estimatedHeight = 176;
+    const estimatedHeight = 280;
     const spaceBelow = window.innerHeight - rect.bottom;
     const showAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
     setDropStyle({
@@ -97,6 +105,7 @@ export function AlbumSortMenu({ value, onChange }: AlbumSortMenuProps) {
         onClick={() => setOpen(current => !current)}
       >
         Сортировка
+        {pinUnread && <span className={styles.triggerDot} title="Сначала непросмотренные" aria-hidden />}
         <svg
           width="12"
           height="12"
@@ -117,8 +126,9 @@ export function AlbumSortMenu({ value, onChange }: AlbumSortMenuProps) {
           className={styles.menu}
           style={dropStyle}
           role="dialog"
-          aria-label="Сортировка"
+          aria-label="Сортировка альбомов"
         >
+          <div className={styles.sectionLabel}>Порядок мероприятий</div>
           <div className={styles.options} role="radiogroup" aria-label="Порядок плиток">
             {ALBUM_LIST_SORT_OPTIONS.map(option => {
               const selected = value === option.id;
@@ -135,11 +145,32 @@ export function AlbumSortMenu({ value, onChange }: AlbumSortMenuProps) {
                   }}
                 >
                   <span className={styles.box}>{selected && <CheckIcon />}</span>
-                  {option.label}
+                  <span className={styles.optionText}>
+                    <span>{option.label}</span>
+                    {option.hint && <span className={styles.optionHint}>{option.hint}</span>}
+                  </span>
                 </button>
               );
             })}
           </div>
+
+          <div className={styles.divider} role="separator" />
+
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={pinUnread}
+            className={`${styles.option} ${pinUnread ? styles.optionOn : ''}`}
+            onClick={() => onPinUnreadChange(!pinUnread)}
+          >
+            <span className={styles.box}>{pinUnread && <CheckIcon />}</span>
+            <span className={styles.optionText}>
+              <span>Сначала непросмотренные</span>
+              <span className={styles.optionHint}>
+                События с новыми фото сверху; внутри — выбранная сортировка
+              </span>
+            </span>
+          </button>
         </div>,
         document.body,
       )}

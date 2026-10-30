@@ -236,15 +236,23 @@ export interface IEventAlbumsGroup {
 }
 
 /** События со свежими альбомами поднимаются, внутри события свежие альбомы — первыми. */
+/**
+ * Подготовка групп к показу.
+ * - внутри события свежие альбомы всегда выше;
+ * - `pinFreshGroups` — поднимать события с непросмотренными наверх ленты
+ *   (выключается, когда пользователь хочет «чистую» сортировку).
+ */
 export function presentAlbumGroupsFreshFirst(
   groups: readonly IEventAlbumsGroup[],
   seenIds: ReadonlySet<string>,
   openAlbumId: string | null,
+  pinFreshGroups = true,
 ): IEventAlbumsGroup[] {
   const shown = groups.map(group => ({
     ...group,
     albums: presentAlbumsFreshFirst(group.albums, seenIds, openAlbumId),
   }));
+  if (!pinFreshGroups) return shown;
   return orderFreshFirst(shown, group => group.albums.some(albumHasNewContent));
 }
 

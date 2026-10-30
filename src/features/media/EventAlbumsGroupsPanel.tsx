@@ -18,7 +18,11 @@ import {
   type EventListItemData,
 } from '@/entities/event/lib/eventListItemUtils';
 import { AlbumGridModal } from '@/features/media/AlbumGridModal';
-import { sortEventAlbumGroups, type AlbumListSort } from '@/features/media/albumListSort';
+import {
+  groupHasUnreadAlbums,
+  sortEventAlbumGroups,
+  type AlbumListSort,
+} from '@/features/media/albumListSort';
 import { syncUnseenAlbums } from '@/features/media/albumFreshStore';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
@@ -379,8 +383,13 @@ interface EventAlbumsGroupsPanelProps {
   organizationId?: string;
   onOpenEvent: (eventId: string) => void;
   onTotalChange?: (total: number) => void;
-  /** Если задан — плитки мероприятий идут в этом порядке, а не «свежие сверху». */
+  /** Порядок плиток мероприятий (клиентский; сервер пока всегда по StartTime). */
   sort?: AlbumListSort;
+  /**
+   * Поднимать события с непросмотренными альбомами наверх.
+   * По умолчанию true на странице альбомов; выкл. → чистая сортировка + только glow.
+   */
+  pinUnread?: boolean;
   emptyTitle?: string;
   emptySub?: string;
   className?: string;
@@ -392,6 +401,7 @@ export function EventAlbumsGroupsPanel({
   onOpenEvent,
   onTotalChange,
   sort,
+  pinUnread = true,
   emptyTitle = 'Альбомов пока нет',
   emptySub = 'Здесь появятся фотоальбомы мероприятий, к которым есть доступ',
   className,
@@ -449,16 +459,23 @@ export function EventAlbumsGroupsPanel({
   const sentinelRef = useInfiniteScroll(loadMore, { enabled: hasMore && !loading && !loadingMore });
 
   const displayGroups = useMemo(() => {
-    const presented = presentAlbumGroupsFreshFirst(groups, seenAlbumIds, gridAlbum?.id ?? null);
-    return sort
-      ? sortEventAlbumGroups(
-          presented,
-          sort,
-          photoTotals,
-          group => group.albums.some(albumHasNewContent),
-        )
-      : presented;
-  }, [groups, seenAlbumIds, gridAlbum, sort, photoTotals]);
+    // Внутри события свежие альбомы всегда выше; группы — только если pinUnread.
+    const presented = presentAlbumGroupsFreshFirst(
+      groups,
+      seenAlbumIds,
+      gridAlbum?.id ?? null,
+      Boolean(pinUnread && !sort),
+    );
+    if (!sort) return presented;
+
+    // При явной сортировке: pinUnread поднимает «новые» корзиной, иначе порядок = sort.
+    return sortEventAlbumGroups(
+      presentAlbumGroupsFreshFirst(groups, seenAlbumIds, gridAlbum?.id ?? null, false),
+      sort,
+      photoTotals,
+      pinUnread ? groupHasUnreadAlbums : undefined,
+    );
+  }, [groups, seenAlbumIds, gridAlbum, sort, pinUnread, photoTotals]);
 
   const handlePhotoTotal = useCallback((eventId: string, total: number) => {
     setPhotoTotals(prev => (prev[eventId] === total ? prev : { ...prev, [eventId]: total }));
