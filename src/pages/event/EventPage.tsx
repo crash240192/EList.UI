@@ -27,9 +27,11 @@ import { RatingWidget, isEventFinished } from '@/features/event/RatingWidget';
 import { EventAlbums } from './EventAlbums';
 import { SimilarEventDialog } from './SimilarEventDialog';
 import {
-  captureScrollAnchor,
-  restoreScrollAnchor,
-  type ScrollAnchorSnapshot,
+  captureScrollTop,
+  restoreScrollTop,
+  isScrollLocked,
+  markPageScroller,
+  type ScrollTopSnapshot,
 } from '@/shared/lib/scrollAnchor';
 import {
   buildSimilarEventSeed,
@@ -228,7 +230,7 @@ export default function EventPage() {
   const [inviteModalOpen,       setInviteModalOpen]       = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
   const descSectionRef = useRef<HTMLDivElement>(null);
-  const pendingDescScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
+  const pendingDescScrollRef = useRef<ScrollTopSnapshot | null>(null);
   const [descTogglePressed, setDescTogglePressed] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [similarOpen, setSimilarOpen] = useState(false);
@@ -274,10 +276,14 @@ export default function EventPage() {
   usePageTitle(event?.name ?? null);
 
   useLayoutEffect(() => {
+    markPageScroller(pageRef.current);
+  });
+
+  useLayoutEffect(() => {
     const snap = pendingDescScrollRef.current;
     if (!snap) return;
     pendingDescScrollRef.current = null;
-    restoreScrollAnchor(snap, descSectionRef.current);
+    restoreScrollTop(snap);
   }, [descExpanded]);
 
   useEffect(() => {
@@ -455,9 +461,13 @@ export default function EventPage() {
   useEffect(() => {
     const el = pageRef.current;
     if (!el || !event) return;
+    markPageScroller(el);
 
     const onScroll = () => {
       setShowScrollTop(el.scrollTop > 360);
+      // Во время программного restore scrollTop не трогаем hero —
+      // иначе высота обложки пляшет и ломает якорение альбомов/описания.
+      if (isScrollLocked(el)) return;
       const t = scrollToHeroCollapse(el.scrollTop);
       setHeroCollapse(t);
     };
@@ -1234,7 +1244,7 @@ export default function EventPage() {
                 onPointerCancel={() => setDescTogglePressed(false)}
                 onPointerLeave={() => setDescTogglePressed(false)}
                 onClick={e => {
-                  pendingDescScrollRef.current = captureScrollAnchor(descSectionRef.current);
+                  pendingDescScrollRef.current = captureScrollTop(descSectionRef.current);
                   setDescExpanded(v => !v);
                   setDescTogglePressed(false);
                   e.currentTarget.blur();

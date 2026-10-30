@@ -71,6 +71,9 @@ export function MessageReplies({
   const { resetBump } = useDiscussionRefreshActions();
   const focusChild = focusPathTail?.[0];
   const focusThroughPage = focusChild?.pageIndex ?? 0;
+  type ModeCache = { items: IMessage[]; total: number; loadedThroughPage: number };
+  const emptyCache = (): ModeCache => ({ items: [], total: 0, loadedThroughPage: -1 });
+
   const [items, setItems] = useState<IMessage[]>([]);
   const [total, setTotal] = useState(0);
   const [loadedThroughPage, setLoadedThroughPage] = useState(-1);
@@ -82,6 +85,10 @@ export function MessageReplies({
   const requestGen = useRef(0);
   const focusThroughPageRef = useRef(focusThroughPage);
   focusThroughPageRef.current = focusThroughPage;
+  /** Кэш по виду — повторное дерево↔лента без refetch и без мигания. */
+  const treeCacheRef = useRef<ModeCache | null>(null);
+  const flatCacheRef = useRef<ModeCache | null>(null);
+  const cacheParentIdRef = useRef(parent.id);
 
   const byId = useMemo(() => {
     const map = new Map<string, IMessage>();
@@ -95,6 +102,21 @@ export function MessageReplies({
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
+  const applyCache = useCallback((cache: ModeCache) => {
+    setItems(cache.items);
+    setTotal(cache.total);
+    setLoadedThroughPage(cache.loadedThroughPage);
+    onTotalLoaded?.(cache.total);
+    setLoading(false);
+    setLoadingMore(false);
+    setError(null);
+  }, [onTotalLoaded]);
+
+  const writeModeCache = useCallback((mode: DiscussionViewMode, cache: ModeCache) => {
+    if (mode === 'flat') flatCacheRef.current = cache;
+    else treeCacheRef.current = cache;
+  }, []);
+
   const fetchTreeRange = useCallback(
     async (
       fromPage: number,
@@ -105,7 +127,6 @@ export function MessageReplies({
       if (toPage < fromPage) return;
       if (mode === 'replace') setLoading(true);
       else if (mode === 'append') setLoadingMore(true);
-      // soft-replace: оставляем текущие сообщения на экране — без скелетона/мигания
 
       try {
         const localAcc: IMessage[] = [];
@@ -125,15 +146,19 @@ export function MessageReplies({
 
         if (generation !== requestGen.current) return;
 
+        let nextItems: IMessage[];
         if (mode === 'append') {
-          setItems((prev) => mergeById(prev, localAcc));
+          nextItems = mergeById(itemsRef.current, localAcc);
+          setItems(nextItems);
         } else {
-          setItems(mergeById([], localAcc));
+          nextItems = mergeById([], localAcc);
+          setItems(nextItems);
         }
         setTotal(nextTotal);
         onTotalLoaded?.(nextTotal);
         setLoadedThroughPage(toPage);
         setError(null);
+        writeModeCache('tree', { items: nextItems, total: nextTotal, loadedThroughPage: toPage });
       } catch (e) {
         if (generation !== requestGen.current) return;
         setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов');
@@ -141,6 +166,7 @@ export function MessageReplies({
           setItems([]);
           setLoadedThroughPage(-1);
           setTotal(0);
+          writeModeCache('tree', emptyCache());
         }
       } finally {
         if (generation === requestGen.current) {
@@ -149,7 +175,7 @@ export function MessageReplies({
         }
       }
     },
-    [parent.id, onTotalLoaded],
+    [parent.id, onTotalLoaded, writeModeCache],
   );
 
   const loadFlat = useCallback(async (generation: number, soft: boolean) => {
@@ -162,24 +188,41 @@ export function MessageReplies({
       onTotalLoaded?.(descendants.length);
       setLoadedThroughPage(0);
       setError(null);
+      writeModeCache('flat', {
+        items: descendants,
+        total: descendants.length,
+        loadedThroughPage: 0,
+      });
     } catch (e) {
       if (generation !== requestGen.current) return;
       setError(e instanceof Error ? e.message : 'Ошибка загрузки ответов');
       if (!soft) {
         setItems([]);
         setLoadedThroughPage(-1);
+        writeModeCache('flat', emptyCache());
       }
     } finally {
       if (generation === requestGen.current) setLoading(false);
     }
-  }, [parent.id, onTotalLoaded]);
+  }, [parent.id, onTotalLoaded, writeModeCache]);
 
   useEffect(() => {
+    if (cacheParentIdRef.current !== parent.id) {
+      cacheParentIdRef.current = parent.id;
+      treeCacheRef.current = null;
+      flatCacheRef.current = null;
+    }
+
     requestGen.current += 1;
     const generation = requestGen.current;
-    // При смене вида (дерево↔лента) не сбрасываем список в скелетон — мягкая подмена.
+    const cached = viewMode === 'flat' ? flatCacheRef.current : treeCacheRef.current;
+    if (cached && cached.loadedThroughPage >= 0) {
+      applyCache(cached);
+      return;
+    }
+
+    // Первая загрузка выбранного вида: без скелетона, если на экране ещё виден другой вид.
     const soft = itemsRef.current.length > 0;
-    setLoadedThroughPage(-1);
     if (viewMode === 'flat') {
       void loadFlat(generation, soft);
     } else {
@@ -188,10 +231,22 @@ export function MessageReplies({
     }
     // refreshKey намеренно не в deps: отправка ответа не должна сбрасывать список
     // (новая запись приходит через useDiscussionAppend).
-  }, [loadFlat, fetchTreeRange, parent.id, viewMode]);
+  }, [loadFlat, fetchTreeRange, parent.id, viewMode, applyCache]);
 
   useDiscussionAppend(parent.id, (message) => {
-    setItems((prev) => mergeById(prev, [message]));
+    setItems((prev) => {
+      const next = mergeById(prev, [message]);
+      const nextTotal = Math.max(total + 1, next.length);
+      writeModeCache(viewMode, {
+        items: next,
+        total: nextTotal,
+        loadedThroughPage: loadedThroughPage < 0 ? 0 : loadedThroughPage,
+      });
+      // Другой вид устарел — при следующем переключении подгрузим заново.
+      if (viewMode === 'flat') treeCacheRef.current = null;
+      else flatCacheRef.current = null;
+      return next;
+    });
     setTotal((prevTotal) => {
       const nextTotal = Math.max(prevTotal + 1, (prevTotal || 0) + 1);
       onTotalLoaded?.(nextTotal);
@@ -199,7 +254,6 @@ export function MessageReplies({
     });
     setPreviewExpanded(true);
     setError(null);
-    // Не трогаем loading: если идёт первичный fetch, он сам дорисует список с бэка
   });
 
   useEffect(() => {
@@ -239,12 +293,19 @@ export function MessageReplies({
         const nextTotal = Math.max(0, prevTotal - 1);
         onTotalLoaded?.(nextTotal);
         if (nextTotal === 0) resetBump(parent.id);
+        writeModeCache(viewMode, {
+          items: next,
+          total: nextTotal,
+          loadedThroughPage: loadedThroughPage < 0 ? 0 : loadedThroughPage,
+        });
+        if (viewMode === 'flat') treeCacheRef.current = null;
+        else flatCacheRef.current = null;
         return nextTotal;
       });
       return next;
     });
     onDeleted?.(messageId);
-  }, [onDeleted, onTotalLoaded, parent.id, resetBump]);
+  }, [onDeleted, onTotalLoaded, parent.id, resetBump, viewMode, writeModeCache, loadedThroughPage]);
 
   const childDepth = depth + 1;
   const nestIndent = viewMode === 'flat' || childDepth <= DISCUSSION_TREE_INDENT_CAP;

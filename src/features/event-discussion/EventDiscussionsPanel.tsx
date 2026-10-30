@@ -18,9 +18,9 @@ import { EventDiscussionsPanelSkeleton } from './EventDiscussionsPanelSkeleton';
 import { AccessDeniedGate } from '@/shared/ui/AccessDenied/AccessDeniedGate';
 import { isAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import {
-  captureScrollAnchor,
-  restoreScrollAnchor,
-  type ScrollAnchorSnapshot,
+  captureScrollTop,
+  restoreScrollTop,
+  type ScrollTopSnapshot,
 } from '@/shared/lib/scrollAnchor';
 import styles from './EventDiscussionsPanel.module.css';
 
@@ -64,12 +64,12 @@ export function EventDiscussionsPanel({
   const threadViewMode: DiscussionViewMode = focusTreeLock ? 'tree' : safeViewMode;
   const layoutBoundsRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const pendingScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
+  const pendingScrollRef = useRef<ScrollTopSnapshot | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   const handleViewModeChange = useCallback((next: DiscussionViewMode) => {
-    // Якорим верх панели обсуждений — смена «дерево/лента» не дёргает низ страницы.
-    pendingScrollRef.current = captureScrollAnchor(
+    // Заморозка scrollTop .page — смена «дерево/лента» без прыжка страницы.
+    pendingScrollRef.current = captureScrollTop(
       layoutBoundsRef.current ?? panelRef.current,
     );
     setFocusTreeLock(false);
@@ -80,7 +80,7 @@ export function EventDiscussionsPanel({
     const snap = pendingScrollRef.current;
     if (!snap) return;
     pendingScrollRef.current = null;
-    restoreScrollAnchor(snap, layoutBoundsRef.current ?? panelRef.current);
+    restoreScrollTop(snap);
   }, [threadViewMode]);
   const showPanelSpinner = useDelayedBusy(loading, DISCUSSION_PRELOADER_DELAY_MS);
 
