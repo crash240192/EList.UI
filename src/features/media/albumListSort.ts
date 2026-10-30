@@ -4,19 +4,20 @@ import { albumHasNewContent, type IAlbum, type IEventAlbumsGroup } from '@/entit
  * Порядок плиток на «Альбомы мероприятий».
  *
  * Флоу:
- * 1) Сортировка задаёт порядок мероприятий.
- * 2) Тумблер «Сначала непросмотренные» (по умолчанию вкл.) поднимает события
- *    с новыми фото наверх, внутри каждой корзины остаётся выбранная сортировка.
+ * 1) Сортировка уходит в byEvents?sort=… (сервер пагинирует уже в нужном порядке).
+ * 2) Тумблер «Сначала непросмотренные» поднимает события с новыми фото наверх
+ *    среди уже загруженных страниц; внутри корзины порядок сервера сохраняется.
  * 3) Подсветка/glow непросмотренных работает всегда — это не сортировка.
  * 4) Дефолт — «по последним фото»: страница про активность в альбомах.
+ *
+ * photoCount убрали: избыточно при наличии latestPhotos и даты мероприятия.
  */
-export type AlbumListSort = 'date' | 'latestPhotos' | 'name' | 'photoCount';
+export type AlbumListSort = 'date' | 'latestPhotos' | 'name';
 
 export const ALBUM_LIST_SORT_OPTIONS: { id: AlbumListSort; label: string; hint?: string }[] = [
   { id: 'latestPhotos', label: 'По последним фотографиям', hint: 'Свежие загрузки выше' },
   { id: 'date', label: 'По дате мероприятия', hint: 'Сначала более ранние' },
   { id: 'name', label: 'По названию' },
-  { id: 'photoCount', label: 'По количеству фотографий', hint: 'Сначала больше фото' },
 ];
 
 /** Страница про фотоактивность, не про календарь событий. */
@@ -97,19 +98,9 @@ function compareGroups(
   a: IEventAlbumsGroup,
   b: IEventAlbumsGroup,
   sort: AlbumListSort,
-  photoTotals: Readonly<Record<string, number | undefined>>,
 ): number {
   if (sort === 'name') {
     return a.event.name.localeCompare(b.event.name, 'ru', { sensitivity: 'base' });
-  }
-
-  if (sort === 'photoCount') {
-    const left = resolveGroupPhotoTotal(a, photoTotals);
-    const right = resolveGroupPhotoTotal(b, photoTotals);
-    if (left == null && right == null) return 0;
-    if (left == null) return 1;
-    if (right == null) return -1;
-    return right - left;
   }
 
   if (sort === 'latestPhotos') {
@@ -131,13 +122,12 @@ function compareGroups(
 }
 
 /**
+ * Клиентский fallback (орг. лента без server sort) и pinUnread поверх серверного порядка.
  * Не меняет альбомы внутри плитки. При равенстве оставляет прежний порядок.
- * `pinFirst` держит такие плитки выше остальных и тоже сортирует их между собой.
  */
 export function sortEventAlbumGroups(
   groups: readonly IEventAlbumsGroup[],
-  sort: AlbumListSort,
-  photoTotals: Readonly<Record<string, number | undefined>> = {},
+  sort: AlbumListSort | null,
   pinFirst?: (group: IEventAlbumsGroup) => boolean,
 ): IEventAlbumsGroup[] {
   return groups
@@ -147,8 +137,10 @@ export function sortEventAlbumGroups(
         const pinned = Number(pinFirst(b.group)) - Number(pinFirst(a.group));
         if (pinned !== 0) return pinned;
       }
-      const diff = compareGroups(a.group, b.group, sort, photoTotals);
-      if (diff !== 0) return diff;
+      if (sort) {
+        const diff = compareGroups(a.group, b.group, sort);
+        if (diff !== 0) return diff;
+      }
       return a.index - b.index;
     })
     .map(({ group }) => group);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   albumCoverFileIdsFromMeta,
   albumHasCoverPreview,
@@ -266,18 +266,14 @@ function EventGroupSection({
   group,
   onOpenAlbum,
   onOpenEvent,
-  onPhotoTotal,
 }: {
   group: IEventAlbumsGroup;
   onOpenAlbum: (album: IAlbum) => void;
   onOpenEvent: (eventId: string) => void;
-  onPhotoTotal?: (eventId: string, total: number) => void;
 }) {
   const { event, albums } = group;
   const albumIdsKey = albums.map(album => album.id).join('\0');
   const [photoTotal, setPhotoTotal] = useState<number | null>(null);
-  const onPhotoTotalRef = useRef(onPhotoTotal);
-  onPhotoTotalRef.current = onPhotoTotal;
   const isMobile = useMediaQuery(media.mobile);
 
   useEffect(() => {
@@ -285,9 +281,7 @@ function EventGroupSection({
     const ids = albumIdsKey ? albumIdsKey.split('\0') : [];
     setPhotoTotal(null);
     const publish = (total: number) => {
-      if (cancelled) return;
-      setPhotoTotal(total);
-      onPhotoTotalRef.current?.(event.id, total);
+      if (!cancelled) setPhotoTotal(total);
     };
     if (ids.length === 0) {
       publish(0);
@@ -306,7 +300,7 @@ function EventGroupSection({
       publish(counts.reduce((sum, count) => sum + count, 0));
     });
     return () => { cancelled = true; };
-  }, [albumIdsKey, albums, event.id]);
+  }, [albumIdsKey, albums]);
   // Свёртка только на мобилке; на tablet/desktop всегда развёрнутые карточки.
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const expanded = !isMobile || mobileExpanded;
@@ -383,7 +377,7 @@ interface EventAlbumsGroupsPanelProps {
   organizationId?: string;
   onOpenEvent: (eventId: string) => void;
   onTotalChange?: (total: number) => void;
-  /** Порядок плиток мероприятий (клиентский; сервер пока всегда по StartTime). */
+  /** Порядок плиток: для accountId уходит в byEvents?sort=; для org — клиентский fallback. */
   sort?: AlbumListSort;
   /**
    * Поднимать события с непросмотренными альбомами наверх.
@@ -413,24 +407,25 @@ export function EventAlbumsGroupsPanel({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gridAlbum, setGridAlbum] = useState<IAlbum | null>(null);
-  const [photoTotals, setPhotoTotals] = useState<Record<string, number>>({});
   const [seenAlbumIds, setSeenAlbumIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const scopeKey = organizationId ? `org:${organizationId}` : `acc:${accountId ?? ''}`;
   const hasScope = Boolean(organizationId || accountId);
   const hasMore = groups.length < total;
+  /** Сервер сортирует только byEvents (аккаунт); орг. лента — клиентский fallback. */
+  const serverSort = Boolean(accountId && !organizationId && sort);
 
   const fetchPage = useCallback(async (idx: number, append: boolean) => {
     if (!organizationId && !accountId) return;
     const data = organizationId
       ? await getAlbumsByOrganizationEvents(organizationId, idx, PAGE_SIZE)
-      : await getAlbumsByEvents(accountId!, idx, PAGE_SIZE);
+      : await getAlbumsByEvents(accountId!, idx, PAGE_SIZE, sort ? { sort } : undefined);
     setGroups(prev => append ? [...prev, ...data.result] : data.result);
     if (!append) setSeenAlbumIds(new Set());
     setTotal(data.total);
     onTotalChange?.(data.total);
     setPageIndex(idx);
-  }, [accountId, organizationId, onTotalChange]);
+  }, [accountId, organizationId, onTotalChange, sort]);
 
   useEffect(() => {
     if (!hasScope) {
@@ -459,27 +454,25 @@ export function EventAlbumsGroupsPanel({
   const sentinelRef = useInfiniteScroll(loadMore, { enabled: hasMore && !loading && !loadingMore });
 
   const displayGroups = useMemo(() => {
-    // Внутри события свежие альбомы всегда выше; группы — только если pinUnread.
+    // Внутри события свежие альбомы всегда выше.
     const presented = presentAlbumGroupsFreshFirst(
       groups,
       seenAlbumIds,
       gridAlbum?.id ?? null,
-      Boolean(pinUnread && !sort),
+      false,
     );
-    if (!sort) return presented;
 
-    // При явной сортировке: pinUnread поднимает «новые» корзиной, иначе порядок = sort.
+    // account + server sort: порядок с API; pinUnread только поднимает «новые» среди загруженных.
+    // org / без sort: клиентский fallback по sort.
+    const clientSortKey = serverSort ? null : (sort ?? null);
+    if (!clientSortKey && !pinUnread) return presented;
+
     return sortEventAlbumGroups(
-      presentAlbumGroupsFreshFirst(groups, seenAlbumIds, gridAlbum?.id ?? null, false),
-      sort,
-      photoTotals,
+      presented,
+      clientSortKey,
       pinUnread ? groupHasUnreadAlbums : undefined,
     );
-  }, [groups, seenAlbumIds, gridAlbum, sort, pinUnread, photoTotals]);
-
-  const handlePhotoTotal = useCallback((eventId: string, total: number) => {
-    setPhotoTotals(prev => (prev[eventId] === total ? prev : { ...prev, [eventId]: total }));
-  }, []);
+  }, [groups, seenAlbumIds, gridAlbum, sort, pinUnread, serverSort]);
 
   const rememberSeen = useCallback((albumId: string) => {
     setSeenAlbumIds(prev => {
@@ -524,7 +517,6 @@ export function EventAlbumsGroupsPanel({
             group={group}
             onOpenAlbum={openAlbum}
             onOpenEvent={onOpenEvent}
-            onPhotoTotal={sort ? handlePhotoTotal : undefined}
           />
         ))}
 

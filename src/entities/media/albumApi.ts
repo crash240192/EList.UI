@@ -306,10 +306,17 @@ export async function getAlbumsByEvents(
   accountId: string,
   pageIndex = 0,
   pageSize = 10,
-  options?: { enrichParameters?: boolean },
+  options?: {
+    enrichParameters?: boolean;
+    /** date | latestPhotos | name — серверная сортировка групп. */
+    sort?: 'date' | 'latestPhotos' | 'name';
+  },
 ): Promise<PagedList<IEventAlbumsGroup>> {
+  const sortParam = options?.sort
+    ? `&sort=${encodeURIComponent(options.sort)}`
+    : '';
   const res = await apiClient.get<PagedList<IEventAlbumsGroup>>(
-    `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}`,
+    `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}${sortParam}`,
   );
   const data = ((res as { result?: PagedList<IEventAlbumsGroup> }).result ?? res) as PagedList<IEventAlbumsGroup>;
   const groups = Array.isArray(data.result) ? data.result.map(normalizeAlbumsGroup) : [];
