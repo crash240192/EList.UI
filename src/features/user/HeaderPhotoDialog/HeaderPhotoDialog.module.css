@@ -109,7 +109,7 @@
   left: 12px;
   bottom: 10px;
   z-index: 6;
-  max-width: calc(100% - 92px);
+  max-width: calc(100% - 112px);
   overflow: hidden;
   text-overflow: ellipsis;
   pointer-events: none;
