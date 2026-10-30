@@ -11,9 +11,9 @@ export function HeaderPhotoIcon() {
       strokeLinejoin="round"
       aria-hidden
     >
-      <rect x="3" y="3" width="18" height="18" rx="3.5" />
-      <circle cx="9.2" cy="12" r="2.7" />
-      <path d="M16.2 10.2v3.6M14.4 12h3.6" />
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.6" />
+      <path d="m21 15-5-5L5 21" />
     </svg>
   );
 }
