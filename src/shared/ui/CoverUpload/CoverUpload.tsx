@@ -5,9 +5,14 @@ import { useRef, useState, useEffect } from 'react';
 import { isFileStorageDownloadUrl, uploadFile } from '@/shared/api/fileStorageClient';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import {
+  COVER_ZOOM_MAX,
+  COVER_ZOOM_MIN,
   DEFAULT_COVER_FOCUS,
-  clampCoverFocusValue,
-  coverObjectPosition,
+  coverFocusImgStyle,
+  coverZoomOf,
+  formatCoverZoom,
+  normalizeCoverFocus,
+  panCoverFocus,
   type CoverFocus,
 } from '@/shared/lib/coverFocus';
 import styles from './CoverUpload.module.css';
@@ -34,10 +39,10 @@ export function CoverUpload({
     pointerId: number;
     startX: number;
     startY: number;
-    focusX: number;
-    focusY: number;
+    focus: CoverFocus;
     moved: boolean;
   } | null>(null);
+  const natRef = useRef({ w: 0, h: 0 });
   const [preview, setPreview] = useState<string | null>(() =>
     currentUrl && !isFileStorageDownloadUrl(currentUrl) ? currentUrl : null,
   );
@@ -58,7 +63,24 @@ export function CoverUpload({
 
   const displayUrl = preview && !isFileStorageDownloadUrl(preview) ? preview : null;
   const hasStoredCover = !!(displayUrl || currentFileId);
-  const objectPosition = coverObjectPosition(focus);
+  const frameStyle = coverFocusImgStyle(focus);
+  const zoom = coverZoomOf(focus);
+
+  useEffect(() => {
+    const zone = zoneRef.current;
+    if (!zone) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!hasStoredCover || loading || !onFocusChange) return;
+      e.preventDefault();
+      const step = e.deltaY < 0 ? 0.1 : -0.1;
+      onFocusChange(normalizeCoverFocus({
+        ...focus,
+        zoom: coverZoomOf(focus) + step,
+      }));
+    };
+    zone.addEventListener('wheel', onWheel, { passive: false });
+    return () => zone.removeEventListener('wheel', onWheel);
+  }, [hasStoredCover, loading, onFocusChange, focus]);
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -76,6 +98,7 @@ export function CoverUpload({
 
     setLoading(true);
     setError(null);
+    natRef.current = { w: 0, h: 0 };
     try {
       const result = await uploadFile(file);
       onFocusChange?.(DEFAULT_COVER_FOCUS);
@@ -107,11 +130,17 @@ export function CoverUpload({
       pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
-      focusX: focus.x,
-      focusY: focus.y,
+      focus,
       moved: false,
     };
     setPanning(true);
+  };
+
+  const rememberNat = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    natRef.current = {
+      w: e.currentTarget.naturalWidth,
+      h: e.currentTarget.naturalHeight,
+    };
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -124,11 +153,15 @@ export function CoverUpload({
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
     const rect = zone.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
-    const next: CoverFocus = {
-      x: clampCoverFocusValue(drag.focusX - (dx / rect.width) * 100),
-      y: clampCoverFocusValue(drag.focusY - (dy / rect.height) * 100),
-    };
-    onFocusChange(next);
+    onFocusChange(panCoverFocus(
+      drag.focus,
+      dx,
+      dy,
+      rect.width,
+      rect.height,
+      natRef.current.w,
+      natRef.current.h,
+    ));
   };
 
   const endPan = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -149,6 +182,7 @@ export function CoverUpload({
   };
 
   return (
+    <div className={styles.wrap}>
     <div
       ref={zoneRef}
       className={`${styles.zone} ${dragging ? styles.dragging : ''} ${hasStoredCover ? styles.hasImage : ''} ${panning ? styles.panning : ''} ${loading ? styles.loading : ''}`}
@@ -169,8 +203,9 @@ export function CoverUpload({
           src={displayUrl}
           alt="Обложка"
           className={styles.preview}
-          style={{ objectPosition }}
+          style={frameStyle}
           draggable={false}
+          onLoad={rememberNat}
         />
       ) : currentFileId ? (
         <AuthImage
@@ -178,7 +213,8 @@ export function CoverUpload({
           alt="Обложка"
           className={styles.preview}
           imageFit="cover"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition, display: 'block' }}
+          style={{ width: '100%', height: '100%', ...frameStyle, display: 'block' }}
+          onLoad={rememberNat}
         />
       ) : (
         <div className={styles.placeholder}>
@@ -190,7 +226,7 @@ export function CoverUpload({
       {hasStoredCover && !loading && (
         <>
           <div className={styles.focusHint}>
-            Перетащите фото, чтобы выбрать кадр
+            {zoom > 1 ? 'Сдвиньте кадр в любую сторону' : 'Перетащите фото, чтобы выбрать кадр'}
           </div>
           <button
             type="button"
@@ -218,6 +254,25 @@ export function CoverUpload({
         className={styles.hiddenInput}
         onChange={e => e.target.files?.[0] && void handleFile(e.target.files[0])}
       />
+    </div>
+    <div className={`${styles.zoomRow} ${!hasStoredCover ? styles.zoomOff : ''}`}>
+      <span className={styles.zoomLabel} id="cover-zoom-label">Масштаб</span>
+      <input
+        className={styles.zoomRange}
+        type="range"
+        min={COVER_ZOOM_MIN}
+        max={COVER_ZOOM_MAX}
+        step={0.01}
+        value={zoom}
+        disabled={!hasStoredCover || loading || !onFocusChange}
+        aria-labelledby="cover-zoom-label"
+        aria-valuetext={formatCoverZoom(zoom)}
+        onChange={e => {
+          onFocusChange?.(normalizeCoverFocus({ ...focus, zoom: Number(e.target.value) }));
+        }}
+      />
+      <span className={styles.zoomValue}>{formatCoverZoom(zoom)}</span>
+    </div>
     </div>
   );
 }

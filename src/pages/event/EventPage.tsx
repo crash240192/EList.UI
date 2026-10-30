@@ -814,7 +814,7 @@ export default function EventPage() {
               imageFit="cover"
               alt={event.name}
               className={styles.heroImg}
-              style={coverFocusStyle}
+              style={{ ...coverFocusStyle, overflow: 'visible' }}
               onLoad={handleCoverLoad}
               fallback={
                 event.coverUrl ? (

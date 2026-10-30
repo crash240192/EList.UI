@@ -55,7 +55,7 @@ import { YandexMapPicker } from '@/features/event-map/YandexMapPicker';
 import { CoverUpload } from '@/shared/ui/CoverUpload/CoverUpload';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { isFileStorageDownloadUrl } from '@/shared/api/fileStorageClient';
-import { saveCoverFocusToFile, loadCoverFocusFromFile } from '@/entities/event/coverFocusApi';
+import { saveCoverFocusToFile, resolveCoverFocus } from '@/entities/event/coverFocusApi';
 import {
   DEFAULT_COVER_FOCUS,
   coverFocusEventPayload,
@@ -883,6 +883,9 @@ export default function CreateEventPage() {
     if (ev.coverImageId) setCoverImageId(String(ev.coverImageId));
     const templateFocus = parseCoverFocusFromRecord(ev);
     setCoverFocus(templateFocus ?? DEFAULT_COVER_FOCUS);
+    if (ev.coverImageId) {
+      void resolveCoverFocus(ev, String(ev.coverImageId)).then(setCoverFocus);
+    }
 
     if (ev.startTime && ev.endTime) {
       const diff = new Date(String(ev.endTime)).getTime() - new Date(String(ev.startTime)).getTime();
@@ -1051,14 +1054,11 @@ export default function CreateEventPage() {
       if (ev.coverUrl)      setCoverUrl(ev.coverUrl);
       if (ev.coverImageId)  setCoverImageId(ev.coverImageId);
       const fromEvent = coverFocusFromEvent(ev);
-      if (fromEvent) {
-        setCoverFocus(fromEvent);
-      } else if (ev.coverImageId) {
-        void loadCoverFocusFromFile(ev.coverImageId).then(f => {
-          if (f) setCoverFocus(f);
-        });
+      if (ev.coverImageId) {
+        if (fromEvent) setCoverFocus(fromEvent);
+        void resolveCoverFocus(ev, String(ev.coverImageId)).then(setCoverFocus);
       } else {
-        setCoverFocus(DEFAULT_COVER_FOCUS);
+        setCoverFocus(fromEvent ?? DEFAULT_COVER_FOCUS);
       }
 
       if (ev.startTime && ev.endTime) {

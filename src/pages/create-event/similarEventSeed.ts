@@ -14,6 +14,7 @@ import {
 } from '@/entities/event/ticketTypesApi';
 import type { IEvent } from '@/entities/event/types';
 import type { Gender } from '@/shared/api/types';
+import { resolveCoverFocus } from '@/entities/event/coverFocusApi';
 import { DEFAULT_COVER_FOCUS, coverFocusFromEvent } from '@/shared/lib/coverFocus';
 import type { CreateEventHost } from './CreateEventHostChooser';
 import {
@@ -122,7 +123,9 @@ export async function buildSimilarEventSeed(input: {
   if (selected.has('cover')) {
     seed.coverImageId = event.coverImageId ?? null;
     seed.coverUrl = event.coverUrl ?? null;
-    seed.coverFocus = coverFocusFromEvent(event) ?? { ...DEFAULT_COVER_FOCUS };
+    seed.coverFocus = event.coverImageId
+      ? await resolveCoverFocus(event, event.coverImageId)
+      : (coverFocusFromEvent(event) ?? { ...DEFAULT_COVER_FOCUS });
   }
 
   if (selected.has('cost')) {

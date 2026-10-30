@@ -81,6 +81,8 @@ export interface IEvent {
   coverFocusX?:   number | null;
   /** Фокус обложки по вертикали, 0…100 */
   coverFocusY?:   number | null;
+  /** Масштаб поверх cover, 1…3. В поиске обычно нет — читается из файла обложки. */
+  coverZoom?:     number | null;
   /** Кол-во участников */
   participantsCount?: number;
   /** Текущий пользователь участвует */

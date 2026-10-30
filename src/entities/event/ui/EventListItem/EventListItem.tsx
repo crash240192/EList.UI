@@ -10,7 +10,8 @@ import {
   type EventListItemData,
 } from '@/entities/event/lib/eventListItemUtils';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
 import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
 import { PinnedCoverBadge } from '@/entities/event/ui/PinnedCoverBadge/PinnedCoverBadge';
 import styles from './EventListItem.module.css';
@@ -101,7 +102,7 @@ export function EventListItem({
       : styles.urgOk;
 
   const showParticipants = params.participantsCount != null;
-  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const focusStyle = coverFocusImgStyle(useResolvedCoverFocus(event));
 
   return (
     <div

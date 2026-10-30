@@ -422,6 +422,8 @@
   height: 110px;
   background: var(--hero-gradient);
   display: flex; align-items: center; justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
 .previewCoverEmpty {
   font-size: 22px; color: rgba(255, 255, 255, 0.85);

@@ -1,3 +1,5 @@
+import { clampCoverZoom } from '@/shared/lib/coverFocus';
+
 /** Блюр шапки профиля: шкала 0…60%. В аккаунте API хранит только boolean. */
 
 export const HEADER_BLUR_MAX_PERCENT = 60;
@@ -23,17 +25,38 @@ export function headerBlurFilter(percent: number): string | undefined {
 }
 
 export function parseHeaderBlurPercent(description: string | null | undefined): number | null {
+  const meta = parseHeaderPhotoContext(description);
+  return meta?.blurPercent ?? null;
+}
+
+export interface HeaderPhotoFileMeta {
+  blurPercent: number | null;
+  zoom: number | null;
+}
+
+/** Контекст файла шапки: процент блюра и масштаб. Один JSON, attach заменяет описание целиком. */
+export function parseHeaderPhotoContext(description: string | null | undefined): HeaderPhotoFileMeta | null {
   if (!description) return null;
   try {
     const data = JSON.parse(description) as Record<string, unknown>;
-    const raw = data.headerBlurPercent ?? data.HeaderBlurPercent;
-    if (raw == null || raw === '') return null;
-    return clampHeaderBlurPercent(raw);
+    const rawBlur = data.headerBlurPercent ?? data.HeaderBlurPercent;
+    const rawZoom = data.headerZoom ?? data.HeaderZoom;
+    const blurPercent = rawBlur == null || rawBlur === '' ? null : clampHeaderBlurPercent(rawBlur);
+    const zoom = rawZoom == null || rawZoom === '' ? null : clampCoverZoom(rawZoom);
+    if (blurPercent == null && zoom == null) return null;
+    return { blurPercent, zoom };
   } catch {
     return null;
   }
 }
 
-export function serializeHeaderBlurContext(percent: number): string {
-  return JSON.stringify({ headerBlurPercent: clampHeaderBlurPercent(percent) });
+export function serializeHeaderPhotoContext(meta: { blurPercent: number; zoom: number }): string {
+  return JSON.stringify({
+    headerBlurPercent: clampHeaderBlurPercent(meta.blurPercent),
+    headerZoom: clampCoverZoom(meta.zoom),
+  });
+}
+
+export function serializeHeaderBlurContext(percent: number, zoom = 1): string {
+  return serializeHeaderPhotoContext({ blurPercent: percent, zoom });
 }

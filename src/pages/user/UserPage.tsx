@@ -7,7 +7,7 @@ import { fetchOrganizerRating } from '@/entities/event';
 import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
-import { loadHeaderBlurPercent, peekHeaderBlurPercent } from '@/entities/user/headerApi';
+import { loadHeaderPhotoMeta, peekHeaderPhotoMeta } from '@/entities/user/headerApi';
 import { useUserProfileEvents } from '@/features/event-list/useUserProfileEvents';
 import { useInfiniteScroll, usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
@@ -64,7 +64,7 @@ import {
   type UserEventsScope,
 } from './userPageUtils';
 import { formatAge, pluralYears } from '@/shared/lib/datetime';
-import { coverFocusFromEvent, coverFocusImgStyle, DEFAULT_COVER_FOCUS } from '@/shared/lib/coverFocus';
+import { coverFocusFromEvent, coverFocusImgStyle, coverZoomOf, DEFAULT_COVER_FOCUS } from '@/shared/lib/coverFocus';
 import { HEADER_BLUR_FALLBACK_PERCENT, HEADER_BLUR_FRAME_SCALE, headerBlurFilter } from '@/shared/lib/headerPhoto';
 import styles from './UserPage.module.css';
 
@@ -92,7 +92,7 @@ function UserCoverBackground({
   accountId: string;
   avatarId: string | null;
   headerImageId: string | null;
-  headerFocus: { x: number; y: number } | null;
+  headerFocus: { x: number; y: number; zoom?: number } | null;
   headerBlurPercent: number;
 }) {
   const fileId = useAvatar(accountId, avatarId);
@@ -109,9 +109,12 @@ function UserCoverBackground({
           alt=""
           className={styles.coverHeaderImg}
           style={{
-            ...coverFocusImgStyle(headerFocus),
+            ...coverFocusImgStyle(headerFocus, {
+              frameScale: headerBlur ? HEADER_BLUR_FRAME_SCALE : 1,
+            }),
             background: 'transparent',
-            ...(headerBlur ? { filter: headerBlur, transform: `scale(${HEADER_BLUR_FRAME_SCALE})` } : {}),
+            overflow: 'visible',
+            ...(headerBlur ? { filter: headerBlur } : {}),
           }}
         />
       ) : fileId ? (
@@ -356,6 +359,7 @@ export default function UserPage() {
   const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
   const [headerEditorOpen, setHeaderEditorOpen] = useState(false);
   const [headerBlurPercent, setHeaderBlurPercent] = useState(0);
+  const [headerZoom, setHeaderZoom] = useState(1);
   const [headerAspect, setHeaderAspect] = useState<number | undefined>(undefined);
   const coverRef = useRef<HTMLDivElement>(null);
 
@@ -363,19 +367,25 @@ export default function UserPage() {
   const headerBlurOn = profile?.account.headerBlur === true;
 
   useEffect(() => {
-    if (!headerImageId || !headerBlurOn) {
+    if (!headerImageId) {
       setHeaderBlurPercent(0);
+      setHeaderZoom(1);
       return;
     }
-    const cached = peekHeaderBlurPercent(headerImageId);
-    if (cached != null) {
-      setHeaderBlurPercent(cached);
+    const cached = peekHeaderPhotoMeta(headerImageId);
+    if (cached) {
+      setHeaderZoom(cached.zoom);
+      setHeaderBlurPercent(headerBlurOn ? cached.blurPercent : 0);
       return;
     }
     let cancelled = false;
-    setHeaderBlurPercent(HEADER_BLUR_FALLBACK_PERCENT);
-    void loadHeaderBlurPercent(headerImageId).then(percent => {
-      if (!cancelled) setHeaderBlurPercent(percent ?? HEADER_BLUR_FALLBACK_PERCENT);
+    if (headerBlurOn) setHeaderBlurPercent(HEADER_BLUR_FALLBACK_PERCENT);
+    void loadHeaderPhotoMeta(headerImageId).then(meta => {
+      if (cancelled) return;
+      setHeaderZoom(meta.zoom);
+      setHeaderBlurPercent(headerBlurOn ? meta.blurPercent : 0);
+    }).catch(() => {
+      if (!cancelled) setHeaderZoom(1);
     });
     return () => { cancelled = true; };
   }, [headerImageId, headerBlurOn]);
@@ -399,6 +409,7 @@ export default function UserPage() {
 
   const applyHeaderPhoto = (next: HeaderPhotoValue) => {
     setHeaderBlurPercent(next.imageId ? next.blurPercent : 0);
+    setHeaderZoom(next.imageId ? coverZoomOf(next.focus) : 1);
     setProfile(prev => prev ? {
       ...prev,
       account: {
@@ -641,6 +652,7 @@ export default function UserPage() {
             headerFocus={coverFocusFromEvent({
               coverFocusX: account.headerFocusX,
               coverFocusY: account.headerFocusY,
+              coverZoom: headerZoom,
             })}
             headerBlurPercent={headerBlurPercent}
           />
@@ -1046,6 +1058,7 @@ export default function UserPage() {
           focus={{
             x: profile.account.headerFocusX ?? DEFAULT_COVER_FOCUS.x,
             y: profile.account.headerFocusY ?? DEFAULT_COVER_FOCUS.y,
+            zoom: headerZoom,
           }}
           blurPercent={headerBlurPercent}
           aspectRatio={headerAspect}

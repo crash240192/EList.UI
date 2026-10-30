@@ -26,7 +26,8 @@ import {
 import { syncUnseenAlbums } from '@/features/media/albumFreshStore';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AppPreloader } from '@/shared/ui/AppPreloader/AppPreloader';
-import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
 import { media } from '@/shared/lib/breakpoints';
 import { useInfiniteScroll, useMediaQuery } from '@/shared/hooks';
 import styles from './EventAlbumsGroupsPanel.module.css';
@@ -182,7 +183,7 @@ function EventGroupHeader({
 }) {
   const coverBg = getEventListCoverBackground(event);
   const dateLabel = formatEventListItemDate(event.startTime);
-  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const focusStyle = coverFocusImgStyle(useResolvedCoverFocus(event));
 
   return (
     <button type="button" className={styles.eventHeader} onClick={onOpen}>
