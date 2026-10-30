@@ -238,7 +238,7 @@ export function isCreateEventDraftDirty(
   if (draft.lat != null || draft.lng != null) return true;
   if (draft.coverImageId || persistableCoverUrl(draft.coverUrl)) return true;
   const focus = normalizeCoverFocus(draft.coverFocus);
-  if (focus.x !== DEFAULT_COVER_FOCUS.x || focus.y !== DEFAULT_COVER_FOCUS.y) return true;
+  if (focus.x !== DEFAULT_COVER_FOCUS.x || focus.y !== DEFAULT_COVER_FOCUS.y || focus.zoom !== DEFAULT_COVER_FOCUS.zoom) return true;
   if (draft.selectedCategories.length > 0 || draft.selectedTypes.length > 0) return true;
   if (draft.endMode !== 'duration') return true;
   if (!durationIsDefault(draft.durationH, draft.durationM)) return true;

@@ -7,7 +7,8 @@ import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
-import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { getEventTypes, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
 import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
@@ -32,7 +33,7 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
   const maxPersons = event.parameters?.maxPersonsCount;
   const gender     = readAllowedGender(event.parameters);
   const hasCover   = !!(event.coverImageId || event.coverUrl);
-  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const focusStyle = coverFocusImgStyle(useResolvedCoverFocus(event));
 
   const hasLimits = isPrivate || maxPersons || gender;
 

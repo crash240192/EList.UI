@@ -12,7 +12,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(760px, calc(100% - 32px));
+  width: min(1120px, calc(100% - 32px));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -29,9 +29,7 @@
 }
 
 .editorRow {
-  display: flex;
-  align-items: stretch;
-  gap: 14px;
+  display: block;
 }
 
 .zone {
@@ -81,6 +79,7 @@
   width: 100%;
   height: 100%;
   min-height: 0;
+  overflow: visible;
   pointer-events: none;
 }
 
@@ -107,11 +106,10 @@
 
 .focusHint {
   position: absolute;
-  left: 50%;
+  left: 12px;
   bottom: 10px;
-  transform: translateX(-50%);
   z-index: 6;
-  max-width: calc(100% - 24px);
+  max-width: calc(100% - 112px);
   overflow: hidden;
   text-overflow: ellipsis;
   pointer-events: none;
@@ -129,7 +127,7 @@
 .deleteBtn {
   position: absolute;
   top: 10px;
-  right: 10px;
+  left: 10px;
   z-index: 6;
   color: #fff;
   font-size: 12px;
@@ -164,23 +162,31 @@
 @keyframes headerPhotoSpin { to { transform: rotate(360deg); } }
 
 .blurCol {
-  width: 86px;
-  flex-shrink: 0;
+  position: absolute;
+  z-index: 6;
+  right: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: 58px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  padding: 8px 0;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 }
 
 .blurName {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #fff;
 }
 
 .blurEnd {
   font-size: 11px;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.82);
   line-height: 1;
 }
 
@@ -207,7 +213,7 @@
   bottom: 6px;
   width: 4px;
   transform: translateX(-50%);
-  background: var(--border);
+  background: rgba(255, 255, 255, 0.35);
   border-radius: 4px;
 }
 
@@ -239,9 +245,48 @@
   transform: translateY(-50%);
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
   white-space: nowrap;
   pointer-events: none;
+}
+
+.zoomRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.zoomOff {
+  opacity: 0.45;
+}
+
+.zoomLabel {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.zoomRange {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.zoomRange:disabled {
+  cursor: default;
+}
+
+.zoomValue {
+  flex-shrink: 0;
+  width: 42px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
 }
 
 .actions {

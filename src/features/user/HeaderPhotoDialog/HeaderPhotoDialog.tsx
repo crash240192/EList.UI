@@ -2,14 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { uploadFile } from '@/shared/api/fileStorageClient';
 import {
-  rememberHeaderBlurPercent,
-  saveHeaderBlurPercent,
+  rememberHeaderPhotoMeta,
+  saveHeaderPhotoMeta,
   setAccountHeader,
 } from '@/entities/user/headerApi';
 import {
-  clampCoverFocusValue,
-  coverObjectPosition,
+  COVER_ZOOM_MAX,
+  COVER_ZOOM_MIN,
+  coverFocusImgStyle,
+  coverZoomOf,
   DEFAULT_COVER_FOCUS,
+  formatCoverZoom,
+  normalizeCoverFocus,
+  panCoverFocus,
   type CoverFocus,
 } from '@/shared/lib/coverFocus';
 import {
@@ -56,16 +61,16 @@ export function HeaderPhotoDialog({
     pointerId: number;
     startX: number;
     startY: number;
-    focusX: number;
-    focusY: number;
+    focus: CoverFocus;
     moved: boolean;
   } | null>(null);
+  const natRef = useRef({ w: 0, h: 0 });
   const previewUrlRef = useRef<string | null>(null);
 
   const [imageId, setImageId] = useState<string | null>(savedImageId);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [focus, setFocus] = useState<CoverFocus>(savedFocus);
+  const [focus, setFocus] = useState<CoverFocus>(() => normalizeCoverFocus(savedFocus));
   const [blurPercent, setBlurPercent] = useState(() => clampHeaderBlurPercent(savedBlur));
   const [draggingFile, setDraggingFile] = useState(false);
   const [panning, setPanning] = useState(false);
@@ -88,12 +93,30 @@ export function HeaderPhotoDialog({
 
   const hasImage = Boolean(previewUrl || imageId);
   const blurFilter = headerBlurFilter(blurPercent);
+  const frameScale = blurFilter ? HEADER_BLUR_FRAME_SCALE : 1;
   const frameStyle = {
-    objectFit: 'cover' as const,
-    objectPosition: coverObjectPosition(focus),
-    ...(blurFilter ? { filter: blurFilter, transform: `scale(${HEADER_BLUR_FRAME_SCALE})` } : {}),
+    ...coverFocusImgStyle(focus, { frameScale }),
+    ...(blurFilter ? { filter: blurFilter } : {}),
   };
   const zoneStyle = aspectRatio && aspectRatio > 0 ? { aspectRatio } : undefined;
+  const zoom = coverZoomOf(focus);
+
+  useEffect(() => {
+    const zone = zoneRef.current;
+    if (!zone) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!hasImage || saving) return;
+      if ((e.target as HTMLElement).closest('[data-header-blur]')) return;
+      e.preventDefault();
+      const step = e.deltaY < 0 ? 0.1 : -0.1;
+      setFocus(current => normalizeCoverFocus({
+        ...current,
+        zoom: coverZoomOf(current) + step,
+      }));
+    };
+    zone.addEventListener('wheel', onWheel, { passive: false });
+    return () => zone.removeEventListener('wheel', onWheel);
+  }, [hasImage, saving]);
 
   const replacePreview = (next: string | null) => {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
@@ -112,6 +135,7 @@ export function HeaderPhotoDialog({
     }
     setError(null);
     setFile(next);
+    natRef.current = { w: 0, h: 0 };
     setFocus(DEFAULT_COVER_FOCUS);
     replacePreview(URL.createObjectURL(next));
   };
@@ -158,23 +182,21 @@ export function HeaderPhotoDialog({
       }
       if (!id) return;
       const percent = clampHeaderBlurPercent(blurPercent);
-      const nextFocus: CoverFocus = {
-        x: clampCoverFocusValue(focus.x),
-        y: clampCoverFocusValue(focus.y),
-      };
+      const nextFocus = normalizeCoverFocus(focus);
       await setAccountHeader({
         imageId: id,
         focus: nextFocus,
         blur: percent > 0,
       });
-      rememberHeaderBlurPercent(id, percent);
+      const meta = { blurPercent: percent, zoom: coverZoomOf(nextFocus) };
+      rememberHeaderPhotoMeta(id, meta);
       onApply({ imageId: id, focus: nextFocus, blurPercent: percent });
       try {
-        await saveHeaderBlurPercent(id, percent);
+        await saveHeaderPhotoMeta(id, meta);
       } catch (e) {
         setImageId(id);
         setFile(null);
-        setError(e instanceof Error ? e.message : 'Не удалось сохранить степень блюра');
+        setError(e instanceof Error ? e.message : 'Не удалось сохранить настройки фото');
         return;
       }
       onClose();
@@ -185,47 +207,59 @@ export function HeaderPhotoDialog({
     }
   };
 
+  const rememberNat = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    natRef.current = {
+      w: e.currentTarget.naturalWidth,
+      h: e.currentTarget.naturalHeight,
+    };
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!hasImage || saving) return;
-    if ((e.target as HTMLElement).closest('button')) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = {
+    if ((e.target as HTMLElement).closest('button, [data-header-blur]')) return;
+    const zone = zoneRef.current;
+    if (!zone) return;
+    zone.setPointerCapture(e.pointerId);
+    const drag = {
       pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
-      focusX: focus.x,
-      focusY: focus.y,
+      focus,
       moved: false,
     };
+    dragRef.current = drag;
     setPanning(true);
-  };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    const zone = zoneRef.current;
-    if (!zone) return;
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
-    const rect = zone.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-    setFocus({
-      x: clampCoverFocusValue(drag.focusX - (dx / rect.width) * 100),
-      y: clampCoverFocusValue(drag.focusY - (dy / rect.height) * 100),
-    });
-  };
-
-  const endPan = (e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    dragRef.current = null;
-    setPanning(false);
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* already released */
-    }
+    const scale = headerBlurFilter(blurPercent) ? HEADER_BLUR_FRAME_SCALE : 1;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      const dx = ev.clientX - drag.startX;
+      const dy = ev.clientY - drag.startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
+      const rect = zone.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      setFocus(panCoverFocus(
+        drag.focus,
+        dx,
+        dy,
+        rect.width,
+        rect.height,
+        natRef.current.w,
+        natRef.current.h,
+        scale,
+      ));
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== drag.pointerId) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (dragRef.current?.pointerId === drag.pointerId) dragRef.current = null;
+      setPanning(false);
+      try { zone.releasePointerCapture(ev.pointerId); } catch { /* already released */ }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
 
   const setBlurFromPointer = (clientY: number) => {
@@ -294,12 +328,9 @@ export function HeaderPhotoDialog({
               if (next) takeFile(next);
             }}
             onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={endPan}
-            onPointerCancel={endPan}
           >
             {previewUrl ? (
-              <img src={previewUrl} alt="" className={styles.frame} style={frameStyle} draggable={false} />
+              <img src={previewUrl} alt="" className={styles.frame} style={frameStyle} draggable={false} onLoad={rememberNat} />
             ) : imageId ? (
               <AuthImage
                 fileId={imageId}
@@ -307,7 +338,8 @@ export function HeaderPhotoDialog({
                 imageFit="cover"
                 alt=""
                 className={styles.frame}
-                style={{ ...frameStyle, background: 'transparent' }}
+                style={{ ...frameStyle, background: 'transparent', overflow: 'visible' }}
+                onLoad={rememberNat}
               />
             ) : (
               <div className={styles.placeholder}>
@@ -317,16 +349,21 @@ export function HeaderPhotoDialog({
             )}
             {hasImage && !saving && (
               <>
-                <div className={styles.focusHint}>Перетащите фото, чтобы выбрать кадр</div>
+                <div className={styles.focusHint}>
+                  {zoom > 1 ? 'Сдвиньте кадр в любую сторону' : 'Перетащите фото, чтобы выбрать кадр'}
+                </div>
                 <button type="button" className={styles.deleteBtn} onClick={() => void onDelete()}>
                   Удалить фото
                 </button>
               </>
             )}
             {saving && <div className={styles.busy}><span className={styles.spinner} /></div>}
-          </div>
 
-          <div className={styles.blurCol}>
+            <div
+              className={styles.blurCol}
+              data-header-blur=""
+              onPointerDown={e => e.stopPropagation()}
+            >
             <div className={styles.blurName}>Блюр</div>
             <div className={styles.blurEnd}>{HEADER_BLUR_MAX_PERCENT}%</div>
             <div
@@ -347,11 +384,34 @@ export function HeaderPhotoDialog({
                 <div className={styles.blurFill} style={{ height: `${(blurPercent / HEADER_BLUR_MAX_PERCENT) * 100}%` }} />
               </div>
               <div className={styles.blurThumb} style={{ bottom: `${(blurPercent / HEADER_BLUR_MAX_PERCENT) * 100}%` }}>
-                <span className={styles.blurVal}>{blurPercent}%</span>
+                {blurPercent > 0 && blurPercent < HEADER_BLUR_MAX_PERCENT && (
+                  <span className={styles.blurVal}>{blurPercent}%</span>
+                )}
               </div>
             </div>
             <div className={styles.blurEnd}>0%</div>
+            </div>
           </div>
+        </div>
+
+        <div className={`${styles.zoomRow} ${!hasImage ? styles.zoomOff : ''}`}>
+          <span className={styles.zoomLabel} id="header-photo-zoom">Масштаб</span>
+          <input
+            className={styles.zoomRange}
+            type="range"
+            min={COVER_ZOOM_MIN}
+            max={COVER_ZOOM_MAX}
+            step={0.01}
+            value={zoom}
+            disabled={!hasImage || saving}
+            aria-labelledby="header-photo-zoom"
+            aria-valuetext={formatCoverZoom(zoom)}
+            onChange={e => {
+              const next = Number(e.target.value);
+              setFocus(current => normalizeCoverFocus({ ...current, zoom: next }));
+            }}
+          />
+          <span className={styles.zoomValue}>{formatCoverZoom(zoom)}</span>
         </div>
 
         {error && <p className={styles.error}>{error}</p>}

@@ -1,6 +1,6 @@
 import type { IEventType } from './types';
 import { readAllowedGender, type EventListItemData } from './lib/eventListItemUtils';
-import { parseCoverFocusFromRecord } from '@/shared/lib/coverFocus';
+import { parseCoverFocusFromRecord, readExplicitCoverZoom } from '@/shared/lib/coverFocus';
 
 function normalizeEventCategory(raw: unknown): IEventType['eventCategory'] {
   if (!raw || typeof raw !== 'object') return null;
@@ -65,6 +65,7 @@ export function normalizeEventListItem(raw: unknown): EventListItemData {
     coverUrl: (e.coverUrl ?? e.CoverUrl ?? null) as string | null,
     coverFocusX: parseCoverFocusFromRecord(e)?.x ?? null,
     coverFocusY: parseCoverFocusFromRecord(e)?.y ?? null,
+    coverZoom: readExplicitCoverZoom(e),
     eventTypes: types.length > 0 ? types : single ? [single] : [],
     eventType: single,
     parameters: params

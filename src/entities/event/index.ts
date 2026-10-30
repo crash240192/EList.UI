@@ -143,4 +143,4 @@ export type {
   IEventTemplateSearchRequest,
 } from './eventTemplatesApi';
 
-export { saveCoverFocusToFile, loadCoverFocusFromFile } from './coverFocusApi';
+export { saveCoverFocusToFile, loadCoverFocusFromFile, resolveCoverFocus } from './coverFocusApi';

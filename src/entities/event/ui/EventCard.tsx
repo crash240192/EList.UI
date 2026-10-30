@@ -5,7 +5,8 @@ import type { IEvent } from '../types';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
-import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { getEventTypes, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
 import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
@@ -57,7 +58,7 @@ function Cover({ fallbackGradient, pinned }: { fallbackGradient?: string; pinned
   const { event } = useEventCard();
   const gradient = fallbackGradient ?? getEventCoverBackground(event);
   const hasCover = !!(event.coverImageId || event.coverUrl);
-  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const focusStyle = coverFocusImgStyle(useResolvedCoverFocus(event));
 
   return (
     <div className={styles.cover} style={{ background: hasCover ? '#111' : gradient }}>
