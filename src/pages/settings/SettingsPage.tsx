@@ -275,13 +275,16 @@ function ProfileDataTab() {
 
   useEffect(() => {
     getMyPersonInfo().then(p => {
-      if (p) setForm({
-        firstName: p.firstName ?? '',
-        lastName: p.lastName ?? '',
-        patronymic: p.patronymic ?? '',
-        gender: (p.gender as 'Male' | 'Female' | '') ?? '',
-        birthDate: p.birthDate ? parseBirthDateFromApi(p.birthDate) : '',
-      });
+      if (p) {
+        setForm({
+          firstName: p.firstName ?? '',
+          lastName: p.lastName ?? '',
+          patronymic: p.patronymic ?? '',
+          gender: (p.gender as 'Male' | 'Female' | '') ?? '',
+          birthDate: p.birthDate ? parseBirthDateFromApi(p.birthDate) : '',
+        });
+        setAbout(typeof p.about === 'string' ? p.about : '');
+      }
     }).finally(() => setLoading(false));
   }, []);
 
@@ -331,6 +334,7 @@ function ProfileDataTab() {
         patronymic: form.patronymic.trim() || undefined,
         gender: form.gender || undefined,
         birthDate: birthDateToApiIso(form.birthDate),
+        about: about.trim() || null,
       });
       if (selectedCity) {
         await updateLocation(selectedCity.lat, selectedCity.lng);
@@ -448,9 +452,10 @@ function ProfileDataTab() {
           <textarea
             className={styles.aboutField}
             value={about}
-            onChange={e => setAbout(e.target.value)}
+            onChange={e => setAbout(e.target.value.slice(0, 2000))}
             placeholder="Здесь вы можете рассказать о себе и о том, чем занимаетесь"
             rows={4}
+            maxLength={2000}
             aria-label="Информация о профиле"
           />
         </div>

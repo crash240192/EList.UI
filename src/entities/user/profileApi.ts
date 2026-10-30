@@ -51,6 +51,8 @@ export interface IPersonInfo {
   ageYears?: number | null;
   /** Акцент «день рождения сегодня» */
   isBirthdayToday?: boolean | null;
+  /** Публичный текст «о себе» */
+  about?: string | null;
 }
 
 export interface IFullProfile {
@@ -106,6 +108,7 @@ async function safePerson(path: string): Promise<IPersonInfo | null> {
     const p = raw as Record<string, unknown>;
     const ageRaw = p.ageYears ?? p.AgeYears;
     const bdayRaw = p.isBirthdayToday ?? p.IsBirthdayToday;
+    const aboutRaw = p.about ?? p.About;
     return {
       id: String(p.id ?? p.Id ?? ''),
       accountId: String(p.accountId ?? p.AccountId ?? ''),
@@ -116,6 +119,7 @@ async function safePerson(path: string): Promise<IPersonInfo | null> {
       birthDate: (p.birthDate ?? p.BirthDate ?? null) as string | null,
       ageYears: typeof ageRaw === 'number' ? ageRaw : null,
       isBirthdayToday: typeof bdayRaw === 'boolean' ? bdayRaw : null,
+      about: typeof aboutRaw === 'string' && aboutRaw.trim() ? aboutRaw.trim() : null,
     };
   } catch {
     return null;

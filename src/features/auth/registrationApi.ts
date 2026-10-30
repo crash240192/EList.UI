@@ -53,6 +53,7 @@ export interface IPersonRequest {
   patronymic?: string;
   gender?: Gender;
   birthDate?: string;  // ISO 8601
+  about?: string | null;
 }
 
 // ---- API ----

@@ -1,6 +1,6 @@
 // pages/user/UserPage.tsx — профиль пользователя (макет examples/elist_user_page.html)
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { fetchOrganizerRating } from '@/entities/event';
@@ -55,9 +55,7 @@ import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   formatContactHref,
-  formatShortEventDate,
   getContactIconKind,
-  getUpcomingPreview,
   isContactLink,
   type ContactIconKind,
   type UserEventsPhase,
@@ -422,7 +420,7 @@ export default function UserPage() {
     } : prev);
   };
 
-  const { scopes: eventScopes, upcomingScopes, scopeTotals } = useUserProfileEvents(
+  const { scopes: eventScopes, scopeTotals } = useUserProfileEvents(
     profileAccountId || null,
     eventsPhase,
   );
@@ -599,14 +597,6 @@ export default function UserPage() {
     participating: scopeTotals.participating,
     albums: albumsCount,
   };
-
-  const upcomingPreview = useMemo(() => {
-    const created = getUpcomingPreview(upcomingScopes.created.events, 'created', 2);
-    const participating = getUpcomingPreview(upcomingScopes.participating.events, 'participating', 2);
-    return [...created, ...participating]
-      .sort((a, b) => new Date(a.event.startTime).getTime() - new Date(b.event.startTime).getTime())
-      .slice(0, 3);
-  }, [upcomingScopes.created.events, upcomingScopes.participating.events]);
 
   const pageTitle = profile
     ? ([profile.person?.lastName, profile.person?.firstName].filter(Boolean).join(' ')
@@ -836,20 +826,32 @@ export default function UserPage() {
 
         <div className={styles.mainGrid}>
           <aside className={styles.leftPanel}>
-            {visibleContacts.length > 0 && (
+            {person?.about?.trim() && (
               <section>
-                <div className={styles.secLabel}>Контакты</div>
-                <div className={styles.contactList}>
-                  {visibleContacts.map(contact => (
-                    <ContactRow key={contact.id} contact={contact} />
-                  ))}
-                </div>
+                <div className={styles.secLabel}>О себе</div>
+                <p className={styles.aboutText}>{person.about.trim()}</p>
               </section>
+            )}
+
+            {visibleContacts.length > 0 && (
+              <>
+                {person?.about?.trim() && <div className={styles.sectionDivider} />}
+                <section>
+                  <div className={styles.secLabel}>Контакты</div>
+                  <div className={styles.contactList}>
+                    {visibleContacts.map(contact => (
+                      <ContactRow key={contact.id} contact={contact} />
+                    ))}
+                  </div>
+                </section>
+              </>
             )}
 
             {organizations.length > 0 && (
               <>
-                {visibleContacts.length > 0 && <div className={styles.sectionDivider} />}
+                {(Boolean(person?.about?.trim()) || visibleContacts.length > 0) && (
+                  <div className={styles.sectionDivider} />
+                )}
                 <section>
                   <div className={styles.secLabel}>Организации</div>
                   <div className={styles.orgList}>
@@ -899,47 +901,6 @@ export default function UserPage() {
                         </button>
                       );
                     })}
-                  </div>
-                </section>
-              </>
-            )}
-
-            {upcomingPreview.length > 0 && (
-              <>
-                {(visibleContacts.length > 0 || organizations.length > 0) && (
-                  <div className={styles.sectionDivider} />
-                )}
-                <section>
-                  <div className={styles.secLabel}>Ближайшие события</div>
-                  <div className={styles.upcomingList}>
-                    {upcomingPreview.map(({ event, scope }, index) => (
-                      <button
-                        key={`${event.id}-${scope}`}
-                        type="button"
-                        className={styles.nextEvent}
-                        onClick={() => navigate(`/event/${event.id}`)}
-                      >
-                        <div className={styles.neDotCol}>
-                          <span
-                            className={styles.neDot}
-                            style={{ background: scope === 'created' ? 'var(--accent)' : '#22c55e' }}
-                            aria-hidden
-                          />
-                          {index < upcomingPreview.length - 1 && <span className={styles.neLine} aria-hidden />}
-                        </div>
-                        <div className={styles.neInfo}>
-                          <div className={styles.neDate}>{formatShortEventDate(event.startTime)}</div>
-                          <div className={styles.neName}>{event.name}</div>
-                          <div className={styles.neMeta}>
-                            {event.address && <span>{event.address}</span>}
-                            {event.address && <span> · </span>}
-                            <span className={scope === 'created' ? styles.neBadgeOrganizer : styles.neBadgeParticipant}>
-                              {scope === 'created' ? 'Организую' : 'Участвую'}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
                   </div>
                 </section>
               </>

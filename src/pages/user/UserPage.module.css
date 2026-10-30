@@ -429,6 +429,15 @@
   margin-bottom: 8px;
 }
 
+.aboutText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .contactList {
   display: flex;
   flex-direction: column;
