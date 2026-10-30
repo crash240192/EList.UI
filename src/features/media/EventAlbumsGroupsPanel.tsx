@@ -32,7 +32,10 @@ import styles from './EventAlbumsGroupsPanel.module.css';
 
 const PAGE_SIZE = 10;
 const COLLAPSED_MAX = 5;
+/** Overflow «ещё альбомы» на свёрнутой мобилке. */
 const STACK_LAYER_MAX = 4;
+/** Слои фото внутри одной миниатюры альбома (M1). */
+const PHOTO_STACK_LAYERS = 3;
 
 function albumCountLabel(count: number): string {
   if (count === 1) return '1 альбом';
@@ -121,36 +124,63 @@ function EventGroupHeader({
   );
 }
 
-function AlbumCover({
-  album,
-  iconSize,
-  mosaic = false,
-}: {
-  album: IAlbum;
-  iconSize: number;
-  /** Развёрнутая карточка: сетка до 4 первых фото */
-  mosaic?: boolean;
-}) {
-  const previewLimit = mosaic ? 4 : 1;
+function useAlbumCoverIds(album: IAlbum, limit: number): string[] {
   const [coverIds, setCoverIds] = useState<string[]>(() => (
-    albumHasCoverPreview(album) ? albumCoverFileIdsFromMeta(album, previewLimit) : []
+    albumHasCoverPreview(album) ? albumCoverFileIdsFromMeta(album, limit) : []
   ));
 
   useEffect(() => {
     let cancelled = false;
     if (albumHasCoverPreview(album)) {
-      setCoverIds(albumCoverFileIdsFromMeta(album, previewLimit));
+      setCoverIds(albumCoverFileIdsFromMeta(album, limit));
       return;
     }
     setCoverIds([]);
-    getAlbumCoverFileIds(album.id, previewLimit, album).then(ids => {
+    getAlbumCoverFileIds(album.id, limit, album).then(ids => {
       if (!cancelled) setCoverIds(ids);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [album, previewLimit]);
+  }, [album, limit]);
 
+  return coverIds;
+}
+
+function CoverEmpty({ iconSize }: { iconSize: number }) {
+  return (
+    <div className={styles.albumCoverEmpty}>
+      <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M3 9h18" />
+        <circle cx="9" cy="15" r="2" />
+        <path d="M14 13l3 4" />
+      </svg>
+    </div>
+  );
+}
+
+function PrivateLock() {
+  return (
+    <div className={styles.privateBadge} aria-label="Приватный альбом">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <rect x="3" y="11" width="18" height="11" rx="2" />
+        <path d="M7 11V7a5 5 0 0110 0v4" />
+      </svg>
+    </div>
+  );
+}
+
+/** Desktop D1: квадрат, мозаика первых фото, имя снизу, счётчик справа сверху. */
+function AlbumCoverMosaic({
+  album,
+  iconSize,
+}: {
+  album: IAlbum;
+  iconSize: number;
+}) {
+  const coverIds = useAlbumCoverIds(album, 4);
   const coverCount = coverIds.length;
-  const showMosaic = mosaic && coverCount > 1;
+  const showMosaic = coverCount > 1;
+  const photoCount = album.photoCount;
 
   return (
     <div className={styles.albumCover}>
@@ -169,41 +199,68 @@ function AlbumCover({
       ) : coverCount > 0 ? (
         <AuthImage fileId={coverIds[0]} alt="" className={styles.albumCoverImg} />
       ) : (
-        <div className={styles.albumCoverEmpty}>
-          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M3 9h18" />
-            <circle cx="9" cy="15" r="2" />
-            <path d="M14 13l3 4" />
-          </svg>
-        </div>
+        <CoverEmpty iconSize={iconSize} />
       )}
-      {album.parameters?.private && (
-        <div className={styles.privateBadge} aria-label="Приватный альбом">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <rect x="3" y="11" width="18" height="11" rx="2" />
-            <path d="M7 11V7a5 5 0 0110 0v4" />
-          </svg>
-        </div>
+      {photoCount != null && photoCount > 0 && (
+        <span className={styles.photoCountBadge} title={photoCountLabel(photoCount)}>
+          {photoCount}
+        </span>
       )}
+      {album.parameters?.private && <PrivateLock />}
+      <div className={styles.albumCaption}>
+        <div className={styles.albumCaptionName}>{album.name}</div>
+      </div>
     </div>
+  );
+}
+
+/** Mobile M1: диагональная стопка одиночных фото альбома (без мозаики). */
+function AlbumPhotoStackThumb({
+  album,
+  onOpen,
+}: {
+  album: IAlbum;
+  onOpen: () => void;
+}) {
+  const coverIds = useAlbumCoverIds(album, PHOTO_STACK_LAYERS);
+  const fresh = albumHasNewContent(album);
+  const layers = (coverIds.length > 0 ? coverIds : [null]).slice(0, PHOTO_STACK_LAYERS).reverse();
+
+  return (
+    <button
+      type="button"
+      className={fresh ? `${styles.photoStack} ${styles.photoStackFresh}` : styles.photoStack}
+      onClick={onOpen}
+      aria-label={album.name}
+      title={album.name}
+      data-fresh={fresh ? 'true' : undefined}
+    >
+      <span className={styles.photoStackLayers} data-count={layers.length}>
+        {layers.map((fileId, i) => (
+          <span key={fileId ?? `empty-${i}`} className={styles.photoStackLayer}>
+            {fileId ? (
+              <AuthImage fileId={fileId} alt="" className={styles.albumCoverImg} />
+            ) : (
+              <CoverEmpty iconSize={16} />
+            )}
+          </span>
+        ))}
+      </span>
+      {album.parameters?.private && <PrivateLock />}
+    </button>
   );
 }
 
 function AlbumTile({
   album,
-  compact,
   onOpen,
 }: {
   album: IAlbum;
-  compact?: boolean;
   onOpen: () => void;
 }) {
-  const iconSize = compact ? 16 : 24;
   const fresh = albumHasNewContent(album);
   const className = [
     styles.albumCard,
-    compact ? styles.albumCardThumb : '',
     fresh ? styles.albumCardFresh : '',
   ].filter(Boolean).join(' ');
 
@@ -212,21 +269,16 @@ function AlbumTile({
       type="button"
       className={className}
       onClick={onOpen}
-      aria-label={compact ? album.name : undefined}
-      title={compact ? album.name : undefined}
+      aria-label={album.name}
+      title={album.name}
       data-fresh={fresh ? 'true' : undefined}
     >
-      <AlbumCover album={album} iconSize={iconSize} mosaic={!compact} />
-      {!compact && (
-        <div className={styles.albumMeta}>
-          <div className={styles.albumName}>{album.name}</div>
-          {album.description && <div className={styles.albumDesc}>{album.description}</div>}
-        </div>
-      )}
+      <AlbumCoverMosaic album={album} iconSize={24} />
     </button>
   );
 }
 
+/** Overflow: стопка альбомов «ещё N» на свёрнутой мобилке. */
 function AlbumStack({
   albums,
   extraCount,
@@ -236,22 +288,31 @@ function AlbumStack({
   extraCount: number;
   onOpen: () => void;
 }) {
-  const layers = albums.slice(0, STACK_LAYER_MAX).reverse();
+  const layers = albums.slice(0, STACK_LAYER_MAX);
   const fresh = albums.some(albumHasNewContent);
+  const coverByAlbum = layers.map(album => ({
+    album,
+    // Одно фото на слой — без мозаики.
+    ids: albumHasCoverPreview(album) ? albumCoverFileIdsFromMeta(album, 1) : [],
+  }));
 
   return (
     <button
       type="button"
-      className={fresh ? `${styles.stackThumb} ${styles.stackThumbFresh}` : styles.stackThumb}
+      className={fresh ? `${styles.photoStack} ${styles.photoStackFresh}` : styles.photoStack}
       onClick={onOpen}
       aria-label={`Ещё ${albumCountLabel(extraCount)}`}
       title={`Ещё ${albumCountLabel(extraCount)}`}
       data-fresh={fresh ? 'true' : undefined}
     >
-      <span className={styles.stackThumbLayers}>
-        {layers.map(album => (
-          <span key={album.id} className={styles.stackThumbLayer}>
-            <AlbumCover album={album} iconSize={14} />
+      <span className={styles.photoStackLayers} data-count={Math.min(coverByAlbum.length, PHOTO_STACK_LAYERS)}>
+        {coverByAlbum.slice(0, PHOTO_STACK_LAYERS).reverse().map(({ album, ids }) => (
+          <span key={album.id} className={styles.photoStackLayer}>
+            {ids[0] ? (
+              <AuthImage fileId={ids[0]} alt="" className={styles.albumCoverImg} />
+            ) : (
+              <CoverEmpty iconSize={14} />
+            )}
           </span>
         ))}
       </span>
@@ -324,10 +385,9 @@ function EventGroupSection({
     tiles = (
       <>
         {head.map(album => (
-          <AlbumTile
+          <AlbumPhotoStackThumb
             key={album.id}
             album={album}
-            compact
             onOpen={expand}
           />
         ))}
@@ -340,10 +400,9 @@ function EventGroupSection({
     );
   } else {
     tiles = albums.map(album => (
-      <AlbumTile
+      <AlbumPhotoStackThumb
         key={album.id}
         album={album}
-        compact
         onOpen={expand}
       />
     ));

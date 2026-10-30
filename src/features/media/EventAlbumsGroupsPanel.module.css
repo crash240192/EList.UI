@@ -150,8 +150,8 @@
 
 .albumGridCollapsed {
   display: grid;
-  gap: 6px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
   max-width: 100%;
 }
@@ -162,11 +162,13 @@
   }
 }
 
+/* Desktop D1: квадратная карточка, мозаика на весь кадр */
 .albumCard {
   display: block;
   width: 100%;
   min-width: 0;
   padding: 0;
+  aspect-ratio: 1;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -175,106 +177,6 @@
   text-align: left;
   font-family: inherit;
   transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
-}
-
-.albumCardThumb {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1;
-  border-radius: 10px;
-}
-
-.albumCardThumb .albumCover {
-  height: 100%;
-  width: 100%;
-}
-
-.albumCardThumb .privateBadge {
-  top: 4px;
-  right: 4px;
-  padding: 2px 3px;
-}
-
-/* Compact stack tile (mobile collapsed, same cell as thumbs) */
-.stackThumb {
-  position: relative;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-family: inherit;
-  border-radius: 10px;
-}
-
-.stackThumbLayers {
-  position: absolute;
-  inset: 0;
-}
-
-.stackThumbLayer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 8px;
-  bottom: 8px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
-}
-
-.stackThumbLayer .albumCover {
-  height: 100%;
-  width: 100%;
-}
-
-.stackThumbLayer:nth-last-child(4) { transform: translate(8px, 8px); opacity: 0.5; }
-.stackThumbLayer:nth-last-child(3) { transform: translate(5px, 5px); opacity: 0.7; }
-.stackThumbLayer:nth-last-child(2) { transform: translate(3px, 3px); opacity: 0.88; }
-.stackThumbLayer:nth-last-child(1) { transform: none; opacity: 1; }
-
-.stackThumbPlus {
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 8px;
-  bottom: 8px;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(8, 8, 14, 0.48);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  border-radius: 8px;
-  pointer-events: none;
-}
-
-.stackThumb:hover .stackThumbLayer:last-child {
-  border-color: var(--accent);
-  box-shadow: var(--hover-glow);
-}
-
-.stackThumbFresh .stackThumbLayer:last-child {
-  border-color: #ff8a1e;
-  box-shadow:
-    0 0 0 1px rgba(255, 138, 30, 0.85),
-    0 0 8px 2px rgba(255, 122, 24, 0.55),
-    0 0 14px 4px rgba(255, 122, 24, 0.28);
-}
-
-.stackThumbFresh:hover .stackThumbLayer:last-child {
-  border-color: #ff8a1e;
-  box-shadow:
-    0 0 0 1px rgba(255, 138, 30, 0.95),
-    0 0 10px 3px rgba(255, 122, 24, 0.65),
-    0 0 16px 5px rgba(255, 122, 24, 0.32);
 }
 
 .albumCard:hover {
@@ -291,15 +193,7 @@
     0 0 22px 6px rgba(255, 122, 24, 0.28);
 }
 
-.albumCardThumb.albumCardFresh {
-  box-shadow:
-    0 0 0 1px rgba(255, 138, 30, 0.85),
-    0 0 8px 2px rgba(255, 122, 24, 0.55),
-    0 0 14px 4px rgba(255, 122, 24, 0.28);
-}
-
-.albumCardFresh:hover,
-.albumCardThumb.albumCardFresh:hover {
+.albumCardFresh:hover {
   border-color: #ff8a1e;
   box-shadow:
     0 0 0 1px rgba(255, 138, 30, 0.95),
@@ -308,8 +202,9 @@
 }
 
 .albumCover {
-  height: 110px;
   position: relative;
+  width: 100%;
+  height: 100%;
   background: var(--surface-2);
   overflow: hidden;
 }
@@ -328,9 +223,10 @@
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
+  background: var(--surface-2);
 }
 
-/* Мозаика превью: 2 / 3 / 4 первых фото на развёрнутой карточке */
+/* Мозаика превью: 2 / 3 / 4 первых фото */
 .albumCoverMosaic {
   display: grid;
   gap: 2px;
@@ -364,10 +260,31 @@
   height: 100%;
 }
 
-.privateBadge {
+/* Счётчик кадров — правый верхний угол */
+.photoCountBadge {
   position: absolute;
   top: 6px;
   right: 6px;
+  z-index: 3;
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+/* Замок слева сверху — не пересекается со счётчиком */
+.privateBadge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   border-radius: 6px;
@@ -376,26 +293,130 @@
   align-items: center;
 }
 
-.albumMeta {
-  padding: 8px 10px;
+/* Подпись поверх низа + тень/градиент для контраста */
+.albumCaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 28px 10px 8px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.78) 0%,
+    rgba(0, 0, 0, 0.42) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
 
-.albumName {
+.albumCaptionName {
   font-size: 12px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: 600;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.45);
 }
 
-.albumDesc {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  white-space: nowrap;
+/* Mobile M1: диагональная стопка фото альбома */
+.photoStack {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: 10px;
+}
+
+.photoStackLayers {
+  position: absolute;
+  inset: 0;
+}
+
+.photoStackLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 10px;
+  bottom: 10px;
+  border-radius: 8px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+}
+
+.photoStackLayers[data-count="1"] .photoStackLayer:nth-last-child(1),
+.photoStackLayers[data-count="2"] .photoStackLayer:nth-last-child(1),
+.photoStackLayers[data-count="3"] .photoStackLayer:nth-last-child(1) {
+  transform: none;
+  opacity: 1;
+  z-index: 3;
+}
+
+.photoStackLayers[data-count="2"] .photoStackLayer:nth-last-child(2),
+.photoStackLayers[data-count="3"] .photoStackLayer:nth-last-child(2) {
+  transform: translate(5px, 5px);
+  opacity: 0.78;
+  z-index: 2;
+}
+
+.photoStackLayers[data-count="3"] .photoStackLayer:nth-last-child(3) {
+  transform: translate(10px, 10px);
+  opacity: 0.55;
+  z-index: 1;
+}
+
+.photoStack .privateBadge {
+  top: 4px;
+  left: 4px;
+  padding: 2px 3px;
+}
+
+.photoStack:hover .photoStackLayer:last-child {
+  border-color: var(--accent);
+  box-shadow: var(--hover-glow);
+}
+
+.photoStackFresh .photoStackLayer:last-child {
+  border-color: #ff8a1e;
+  box-shadow:
+    0 0 0 1px rgba(255, 138, 30, 0.85),
+    0 0 8px 2px rgba(255, 122, 24, 0.55),
+    0 0 14px 4px rgba(255, 122, 24, 0.28);
+}
+
+.photoStackFresh:hover .photoStackLayer:last-child {
+  border-color: #ff8a1e;
+  box-shadow:
+    0 0 0 1px rgba(255, 138, 30, 0.95),
+    0 0 10px 3px rgba(255, 122, 24, 0.65),
+    0 0 16px 5px rgba(255, 122, 24, 0.32);
+}
+
+.stackThumbPlus {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 10px;
+  bottom: 10px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 8, 14, 0.48);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 8px;
+  pointer-events: none;
 }
 
 .skeletons {
