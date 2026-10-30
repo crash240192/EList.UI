@@ -117,8 +117,8 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
   const menuElRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({ visibility: 'hidden' });
 
-  // Свёрнутые thumbs — одно фото; развёрнутая карточка — до 4 для мозаики.
-  const previewLimit = hideMeta ? 1 : 4;
+  // Свёрнутые M1 — до 3 одиночных кадров в стопку; D1 — до 4 для мозаики.
+  const previewLimit = hideMeta ? 3 : 4;
 
   useEffect(() => {
     let cancelled = false;
@@ -177,55 +177,84 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
   const coverCount = coverIds.length;
   const showMosaic = !hideMeta && coverCount > 1;
   const fresh = albumHasNewContent(album);
+  // Collapsed M1: диагональная стопка до 3 одиночных кадров.
+  const stackLayers = (coverCount > 0 ? coverIds : [null as string | null])
+    .slice(0, 3)
+    .reverse();
 
   return (
     <div className={styles.albumTile}>
       <div
-        className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : ''} ${fadeRight ? styles.albumCardFadeRight : ''} ${fresh ? styles.albumCardFresh : ''}`}
+        className={`${styles.albumCard} ${hideMeta ? styles.albumCardThumb : styles.albumCardD1} ${fadeRight ? styles.albumCardFadeRight : ''} ${fresh ? styles.albumCardFresh : ''}`}
         data-fresh={fresh ? 'true' : undefined}
         data-album-name={album.name}
       >
       <div className={styles.albumCardBody} onClick={onOpen} role="button" tabIndex={0}
         aria-label={album.name}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}>
-        <div className={styles.albumCover}>
-          {showMosaic ? (
-            <div
-              className={styles.albumCoverMosaic}
-              data-count={Math.min(coverCount, 4)}
-              aria-hidden
-            >
-              {coverIds.slice(0, 4).map((fileId, i) => (
-                <div key={`${fileId}-${i}`} className={styles.albumCoverMosaicCell}>
+        {hideMeta ? (
+          <span className={styles.photoStackLayers} data-count={stackLayers.length}>
+            {stackLayers.map((fileId, i) => (
+              <span key={fileId ?? `empty-${i}`} className={styles.photoStackLayer}>
+                {fileId ? (
                   <SpinnerImage fileId={fileId} alt="" className={styles.albumCoverImg} />
-                </div>
-              ))}
+                ) : (
+                  <div className={styles.albumCoverEmpty}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>
+                      <circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/>
+                    </svg>
+                  </div>
+                )}
+              </span>
+            ))}
+            {album.parameters?.private && (
+              <div className={styles.privateBadge}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+              </div>
+            )}
+          </span>
+        ) : (
+          <div className={styles.albumCover}>
+            {showMosaic ? (
+              <div
+                className={styles.albumCoverMosaic}
+                data-count={Math.min(coverCount, 4)}
+                aria-hidden
+              >
+                {coverIds.slice(0, 4).map((fileId, i) => (
+                  <div key={`${fileId}-${i}`} className={styles.albumCoverMosaicCell}>
+                    <SpinnerImage fileId={fileId} alt="" className={styles.albumCoverImg} />
+                  </div>
+                ))}
+              </div>
+            ) : coverCount > 0 ? (
+              <SpinnerImage fileId={coverIds[0]} alt={album.name} className={styles.albumCoverImg} />
+            ) : (
+              <div className={styles.albumCoverEmpty}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>
+                  <circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/>
+                </svg>
+              </div>
+            )}
+            {album.parameters?.private && (
+              <div className={styles.privateBadge}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+              </div>
+            )}
+            {photoCount != null && photoCount > 0 && (
+              <span className={styles.photoCountBadge} title={`${photoCount}`}>
+                {photoCount}
+              </span>
+            )}
+            <div className={styles.albumCaption}>
+              <div className={styles.albumCaptionName}>{album.name}</div>
             </div>
-          ) : coverCount > 0 ? (
-            <SpinnerImage fileId={coverIds[0]} alt={album.name} className={styles.albumCoverImg} />
-          ) : (
-            <div className={styles.albumCoverEmpty}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>
-                <circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/>
-              </svg>
-            </div>
-          )}
-          {album.parameters?.private && (
-            <div className={styles.privateBadge}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-              </svg>
-            </div>
-          )}
-          {photoCount != null && (
-            <span className={styles.photoCount}>{photoCount}</span>
-          )}
-        </div>
-        {!hideMeta && (
-          <div className={styles.albumMeta}>
-            <div className={styles.albumName}>{album.name}</div>
-            {album.description && <div className={styles.albumDesc}>{album.description}</div>}
           </div>
         )}
       </div>
@@ -235,7 +264,7 @@ function AlbumCard({ album, canManage, coverVersion = 0, hideMeta = false, fadeR
         <span className={styles.albumOverflowCount} aria-hidden>+{overflowCount}</span>
       )}
 
-      {canManage && (
+      {canManage && !hideMeta && (
         <div className={styles.albumMenuWrap}>
           <button
             ref={menuBtnRef}
@@ -290,16 +319,16 @@ function AddAlbumThumb({ onClick }: { onClick: () => void }) {
 
 function AddAlbumCard({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" className={styles.addAlbumCard} onClick={onClick}>
+    <button type="button" className={`${styles.addAlbumCard} ${styles.albumCardD1}`} onClick={onClick}>
       <div className={`${styles.albumCover} ${styles.addAlbumCover}`}>
         <div className={styles.addAlbumIcon}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
         </div>
-      </div>
-      <div className={styles.albumMeta}>
-        <div className={styles.albumName}>Добавить альбом</div>
+        <div className={styles.albumCaption}>
+          <div className={styles.albumCaptionName}>Добавить альбом</div>
+        </div>
       </div>
     </button>
   );
