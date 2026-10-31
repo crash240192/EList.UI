@@ -88,20 +88,18 @@
   background: none;
 }
 
-/* Размытая вуаль: линейный градиент на коротком участке даёт видимую кромку. */
+/* Не линейный градиент: на узкой шапке его верхняя кромка читается полосой.
+   Плотная плашка сильно размыта, поэтому затемнение только тает к низу. */
 .coverOverlayPhoto::before {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -18px;
-  height: 46%;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.48) 100%
-  );
-  filter: blur(14px);
+  /* Кромка плашки ниже видимой шапки: в кадре только верхний хвост размытия. */
+  bottom: -52px;
+  height: 64px;
+  background: rgba(0, 0, 0, 0.72);
+  filter: blur(36px);
   pointer-events: none;
 }
 
