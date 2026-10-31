@@ -349,9 +349,19 @@ export function HeaderPhotoDialog({
             )}
             {hasImage && !saving && (
               <>
-                <div className={styles.focusHint}>
+                <div className={`${styles.focusHint} ${zoom <= 1 ? styles.focusHintDrag : ''}`}>
                   {zoom > 1 ? 'Сдвиньте кадр в любую сторону' : 'Перетащите фото, чтобы выбрать кадр'}
                 </div>
+                <button
+                  type="button"
+                  className={`${styles.uploadBtn} ${zoom <= 1 ? styles.uploadBtnOn : ''}`}
+                  onClick={e => {
+                    e.stopPropagation();
+                    openPicker();
+                  }}
+                >
+                  Загрузить фото
+                </button>
                 <button type="button" className={styles.deleteBtn} onClick={() => void onDelete()}>
                   Удалить фото
                 </button>

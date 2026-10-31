@@ -124,6 +124,38 @@
 
 .zonePanning .focusHint { opacity: 0; }
 
+.uploadBtn {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .focusHintDrag { display: none; }
+
+  .uploadBtnOn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    left: 12px;
+    bottom: 10px;
+    z-index: 6;
+    max-width: calc(100% - 84px);
+    padding: 6px 14px;
+    border: none;
+    border-radius: 20px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    line-height: 1.2;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+
+  .uploadBtnOn:hover { background: var(--accent-hover); }
+}
+
 .deleteBtn {
   position: absolute;
   top: 10px;
