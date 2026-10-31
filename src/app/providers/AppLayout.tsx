@@ -1,6 +1,6 @@
 // app/providers/AppLayout.tsx
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useThemeStore, useAuthStore, useFiltersStore, usePlatformRoleStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
@@ -48,6 +48,8 @@ export function AppLayout() {
   const isWide = useMediaQuery(media.wide);
   // На широком десктопе меню закреплено раскрытым (docked), на узких — оверлей.
   const [sidebarExpanded, setSidebarExpanded] = useState(isWide);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
   const [draftResumeOpen, setDraftResumeOpen] = useState(false);
   const [showTicketsNav,  setShowTicketsNav]  = useState(false);
@@ -128,6 +130,22 @@ export function AppLayout() {
     return () => document.removeEventListener('keydown', fn);
   }, [isWide]);
 
+  // Оверлей: тап в любое место кроме самого меню его сворачивает.
+  // Шапка (аватар, уведомления, условия) выше подложки, поэтому слушаем документ.
+  // Кнопку-гамбургер не трогаем — у неё свой toggle.
+  useEffect(() => {
+    if (isWide || !sidebarExpanded) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (sidebarRef.current?.contains(target)) return;
+      if (menuBtnRef.current?.contains(target)) return;
+      setSidebarExpanded(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [isWide, sidebarExpanded]);
+
   return (
     <UserAgreementsGate>
     <div className={styles.root}>
@@ -136,6 +154,7 @@ export function AppLayout() {
       <header className={styles.header}>
         <div className={styles.headerLeft}>
           <button
+            ref={menuBtnRef}
             className={styles.menuBtn}
             onClick={() => setSidebarExpanded(v => !v)}
             aria-label={sidebarExpanded ? 'Свернуть меню' : 'Развернуть меню'}
@@ -201,7 +220,7 @@ export function AppLayout() {
       </header>
 
       {/* ---- Sidebar ---- */}
-      <aside className={`${styles.sidebar} ${sidebarExpanded ? styles.sidebarExpanded : ''}`}>
+      <aside ref={sidebarRef} className={`${styles.sidebar} ${sidebarExpanded ? styles.sidebarExpanded : ''}`}>
         <nav className={styles.nav}>
           {visibleMainNavItems.map(({ to, label, icon }) => (
             <NavLink
