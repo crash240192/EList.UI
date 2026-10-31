@@ -190,7 +190,9 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
 
       if (generation !== generationRef.current) return;
 
-      const incoming = result?.result ?? [];
+      const incoming = (result?.result ?? []).map(ev => (
+        filter === 'mine' ? { ...ev, isOrganizer: true as const } : ev
+      ));
       const total = typeof result?.total === 'number' ? result.total : null;
       const s = cache.current[phase][filter];
 

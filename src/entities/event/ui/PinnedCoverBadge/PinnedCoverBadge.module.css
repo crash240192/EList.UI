@@ -25,6 +25,13 @@
   filter: invert(1);
 }
 
+.organizerGlyph {
+  width: 14px;
+  height: 14px;
+  display: block;
+  fill: #fff;
+}
+
 .menuGlyph {
   width: 14px;
   height: 14px;
