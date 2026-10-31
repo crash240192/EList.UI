@@ -30,17 +30,15 @@ function phaseOf(event: IEvent, now: number): EventsPhase | null {
 function snapshotMatches(
   event: IEvent,
   tab: EventsPhase,
-  owner: OwnerFilter,
+  slices: readonly OwnerFilter[],
   now: number,
 ): boolean {
-  if (owner === 'cancelled') {
-    if (event.active !== false) return false;
-  } else if (event.active === false) {
-    return false;
-  }
-  if (owner === 'mine' && !event.isOrganizer) return false;
-  if (owner === 'others' && event.isOrganizer) return false;
-  return phaseOf(event, now) === tab;
+  if (phaseOf(event, now) !== tab) return false;
+  const cancelled = event.active === false;
+  if (cancelled) return slices.includes('cancelled');
+  if (slices.includes('mine') && event.isOrganizer) return true;
+  if (slices.includes('others') && !event.isOrganizer) return true;
+  return false;
 }
 
 export function orderPinnedMyEvents(options: {
@@ -49,7 +47,7 @@ export function orderPinnedMyEvents(options: {
   snapshots: Record<string, IEvent>;
   allowSnapshots: boolean;
   tab: EventsPhase;
-  owner: OwnerFilter;
+  slices: readonly OwnerFilter[];
   now?: number;
 }): IEvent[] {
   const now = options.now ?? Date.now();
@@ -66,7 +64,7 @@ export function orderPinnedMyEvents(options: {
     }
     if (!options.allowSnapshots) continue;
     const snap = options.snapshots[id];
-    if (!snap || !snapshotMatches(snap, options.tab, options.owner, now)) continue;
+    if (!snap || !snapshotMatches(snap, options.tab, options.slices, now)) continue;
     pinned.push(snap);
     used.add(id);
   }

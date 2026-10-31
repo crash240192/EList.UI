@@ -1,8 +1,8 @@
 // features/event-list/useMyEvents.ts
 //
 // Логика:
-// - Три вкладки ('mine', 'others', 'cancelled') и две фазы ('active', 'archive')
-//   — у каждой пары свой кеш и свой API-запрос
+// - Три набора ('mine', 'others', 'cancelled') и две фазы ('active', 'archive')
+//   — у каждой пары свой кеш и свой API-запрос. Выбранные наборы складываются.
 // - При первом открытии вкладки → делаем запрос к API
 // - При повторном переключении → сразу показываем кешированные данные
 // - При прокрутке до конца → загружаем следующую страницу, только если первая уже загружена
@@ -88,7 +88,8 @@ function ownerParams(
 
 interface Options {
   accountId:    string | null;
-  ownerFilter:  OwnerFilter;
+  /** Выбранные кнопки. Пустой список — пустая выдача. */
+  slices:       OwnerFilter[];
   tab:          EventsPhase;
   extraParams:  Partial<IEventsSearchParams>;
 }
@@ -102,7 +103,24 @@ interface Result {
   loadMore:      () => void;
 }
 
-export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Options): Result {
+function mergeEvents(lists: IEvent[][], phase: EventsPhase): IEvent[] {
+  const byId = new Map<string, IEvent>();
+  for (const list of lists) {
+    for (const event of list) byId.set(event.id, event);
+  }
+  const events = [...byId.values()];
+  events.sort((a, b) => {
+    if (phase === 'archive') {
+      const aEnd = Date.parse(a.endTime || a.startTime);
+      const bEnd = Date.parse(b.endTime || b.startTime);
+      return bEnd - aEnd;
+    }
+    return Date.parse(a.startTime) - Date.parse(b.startTime);
+  });
+  return events;
+}
+
+export function useMyEvents({ accountId, slices, tab, extraParams }: Options): Result {
   // Кеш: фаза × вкладка владельца. «Прошедшие» не затирают «Активные».
   const cache = useRef<Record<EventsPhase, Record<OwnerFilter, TabState>>>({
     active: emptyOwners(),
@@ -110,8 +128,9 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
   });
 
   const loadingRef = useRef(emptyLoading());
-  const ownerFilterRef = useRef(ownerFilter);
-  ownerFilterRef.current = ownerFilter;
+  const slicesKey = [...slices].sort().join(',');
+  const slicesRef = useRef(slices);
+  slicesRef.current = slices;
   const phaseRef = useRef(tab);
   phaseRef.current = tab;
   const generationRef = useRef(0);
@@ -137,20 +156,31 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     generationRef.current += 1;
   }
 
-  const current = cache.current[tab][ownerFilter];
-  const [isLoading,     setIsLoading]     = useState(!current.isLoaded);
+  const selected = slicesRef.current;
+  const currentLoaded = selected.some(slice => cache.current[tab][slice].isLoaded);
+  const [isLoading,     setIsLoading]     = useState(selected.length > 0 && !currentLoaded);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore,       setHasMore]       = useState(current.hasMore);
+  const [hasMore,       setHasMore]       = useState(
+    selected.some(slice => cache.current[tab][slice].hasMore),
+  );
   const [error,         setError]         = useState<string | null>(null);
   const [tick,          setTick]          = useState(0);
 
   useEffect(() => {
-    const s = cache.current[tab][ownerFilter];
-    setHasMore(s.hasMore);
-    setIsLoading(!s.isLoaded);
+    const chosen = slicesRef.current;
+    if (chosen.length === 0) {
+      setHasMore(false);
+      setIsLoading(false);
+      setIsLoadingMore(false);
+      setError(null);
+      return;
+    }
+    const states = chosen.map(slice => cache.current[tab][slice]);
+    setHasMore(states.some(state => state.hasMore));
+    setIsLoading(states.every(state => !state.isLoaded));
     setIsLoadingMore(false);
     setError(null);
-  }, [ownerFilter, tab, filterKey]);
+  }, [slicesKey, tab, filterKey]);
 
   const loadPage = useCallback(async (page: number, filter: OwnerFilter, phase: EventsPhase) => {
     if (!accountId || loadingRef.current[phase][filter]) return;
@@ -160,12 +190,13 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     const isFirst = page === 0;
     const stillViewing = () =>
       generation === generationRef.current
-      && ownerFilterRef.current === filter
-      && phaseRef.current === phase;
+      && phaseRef.current === phase
+      && slicesRef.current.includes(filter);
 
     if (stillViewing()) {
-      if (isFirst) setIsLoading(true);
-      else setIsLoadingMore(true);
+      const anyLoaded = slicesRef.current.some(slice => cache.current[phase][slice].isLoaded);
+      if (isFirst && !anyLoaded) setIsLoading(true);
+      else if (!isFirst) setIsLoadingMore(true);
       setError(null);
     }
 
@@ -186,18 +217,22 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
 
       if (generation !== generationRef.current) return;
 
-      const incoming = result?.result ?? [];
+      const raw = result?.result ?? [];
+      const incoming = filter === 'cancelled'
+        ? raw.filter(event => event.active === false)
+        : raw.filter(event => event.active !== false);
       const total = typeof result?.total === 'number' ? result.total : null;
       const s = cache.current[phase][filter];
 
       s.events   = isFirst ? incoming : [...s.events, ...incoming];
       s.page     = page;
-      s.hasMore  = incoming.length >= PAGE_SIZE
+      s.hasMore  = raw.length >= PAGE_SIZE
         && (total == null || (page + 1) * PAGE_SIZE < total);
       s.isLoaded = true;
 
       if (stillViewing()) {
-        setHasMore(s.hasMore);
+        const anyMore = slicesRef.current.some(slice => cache.current[phase][slice].hasMore);
+        setHasMore(anyMore);
         setTick(t => t + 1);
       }
     } catch (e) {
@@ -218,23 +253,29 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
 
   useEffect(() => {
     if (!accountId) return;
-    if (!cache.current[tab][ownerFilter].isLoaded) {
-      void loadPage(0, ownerFilter, tab);
+    for (const slice of slicesRef.current) {
+      if (!cache.current[tab][slice].isLoaded) {
+        void loadPage(0, slice, tab);
+      }
     }
-  }, [ownerFilter, tab, filterKey, accountId, loadPage]);
+  }, [slicesKey, tab, filterKey, accountId, loadPage]);
 
   const loadMore = useCallback(() => {
     const phase = phaseRef.current;
-    const filter = ownerFilterRef.current;
-    const s = cache.current[phase][filter];
-    // Пока первая страница не записана, не занимать замок запросом page 1:
-    // сентинел на коротком кадре после смены вкладки иначе съедает page 0.
-    if (!s.isLoaded || !s.hasMore || loadingRef.current[phase][filter]) return;
-    void loadPage(s.page + 1, filter, phase);
+    for (const filter of slicesRef.current) {
+      const s = cache.current[phase][filter];
+      // Пока первая страница не записана, не занимать замок запросом page 1:
+      // сентинел на коротком кадре после смены вкладки иначе съедает page 0.
+      if (!s.isLoaded || !s.hasMore || loadingRef.current[phase][filter]) continue;
+      void loadPage(s.page + 1, filter, phase);
+    }
   }, [loadPage]);
 
   void tick;
-  const events = cache.current[tab][ownerFilter].events;
+  const events = mergeEvents(
+    slicesRef.current.map(slice => cache.current[tab][slice].events),
+    tab,
+  );
 
   return { events, isLoading, isLoadingMore, hasMore, error, loadMore };
 }

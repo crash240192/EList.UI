@@ -41,12 +41,21 @@ function readTab(): Tab {
   }
 }
 
-function readOwner(): OwnerFilter {
+const SLICE_ORDER: OwnerFilter[] = ['mine', 'others', 'cancelled'];
+
+function readSlices(): OwnerFilter[] {
   try {
     const v = sessionStorage.getItem(SS_OWNER);
-    if (v === 'mine' || v === 'others' || v === 'cancelled') return v;
+    if (!v) return ['mine', 'others'];
+    if (v.startsWith('[')) {
+      const parsed = JSON.parse(v) as unknown;
+      if (!Array.isArray(parsed)) return ['mine', 'others'];
+      return SLICE_ORDER.filter(key => parsed.includes(key));
+    }
+    if (v === 'mine' || v === 'others' || v === 'cancelled') return [v];
+    if (v === 'all') return ['mine', 'others'];
   } catch { /* ignore */ }
-  return 'mine';
+  return ['mine', 'others'];
 }
 
 const OWNER_TABS: { key: OwnerFilter; label: string; align?: 'end' }[] = [
@@ -68,7 +77,7 @@ export default function MyEventsPage() {
   const { filters, setFilter, resetFilters } = useMyEventsFiltersStore();
 
   const [tab,           setTab]           = useState<Tab>(readTab);
-  const [ownerFilter,   setOwnerFilter]   = useState<OwnerFilter>(readOwner);
+  const [slices, setSlices] = useState<OwnerFilter[]>(readSlices);
   const [searchName,    setSearchName]    = useState('');
   const [viewMode,      setViewMode]      = useState<EventViewMode>('list');
   const [searchVersion, setSearchVersion] = useState(0);
@@ -109,9 +118,15 @@ export default function MyEventsPage() {
        filters.ageLimit, filters.adultOnly,
        searchVersion]);
 
+  const toggleSlice = (key: OwnerFilter) => {
+    setSlices(prev => (
+      prev.includes(key) ? prev.filter(item => item !== key) : SLICE_ORDER.filter(item => item === key || prev.includes(item))
+    ));
+  };
+
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useMyEvents({
     accountId,
-    ownerFilter,
+    slices,
     extraParams,
     tab,
   });
@@ -122,8 +137,8 @@ export default function MyEventsPage() {
     snapshots: pinSnapshots,
     allowSnapshots: !myEventsQueryIsNarrowed(extraParams),
     tab,
-    owner: ownerFilter,
-  }), [events, pinnedIds, pinSnapshots, extraParams, tab, ownerFilter]);
+    slices,
+  }), [events, pinnedIds, pinSnapshots, extraParams, tab, slices]);
 
   useEffect(() => {
     if (!accountId) return;
@@ -183,8 +198,8 @@ export default function MyEventsPage() {
   const isReady = !accountLoading && !!accountId;
 
   const listUiKey = useMemo(
-    () => JSON.stringify({ tab, ownerFilter, extraParams }),
-    [tab, ownerFilter, extraParams],
+    () => JSON.stringify({ tab, slices, extraParams }),
+    [tab, slices, extraParams],
   );
 
   useEffect(() => {
@@ -195,9 +210,9 @@ export default function MyEventsPage() {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(SS_OWNER, ownerFilter);
+      sessionStorage.setItem(SS_OWNER, JSON.stringify(slices));
     } catch { /* ignore */ }
-  }, [ownerFilter]);
+  }, [slices]);
 
   useEffect(() => {
     if (prevListKeyRef.current !== null && prevListKeyRef.current !== listUiKey) {
@@ -265,8 +280,8 @@ export default function MyEventsPage() {
         hideCity
         hideViewToggle
         tabs={OWNER_TABS}
-        activeTab={ownerFilter}
-        onTabChange={key => setOwnerFilter(key as OwnerFilter)}
+        selectedKeys={slices}
+        onTabChange={key => toggleSlice(key as OwnerFilter)}
       />
 
       {/* ── Кнопка создать + переключатель активные/прошедшие ── */}
@@ -296,13 +311,15 @@ export default function MyEventsPage() {
         ) : orderedEvents.length === 0 ? (
           <div className={styles.empty}>
             <p>{
-              ownerFilter === 'cancelled'
-                ? 'Нет отмененных событий'
-                : tab === 'active'
-                  ? 'Нет активных событий'
-                  : 'Прошедшие пусты'
+              slices.length === 0
+                ? 'Выберите, какие события показать'
+                : slices.length === 1 && slices[0] === 'cancelled'
+                  ? 'Нет отмененных событий'
+                  : tab === 'active'
+                    ? 'Нет активных событий'
+                    : 'Прошедшие пусты'
             }</p>
-            {tab === 'active' && ownerFilter !== 'cancelled' && (
+            {tab === 'active' && slices.some(slice => slice !== 'cancelled') && (
               <button className={styles.emptyBtn} onClick={() => navigate('/')}>
                 Найти события
               </button>
@@ -387,7 +404,7 @@ export default function MyEventsPage() {
         )}
 
         {hasMore && (
-          <div key={`${tab}-${ownerFilter}`} ref={sentinelRef} className={styles.sentinel}>
+          <div key={`${tab}-${slices.join(',')}`} ref={sentinelRef} className={styles.sentinel}>
             {isLoadingMore && <span className={styles.loadingMore}>Загрузка...</span>}
           </div>
         )}
