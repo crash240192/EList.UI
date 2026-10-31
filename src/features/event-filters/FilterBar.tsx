@@ -67,7 +67,7 @@ interface FilterBarProps {
   useStore?: typeof useFiltersStore;
   hideCity?: boolean;
   hideViewToggle?: boolean;
-  tabs?: { key: string; label: string }[];
+  tabs?: { key: string; label: string; align?: 'end' }[];
   activeTab?: string;
   onTabChange?: (key: string) => void;
 }
@@ -393,7 +393,7 @@ export function FilterBar({
       <div className={styles.mobileTabsRow}>
         {tabs.map(t => (
           <button key={t.key}
-            className={`${styles.mobileTab} ${activeTab === t.key ? styles.mobileTabActive : ''}`}
+            className={`${styles.mobileTab} ${activeTab === t.key ? styles.mobileTabActive : ''} ${t.align === 'end' ? styles.tabEnd : ''}`}
             onClick={() => onTabChange?.(t.key)}>
             {t.label}
           </button>
@@ -408,7 +408,7 @@ export function FilterBar({
         <div className={styles.tabsRow}>
           {tabs.map(t => (
             <button key={t.key}
-              className={`${styles.tabBtn} ${activeTab === t.key ? styles.tabBtnActive : ''}`}
+              className={`${styles.tabBtn} ${activeTab === t.key ? styles.tabBtnActive : ''} ${t.align === 'end' ? styles.tabEnd : ''}`}
               onClick={() => onTabChange?.(t.key)}>
               {t.label}
             </button>

@@ -31,10 +31,13 @@ function snapshotMatches(
   event: IEvent,
   tab: EventsPhase,
   owner: OwnerFilter,
-  showCancelled: boolean,
   now: number,
 ): boolean {
-  if (event.active === false && !showCancelled) return false;
+  if (owner === 'cancelled') {
+    if (event.active !== false) return false;
+  } else if (event.active === false) {
+    return false;
+  }
   if (owner === 'mine' && !event.isOrganizer) return false;
   if (owner === 'others' && event.isOrganizer) return false;
   return phaseOf(event, now) === tab;
@@ -47,7 +50,6 @@ export function orderPinnedMyEvents(options: {
   allowSnapshots: boolean;
   tab: EventsPhase;
   owner: OwnerFilter;
-  showCancelled: boolean;
   now?: number;
 }): IEvent[] {
   const now = options.now ?? Date.now();
@@ -64,7 +66,7 @@ export function orderPinnedMyEvents(options: {
     }
     if (!options.allowSnapshots) continue;
     const snap = options.snapshots[id];
-    if (!snap || !snapshotMatches(snap, options.tab, options.owner, options.showCancelled, now)) continue;
+    if (!snap || !snapshotMatches(snap, options.tab, options.owner, now)) continue;
     pinned.push(snap);
     used.add(id);
   }

@@ -1,13 +1,13 @@
 // features/event-list/useMyEvents.ts
 //
 // Логика:
-// - Три вкладки владельца ('all', 'mine', 'others') и две фазы ('active', 'archive')
+// - Три вкладки ('mine', 'others', 'cancelled') и две фазы ('active', 'archive')
 //   — у каждой пары свой кеш и свой API-запрос
 // - При первом открытии вкладки → делаем запрос к API
 // - При повторном переключении → сразу показываем кешированные данные
 // - При прокрутке до конца → загружаем следующую страницу, только если первая уже загружена
 // - Пустой список в ответе → останавливаем пагинацию для этой вкладки
-// - Сброс кеша при смене доп. фильтров (название, тип, дата, цена, возраст, отменённые), но не при смене фазы
+// - Сброс кеша при смене доп. фильтров (название, тип, дата, цена, возраст), но не при смене фазы
 // - Ответ пишется в кеш своей пары и двигает UI только если она всё ещё открыта
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -15,7 +15,7 @@ import type { IEvent, IEventsSearchParams } from '@/entities/event';
 import { fetchEvents } from '@/entities/event';
 import { eventOwnerSearchParams } from './eventOwnerSearchParams';
 
-export type OwnerFilter = 'all' | 'mine' | 'others';
+export type OwnerFilter = 'mine' | 'others' | 'cancelled';
 export type EventsPhase = 'active' | 'archive';
 
 const PAGE_SIZE = 20;
@@ -33,13 +33,13 @@ function emptyTab(): TabState {
 }
 
 function emptyOwners(): Record<OwnerFilter, TabState> {
-  return { all: emptyTab(), mine: emptyTab(), others: emptyTab() };
+  return { mine: emptyTab(), others: emptyTab(), cancelled: emptyTab() };
 }
 
 function emptyLoading(): Record<EventsPhase, Record<OwnerFilter, boolean>> {
   return {
-    active: { all: false, mine: false, others: false },
-    archive: { all: false, mine: false, others: false },
+    active: { mine: false, others: false, cancelled: false },
+    archive: { mine: false, others: false, cancelled: false },
   };
 }
 
@@ -81,8 +81,7 @@ function ownerParams(
       return eventOwnerSearchParams('organizer', accountId);
     case 'others':
       return eventOwnerSearchParams('participant', accountId);
-    case 'all':
-    default:
+    case 'cancelled':
       return eventOwnerSearchParams('all', accountId);
   }
 }
@@ -128,7 +127,6 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     price:      extraParams.price,
     ageLimit:   extraParams.ageLimit,
     adultOnly:  extraParams.adultOnly === true,
-    includeInactive: extraParams.active === false,
   });
   const prevFilterKey = useRef(filterKey);
 
@@ -153,8 +151,6 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
     setIsLoadingMore(false);
     setError(null);
   }, [ownerFilter, tab, filterKey]);
-
-  const includeInactive = extraParams.active === false;
 
   const loadPage = useCallback(async (page: number, filter: OwnerFilter, phase: EventsPhase) => {
     if (!accountId || loadingRef.current[phase][filter]) return;
@@ -183,7 +179,7 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
         ...(extraParams.price != null ? { price: extraParams.price } : {}),
         ...(extraParams.ageLimit != null ? { ageLimit: extraParams.ageLimit } : {}),
         ...(extraParams.adultOnly ? { adultOnly: true } : {}),
-        ...(includeInactive ? { active: false } : {}),
+        ...(filter === 'cancelled' ? { active: false } : {}),
         pageIndex:  page,
         pageSize:   PAGE_SIZE,
       });
@@ -218,7 +214,7 @@ export function useMyEvents({ accountId, ownerFilter, tab, extraParams }: Option
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterKey, accountId, includeInactive]);
+  }, [filterKey, accountId]);
 
   useEffect(() => {
     if (!accountId) return;

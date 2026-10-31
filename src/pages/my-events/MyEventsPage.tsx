@@ -30,7 +30,6 @@ type Tab = 'active' | 'archive';
 
 const SS_TAB = 'elist_my_events_tab_v1';
 const SS_OWNER = 'elist_my_events_owner_v1';
-const SS_CANCELLED = 'elist_my_events_show_cancelled_v1';
 const SS_LIST_UI = 'elist_my_events_list_ui_v1';
 
 function readTab(): Tab {
@@ -45,23 +44,15 @@ function readTab(): Tab {
 function readOwner(): OwnerFilter {
   try {
     const v = sessionStorage.getItem(SS_OWNER);
-    if (v === 'mine' || v === 'others' || v === 'all') return v;
+    if (v === 'mine' || v === 'others' || v === 'cancelled') return v;
   } catch { /* ignore */ }
-  return 'all';
+  return 'mine';
 }
 
-function readShowCancelled(): boolean {
-  try {
-    return sessionStorage.getItem(SS_CANCELLED) === '1';
-  } catch {
-    return false;
-  }
-}
-
-const OWNER_TABS = [
-  { key: 'all',    label: 'Все мои' },
-  { key: 'mine',   label: 'Организую' },
+const OWNER_TABS: { key: OwnerFilter; label: string; align?: 'end' }[] = [
+  { key: 'mine', label: 'Организую' },
   { key: 'others', label: 'Участвую' },
+  { key: 'cancelled', label: 'Отмененные', align: 'end' },
 ];
 
 function cancelledLabel(event: { active?: boolean; cancelSource?: string | null }): string | null {
@@ -81,7 +72,6 @@ export default function MyEventsPage() {
   const [searchName,    setSearchName]    = useState('');
   const [viewMode,      setViewMode]      = useState<EventViewMode>('list');
   const [searchVersion, setSearchVersion] = useState(0);
-  const [showCancelled, setShowCancelled] = useState(readShowCancelled);
 
   const listElRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -112,14 +102,12 @@ export default function MyEventsPage() {
     price:      filters.price,
     ageLimit:   filters.ageLimit,
     adultOnly:  filters.adultOnly,
-    // Галочка на всех вкладках: active: false включает отменённые в выдачу
-    ...(showCancelled ? { active: false } : {}),
   // @ts-ignore
     _v:         searchVersion,
   }), [debouncedName, selectedCategories, selectedTypes,
        filters.startTime, filters.endTime, filters.price,
        filters.ageLimit, filters.adultOnly,
-       showCancelled, searchVersion]);
+       searchVersion]);
 
   const { events, isLoading, isLoadingMore, hasMore, loadMore } = useMyEvents({
     accountId,
@@ -135,8 +123,7 @@ export default function MyEventsPage() {
     allowSnapshots: !myEventsQueryIsNarrowed(extraParams),
     tab,
     owner: ownerFilter,
-    showCancelled,
-  }), [events, pinnedIds, pinSnapshots, extraParams, tab, ownerFilter, showCancelled]);
+  }), [events, pinnedIds, pinSnapshots, extraParams, tab, ownerFilter]);
 
   useEffect(() => {
     if (!accountId) return;
@@ -213,12 +200,6 @@ export default function MyEventsPage() {
   }, [ownerFilter]);
 
   useEffect(() => {
-    try {
-      sessionStorage.setItem(SS_CANCELLED, showCancelled ? '1' : '0');
-    } catch { /* ignore */ }
-  }, [showCancelled]);
-
-  useEffect(() => {
     if (prevListKeyRef.current !== null && prevListKeyRef.current !== listUiKey) {
       try {
         sessionStorage.removeItem(SS_LIST_UI);
@@ -289,7 +270,7 @@ export default function MyEventsPage() {
       />
 
       {/* ── Кнопка создать + переключатель активные/прошедшие ── */}
-      <div className={`${styles.subHeader} ${styles.subHeaderWithCancelled}`}>
+      <div className={styles.subHeader}>
         <TabBar
           className={styles.archiveTabs}
           tabs={[
@@ -299,16 +280,9 @@ export default function MyEventsPage() {
           activeId={tab}
           onChange={id => setTab(id as typeof tab)}
         />
-        <div className={styles.subHeaderActions}>
-          <label className={styles.showCancelled}>
-            <input type="checkbox" checked={showCancelled}
-              onChange={e => setShowCancelled(e.target.checked)} />
-            <span>Показывать отменённые</span>
-          </label>
-          <button className={styles.createBtn} onClick={() => navigate('/create-event')}>
-            + Создать
-          </button>
-        </div>
+        <button className={styles.createBtn} onClick={() => navigate('/create-event')}>
+          + Создать
+        </button>
       </div>
 
       {/* ---- Content ---- */}
@@ -321,8 +295,14 @@ export default function MyEventsPage() {
           </div>
         ) : orderedEvents.length === 0 ? (
           <div className={styles.empty}>
-            <p>{tab === 'active' ? 'Нет активных событий' : 'Прошедшие пусты'}</p>
-            {tab === 'active' && (
+            <p>{
+              ownerFilter === 'cancelled'
+                ? 'Нет отмененных событий'
+                : tab === 'active'
+                  ? 'Нет активных событий'
+                  : 'Прошедшие пусты'
+            }</p>
+            {tab === 'active' && ownerFilter !== 'cancelled' && (
               <button className={styles.emptyBtn} onClick={() => navigate('/')}>
                 Найти события
               </button>

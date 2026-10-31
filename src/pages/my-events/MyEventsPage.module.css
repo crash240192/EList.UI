@@ -345,21 +345,6 @@
   min-width: 0;
 }
 
-.showCancelled {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.showCancelled input {
-  flex-shrink: 0;
-}
-
 @media (max-width: 639px) {
   .subHeader {
     flex-wrap: nowrap;
@@ -391,37 +376,6 @@
     padding-top: 0;
     padding-bottom: 0;
     align-self: stretch;
-  }
-
-  /* Галочка на всех вкладках — переносим actions на вторую строку */
-  .subHeaderWithCancelled {
-    flex-wrap: wrap;
-    align-items: stretch;
-  }
-
-  .subHeaderWithCancelled .archiveTabs {
-    flex: 1 1 100%;
-    width: 100%;
-  }
-
-  .subHeaderWithCancelled .subHeaderActions {
-    flex: 1 1 100%;
-    width: 100%;
-    justify-content: space-between;
-    gap: 10px;
-  }
-
-  .subHeaderWithCancelled .showCancelled {
-    flex: 1 1 auto;
-    min-width: 0;
-    white-space: normal;
-    line-height: 1.25;
-  }
-
-  .subHeaderWithCancelled .createBtn {
-    margin-left: auto;
-    align-self: center;
-    height: 33px;
   }
 }
 
