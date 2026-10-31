@@ -36,6 +36,7 @@ import { useAuthStore } from '@/app/store';
 import { UserShareMenu } from '@/features/user/UserShareMenu';
 import { HeaderPhotoDialog, type HeaderPhotoValue } from '@/features/user/HeaderPhotoDialog/HeaderPhotoDialog';
 import { HeaderPhotoIcon } from '@/features/user/HeaderPhotoDialog/HeaderPhotoIcon';
+import { AvatarFrameSession } from '@/shared/ui/AvatarUpload/AvatarFrameSession';
 import {
   InviteBlockedDialog,
   ProfileEventInviteModal,
@@ -349,6 +350,8 @@ export default function UserPage() {
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
+  const [ownMenuOpen, setOwnMenuOpen] = useState(false);
+  const [avatarFrameOpen, setAvatarFrameOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
     type: typeof ReportTargetType.Account | typeof ReportTargetType.Photo;
     id: string;
@@ -356,6 +359,7 @@ export default function UserPage() {
   const [accountReported, setAccountReported] = useState(false);
   const [reportedPhotoIds, setReportedPhotoIds] = useState<Set<string>>(() => new Set());
   const reportMenuRef = useRef<HTMLButtonElement>(null);
+  const ownMenuRef = useRef<HTMLButtonElement>(null);
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
   const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
@@ -665,26 +669,41 @@ export default function UserPage() {
                 <ShareIcon />
               </button>
               {isOwnProfile && (
-                <div className={styles.heroSettingsCol}>
+                <>
                   <button
+                    ref={ownMenuRef}
                     type="button"
                     className={`${heroStyles.heroBtn} noHoverGlow`}
-                    onClick={() => navigate('/settings')}
-                    aria-label="Настройки"
-                    title="Настройки"
+                    onClick={() => setOwnMenuOpen(v => !v)}
+                    aria-label="Действия с профилем"
+                    aria-expanded={ownMenuOpen}
+                    title="Действия с профилем"
                   >
-                    <SettingsIcon />
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
+                    </svg>
                   </button>
-                  <button
-                    type="button"
-                    className={`${heroStyles.heroBtn} noHoverGlow`}
-                    onClick={() => setHeaderEditorOpen(true)}
-                    aria-label="Изменить фото шапки"
-                    title="Изменить фото шапки"
+                  <HeroContextMenu
+                    open={ownMenuOpen}
+                    onClose={() => setOwnMenuOpen(false)}
+                    anchorRef={ownMenuRef}
+                    aria-label="Действия с профилем"
+                    fit
                   >
-                    <HeaderPhotoIcon />
-                  </button>
-                </div>
+                    <HeroContextMenuItem onClick={() => { setOwnMenuOpen(false); navigate('/settings'); }}>
+                      <ProfileGearIcon />
+                      Настроить профиль
+                    </HeroContextMenuItem>
+                    <HeroContextMenuItem onClick={() => { setOwnMenuOpen(false); setAvatarFrameOpen(true); }}>
+                      <ProfileAvatarIcon />
+                      Сменить аватар
+                    </HeroContextMenuItem>
+                    <HeroContextMenuItem onClick={() => { setOwnMenuOpen(false); setHeaderEditorOpen(true); }}>
+                      <HeaderPhotoIcon />
+                      Сменить обложку
+                    </HeroContextMenuItem>
+                  </HeroContextMenu>
+                </>
               )}
               {!isOwnProfile && authenticated && (
                 <>
@@ -1018,6 +1037,22 @@ export default function UserPage() {
         />
       )}
 
+      {avatarFrameOpen && isOwnProfile && (
+        <AvatarFrameSession
+          open
+          accountId={profileAccountId}
+          fileId={account.avatarId ?? null}
+          onClose={() => setAvatarFrameOpen(false)}
+          onChanged={next => {
+            seedAvatarCache(profileAccountId, next);
+            setProfile(prev => prev ? {
+              ...prev,
+              account: { ...prev.account, avatarId: next },
+            } : prev);
+          }}
+        />
+      )}
+
       {headerEditorOpen && profile?.account && isOwnProfile && (
         <HeaderPhotoDialog
           imageId={profile.account.headerImageId ?? null}
@@ -1059,20 +1094,30 @@ function Skeleton() {
   );
 }
 
+function ProfileGearIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function ProfileAvatarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="12" cy="10" r="2.2" />
+      <path d="M8.2 17.2c.5-2 2-3.1 3.8-3.1s3.3 1.1 3.8 3.1" />
+    </svg>
+  );
+}
+
 function ShareIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
       <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }

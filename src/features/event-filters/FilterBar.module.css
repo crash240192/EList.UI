@@ -245,6 +245,10 @@
   background: color-mix(in srgb, var(--accent) 16%, color-mix(in srgb, #fff 7%, transparent));
 }
 
+.tabEnd {
+  margin-left: auto;
+}
+
 /* ── Мобильная компактная строка ── */
 .mobileBar {
   display: none; /* Скрыта на десктопе */
@@ -292,7 +296,8 @@
   gap: 4px;
 }
 .mobileTab {
-  flex: 1; padding: 6px 6px; font-size: 12px; font-weight: 500;
+  flex: 0 0 auto;
+  padding: 6px 10px; font-size: 12px; font-weight: 500;
   color: var(--text-secondary); background: transparent; border: none;
   border-bottom: 2px solid transparent;
   border-radius: 10px;
