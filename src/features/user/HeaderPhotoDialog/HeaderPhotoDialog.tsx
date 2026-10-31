@@ -349,12 +349,14 @@ export function HeaderPhotoDialog({
             )}
             {hasImage && !saving && (
               <>
-                <div className={`${styles.focusHint} ${zoom <= 1 ? styles.focusHintDrag : ''}`}>
-                  {zoom > 1 ? 'Сдвиньте кадр в любую сторону' : 'Перетащите фото, чтобы выбрать кадр'}
-                </div>
+                {zoom <= 1 && (
+                  <div className={`${styles.focusHint} ${styles.focusHintDrag}`}>
+                    Перетащите фото, чтобы выбрать кадр
+                  </div>
+                )}
                 <button
                   type="button"
-                  className={`${styles.uploadBtn} ${zoom <= 1 ? styles.uploadBtnOn : ''}`}
+                  className={`${styles.uploadBtn} ${styles.uploadBtnOn}`}
                   onClick={e => {
                     e.stopPropagation();
                     openPicker();
