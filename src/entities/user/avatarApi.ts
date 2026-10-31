@@ -1,10 +1,47 @@
 // entities/user/avatarApi.ts
 
 import { apiClient } from '@/shared/api/client';
+import { attachFileContext, getFileInfo } from '@/shared/api/fileStorageClient';
 
 export interface IAvatarInfo {
   photoId: string;
   fileId:  string;
+}
+
+/** Контекст обрезанного аватара: id исходного файла для повторного кадра. */
+export interface AvatarCropFileMeta {
+  sourceFileId: string;
+}
+
+const SOURCE_KEY = 'avatarSourceId';
+
+export function parseAvatarCropContext(description: string | null | undefined): AvatarCropFileMeta | null {
+  if (!description) return null;
+  try {
+    const data = JSON.parse(description) as Record<string, unknown>;
+    const raw = data[SOURCE_KEY] ?? data.AvatarSourceId;
+    if (typeof raw !== 'string') return null;
+    const sourceFileId = raw.trim();
+    if (!sourceFileId) return null;
+    return { sourceFileId };
+  } catch {
+    return null;
+  }
+}
+
+export function serializeAvatarCropContext(meta: AvatarCropFileMeta): string {
+  return JSON.stringify({ [SOURCE_KEY]: meta.sourceFileId });
+}
+
+/** Исходник, с которого собран текущий квадрат аватара (если сохраняли кадр). */
+export async function loadAvatarSourceFileId(cropFileId: string): Promise<string | null> {
+  const info = await getFileInfo(cropFileId);
+  return parseAvatarCropContext(info?.description)?.sourceFileId ?? null;
+}
+
+/** Пишем ссылку на исходник в описание обрезанного файла (attach заменяет описание целиком). */
+export async function saveAvatarSourceLink(cropFileId: string, sourceFileId: string): Promise<void> {
+  await attachFileContext(cropFileId, serializeAvatarCropContext({ sourceFileId }));
 }
 
 /** GET /api/media/account/avatars/setNew/{photoId} — назначить новый аватар */
