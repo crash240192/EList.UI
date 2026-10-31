@@ -1,9 +1,15 @@
 // Окно «Кадр аватара» для уже выбранного или текущего фото.
-// «Выбрать фото...» подменяет кадр, «Удалить» снимает сохранённый аватар.
+// В кадр подставляем исходник (если есть), а не предыдущий обрезанный JPEG.
+// «Выбрать фото...» подменяет исходник, «Удалить» снимает сохранённый аватар.
 
 import { useEffect, useRef, useState } from 'react';
 import { fetchAuthedImage, uploadFile } from '@/shared/api/fileStorageClient';
-import { deleteAvatar, setAvatar } from '@/entities/user/avatarApi';
+import {
+  deleteAvatar,
+  loadAvatarSourceFileId,
+  saveAvatarSourceLink,
+  setAvatar,
+} from '@/entities/user/avatarApi';
 import { seedAvatarCache } from '@/features/auth/useAvatar';
 import { AvatarCropDialog } from './AvatarCropDialog';
 
@@ -28,65 +34,101 @@ export function AvatarFrameSession({
   const [loadingImage, setLoadingImage] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const localUrlRef = useRef<string | null>(null);
+  const remoteUrlRef = useRef<string | null>(null);
+  const localFileRef = useRef<File | null>(null);
+  const sourceFileIdRef = useRef<string | null>(null);
   const savedIdRef = useRef<string | null>(fileId);
   const pickGen = useRef(0);
 
   const dropLocal = () => {
-    if (!localUrlRef.current) return;
-    URL.revokeObjectURL(localUrlRef.current);
-    localUrlRef.current = null;
+    if (localUrlRef.current) {
+      URL.revokeObjectURL(localUrlRef.current);
+      localUrlRef.current = null;
+    }
+    localFileRef.current = null;
+  };
+
+  const dropRemote = () => {
+    if (!remoteUrlRef.current) return;
+    URL.revokeObjectURL(remoteUrlRef.current);
+    remoteUrlRef.current = null;
+  };
+
+  const dropAllUrls = () => {
+    dropLocal();
+    dropRemote();
   };
 
   useEffect(() => {
     if (!open) {
-      dropLocal();
+      dropAllUrls();
+      localFileRef.current = null;
+      sourceFileIdRef.current = null;
       setSrc(null);
       setLoadingImage(false);
       return;
     }
     savedIdRef.current = fileId;
-    dropLocal();
+    dropAllUrls();
+    localFileRef.current = null;
+    sourceFileIdRef.current = null;
     if (!fileId) {
       setSrc(null);
       setLoadingImage(false);
       return;
     }
     let cancelled = false;
-    let loaded: string | null = null;
     const gen = pickGen.current;
     setLoadingImage(true);
     setSrc(null);
-    fetchAuthedImage(fileId, { fullSize: true })
-      .then(url => {
+
+    void (async () => {
+      let loadId = fileId;
+      try {
+        const sourceId = await loadAvatarSourceFileId(fileId);
+        if (cancelled || pickGen.current !== gen) return;
+        if (sourceId) {
+          sourceFileIdRef.current = sourceId;
+          loadId = sourceId;
+        }
+      } catch {
+        // Нет контекста исходника — кадрируем то, что есть (старые аватары).
+      }
+
+      try {
+        const url = await fetchAuthedImage(loadId, { fullSize: true });
         if (cancelled || pickGen.current !== gen) {
           URL.revokeObjectURL(url);
           return;
         }
-        loaded = url;
+        dropRemote();
+        remoteUrlRef.current = url;
         setSrc(url);
         setFileName('avatar');
-      })
-      .catch(() => {
-        if (!cancelled) setSrc(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingImage(false);
-      });
+      } catch {
+        if (!cancelled && pickGen.current === gen) setSrc(null);
+      } finally {
+        if (!cancelled && pickGen.current === gen) setLoadingImage(false);
+      }
+    })();
+
     return () => {
       cancelled = true;
-      if (loaded) URL.revokeObjectURL(loaded);
     };
   }, [open, fileId]);
 
-  useEffect(() => () => dropLocal(), []);
+  useEffect(() => () => dropAllUrls(), []);
 
   if (!open) return null;
 
   const onFilePicked = (file: File) => {
     pickGen.current += 1;
-    dropLocal();
+    dropAllUrls();
+    sourceFileIdRef.current = null;
     const url = URL.createObjectURL(file);
     localUrlRef.current = url;
+    localFileRef.current = file;
+    setLoadingImage(false);
     setSrc(url);
     setFileName(file.name || 'avatar');
   };
@@ -101,7 +143,9 @@ export function AvatarFrameSession({
         seedAvatarCache(accountId, null);
         onChanged(null);
       }
-      dropLocal();
+      dropAllUrls();
+      localFileRef.current = null;
+      sourceFileIdRef.current = null;
       setSrc(null);
     } finally {
       setDeleting(false);
@@ -111,7 +155,23 @@ export function AvatarFrameSession({
   const onConfirm = async (file: File) => {
     setSaving(true);
     try {
+      let sourceFileId = sourceFileIdRef.current;
+      const localOriginal = localFileRef.current;
+      if (localOriginal) {
+        const uploadedSource = await uploadFile(localOriginal);
+        sourceFileId = uploadedSource.id;
+        sourceFileIdRef.current = sourceFileId;
+        localFileRef.current = null;
+      }
+
       const uploaded = await uploadFile(file);
+      if (sourceFileId) {
+        try {
+          await saveAvatarSourceLink(uploaded.id, sourceFileId);
+        } catch {
+          // Кадр уже готов; без ссылки следующий раз откроется квадрат — не блокируем сохранение.
+        }
+      }
       await setAvatar(uploaded.id);
       seedAvatarCache(accountId, uploaded.id);
       savedIdRef.current = uploaded.id;
