@@ -36,7 +36,9 @@ import { AvatarUpload } from '@/shared/ui/AvatarUpload/AvatarUpload';
 import { HeaderPhotoDialog, type HeaderPhotoValue } from '@/features/user/HeaderPhotoDialog/HeaderPhotoDialog';
 import { loadHeaderPhotoMeta } from '@/entities/user/headerApi';
 import { fetchFullProfile } from '@/entities/user/profileApi';
-import { DEFAULT_COVER_FOCUS } from '@/shared/lib/coverFocus';
+import { DEFAULT_COVER_FOCUS, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { HEADER_BLUR_FRAME_SCALE, headerBlurFilter } from '@/shared/lib/headerPhoto';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
 import { Select } from '@/shared/ui/Select/Select';
@@ -403,6 +405,8 @@ function ProfileDataTab() {
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm(f => ({ ...f, [k]: e.target.value }));
 
+  const headerBlur = headerImageId ? headerBlurFilter(headerBlurPercent) : undefined;
+
   if (loading) {
     return <div className={styles.sectionLoader}>Загрузка...</div>;
   }
@@ -429,12 +433,43 @@ function ProfileDataTab() {
       </div>
 
       <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Фото шапки профиля</div>
+        </div>
         <button
           type="button"
-          className={styles.headerPhotoBtn}
+          className={styles.headerPhotoPreview}
           onClick={() => setHeaderOpen(true)}
+          aria-label="Фото шапки профиля"
         >
-          Фото шапки профиля
+          <span className={styles.headerPhotoFrame}>
+            {headerImageId ? (
+              <AuthImage
+                fileId={headerImageId}
+                fullSize
+                imageFit="cover"
+                alt=""
+                className={styles.headerPhotoImg}
+                style={{
+                  ...coverFocusImgStyle(headerFocus, {
+                    frameScale: headerBlur ? HEADER_BLUR_FRAME_SCALE : 1,
+                  }),
+                  background: 'transparent',
+                  overflow: 'visible',
+                  ...(headerBlur ? { filter: headerBlur } : {}),
+                }}
+              />
+            ) : myAvatarFileId ? (
+              <AuthImage
+                fileId={myAvatarFileId}
+                alt=""
+                className={`${styles.headerPhotoImg} ${styles.headerPhotoAvatar}`}
+              />
+            ) : (
+              <span className={styles.headerPhotoEmpty} aria-hidden />
+            )}
+            <span className={styles.headerPhotoHint}>Нажмите, чтобы изменить</span>
+          </span>
         </button>
       </div>
 
