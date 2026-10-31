@@ -106,10 +106,11 @@ const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: React
   {
     key: 'moderation',
     section: 'Безопасность',
-    label: 'Модерация',
+    label: 'Жалобы',
     icon: (
-      <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M5 3v18" />
+        <path d="M5 5.2c2.5.9 4-.8 6.4.2 1.6.6 2.9.8 4.8-.2.9 1.6.2 2.7-1.1 3.4 1.4.9 1.3 2.2-.1 3.2-1.7.8-3 .3-4.6-.5C7.2 10.6 5.8 11.5 5 10.8" />
       </svg>
     ),
   },
