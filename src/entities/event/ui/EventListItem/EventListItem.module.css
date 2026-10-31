@@ -79,6 +79,16 @@
   height: 100%;
 }
 
+.coverMarks {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 2;
+}
+
 .urgBadge {
   position: absolute;
   top: 4px;

@@ -178,23 +178,6 @@
   border-radius: 12px;
 }
 
-/* Бейдж "Организатор" поверх карточки */
-.organizerTag {
-  position: absolute;
-  top: 8px; left: 8px;
-  z-index: 2;
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.06em; color: #fff;
-  background: var(--accent);
-  border-radius: 20px; padding: 2px 8px;
-  pointer-events: none;
-}
-
-.organizerTagShifted {
-  left: auto;
-  right: 8px;
-}
-
 .pinHit {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
@@ -231,17 +214,6 @@
 
 .pinMenuItem:hover {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-.organizerTagInline {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #fff;
-  background: var(--accent);
-  border-radius: 20px;
-  padding: 2px 8px;
 }
 
 /* Отменённое: вся карточка ч/б, плашка на фото как на обложке события */

@@ -337,13 +337,9 @@ export default function MyEventsPage() {
                           event={event}
                           bleedCover
                           pinned={pinnedSet.has(event.id)}
+                          organizer={event.isOrganizer}
                           onClick={() => navigate(`/event/${event.id}`)}
                           className={event.isOrganizer ? styles.cardOrganizer : undefined}
-                          header={
-                            event.isOrganizer ? (
-                              <span className={styles.organizerTagInline}>Организатор</span>
-                            ) : undefined
-                          }
                         />
                       </div>
                       <div className={`${styles.cancelledOnPhoto} ${styles.cancelledOnPhotoRow}`}>
@@ -355,13 +351,9 @@ export default function MyEventsPage() {
                       event={event}
                       bleedCover
                       pinned={pinnedSet.has(event.id)}
+                      organizer={event.isOrganizer}
                       onClick={() => navigate(`/event/${event.id}`)}
                       className={event.isOrganizer ? styles.cardOrganizer : undefined}
-                      header={
-                        event.isOrganizer ? (
-                          <span className={styles.organizerTagInline}>Организатор</span>
-                        ) : undefined
-                      }
                     />
                   )}
                 </PinHit>
@@ -377,14 +369,10 @@ export default function MyEventsPage() {
               <Fragment key={event.id}>
                 <PinHit className={styles.cardWrap} onOpenMenu={(x, y) => openMenu(event, x, y)}>
                   <div className={cancelledLabel(event) ? styles.cancelledGray : undefined}>
-                    {event.isOrganizer && (
-                      <span className={`${styles.organizerTag} ${pinnedSet.has(event.id) ? styles.organizerTagShifted : ''}`}>
-                        Организатор
-                      </span>
-                    )}
                     <EventCard.Preset
                       event={event}
                       pinned={pinnedSet.has(event.id)}
+                      organizer={event.isOrganizer}
                       onClick={() => navigate(`/event/${event.id}`)}
                       className={event.isOrganizer ? styles.cardOrganizer : undefined}
                     />

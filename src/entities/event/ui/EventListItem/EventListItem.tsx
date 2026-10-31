@@ -13,7 +13,7 @@ import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
 import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
 import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
-import { PinnedCoverBadge } from '@/entities/event/ui/PinnedCoverBadge/PinnedCoverBadge';
+import { OrganizerCoverBadge, PinnedCoverBadge } from '@/entities/event/ui/PinnedCoverBadge/PinnedCoverBadge';
 import styles from './EventListItem.module.css';
 
 export type EventListUrgencyKind = 'hot' | 'soon' | 'ok';
@@ -37,6 +37,8 @@ interface EventListItemProps {
   bleedCover?: boolean;
   /** Значок закрепа в левом верхнем углу обложки */
   pinned?: boolean;
+  /** Значок организатора рядом с закрепом: без закрепа стоит в углу, с закрепом сдвигается вправо */
+  organizer?: boolean;
 }
 
 function ClockIcon() {
@@ -88,6 +90,7 @@ export function EventListItem({
   showChevron,
   bleedCover,
   pinned,
+  organizer,
 }: EventListItemProps) {
   const params = getEventListParams(event);
   const price = formatEventListItemPrice(params.priceMin, params.priceMax);
@@ -138,7 +141,12 @@ export function EventListItem({
           ) : (
             <div className={styles.coverPlaceholder} />
           )}
-          {pinned && <PinnedCoverBadge placement="corner" />}
+          {(pinned || organizer) && (
+            <div className={styles.coverMarks}>
+              {pinned && <PinnedCoverBadge />}
+              {organizer && <OrganizerCoverBadge />}
+            </div>
+          )}
           {urgency && (
             <span className={`${styles.urgBadge} ${urgClass}`}>{urgency.label}</span>
           )}
