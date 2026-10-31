@@ -19,14 +19,17 @@ import {
   getOrganizationAvatar,
 } from '@/entities/organization';
 import { apiClient } from '@/shared/api/client';
-import { isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
+import { getApiErrorCode, isAccessDeniedError, isApiError } from '@/shared/api/apiErrorUtils';
+import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { TabBar } from '@/shared/ui/TabBar';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
 import { EventListItem } from '@/entities/event/ui/EventListItem';
-import { EVENT_TYPE_CHIPS_MAX } from '@/entities/event/lib/eventListItemUtils';
+import { EVENT_TYPE_CHIPS_MAX, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
+import { OppositeGenderDialog } from '@/features/event/OppositeGenderDialog';
+import { myGenderConflictsWith } from '@/features/event/oppositeGender';
 import listItemStyles from '@/entities/event/ui/EventListItem/EventListItem.module.css';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -41,6 +44,7 @@ import {
   getEventUrgency,
 } from './invitationsPageUtils';
 import type { IEventType } from '@/entities/event/types';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import styles from './InvitationsPage.module.css';
 
 type Tab = 'incoming' | 'sent';
@@ -57,15 +61,23 @@ function personInviterName(inv: IInvitation): string {
   return inv.inviter?.account?.login ?? 'Неизвестный';
 }
 
-function inviterName(inv: IInvitation, orgById: Record<string, OrgInviterInfo>): string {
-  if (inv.inviterOrganizationId) {
+function inviterName(
+  inv: IInvitation,
+  orgById: Record<string, OrgInviterInfo>,
+  organizationsEnabled = true,
+): string {
+  if (organizationsEnabled && inv.inviterOrganizationId) {
     return orgById[inv.inviterOrganizationId]?.name ?? 'Организация';
   }
   return personInviterName(inv);
 }
 
-function inviterInitials(inv: IInvitation, orgById: Record<string, OrgInviterInfo>): string {
-  if (inv.inviterOrganizationId) {
+function inviterInitials(
+  inv: IInvitation,
+  orgById: Record<string, OrgInviterInfo>,
+  organizationsEnabled = true,
+): string {
+  if (organizationsEnabled && inv.inviterOrganizationId) {
     const name = orgById[inv.inviterOrganizationId]?.name ?? 'ОР';
     return name.slice(0, 2).toUpperCase();
   }
@@ -79,15 +91,17 @@ function InviterAvatar({
   orgById,
   size,
   className,
+  organizationsEnabled = true,
 }: {
   inv: IInvitation;
   orgById: Record<string, OrgInviterInfo>;
   size: number;
   className?: string;
+  organizationsEnabled?: boolean;
 }) {
-  if (inv.inviterOrganizationId) {
+  if (organizationsEnabled && inv.inviterOrganizationId) {
     const org = orgById[inv.inviterOrganizationId];
-    const initials = inviterInitials(inv, orgById);
+    const initials = inviterInitials(inv, orgById, organizationsEnabled);
     return (
       <div
         className={`${styles.orgAvatar} ${className ?? ''}`}
@@ -112,7 +126,7 @@ function InviterAvatar({
     <UserAvatar
       accountId={inv.inviterAccountId}
       avatarId={inv.inviter?.account?.avatarId ?? null}
-      initials={inviterInitials(inv, orgById)}
+      initials={inviterInitials(inv, orgById, organizationsEnabled)}
       size={size}
       className={className}
     />
@@ -191,10 +205,13 @@ export default function InvitationsPage() {
   const [sentErr, setSentErr] = useState<string | null>(null);
   const [sentLoaded, setSentLoaded] = useState(false);
   const [previewInv, setPreviewInv] = useState<IInvitation | null>(null);
+  const [genderConfirmInv, setGenderConfirmInv] = useState<IInvitation | null>(null);
   const [confirmDecl, setConfirmDecl] = useState<IInvitation | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<IInvitation | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const [orgById, setOrgById] = useState<Record<string, OrgInviterInfo>>({});
+  const [ticketsModuleOn, setTicketsModuleOn] = useState(false);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
 
   const unviewedCount = useMemo(
     () => items.filter(isInvitationUnviewed).length,
@@ -202,6 +219,22 @@ export default function InvitationsPage() {
   );
 
   const urgentInv = useMemo(() => findUrgentInvitation(items), [items]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (cancelled) return;
+        setTicketsModuleOn(f.ticketsEnabled);
+        setOrganizationsEnabled(f.organizationsEnabled);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTicketsModuleOn(false);
+        setOrganizationsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     fetchUserInvitations()
@@ -233,6 +266,7 @@ export default function InvitationsPage() {
 
   // Имена/логотипы организаций-приглашающих
   useEffect(() => {
+    if (!organizationsEnabled) return;
     const ids = [...new Set(
       [...items, ...sentItems]
         .map(inv => inv.inviterOrganizationId)
@@ -259,7 +293,7 @@ export default function InvitationsPage() {
       setOrgById(prev => ({ ...prev, ...Object.fromEntries(entries) }));
     });
     return () => { cancelled = true; };
-  }, [items, sentItems, orgById]);
+  }, [items, sentItems, orgById, organizationsEnabled]);
 
   const markViewedIfNeeded = async (inv: IInvitation) => {
     if (!isInvitationUnviewed(inv)) return;
@@ -287,7 +321,30 @@ export default function InvitationsPage() {
     setPreviewInv(inv);
   };
 
+  const requestAccept = async (inv: IInvitation) => {
+    try {
+      const conflict = await myGenderConflictsWith(readAllowedGender(inv.event.parameters));
+      if (conflict) {
+        setGenderConfirmInv(inv);
+        return;
+      }
+    } catch {
+      /* профиль недоступен — не блокируем принятие */
+    }
+    void doAccept(inv);
+  };
+
   const doAccept = async (inv: IInvitation) => {
+    const ticketsEnabled = ticketsModuleOn && Boolean(inv.event.parameters?.ticketsEnabled);
+
+    // Модель A: ticketed — accept не создаёт участие; сразу на карточку к покупке/получению билета.
+    if (ticketsEnabled) {
+      useToastStore.getState().add('Приглашение не даёт вход — нужен билет', 'info');
+      openEvent(inv.eventId);
+      setPreviewInv(null);
+      return;
+    }
+
     try {
       await apiClient.get(`/api/invitations/accept?invitationId=${inv.id}`);
       setItems(prev => prev.filter(i => i.id !== inv.id));
@@ -297,6 +354,15 @@ export default function InvitationsPage() {
       openEvent(inv.eventId);
       setPreviewInv(null);
     } catch (e) {
+      if (isApiError(e) && getApiErrorCode(e) === ApiErrorCode.OrganizationPaymentRequired) {
+        useToastStore.getState().add(
+          e.serverMessage || 'Для участия нужно купить билет',
+          'info',
+        );
+        openEvent(inv.eventId);
+        setPreviewInv(null);
+        return;
+      }
       if (isApiError(e) && isAccessDeniedError(e)) {
         useToastStore.getState().add(e.serverMessage || e.message);
       }
@@ -409,6 +475,7 @@ export default function InvitationsPage() {
                 key={inv.id}
                 inv={inv}
                 orgById={orgById}
+                organizationsEnabled={organizationsEnabled}
                 onOpen={() => handleInvitationClick(inv)}
                 onPreview={() => openPreview(inv)}
                 onDecline={() => setConfirmDecl(inv)}
@@ -458,8 +525,21 @@ export default function InvitationsPage() {
         <AcceptDialog
           inv={previewInv}
           orgById={orgById}
+          organizationsEnabled={organizationsEnabled}
+          ticketsModuleOn={ticketsModuleOn}
           onClose={() => setPreviewInv(null)}
-          onAccept={() => doAccept(previewInv)}
+          onAccept={() => requestAccept(previewInv)}
+        />
+      )}
+
+      {genderConfirmInv && (
+        <OppositeGenderDialog
+          onParticipate={() => {
+            const inv = genderConfirmInv;
+            setGenderConfirmInv(null);
+            void doAccept(inv);
+          }}
+          onDecline={() => setGenderConfirmInv(null)}
         />
       )}
 
@@ -507,12 +587,14 @@ export default function InvitationsPage() {
 function InvitationRow({
   inv,
   orgById,
+  organizationsEnabled,
   onOpen,
   onPreview,
   onDecline,
 }: {
   inv: IInvitation;
   orgById: Record<string, OrgInviterInfo>;
+  organizationsEnabled: boolean;
   onOpen: () => void;
   onPreview: () => void;
   onDecline: () => void;
@@ -520,7 +602,7 @@ function InvitationRow({
   const event = inv.event;
   const urgency = getEventUrgency(event.startTime);
   const unviewed = isInvitationUnviewed(inv);
-  const name = inviterName(inv, orgById);
+  const name = inviterName(inv, orgById, organizationsEnabled);
 
   return (
     <EventListItem
@@ -534,6 +616,7 @@ function InvitationRow({
           <InviterAvatar
             inv={inv}
             orgById={orgById}
+            organizationsEnabled={organizationsEnabled}
             size={18}
             className={styles.whoAvatar}
           />
@@ -615,11 +698,15 @@ function SentInvitationRow({
 function AcceptDialog({
   inv,
   orgById,
+  organizationsEnabled,
+  ticketsModuleOn,
   onClose,
   onAccept,
 }: {
   inv: IInvitation;
   orgById: Record<string, OrgInviterInfo>;
+  organizationsEnabled: boolean;
+  ticketsModuleOn: boolean;
   onClose: () => void;
   onAccept: () => void;
 }) {
@@ -630,8 +717,9 @@ function AcceptDialog({
   const days = getDaysUntil(event.startTime);
   const coverBg = getEventCoverBackground(event as Parameters<typeof getEventCoverBackground>[0]);
   const daysLabel = days === 0 ? 'сегодня' : days === 1 ? 'завтра' : days > 0 ? `через ${days} дн.` : '';
-  const name = inviterName(inv, orgById);
-  const fromOrg = Boolean(inv.inviterOrganizationId);
+  const name = inviterName(inv, orgById, organizationsEnabled);
+  const fromOrg = organizationsEnabled && Boolean(inv.inviterOrganizationId);
+  const ticketsEnabled = ticketsModuleOn && Boolean(event.parameters?.ticketsEnabled);
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -647,6 +735,7 @@ function AcceptDialog({
             <InviterAvatar
               inv={inv}
               orgById={orgById}
+              organizationsEnabled={organizationsEnabled}
               size={28}
               className={styles.dialogInviterAv}
             />
@@ -681,6 +770,11 @@ function AcceptDialog({
                 <div className={styles.dmetaVal} style={params.cost === 0 ? { color: 'var(--success)' } : undefined}>
                   {params.cost === 0 ? 'Бесплатно' : `${params.cost.toLocaleString('ru-RU')} ₽`}
                 </div>
+                {ticketsEnabled && (
+                  <div className={styles.dmetaSub}>
+                    Приглашение не даёт вход — нужен билет
+                  </div>
+                )}
                 {params.maxPersonsCount != null && params.participantsCount != null && (
                   <div className={styles.dmetaSub}>
                     {params.participantsCount} из {params.maxPersonsCount} мест занято
@@ -691,7 +785,11 @@ function AcceptDialog({
           </div>
           <div className={styles.dialogBtns}>
             <button type="button" className={styles.dbtnLater} onClick={onClose}>Решу позже</button>
-            <button type="button" className={styles.dbtnAccept} onClick={onAccept}>Принять приглашение</button>
+            <button type="button" className={styles.dbtnAccept} onClick={onAccept}>
+              {ticketsEnabled
+                ? (params.cost === 0 ? 'Перейти к билету' : 'Перейти к покупке')
+                : 'Принять приглашение'}
+            </button>
           </div>
         </div>
       </div>

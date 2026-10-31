@@ -183,7 +183,7 @@
   cursor: pointer; color: var(--text-primary); transition: background 0.1s;
 }
 .day:hover:not(.daySelected):not(.dayDisabled) { background: var(--surface-2); }
-.dayOther    { color: var(--text-muted); cursor: default; }
+.dayOther    { color: var(--text-muted); }
 .dayToday    { color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px rgba(99,102,241,0.4); }
 .daySelected { background: var(--accent) !important; color: #fff !important; font-weight: 600; }
 .dayDisabled { color: var(--text-muted); opacity: 0.35; cursor: not-allowed; }

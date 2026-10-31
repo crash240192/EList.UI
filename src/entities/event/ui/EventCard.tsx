@@ -5,9 +5,12 @@ import type { IEvent } from '../types';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
-import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
+import { getEventTypes, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
+import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
+import { OrganizerCoverBadge, PinnedCoverBadge } from '@/entities/event/ui/PinnedCoverBadge/PinnedCoverBadge';
 import styles from './EventCard.module.css';
 
 interface EventCardContextValue { event: IEvent; }
@@ -51,11 +54,19 @@ function EventCard({ event, onClick, className = '', children }: EventCardProps)
 }
 
 // ---- Cover ----
-function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
+function Cover({
+  fallbackGradient,
+  pinned,
+  organizer,
+}: {
+  fallbackGradient?: string;
+  pinned?: boolean;
+  organizer?: boolean;
+}) {
   const { event } = useEventCard();
   const gradient = fallbackGradient ?? getEventCoverBackground(event);
   const hasCover = !!(event.coverImageId || event.coverUrl);
-  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const focusStyle = coverFocusImgStyle(useResolvedCoverFocus(event));
 
   return (
     <div className={styles.cover} style={{ background: hasCover ? '#111' : gradient }}>
@@ -81,6 +92,8 @@ function Cover({ fallbackGradient }: { fallbackGradient?: string }) {
         />
       )}
       <div className={styles.coverTopLeft}>
+        {pinned && <PinnedCoverBadge />}
+        {organizer && <OrganizerCoverBadge />}
         <span className={styles.ageBadge}>{resolveAgeLimitBadge(event.parameters?.ageLimit)}</span>
         {event.parameters?.private && (
           <span className={styles.privateBadge} aria-label="Приватное">
@@ -123,9 +136,21 @@ function Footer({ children }: { children: React.ReactNode }) { return <div class
 function Price() {
   const { event } = useEventCard();
   const cost = event.parameters?.cost ?? 0;
+  const min = event.parameters?.priceMin != null && Number.isFinite(Number(event.parameters.priceMin))
+    ? Number(event.parameters.priceMin)
+    : cost;
+  const max = event.parameters?.priceMax != null && Number.isFinite(Number(event.parameters.priceMax))
+    ? Number(event.parameters.priceMax)
+    : min;
+  const free = min <= 0 && max <= 0;
+  const label = free
+    ? 'Бесплатно'
+    : min === max
+      ? `${min.toLocaleString('ru-RU')} ₽`
+      : `${min.toLocaleString('ru-RU')}–${max.toLocaleString('ru-RU')} ₽`;
   return (
-    <span className={`${styles.price} ${cost === 0 ? styles.priceFree : styles.pricePaid}`}>
-      {cost === 0 ? 'Бесплатно' : `${cost.toLocaleString('ru-RU')} ₽`}
+    <span className={`${styles.price} ${free ? styles.priceFree : styles.pricePaid}`}>
+      {label}
     </span>
   );
 }
@@ -153,17 +178,18 @@ function Rating() {
 }
 
 // ---- Preset ----
-interface PresetProps { event: IEvent; onClick?: (e: IEvent) => void; className?: string; }
-function Preset({ event, onClick, className }: PresetProps) {
+interface PresetProps { event: IEvent; onClick?: (e: IEvent) => void; className?: string; pinned?: boolean; organizer?: boolean; }
+function Preset({ event, onClick, className, pinned, organizer }: PresetProps) {
   return (
     <EventCard event={event} onClick={onClick} className={className}>
-      <Cover />
+      <Cover pinned={pinned} organizer={organizer} />
       <Body>
         <Title />
         <Meta />
         <Footer>
           <div className={styles.footerLeft}><Price /><Rating /><Participants /></div>
         </Footer>
+        <GenderLimitBadge gender={readAllowedGender(event.parameters)} />
       </Body>
     </EventCard>
   );

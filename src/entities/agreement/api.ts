@@ -3,6 +3,7 @@
 
 import { apiClient } from '@/shared/api/client';
 import {
+  DocumentType,
   parseDocumentType,
   type DocumentTypeValue,
   type IAgreementDocument,
@@ -91,13 +92,19 @@ export async function addAgreementDocument(payload: IDocumentRequest): Promise<v
 }
 
 function normalizeDocument(raw: IAgreementDocument & Record<string, unknown>): IAgreementDocument {
+  const type = parseDocumentType(raw.type ?? raw.Type);
+  const requiresRaw = raw.requiresAgreement ?? raw.RequiresAgreement;
+  const requiresAgreement = typeof requiresRaw === 'boolean'
+    ? requiresRaw
+    : type !== DocumentType.Policy;
   return {
     id: String(raw.id ?? raw.Id ?? ''),
     header: String(raw.header ?? raw.Header ?? ''),
     text: String(raw.text ?? raw.Text ?? ''),
     hash: String(raw.hash ?? raw.Hash ?? ''),
-    type: parseDocumentType(raw.type ?? raw.Type),
+    type,
     version: String(raw.version ?? raw.Version ?? ''),
     creationDate: String(raw.creationDate ?? raw.CreationDate ?? ''),
+    requiresAgreement,
   };
 }

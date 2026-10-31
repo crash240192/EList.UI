@@ -11,6 +11,7 @@ import {
 } from '@/entities/agreement';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { AgreementDocumentHtml } from './AgreementDocumentHtml';
+import { agreementRevisionLabel } from './agreementRevisionLabel';
 import styles from './UserAgreementsGate.module.css';
 
 export interface PendingUserAgreement {
@@ -32,6 +33,8 @@ function consentLabel(type: DocumentTypeValue): string {
       return 'Согласен с условиями пользовательского соглашения';
     case DocumentType.Policy:
       return 'Ознакомлен с политикой обработки персональных данных';
+    case DocumentType.DistributionConsent:
+      return 'Согласен на распространение персональных данных';
     default:
       return 'Принимаю условия документа';
   }
@@ -75,6 +78,11 @@ export function UserAgreementAcceptDialog({ item, onComplete, onCancel }: Props)
             <h2 id="user-reconsent-title" className={styles.title}>
               {item.document.header || 'Документ'}
             </h2>
+            {agreementRevisionLabel(item.document.creationDate) && (
+              <p className={styles.revisionLabel}>
+                {agreementRevisionLabel(item.document.creationDate)}
+              </p>
+            )}
           </div>
         </div>
 

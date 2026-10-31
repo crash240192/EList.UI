@@ -6,12 +6,20 @@ import type { EventListItemData } from '@/entities/event/lib/eventListItemUtils'
 import { normalizeEventListItem } from '@/entities/event/normalizeEventListItem';
 import { fetchEventParameters } from '@/entities/event/eventExtrasApi';
 import { fetchEvents } from '@/entities/event/api';
+import { createConcurrencyLimiter } from '@/shared/lib/concurrencyLimit';
+
+/** Параллельные filesByAlbumId на ленте мозаик — не больше 4. */
+const limitAlbumCoverList = createConcurrencyLimiter(4);
+/** Параллельные eventParameters / byEvent при обогащении ленты. */
+const limitAlbumFeedEnrich = createConcurrencyLimiter(4);
 
 export interface IAlbumParams {
   albumId?: string;
   headAlbum?: boolean;
   participantsReadonly?: boolean;
   private?: boolean;
+  /** 1 = DiscussionPhotos и т.п.; null/undefined — обычный альбом */
+  systemKind?: number | null;
 }
 
 export interface IAlbum {
@@ -23,6 +31,67 @@ export interface IAlbum {
   organizationId?: string;
   wallpaperId?: string;
   parameters?: IAlbumParams;
+  /** Когда в альбом последний раз добавили фото. */
+  lastContentAt?: string;
+  /** Когда текущий пользователь последний раз открывал альбом. */
+  lastViewedAt?: string;
+  /** Сервер уже сравнил даты. Если поля нет — считаем по lastContentAt / lastViewedAt. */
+  hasNewContent?: boolean;
+  /** Число фото с byEvents/byEvent — без отдельного filesByAlbumId. */
+  photoCount?: number;
+  /** Первые fileId для мозаики/обложки с byEvents/byEvent. */
+  coverFileIds?: string[];
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
+/** Новые фото после последнего просмотра. Старый API без полей — не новый. */
+export function albumHasNewContent(
+  album: Pick<IAlbum, 'hasNewContent' | 'lastContentAt' | 'lastViewedAt'>,
+): boolean {
+  if (typeof album.hasNewContent === 'boolean') return album.hasNewContent;
+  const content = album.lastContentAt ? Date.parse(album.lastContentAt) : NaN;
+  if (!Number.isFinite(content)) return false;
+  const viewed = album.lastViewedAt ? Date.parse(album.lastViewedAt) : NaN;
+  if (!Number.isFinite(viewed)) return true;
+  return content > viewed;
+}
+
+/** Свежие элементы впереди, исходный порядок среди равных сохраняется. */
+export function orderFreshFirst<T>(items: readonly T[], isFresh: (item: T) => boolean): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const freshRank = Number(isFresh(b.item)) - Number(isFresh(a.item));
+      if (freshRank !== 0) return freshRank;
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
+
+/**
+ * Копия списка для показа: просмотренные альбомы больше не свежие,
+ * открытый альбом остаётся на месте, пока модалка не закрыта.
+ */
+export function presentAlbumsFreshFirst(
+  albums: readonly IAlbum[],
+  seenIds: ReadonlySet<string>,
+  openAlbumId: string | null,
+): IAlbum[] {
+  const viewedAt = new Date().toISOString();
+  const shown = albums.map(album => {
+    if (album.id === openAlbumId || !seenIds.has(album.id)) return album;
+    return { ...album, hasNewContent: false, lastViewedAt: viewedAt };
+  });
+  return orderFreshFirst(shown, albumHasNewContent);
+}
+
+export function isSystemAlbum(album: IAlbum | null | undefined): boolean {
+  return album?.parameters?.systemKind != null;
 }
 
 export interface ICreateAlbumPayload {
@@ -61,10 +130,104 @@ export async function deleteAlbum(albumId: string): Promise<void> {
   await apiClient.delete(`/api/media/albums/${albumId}`);
 }
 
+function normalizeAlbumParams(raw: unknown): IAlbumParams | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const systemRaw = r.systemKind ?? r.SystemKind;
+  return {
+    albumId: r.albumId != null || r.AlbumId != null ? String(r.albumId ?? r.AlbumId) : undefined,
+    headAlbum: Boolean(r.headAlbum ?? r.HeadAlbum),
+    participantsReadonly: Boolean(r.participantsReadonly ?? r.ParticipantsReadonly),
+    private: Boolean(r.private ?? r.Private),
+    systemKind: systemRaw == null || systemRaw === '' ? null : Number(systemRaw),
+  };
+}
+
+function normalizeAlbum(raw: unknown): IAlbum {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const params = normalizeAlbumParams(r.parameters ?? r.Parameters);
+  return {
+    id: String(r.id ?? r.Id ?? ''),
+    name: String(r.name ?? r.Name ?? ''),
+    description: r.description != null || r.Description != null
+      ? String(r.description ?? r.Description)
+      : undefined,
+    eventId: r.eventId != null || r.EventId != null ? String(r.eventId ?? r.EventId) : undefined,
+    accountId: r.accountId != null || r.AccountId != null ? String(r.accountId ?? r.AccountId) : undefined,
+    organizationId: r.organizationId != null || r.OrganizationId != null
+      ? String(r.organizationId ?? r.OrganizationId)
+      : undefined,
+    wallpaperId: r.wallpaperId != null || r.WallpaperId != null
+      ? String(r.wallpaperId ?? r.WallpaperId)
+      : undefined,
+    parameters: params,
+    lastContentAt: readOptionalString(r.lastContentAt ?? r.LastContentAt),
+    lastViewedAt: readOptionalString(r.lastViewedAt ?? r.LastViewedAt),
+    hasNewContent: typeof (r.hasNewContent ?? r.HasNewContent) === 'boolean'
+      ? (r.hasNewContent ?? r.HasNewContent) as boolean
+      : undefined,
+    photoCount: readOptionalNonNegInt(r.photoCount ?? r.PhotoCount),
+    coverFileIds: readGuidList(r.coverFileIds ?? r.CoverFileIds),
+  };
+}
+
+function readOptionalNonNegInt(value: unknown): number | undefined {
+  const n = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim() !== ''
+      ? Number(value)
+      : NaN;
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.trunc(n);
+}
+
+function readGuidList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const ids = value
+    .map(item => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        const row = item as Record<string, unknown>;
+        const raw = row.fileId ?? row.FileId ?? row.id ?? row.Id;
+        return raw != null ? String(raw).trim() : '';
+      }
+      return item != null ? String(item).trim() : '';
+    })
+    .filter(Boolean);
+  return ids.length ? ids : [];
+}
+
+/** Есть ли серверные cover/count — тогда filesByAlbumId на ленте не нужен. */
+export function albumHasCoverPreview(album: Pick<IAlbum, 'photoCount' | 'coverFileIds' | 'wallpaperId'>): boolean {
+  return album.photoCount != null || (album.coverFileIds != null && album.coverFileIds.length > 0)
+    || Boolean(album.wallpaperId);
+}
+
+export function albumCoverFileIdsFromMeta(
+  album: Pick<IAlbum, 'coverFileIds' | 'wallpaperId'>,
+  limit = 4,
+): string[] {
+  const safeLimit = Math.max(1, Math.min(limit, 4));
+  const ids: string[] = [];
+  if (album.wallpaperId) ids.push(album.wallpaperId);
+  for (const id of album.coverFileIds ?? []) {
+    if (!id || ids.includes(id)) continue;
+    ids.push(id);
+    if (ids.length >= safeLimit) break;
+  }
+  return ids.slice(0, safeLimit);
+}
+
+/** Сбросить HasNewContent у текущего пользователя. Тело запроса пустое. */
+export async function markAlbumViewed(albumId: string): Promise<void> {
+  await apiClient.post(`/api/media/albums/${albumId}/markViewed`);
+}
+
 /** Получить альбомы события */
 export async function getEventAlbums(eventId: string): Promise<IAlbum[]> {
   const res = await apiClient.get<IAlbum[]>(`/api/media/albums/byEvent/${eventId}`);
-  return ((res as any).result ?? res) as IAlbum[];
+  const list = ((res as any).result ?? res) as unknown[];
+  return Array.isArray(list) ? list.map(normalizeAlbum) : [];
 }
 
 export interface IEventAlbumsGroup {
@@ -72,11 +235,32 @@ export interface IEventAlbumsGroup {
   albums: IAlbum[];
 }
 
+/** События со свежими альбомами поднимаются, внутри события свежие альбомы — первыми. */
+/**
+ * Подготовка групп к показу.
+ * - внутри события свежие альбомы всегда выше;
+ * - `pinFreshGroups` — поднимать события с непросмотренными наверх ленты
+ *   (выключается, когда пользователь хочет «чистую» сортировку).
+ */
+export function presentAlbumGroupsFreshFirst(
+  groups: readonly IEventAlbumsGroup[],
+  seenIds: ReadonlySet<string>,
+  openAlbumId: string | null,
+  pinFreshGroups = true,
+): IEventAlbumsGroup[] {
+  const shown = groups.map(group => ({
+    ...group,
+    albums: presentAlbumsFreshFirst(group.albums, seenIds, openAlbumId),
+  }));
+  if (!pinFreshGroups) return shown;
+  return orderFreshFirst(shown, group => group.albums.some(albumHasNewContent));
+}
+
 function normalizeAlbumsGroup(raw: unknown): IEventAlbumsGroup {
   const row = (raw ?? {}) as Record<string, unknown>;
   const event = row.event ?? row.Event;
   const albumsRaw = row.albums ?? row.Albums;
-  const albums = Array.isArray(albumsRaw) ? albumsRaw as IAlbum[] : [];
+  const albums = Array.isArray(albumsRaw) ? albumsRaw.map(normalizeAlbum) : [];
   return {
     event: normalizeEventListItem(event),
     albums,
@@ -91,7 +275,10 @@ async function enrichAlbumGroupsWithParameters(groups: IEventAlbumsGroup[]): Pro
   const paramsByEvent = new Map<string, Awaited<ReturnType<typeof fetchEventParameters>>>();
 
   await Promise.all(eventIds.map(async eventId => {
-    paramsByEvent.set(eventId, await fetchEventParameters(eventId));
+    paramsByEvent.set(
+      eventId,
+      await limitAlbumFeedEnrich(() => fetchEventParameters(eventId)),
+    );
   }));
 
   return groups.map(group => {
@@ -119,17 +306,50 @@ export async function getAlbumsByEvents(
   accountId: string,
   pageIndex = 0,
   pageSize = 10,
+  options?: {
+    enrichParameters?: boolean;
+    /** date | latestPhotos | name — серверная сортировка групп. */
+    sort?: 'date' | 'latestPhotos' | 'name';
+  },
 ): Promise<PagedList<IEventAlbumsGroup>> {
+  const sortParam = options?.sort
+    ? `&sort=${encodeURIComponent(options.sort)}`
+    : '';
   const res = await apiClient.get<PagedList<IEventAlbumsGroup>>(
-    `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}`,
+    `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}${sortParam}`,
   );
   const data = ((res as { result?: PagedList<IEventAlbumsGroup> }).result ?? res) as PagedList<IEventAlbumsGroup>;
   const groups = Array.isArray(data.result) ? data.result.map(normalizeAlbumsGroup) : [];
-  const enriched = await enrichAlbumGroupsWithParameters(groups);
+  const result = options?.enrichParameters === false
+    ? groups
+    : await enrichAlbumGroupsWithParameters(groups);
   return {
     ...data,
-    result: enriched,
+    result,
   };
+}
+
+const UNSEEN_ALBUM_PAGE_SIZE = 20;
+const UNSEEN_ALBUM_PAGE_CAP = 20;
+
+/** Есть ли среди альбомов аккаунта хотя бы один с непросмотренными фото. */
+export async function accountHasUnseenAlbums(accountId: string): Promise<boolean> {
+  let pageIndex = 0;
+  let loaded = 0;
+  let total = Number.POSITIVE_INFINITY;
+
+  while (loaded < total && pageIndex < UNSEEN_ALBUM_PAGE_CAP) {
+    const page = await getAlbumsByEvents(accountId, pageIndex, UNSEEN_ALBUM_PAGE_SIZE, {
+      enrichParameters: false,
+    });
+    if (page.result.some(group => group.albums.some(albumHasNewContent))) return true;
+    if (page.result.length === 0) return false;
+    loaded += page.result.length;
+    total = Number.isFinite(page.total) ? page.total : loaded;
+    pageIndex += 1;
+  }
+
+  return false;
 }
 
 /**
@@ -159,14 +379,14 @@ export async function getAlbumsByOrganizationEvents(
     if (batch.length === 0) break;
 
     const groups = await Promise.all(
-      batch.map(async (event) => {
+      batch.map(async (event) => limitAlbumFeedEnrich(async () => {
         const albums = await getEventAlbums(event.id).catch(() => [] as IAlbum[]);
         if (!albums.length) return null;
         return {
           event: normalizeEventListItem(event),
           albums,
         } satisfies IEventAlbumsGroup;
-      }),
+      })),
     );
 
     for (const g of groups) {
@@ -201,12 +421,95 @@ export interface IAlbumFile {
   albumId: string;
 }
 
-/** Получить файлы альбома */
-export async function getAlbumFiles(albumId: string, pageIndex = 1, pageSize = 50): Promise<IAlbumFile[]> {
-  const res = await apiClient.get<any>(`/api/media/albums/filesByAlbumId/${albumId}?pageIndex=${pageIndex}&pageSize=${pageSize}`);
-  const data = (res as any).result ?? res;
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.result)) return data.result;
-  if (Array.isArray(data?.items)) return data.items;
-  return [];
+interface AlbumFilesPage {
+  files: IAlbumFile[];
+  total: number;
+}
+
+function readAlbumFileTotal(value: unknown, fallback: number): number {
+  const numeric = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim() !== ''
+      ? Number(value)
+      : NaN;
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function parseAlbumFilesPage(res: unknown): AlbumFilesPage {
+  const data = (res as { result?: unknown } | null)?.result ?? res;
+  let files: IAlbumFile[] = [];
+  let declaredTotal: unknown;
+
+  if (Array.isArray(data)) {
+    files = data as IAlbumFile[];
+  } else if (data && typeof data === 'object') {
+    const page = data as { result?: unknown; items?: unknown; total?: unknown; Total?: unknown };
+    if (Array.isArray(page.result)) files = page.result as IAlbumFile[];
+    else if (Array.isArray(page.items)) files = page.items as IAlbumFile[];
+    declaredTotal = page.total ?? page.Total;
+  }
+
+  return {
+    files,
+    total: readAlbumFileTotal(declaredTotal, files.length),
+  };
+}
+
+async function fetchAlbumFilesPage(albumId: string, pageIndex: number, pageSize: number): Promise<AlbumFilesPage> {
+  const res = await apiClient.get<unknown>(
+    `/api/media/albums/filesByAlbumId/${albumId}?pageIndex=${pageIndex}&pageSize=${pageSize}`,
+  );
+  return parseAlbumFilesPage(res);
+}
+
+/** Получить файлы альбома (pageIndex 0-based, как byEvents). */
+export async function getAlbumFiles(albumId: string, pageIndex = 0, pageSize = 50): Promise<IAlbumFile[]> {
+  const page = await fetchAlbumFilesPage(albumId, pageIndex, pageSize);
+  return page.files;
+}
+
+/** Сколько фото в альбоме. pageSize=1: достаточно поля total. */
+export async function getAlbumFileCount(albumId: string): Promise<number> {
+  return limitAlbumCoverList(async () => {
+    const page = await fetchAlbumFilesPage(albumId, 0, 1);
+    return page.total;
+  });
+}
+
+/**
+ * Первые fileId и общее число фото одним запросом.
+ * Через очередь — на страницах со многими альбомами не роняем API/браузер.
+ * Если у альбома уже есть photoCount/coverFileIds с byEvents — сеть не дергаем.
+ */
+export async function getAlbumCoverPreview(
+  albumId: string,
+  limit = 4,
+  meta?: Pick<IAlbum, 'photoCount' | 'coverFileIds' | 'wallpaperId'>,
+): Promise<{ fileIds: string[]; total: number }> {
+  const safeLimit = Math.max(1, Math.min(limit, 4));
+  if (meta && albumHasCoverPreview(meta)) {
+    const fileIds = albumCoverFileIdsFromMeta(meta, safeLimit);
+    return {
+      fileIds,
+      total: meta.photoCount ?? fileIds.length,
+    };
+  }
+  return limitAlbumCoverList(async () => {
+    const page = await fetchAlbumFilesPage(albumId, 0, safeLimit);
+    return {
+      fileIds: page.files.slice(0, safeLimit).map(file => file.fileId).filter(Boolean),
+      total: page.total,
+    };
+  });
+}
+
+/** Первые fileId для превью обложки/мозаики. */
+export async function getAlbumCoverFileIds(
+  albumId: string,
+  limit = 4,
+  meta?: Pick<IAlbum, 'photoCount' | 'coverFileIds' | 'wallpaperId'>,
+): Promise<string[]> {
+  const preview = await getAlbumCoverPreview(albumId, limit, meta);
+  return preview.fileIds;
 }

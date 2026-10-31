@@ -17,6 +17,7 @@ export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
   Used: 'Использован',
   Refunded: 'Возвращён',
   Void: 'Аннулирован',
+  RefundPending: 'Заявка на возврат',
 };
 
 export function formatMoney(amount: number, currency = 'RUB'): string {

@@ -1,0 +1,50 @@
+.badge {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: 0.5px solid transparent;
+}
+
+.badge svg {
+  display: block;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 3px currentColor);
+}
+
+.female {
+  color: #ff4ecd;
+  background: rgba(255, 45, 168, 0.14);
+  border-color: rgba(255, 78, 205, 0.8);
+  box-shadow: 0 0 10px rgba(255, 78, 205, 0.45);
+}
+
+.male {
+  color: #3ecbff;
+  background: rgba(62, 203, 255, 0.12);
+  border-color: rgba(62, 203, 255, 0.8);
+  box-shadow: 0 0 10px rgba(62, 203, 255, 0.4);
+}
+
+/* На белой карточке неоновые цвета теряются — в светлой теме чип чуть плотнее. */
+:global(body.light-theme) .female {
+  color: #e11d9a;
+  background: rgba(225, 29, 154, 0.14);
+  border-color: rgba(200, 20, 140, 0.85);
+  box-shadow: 0 0 10px rgba(225, 29, 154, 0.4);
+}
+
+:global(body.light-theme) .male {
+  color: #0284c7;
+  background: rgba(2, 132, 199, 0.13);
+  border-color: rgba(2, 120, 186, 0.85);
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.38);
+}

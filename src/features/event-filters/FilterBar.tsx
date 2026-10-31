@@ -28,6 +28,8 @@ import { useAgeFilterGate } from '@/features/event-filters/useAgeFilterGate';
 import styles from './FilterBar.module.css';
 
 const DEFAULT_RADIUS_M = 25000; // запасной радиус до первой синхронизации с картой
+/** Согласовано с API MaxEventCost */
+const MAX_EVENT_COST = 1_000_000;
 
 /** Текущий город в фильтре поиска (не путать с родным городом аккаунта). */
 function getSearchCityName(): string {
@@ -65,8 +67,10 @@ interface FilterBarProps {
   useStore?: typeof useFiltersStore;
   hideCity?: boolean;
   hideViewToggle?: boolean;
-  tabs?: { key: string; label: string }[];
+  tabs?: { key: string; label: string; align?: 'end' }[];
   activeTab?: string;
+  /** Несколько одновременно выбранных вкладок. Клик переключает ключ, не снимая остальные. */
+  selectedKeys?: string[];
   onTabChange?: (key: string) => void;
 }
 
@@ -87,8 +91,9 @@ function weekendRange()  {
 
 export function FilterBar({
   searchName, onSearchChange, viewMode, onViewModeChange, onSearch,
-  useStore: useStoreOverride, hideCity = false, hideViewToggle = false, tabs, activeTab, onTabChange,
+  useStore: useStoreOverride, hideCity = false, hideViewToggle = false, tabs, activeTab, selectedKeys, onTabChange,
 }: FilterBarProps) {
+  const tabOn = (key: string) => selectedKeys ? selectedKeys.includes(key) : activeTab === key;
   const storeDefault = useFiltersStore();
   const storeOverride = useStoreOverride?.();
   const { filters, setFilter, resetFilters, setMapCenter, setMapZoom } = storeOverride ?? storeDefault;
@@ -334,9 +339,22 @@ export function FilterBar({
     setFilter('startTime', normalizeSearchStartTime(iso || undefined));
     setQuickDate(null);
   };
+  const isFree = filters.price === 0;
+  const priceInputValue = isFree ? '' : (filters.price ?? '');
+  const handlePriceInputChange = (raw: string) => {
+    if (raw === '') {
+      setFilter('price', undefined);
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n)) {
+      setFilter('price', undefined);
+      return;
+    }
+    setFilter('price', Math.min(Math.max(n, 0), MAX_EVENT_COST));
+  };
   const hasExpandedActive =
     (!quickDate && !!filters.endTime)
-    || (!!filters.price && filters.price > 0)
     || ageFiltersActive(filters);
 
   return (
@@ -351,19 +369,24 @@ export function FilterBar({
         {searchName && <button className={styles.clearBtn} onClick={() => onSearchChange('')}>✕</button>}
       </div>
       <button className={styles.mobileFilterBtn} onClick={() => setMobileSheet(true)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="6" y1="4" x2="6" y2="20"/>
+          <circle cx="6" cy="8" r="2.2"/>
+          <line x1="12" y1="4" x2="12" y2="20"/>
+          <circle cx="12" cy="16" r="2.2"/>
+          <line x1="18" y1="4" x2="18" y2="20"/>
+          <circle cx="18" cy="10" r="2.2"/>
         </svg>
         {mobileFilterCount > 0 && <span className={styles.mobileFilterBadge}>{mobileFilterCount}</span>}
       </button>
       {!hideViewToggle && (
         <button className={styles.viewToggle} onClick={() => onViewModeChange(viewMode === 'map' ? 'list' : 'map')}
           title={viewMode === 'map' ? 'Показать списком' : 'Показать на карте'}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           <div className={`${styles.viewTrack} ${viewMode === 'map' ? styles.viewTrackOn : ''}`}>
             <div className={styles.viewThumb} />
           </div>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
         </button>
       )}
     </div>
@@ -373,7 +396,7 @@ export function FilterBar({
       <div className={styles.mobileTabsRow}>
         {tabs.map(t => (
           <button key={t.key}
-            className={`${styles.mobileTab} ${activeTab === t.key ? styles.mobileTabActive : ''}`}
+            className={`${styles.mobileTab} ${tabOn(t.key) ? styles.mobileTabActive : ''} ${t.align === 'end' ? styles.tabEnd : ''}`}
             onClick={() => onTabChange?.(t.key)}>
             {t.label}
           </button>
@@ -388,7 +411,7 @@ export function FilterBar({
         <div className={styles.tabsRow}>
           {tabs.map(t => (
             <button key={t.key}
-              className={`${styles.tabBtn} ${activeTab === t.key ? styles.tabBtnActive : ''}`}
+              className={`${styles.tabBtn} ${tabOn(t.key) ? styles.tabBtnActive : ''} ${t.align === 'end' ? styles.tabEnd : ''}`}
               onClick={() => onTabChange?.(t.key)}>
               {t.label}
             </button>
@@ -408,11 +431,11 @@ export function FilterBar({
         {!hideViewToggle && (
           <button className={styles.viewToggle} onClick={() => onViewModeChange(viewMode === 'map' ? 'list' : 'map')}
             title={viewMode === 'map' ? 'Показать списком' : 'Показать на карте'}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
             <div className={`${styles.viewTrack} ${viewMode === 'map' ? styles.viewTrackOn : ''}`}>
               <div className={styles.viewThumb} />
             </div>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
           </button>
         )}
       </div>
@@ -439,15 +462,30 @@ export function FilterBar({
 
         {/* Группа: когда */}
         <span className={styles.groupLabel}>Когда</span>
-        <button className={`${styles.quickBtn} ${quickDate === 'today'    ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('today')}>Сегодня</button>
-        <button className={`${styles.quickBtn} ${quickDate === 'tomorrow' ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('tomorrow')}>Завтра</button>
-        <button className={`${styles.quickBtn} ${quickDate === 'weekend'  ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('weekend')}>Выходные</button>
+        <button className={`noHoverGlow ${styles.quickBtn} ${quickDate === 'today'    ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('today')}>Сегодня</button>
+        <button className={`noHoverGlow ${styles.quickBtn} ${quickDate === 'tomorrow' ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('tomorrow')}>Завтра</button>
+        <button className={`noHoverGlow ${styles.quickBtn} ${quickDate === 'weekend'  ? styles.quickBtnOn : ''}`} onClick={() => handleQuickDate('weekend')}>Выходные</button>
 
         <div className={styles.sep}/>
 
         {/* Группа: цена */}
-        <span className={styles.groupLabel}>Цена</span>
-        <button className={`${styles.quickBtn} ${filters.price === 0 ? styles.quickBtnOn : ''}`} onClick={() => filters.price === 0 ? setFilter('price', undefined) : setFilter('price', 0)}>Бесплатно</button>
+        <span className={styles.groupLabel}>Стоимость, до</span>
+        <input
+          type="number"
+          className={styles.priceInput}
+          placeholder="Любая"
+          value={priceInputValue}
+          min={0}
+          max={MAX_EVENT_COST}
+          disabled={isFree}
+          onFocus={e => e.currentTarget.select()}
+          onChange={e => handlePriceInputChange(e.target.value)}
+        />
+        <span className={`${styles.priceRub} ${isFree ? styles.priceRubOff : ''}`}>₽</span>
+        <button
+          className={`noHoverGlow ${styles.quickBtn} ${isFree ? styles.quickBtnOn : ''}`}
+          onClick={() => isFree ? setFilter('price', undefined) : setFilter('price', 0)}
+        >Бесплатно</button>
 
         <div className={styles.sep}/>
 
@@ -467,14 +505,14 @@ export function FilterBar({
         <span className={styles.groupLabel}>Тип</span>
         {QUICK_TYPES.map(t => (
           <button key={t.id} title={t.name}
-            className={`${styles.quickBtn} ${styles.quickBtnIcon} ${draftTypes.includes(t.id) ? styles.quickBtnOn : ''}`}
+            className={`noHoverGlow ${styles.quickBtn} ${styles.quickBtnIcon} ${draftTypes.includes(t.id) ? styles.quickBtnOn : ''}`}
             onClick={() => toggleType(t.id)}>
             {t.ico
               ? <img src={icoToUrl(t.ico) ?? ''} alt={t.name} width={14} height={14} className="event-type-ico" style={{ objectFit: 'contain' }} />
               : <span className={styles.quickBtnLetter}>{t.name[0]}</span>}
           </button>
         ))}
-        <button className={`${styles.quickBtn} ${(draftTypes.length > 0 || draftCats.length > 0) ? styles.quickBtnOn : ''}`}
+        <button className={`noHoverGlow ${styles.quickBtn} ${(draftTypes.length > 0 || draftCats.length > 0) ? styles.quickBtnOn : ''}`}
           onClick={() => setPickerOpen(true)}>
           Ещё&nbsp;
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -513,14 +551,7 @@ export function FilterBar({
               onChange={iso => { setFilter('endTime', iso || undefined); setQuickDate(null); }} />
           </div>
           <div className={styles.epBlock}>
-            <span className={styles.epLabel}>Цена, ₽</span>
-            <input type="number" className={styles.epInput}
-              placeholder="Любая" value={filters.price ?? ''}
-              onFocus={e => e.currentTarget.select()}
-              onChange={e => setFilter('price', e.target.value !== '' ? Number(e.target.value) : undefined)} />
-          </div>
-          <div className={styles.epBlock}>
-            <span className={styles.epLabel}>Возраст, до</span>
+            <span className={styles.epLabel}>Возраст</span>
             <Select
               className={styles.epAgeSelect}
               value={ageSelectValue}

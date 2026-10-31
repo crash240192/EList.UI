@@ -7,9 +7,11 @@ import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
-import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
+import { getEventTypes, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
+import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
 import styles from './EventModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
@@ -29,9 +31,9 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
   const ageLimit   = event.parameters?.ageLimit;
   const isPrivate  = event.parameters?.private;
   const maxPersons = event.parameters?.maxPersonsCount;
-  const gender     = event.parameters?.allowedGender;
+  const gender     = readAllowedGender(event.parameters);
   const hasCover   = !!(event.coverImageId || event.coverUrl);
-  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const focusStyle = coverFocusImgStyle(useResolvedCoverFocus(event));
 
   const hasLimits = isPrivate || maxPersons || gender;
 
@@ -131,12 +133,7 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
                   до {maxPersons} мест
                 </span>
               )}
-              {gender && (
-                <span className={`${styles.limitBadge} ${styles.limitGender}`}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  {gender === 'Male' ? 'Только мужчины' : 'Только женщины'}
-                </span>
-              )}
+              <GenderLimitBadge gender={gender} />
             </div>
           )}
 

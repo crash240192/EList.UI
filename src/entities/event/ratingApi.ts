@@ -92,3 +92,10 @@ export async function fetchOrganizerRating(accountId: string): Promise<number> {
   const value = (res as { result?: number }).result ?? res;
   return typeof value === 'number' ? value : Number(value) || 0;
 }
+
+/** Суммарный рейтинг организации (как у организатора-пользователя) */
+export async function fetchOrganizationRating(organizationId: string): Promise<number> {
+  const res = await apiClient.get<number>(`/api/Rating/organizations/${organizationId}`);
+  const value = (res as { result?: number }).result ?? res;
+  return typeof value === 'number' ? value : Number(value) || 0;
+}

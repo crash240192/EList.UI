@@ -60,7 +60,7 @@
   to { opacity: 1; }
 }
 
-/* Центр: этап 1 (чёрный фон) и этап 2 (поверх превью) */
+/* Центр слота изображения (не viewport): этап 1/2 для fullSizeRoot */
 .preloaderSlot {
   position: absolute;
   inset: 0;
@@ -69,5 +69,20 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
+}
+
+/*
+ * Placeholder, пока нет blob URL.
+ * Без position:relative у предка absolute inset:0 цепляется к viewport —
+ * крутилка оказывается по центру экрана (лента альбомов при пагинации).
+ */
+.pendingShell {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 1px;
+  overflow: hidden;
+  background: transparent;
 }
 
