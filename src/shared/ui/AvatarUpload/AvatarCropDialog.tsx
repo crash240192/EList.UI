@@ -22,14 +22,20 @@ const CIRCLE_RATIO = 0.8;
 export type AvatarCropShape = 'circle' | 'rounded-square';
 
 interface AvatarCropDialogProps {
-  src: string;
+  src: string | null;
   fileName: string;
   saving: boolean;
   onCancel: () => void;
-  onConfirm: (file: File) => void;
+  onConfirm: (file: File) => void | Promise<void>;
   title?: string;
   lead?: string;
   shape?: AvatarCropShape;
+  /** «Выбрать фото...» поверх кадра. */
+  onFilePicked?: (file: File) => void;
+  /** «Удалить» поверх кадра. Нет колбэка — кнопки нет. */
+  onDelete?: () => void | Promise<void>;
+  deleteDisabled?: boolean;
+  loadingImage?: boolean;
 }
 
 export function AvatarCropDialog({
@@ -41,9 +47,14 @@ export function AvatarCropDialog({
   title = 'Кадр аватара',
   lead = 'Перетащите фото и подгоните масштаб. В круг попадёт то, что видно в окне.',
   shape = 'circle',
+  onFilePicked,
+  onDelete,
+  deleteDisabled = false,
+  loadingImage = false,
 }: AvatarCropDialogProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
 
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
@@ -54,6 +65,16 @@ export function AvatarCropDialog({
   const [error, setError] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const seenSrc = useRef(src);
+  if (seenSrc.current !== src) {
+    seenSrc.current = src;
+    setNatural(null);
+    setDecoded(false);
+    setZoom(AVATAR_ZOOM_MIN);
+    setPan({ x: 0, y: 0 });
+    setError(null);
+    setPreparing(false);
+  }
 
   useModalBackButton(onCancel);
 
@@ -96,6 +117,7 @@ export function AvatarCropDialog({
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (saving || preparing || !placed) return;
+    if ((e.target as HTMLElement).closest('button, input')) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, panX: placed.panX, panY: placed.panY };
     setDragging(true);
@@ -141,9 +163,9 @@ export function AvatarCropDialog({
     setError(null);
     try {
       const file = await renderAvatarFile(image, square, fileName);
-      onConfirm(file);
-    } catch {
-      setError('Не удалось подготовить фото');
+      await onConfirm(file);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось сохранить фото');
       setPreparing(false);
     }
   }, [natural, disp, placed, saving, preparing, stageSize, circleSize, fileName, onConfirm]);
@@ -170,7 +192,7 @@ export function AvatarCropDialog({
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
         >
-          {disp && placed && (
+          {disp && placed && src && (
             <img
               ref={imgRef}
               src={src}
@@ -188,7 +210,7 @@ export function AvatarCropDialog({
               onError={() => setError('Не удалось открыть это изображение')}
             />
           )}
-          {!natural && !error && (
+          {!natural && !error && src && (
             <img
               src={src}
               alt=""
@@ -201,6 +223,56 @@ export function AvatarCropDialog({
             />
           )}
           <div className={`${styles.shade} ${shape === 'rounded-square' ? styles.shadeSquare : styles.shadeCircle}`} />
+          {(onFilePicked || onDelete) && (
+            <div className={styles.stageTools}>
+              {onFilePicked && (
+                <button
+                  type="button"
+                  className={styles.pickBtn}
+                  disabled={busy}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Выбрать фото...
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  className={styles.deleteBtn}
+                  disabled={busy || deleteDisabled}
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        await onDelete?.();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'Не удалось удалить фото');
+                      }
+                    })();
+                  }}
+                >
+                  Удалить
+                </button>
+              )}
+            </div>
+          )}
+          {loadingImage && <div className={styles.stageStatus}>Загрузка фото…</div>}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className={styles.fileInput}
+            onChange={e => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file || !onFilePicked) return;
+              if (!file.type.startsWith('image/')) {
+                setError('Выберите изображение');
+                return;
+              }
+              setError(null);
+              onFilePicked(file);
+            }}
+          />
         </div>
 
         <label className={styles.zoom}>
