@@ -194,6 +194,24 @@
   line-height: 1.5;
 }
 
+.headerPhotoBtn {
+  display: block;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.headerPhotoBtn:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 /* ── Form rows (без разделителей — группировка отступами, не «клеткой») ── */
 .frow {
   display: flex;
