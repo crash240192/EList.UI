@@ -33,6 +33,12 @@ import { useUserLocation } from '@/features/auth/useUserLocation';
 import { POPULAR_CITIES, useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { cookies } from '@/shared/lib/cookies';
 import { AvatarUpload } from '@/shared/ui/AvatarUpload/AvatarUpload';
+import { HeaderPhotoDialog, type HeaderPhotoValue } from '@/features/user/HeaderPhotoDialog/HeaderPhotoDialog';
+import { loadHeaderPhotoMeta } from '@/entities/user/headerApi';
+import { fetchFullProfile } from '@/entities/user/profileApi';
+import { DEFAULT_COVER_FOCUS, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { HEADER_BLUR_FRAME_SCALE, headerBlurFilter } from '@/shared/lib/headerPhoto';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
 import { Select } from '@/shared/ui/Select/Select';
@@ -263,6 +269,10 @@ function ProfileDataTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [headerOpen, setHeaderOpen] = useState(false);
+  const [headerImageId, setHeaderImageId] = useState<string | null>(null);
+  const [headerFocus, setHeaderFocus] = useState(DEFAULT_COVER_FOCUS);
+  const [headerBlurPercent, setHeaderBlurPercent] = useState(0);
 
   const initials = (form.firstName?.[0] ?? '') + (form.lastName?.[0] ?? '');
   const accountId = getStoredAccountId() ?? '';
@@ -274,7 +284,12 @@ function ProfileDataTab() {
   const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
 
   useEffect(() => {
-    getMyPersonInfo().then(p => {
+    let cancelled = false;
+    Promise.all([
+      getMyPersonInfo(),
+      fetchFullProfile(null).catch(() => null),
+    ]).then(async ([p, profile]) => {
+      if (cancelled) return;
       if (p) {
         setForm({
           firstName: p.firstName ?? '',
@@ -285,7 +300,29 @@ function ProfileDataTab() {
         });
         setAbout(typeof p.about === 'string' ? p.about : '');
       }
-    }).finally(() => setLoading(false));
+      const account = profile?.account;
+      const imageId = account?.headerImageId ?? null;
+      setHeaderImageId(imageId);
+      let zoom = DEFAULT_COVER_FOCUS.zoom ?? 1;
+      let blur = 0;
+      if (imageId) {
+        try {
+          const meta = await loadHeaderPhotoMeta(imageId);
+          if (cancelled) return;
+          zoom = meta.zoom;
+          blur = account?.headerBlur ? meta.blurPercent : 0;
+        } catch { /* кадр откроется без сохранённого масштаба */ }
+      }
+      setHeaderFocus({
+        x: account?.headerFocusX ?? DEFAULT_COVER_FOCUS.x,
+        y: account?.headerFocusY ?? DEFAULT_COVER_FOCUS.y,
+        zoom,
+      });
+      setHeaderBlurPercent(blur);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -368,6 +405,8 @@ function ProfileDataTab() {
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm(f => ({ ...f, [k]: e.target.value }));
 
+  const headerBlur = headerImageId ? headerBlurFilter(headerBlurPercent) : undefined;
+
   if (loading) {
     return <div className={styles.sectionLoader}>Загрузка...</div>;
   }
@@ -391,6 +430,47 @@ function ProfileDataTab() {
             <p>JPG, PNG или GIF · до 5 МБ<br />Нажмите на аватар, чтобы выбрать кадр</p>
           </div>
         </div>
+      </div>
+
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Фото шапки профиля</div>
+        </div>
+        <button
+          type="button"
+          className={styles.headerPhotoPreview}
+          onClick={() => setHeaderOpen(true)}
+          aria-label="Фото шапки профиля"
+        >
+          <span className={styles.headerPhotoFrame}>
+            {headerImageId ? (
+              <AuthImage
+                fileId={headerImageId}
+                fullSize
+                imageFit="cover"
+                alt=""
+                className={styles.headerPhotoImg}
+                style={{
+                  ...coverFocusImgStyle(headerFocus, {
+                    frameScale: headerBlur ? HEADER_BLUR_FRAME_SCALE : 1,
+                  }),
+                  background: 'transparent',
+                  overflow: 'visible',
+                  ...(headerBlur ? { filter: headerBlur } : {}),
+                }}
+              />
+            ) : myAvatarFileId ? (
+              <AuthImage
+                fileId={myAvatarFileId}
+                alt=""
+                className={`${styles.headerPhotoImg} ${styles.headerPhotoAvatar}`}
+              />
+            ) : (
+              <span className={styles.headerPhotoEmpty} aria-hidden />
+            )}
+            <span className={styles.headerPhotoHint}>Нажмите, чтобы изменить</span>
+          </span>
+        </button>
       </div>
 
       <div className={styles.scard}>
@@ -443,6 +523,20 @@ function ProfileDataTab() {
           </div>
         </div>
       </div>
+
+      {headerOpen && (
+        <HeaderPhotoDialog
+          imageId={headerImageId}
+          focus={headerFocus}
+          blurPercent={headerBlurPercent}
+          onClose={() => setHeaderOpen(false)}
+          onApply={(next: HeaderPhotoValue) => {
+            setHeaderImageId(next.imageId);
+            setHeaderFocus(next.focus);
+            setHeaderBlurPercent(next.imageId ? next.blurPercent : 0);
+          }}
+        />
+      )}
 
       <div className={styles.scard}>
         <div className={styles.scardHead}>
