@@ -224,6 +224,7 @@ function UserEventsPanel({
   phase,
   onPhaseChange,
   onOpen,
+  viewerOrganizesCreated,
 }: {
   events: IEvent[];
   total: number;
@@ -235,6 +236,8 @@ function UserEventsPanel({
   phase: UserEventsPhase;
   onPhaseChange: (phase: UserEventsPhase) => void;
   onOpen: (eventId: string) => void;
+  /** Свои мероприятия на вкладке «Организует» — значок организатора */
+  viewerOrganizesCreated?: boolean;
 }) {
   const sentinelRef = useInfiniteScroll(onLoadMore, {
     enabled: !isLoading && !isLoadingMore && hasMore,
@@ -279,6 +282,7 @@ function UserEventsPanel({
               event={event}
               onClick={() => onOpen(event.id)}
               bleedCover
+              organizer={Boolean(event.isOrganizer) || (scope === 'created' && viewerOrganizesCreated)}
             />
           ))}
         </EventList>
@@ -937,6 +941,7 @@ export default function UserPage() {
                 scope={mainTab}
                 phase={eventsPhase}
                 onPhaseChange={setEventsPhase}
+                viewerOrganizesCreated={isOwnProfile}
                 onOpen={eventId => navigate(`/event/${eventId}`)}
               />
             )}

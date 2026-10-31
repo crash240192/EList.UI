@@ -329,6 +329,7 @@ export default function HomePage() {
                       <EventListItem
                         event={event}
                         bleedCover
+                        organizer={event.isOrganizer}
                         onClick={() => handleListEventClick(event)}
                       />
                       {shouldInsertAdAfterIndex(idx) && (
@@ -343,6 +344,7 @@ export default function HomePage() {
                     <Fragment key={event.id}>
                       <EventCard.Preset
                         event={event}
+                        organizer={event.isOrganizer}
                         onClick={e => handleListEventClick(e)}
                       />
                       {shouldInsertAdAfterIndex(idx) && (
