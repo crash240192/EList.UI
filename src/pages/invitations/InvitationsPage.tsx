@@ -23,6 +23,7 @@ import { getApiErrorCode, isAccessDeniedError, isApiError } from '@/shared/api/a
 import { ApiErrorCode } from '@/shared/api/errorCodes';
 import { useToastStore } from '@/app/store';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { TabBar } from '@/shared/ui/TabBar';
 import { EventTypeChip } from '@/shared/ui/EventTypeChip';
@@ -109,7 +110,7 @@ function InviterAvatar({
         aria-hidden
       >
         {org?.logoId ? (
-          <AuthImage
+          <FramedAuthImage
             fileId={org.logoId}
             alt=""
             className={styles.orgAvatarImg}

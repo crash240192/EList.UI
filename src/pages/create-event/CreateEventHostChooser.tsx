@@ -17,6 +17,7 @@ import { getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { Button } from '@/shared/ui/Button';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { apiIsoToLocalParts, formatLocalDateLongRu } from '@/shared/lib/datetime';
@@ -348,7 +349,7 @@ export function CreateEventHostChooser({
                     >
                       <div className={`${styles.hostAvatar} ${styles.hostAvatarSquare}`}>
                         {logoId ? (
-                          <AuthImage
+                          <FramedAuthImage
                             fileId={logoId}
                             alt=""
                             className={styles.hostAvatarImg}

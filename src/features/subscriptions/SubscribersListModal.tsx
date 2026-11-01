@@ -18,7 +18,7 @@ import {
 } from '@/entities/organization';
 import { useDebounce, useInfiniteScroll } from '@/shared/hooks';
 import { UserChip } from '@/entities/user/ui/UserChip';
-import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { formatPeopleCount } from '@/shared/lib/plural.ru';
 import styles from './SubscribersListModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -336,7 +336,7 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
                   <div className={styles.orgChip}>
                     <div className={styles.orgAvatar}>
                       {row.logoId ? (
-                        <AuthImage
+                        <FramedAuthImage
                           fileId={row.logoId}
                           alt=""
                           className={styles.orgAvatarImg}

@@ -24,6 +24,7 @@ import { SubscribersListModal } from '@/features/subscriptions/SubscribersListMo
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { useAvatar, seedAvatarCache } from '@/features/auth/useAvatar';
 import { getAvatarHistory, useAvatarCropDisplay } from '@/entities/user/avatarApi';
 import { EventListItem, EventList } from '@/entities/event/ui/EventListItem';
@@ -892,7 +893,7 @@ export default function UserPage() {
                         >
                           <div className={styles.orgLogo} aria-hidden>
                             {logoId ? (
-                              <AuthImage
+                              <FramedAuthImage
                                 fileId={logoId}
                                 alt=""
                                 className={styles.orgLogoImg}

@@ -25,6 +25,7 @@ import {
 import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
 import { fetchOrganizationRating } from '@/entities/event';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { getOrFetchAccountId, getStoredAccountId } from '@/entities/user/api';
 import type { IContactDataItem } from '@/entities/user/profileApi';
 import type { INotifySettings } from '@/entities/user/subscriptionApi';
@@ -42,7 +43,6 @@ import {
 } from '@/shared/lib/contactDisplay';
 import { useAuthStore } from '@/app/store';
 import { fetchAppFeatures } from '@/shared/api/featuresApi';
-import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
@@ -82,7 +82,7 @@ function OrgCoverBackground({ logoId }: { logoId: string | null }) {
     <div className={styles.coverBg}>
       <div className={styles.coverBgGradient} aria-hidden />
       {logoId ? (
-        <AuthImage
+        <FramedAuthImage
           fileId={logoId}
           alt=""
           className={styles.coverAvatarImg}
@@ -494,7 +494,7 @@ export default function OrganizationPage() {
           >
             <div className={styles.avatar}>
               {logoId ? (
-                <AuthImage
+                <FramedAuthImage
                   fileId={logoId}
                   alt={org.name}
                   className={styles.avatarImg}

@@ -15,6 +15,7 @@ import { useToastStore, useAuthStore, usePlatformRoleStore } from '@/app/store';
 import { useAccountId } from '@/features/auth/useAccountId';
 import { apiClient } from '@/shared/api/client';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { ParticipantsChipPreview } from '@/features/event/ParticipantsChipPreview';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { ParticipantsModal } from '@/features/event/ParticipantsModal';
@@ -124,7 +125,7 @@ function EventOrganizerChip({
       {kind === 'org' ? (
         <div className={styles.orgChipLogo}>
           {logoId ? (
-            <AuthImage
+            <FramedAuthImage
               fileId={logoId}
               alt={name}
               className={styles.orgChipLogoImg}

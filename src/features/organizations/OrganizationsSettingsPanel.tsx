@@ -88,6 +88,7 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { Select } from '@/shared/ui/Select/Select';
 import { OrgInnLookupModal } from './OrgInnLookupModal';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { OrgLogoUpload } from './OrgLogoUpload';
 import { AddOrgManagersFromSubscribersModal } from './AddOrgManagersFromSubscribersModal';
 import styles from './OrganizationsSettingsPanel.module.css';
@@ -726,7 +727,7 @@ function OrganizationProfileSection({
   avatarId: string | null;
   canEdit: boolean;
   isOwner: boolean;
-  onAvatarChanged: (id: string) => void;
+  onAvatarChanged: (id: string | null) => void;
   onUpdated: () => Promise<void>;
 }) {
   const [name, setName] = useState(org.name);
@@ -801,7 +802,16 @@ function OrganizationProfileSection({
             />
           ) : (
             <div className={styles.logoBtn}>
-              <span className={styles.logoInitials}>{initials.slice(0, 2).toUpperCase()}</span>
+              {avatarId ? (
+                <FramedAuthImage
+                  fileId={avatarId}
+                  alt=""
+                  className={styles.logoImg}
+                  fallback={<span className={styles.logoInitials}>{initials.slice(0, 2).toUpperCase()}</span>}
+                />
+              ) : (
+                <span className={styles.logoInitials}>{initials.slice(0, 2).toUpperCase()}</span>
+              )}
             </div>
           )}
           <div>
