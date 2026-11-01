@@ -5,9 +5,44 @@ export const AVATAR_OUTPUT_SIZE = 1024;
 export const AVATAR_ZOOM_MIN = 1;
 export const AVATAR_ZOOM_MAX = 3;
 
+/** Кадр относительно исходника: масштаб и точка, на которую смотрит центр окна. */
+export interface AvatarCropFrame {
+  zoom: number;
+  /** 0…1 по ширине исходника */
+  focusX: number;
+  /** 0…1 по высоте исходника */
+  focusY: number;
+}
+
+export const DEFAULT_AVATAR_CROP_FRAME: AvatarCropFrame = {
+  zoom: AVATAR_ZOOM_MIN,
+  focusX: 0.5,
+  focusY: 0.5,
+};
+
 export function clamp(value: number, min: number, max: number): number {
   if (min > max) return (min + max) / 2;
   return Math.min(max, Math.max(min, value));
+}
+
+export function clampAvatarZoom(value: unknown, fallback = AVATAR_ZOOM_MIN): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.round(clamp(n, AVATAR_ZOOM_MIN, AVATAR_ZOOM_MAX) * 100) / 100;
+}
+
+export function clampFocus01(value: unknown, fallback = 0.5): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.round(clamp(n, 0, 1) * 10000) / 10000;
+}
+
+export function normalizeAvatarCropFrame(raw?: Partial<AvatarCropFrame> | null): AvatarCropFrame {
+  return {
+    zoom: clampAvatarZoom(raw?.zoom ?? DEFAULT_AVATAR_CROP_FRAME.zoom),
+    focusX: clampFocus01(raw?.focusX ?? DEFAULT_AVATAR_CROP_FRAME.focusX),
+    focusY: clampFocus01(raw?.focusY ?? DEFAULT_AVATAR_CROP_FRAME.focusY),
+  };
 }
 
 /** Масштаб, при котором меньшая сторона картинки закрывает круг. */
@@ -52,6 +87,43 @@ export function clampedPan(
     panX: left - (stageSize - imageWidth) / 2,
     panY: top - (stageSize - imageHeight) / 2,
   };
+}
+
+/** Центр окна → доля исходника (независимо от размера stage). */
+export function frameFocusFromPan(
+  stageSize: number,
+  naturalWidth: number,
+  naturalHeight: number,
+  circleSize: number,
+  zoom: number,
+  panX: number,
+  panY: number,
+): Pick<AvatarCropFrame, 'focusX' | 'focusY'> {
+  const disp = displayedSize(naturalWidth, naturalHeight, circleSize, zoom);
+  const placed = clampedPan(stageSize, disp.width, disp.height, circleSize, panX, panY);
+  return {
+    focusX: clampFocus01(disp.width === 0 ? 0.5 : (stageSize / 2 - placed.left) / disp.width),
+    focusY: clampFocus01(disp.height === 0 ? 0.5 : (stageSize / 2 - placed.top) / disp.height),
+  };
+}
+
+/** Доля исходника → пан для текущего stage/zoom. */
+export function panFromFrameFocus(
+  stageSize: number,
+  naturalWidth: number,
+  naturalHeight: number,
+  circleSize: number,
+  zoom: number,
+  focusX: number,
+  focusY: number,
+): { panX: number; panY: number } {
+  const disp = displayedSize(naturalWidth, naturalHeight, circleSize, zoom);
+  const left = stageSize / 2 - clampFocus01(focusX) * disp.width;
+  const top = stageSize / 2 - clampFocus01(focusY) * disp.height;
+  const panX = left - (stageSize - disp.width) / 2;
+  const panY = top - (stageSize - disp.height) / 2;
+  const next = clampedPan(stageSize, disp.width, disp.height, circleSize, panX, panY);
+  return { panX: next.panX, panY: next.panY };
 }
 
 /** Пан, при котором центр круга смотрит в ту же точку фото после смены масштаба. */

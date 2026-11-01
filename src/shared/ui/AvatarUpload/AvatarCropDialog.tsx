@@ -1,5 +1,6 @@
 // Окно кадра аватара: сдвиг и масштаб фото внутри круга.
 // Наружу отдаётся уже обрезанный JPEG — API загрузки не меняется.
+// При повторном открытии можно восстановить zoom/focus поверх исходника.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -8,12 +9,18 @@ import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import {
   AVATAR_ZOOM_MAX,
   AVATAR_ZOOM_MIN,
+  clampAvatarZoom,
   clampedPan,
+  DEFAULT_AVATAR_CROP_FRAME,
   displayedSize,
+  frameFocusFromPan,
+  normalizeAvatarCropFrame,
   panForZoom,
+  panFromFrameFocus,
   renderAvatarFile,
   sourceSquare,
   circleOrigin,
+  type AvatarCropFrame,
 } from './cropAvatar';
 import styles from './AvatarCropDialog.module.css';
 
@@ -21,15 +28,23 @@ const CIRCLE_RATIO = 0.8;
 
 export type AvatarCropShape = 'circle' | 'rounded-square';
 
+function zoomPercent(zoom: number): number {
+  const span = AVATAR_ZOOM_MAX - AVATAR_ZOOM_MIN;
+  if (span <= 0) return 0;
+  return Math.round(((clampAvatarZoom(zoom) - AVATAR_ZOOM_MIN) / span) * 100);
+}
+
 interface AvatarCropDialogProps {
   src: string | null;
   fileName: string;
   saving: boolean;
   onCancel: () => void;
-  onConfirm: (file: File) => void | Promise<void>;
+  onConfirm: (file: File, frame: AvatarCropFrame) => void | Promise<void>;
   title?: string;
   lead?: string;
   shape?: AvatarCropShape;
+  /** Последний кадр поверх текущего src (исходник). Сброс при смене src без frame. */
+  initialFrame?: AvatarCropFrame | null;
   /** «Выбрать фото...» поверх кадра. */
   onFilePicked?: (file: File) => void;
   /** «Удалить» поверх кадра. Нет колбэка — кнопки нет. */
@@ -47,6 +62,7 @@ export function AvatarCropDialog({
   title = 'Кадр аватара',
   lead = 'Перетащите фото и подгоните масштаб. В круг попадёт то, что видно в окне.',
   shape = 'circle',
+  initialFrame = null,
   onFilePicked,
   onDelete,
   deleteDisabled = false,
@@ -56,21 +72,32 @@ export function AvatarCropDialog({
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
+  const pendingFrameRef = useRef<AvatarCropFrame>(
+    normalizeAvatarCropFrame(initialFrame ?? DEFAULT_AVATAR_CROP_FRAME),
+  );
+  const appliedFrameKeyRef = useRef<string | null>(null);
 
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [stageSize, setStageSize] = useState(0);
-  const [zoom, setZoom] = useState(AVATAR_ZOOM_MIN);
+  const [zoom, setZoom] = useState(() => clampAvatarZoom(initialFrame?.zoom ?? AVATAR_ZOOM_MIN));
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [decoded, setDecoded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [dragging, setDragging] = useState(false);
+
   const seenSrc = useRef(src);
-  if (seenSrc.current !== src) {
+  const seenFrameKey = useRef(`${src ?? ''}|${initialFrame?.zoom ?? ''}|${initialFrame?.focusX ?? ''}|${initialFrame?.focusY ?? ''}`);
+  const frameKey = `${src ?? ''}|${initialFrame?.zoom ?? ''}|${initialFrame?.focusX ?? ''}|${initialFrame?.focusY ?? ''}`;
+  if (seenSrc.current !== src || seenFrameKey.current !== frameKey) {
     seenSrc.current = src;
+    seenFrameKey.current = frameKey;
+    const nextFrame = normalizeAvatarCropFrame(initialFrame ?? DEFAULT_AVATAR_CROP_FRAME);
+    pendingFrameRef.current = nextFrame;
+    appliedFrameKeyRef.current = null;
     setNatural(null);
     setDecoded(false);
-    setZoom(AVATAR_ZOOM_MIN);
+    setZoom(nextFrame.zoom);
     setPan({ x: 0, y: 0 });
     setError(null);
     setPreparing(false);
@@ -95,6 +122,27 @@ export function AvatarCropDialog({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // Когда известны размеры картинки и stage — ставим сохранённый кадр.
+  useLayoutEffect(() => {
+    if (!natural || stageSize <= 0 || !src) return;
+    const key = `${src}|${pendingFrameRef.current.zoom}|${pendingFrameRef.current.focusX}|${pendingFrameRef.current.focusY}|${natural.w}x${natural.h}|${stageSize}`;
+    if (appliedFrameKeyRef.current === key) return;
+    const frame = pendingFrameRef.current;
+    const circle = stageSize * CIRCLE_RATIO;
+    const nextPan = panFromFrameFocus(
+      stageSize,
+      natural.w,
+      natural.h,
+      circle,
+      frame.zoom,
+      frame.focusX,
+      frame.focusY,
+    );
+    appliedFrameKeyRef.current = key;
+    setZoom(frame.zoom);
+    setPan({ x: nextPan.panX, y: nextPan.panY });
+  }, [natural, stageSize, src]);
 
   const circleSize = stageSize * CIRCLE_RATIO;
   const disp = natural && stageSize > 0
@@ -159,18 +207,29 @@ export function AvatarCropDialog({
       circle.top,
       circleSize,
     );
+    const focus = frameFocusFromPan(
+      stageSize,
+      natural.w,
+      natural.h,
+      circleSize,
+      zoom,
+      pan.x,
+      pan.y,
+    );
+    const frame = normalizeAvatarCropFrame({ zoom, ...focus });
     setPreparing(true);
     setError(null);
     try {
       const file = await renderAvatarFile(image, square, fileName);
-      await onConfirm(file);
+      await onConfirm(file, frame);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось сохранить фото');
       setPreparing(false);
     }
-  }, [natural, disp, placed, saving, preparing, stageSize, circleSize, fileName, onConfirm]);
+  }, [natural, disp, placed, saving, preparing, stageSize, circleSize, fileName, onConfirm, zoom, pan.x, pan.y]);
 
   const busy = saving || preparing;
+  const percent = zoomPercent(zoom);
 
   return createPortal(
     <>
@@ -276,14 +335,14 @@ export function AvatarCropDialog({
         </div>
 
         <label className={styles.zoom}>
-          <span>Масштаб</span>
+          <span>Масштаб {percent}%</span>
           <input
             type="range"
             min={AVATAR_ZOOM_MIN}
             max={AVATAR_ZOOM_MAX}
             step={0.01}
             value={zoom}
-            aria-label="Масштаб"
+            aria-label={`Масштаб ${percent}%`}
             disabled={busy || !natural}
             onChange={e => onZoom(Number(e.target.value))}
           />
