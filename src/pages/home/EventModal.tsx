@@ -46,9 +46,16 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
         <div className={styles.cover}
           style={{ background: hasCover ? '#111' : getEventCoverBackground(event) }}>
           {event.coverImageId ? (
-            <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg}
+            <AuthImage
+              fileId={event.coverImageId}
+              fullSize
+              imageFit="cover"
+              lazy={false}
+              alt={event.name}
+              className={styles.coverImg}
               style={focusStyle}
-              fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} /> : undefined} />
+              fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} /> : undefined}
+            />
           ) : event.coverUrl ? (
             <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} />
           ) : null}

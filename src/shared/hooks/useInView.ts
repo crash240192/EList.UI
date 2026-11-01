@@ -34,6 +34,18 @@ export function useInView(options: UseInViewOptions = {}) {
   useEffect(() => {
     if (!enabled || !node || frozenRef.current) return;
 
+    // fixed-модалка (превью на карте и т.п.): IO со scroll-root / transform часто
+    // не считает слот видимым → AuthImage так и не начинает download. Грузим сразу.
+    let ancestor: Element | null = node;
+    while (ancestor) {
+      if (getComputedStyle(ancestor).position === 'fixed') {
+        frozenRef.current = true;
+        setInView(true);
+        return;
+      }
+      ancestor = ancestor.parentElement;
+    }
+
     let root: Element | null = null;
     let cur = node.parentElement;
     while (cur) {
