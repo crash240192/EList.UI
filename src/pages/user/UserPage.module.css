@@ -84,23 +84,15 @@
   min-height: 0;
 }
 
+/* Лёгкое затемнение только у низа: длинный прозрачный хвост, без резкой кромки. */
 .coverOverlayPhoto {
-  background: none;
-}
-
-/* Не линейный градиент: на узкой шапке его верхняя кромка читается полосой.
-   Плотная плашка сильно размыта, поэтому затемнение только тает к низу. */
-.coverOverlayPhoto::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  /* Кромка плашки ниже видимой шапки: в кадре только верхний хвост размытия. */
-  bottom: -52px;
-  height: 64px;
-  background: rgba(0, 0, 0, 0.72);
-  filter: blur(36px);
-  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.42) 0%,
+    rgba(0, 0, 0, 0.16) 28%,
+    rgba(0, 0, 0, 0.04) 55%,
+    transparent 78%
+  );
 }
 
 /* ── Profile header ── */
