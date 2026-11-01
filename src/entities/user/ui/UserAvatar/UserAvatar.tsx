@@ -1,8 +1,10 @@
 // entities/user/ui/UserAvatar/UserAvatar.tsx
-// Аватар пользователя — fileId из avatarId аккаунта, без отдельного запроса
+// Аватар: fileId из avatarId; при наличии меты кадра — исходник + CSS (как шапка).
 
+import type { CSSProperties } from 'react';
 import { useAvatar } from '@/features/auth/useAvatar';
 import { useOnlinePresence } from '@/features/presence';
+import { useAvatarCropDisplay } from '@/entities/user/avatarApi';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './UserAvatar.module.css';
 
@@ -12,7 +14,7 @@ interface UserAvatarProps {
   avatarId?: string | null;
   size?:     number;
   className?: string;
-  style?:    React.CSSProperties;
+  style?:    CSSProperties;
   /** Показывать зелёную точку, если пользователь онлайн (по умолчанию да) */
   showOnline?: boolean;
   /** Явный статус; если не задан — берётся из presence store */
@@ -33,6 +35,7 @@ export function UserAvatar({
   onlineDotSize,
 }: UserAvatarProps) {
   const fileId = useAvatar(accountId, avatarId);
+  const { displayFileId, imgStyle } = useAvatarCropDisplay(fileId);
   const presenceOnline = useOnlinePresence(showOnline && onlineProp == null ? accountId : null);
   const isOnline = onlineProp ?? presenceOnline;
 
@@ -47,9 +50,14 @@ export function UserAvatar({
   return (
     <div className={`${styles.wrap} ${className ?? ''}`} style={{ width: size, height: size }}>
       <div className={styles.avatar} style={style}>
-        {fileId
-          ? <AuthImage fileId={fileId} alt={initials} className={styles.img}
-              fallback={<span>{initials}</span>} />
+        {displayFileId
+          ? <AuthImage
+              fileId={displayFileId}
+              alt={initials}
+              className={styles.img}
+              style={imgStyle}
+              fallback={<span>{initials}</span>}
+            />
           : <span>{initials}</span>}
       </div>
       {showOnline && isOnline && (

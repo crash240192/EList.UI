@@ -1,6 +1,6 @@
-// Окно «Кадр аватара» для уже выбранного или текущего фото.
-// Подставляем исходник и последний zoom/focus, а не обрезанный JPEG с нуля.
-// «Выбрать фото...» подменяет исходник, «Удалить» снимает сохранённый аватар.
+// Окно «Кадр аватара» — модель как у шапки:
+// новый файл в хранилище и запись в историю только при выборе нового фото;
+// сдвиг/масштаб кадра сохраняются в description без upload и без setNew.
 
 import { useEffect, useRef, useState } from 'react';
 import { fetchAuthedImage, uploadFile } from '@/shared/api/fileStorageClient';
@@ -168,30 +168,35 @@ export function AvatarFrameSession({
     }
   };
 
-  const onConfirm = async (file: File, frame: AvatarCropFrame) => {
+  const onConfirm = async ({ frame }: { frame: AvatarCropFrame }) => {
     setSaving(true);
     try {
-      let sourceFileId = sourceFileIdRef.current;
       const localOriginal = localFileRef.current;
+      const nextFrame = normalizeAvatarCropFrame(frame);
+
+      // Новый файл — один upload исходника + setNew (история). Кроп JPEG не создаём.
       if (localOriginal) {
         const uploadedSource = await uploadFile(localOriginal);
-        sourceFileId = uploadedSource.id;
+        const sourceFileId = uploadedSource.id;
+        await saveAvatarCropMeta(sourceFileId, sourceFileId, nextFrame);
+        await setAvatar(sourceFileId);
+        seedAvatarCache(accountId, sourceFileId);
+        savedIdRef.current = sourceFileId;
         sourceFileIdRef.current = sourceFileId;
         localFileRef.current = null;
+        onChanged(sourceFileId);
+        onClose();
+        return;
       }
 
-      const uploaded = await uploadFile(file);
-      if (sourceFileId) {
-        try {
-          await saveAvatarCropMeta(uploaded.id, sourceFileId, frame);
-        } catch {
-          // Кадр уже готов; без меты следующий раз откроется без zoom/focus — не блокируем.
-        }
+      // Только кадр — обновляем description, без upload и без новой записи в истории.
+      const avatarFileId = savedIdRef.current;
+      if (!avatarFileId) {
+        throw new Error('Сначала выберите фото');
       }
-      await setAvatar(uploaded.id);
-      seedAvatarCache(accountId, uploaded.id);
-      savedIdRef.current = uploaded.id;
-      onChanged(uploaded.id);
+      const sourceFileId = sourceFileIdRef.current ?? avatarFileId;
+      await saveAvatarCropMeta(avatarFileId, sourceFileId, nextFrame);
+      onChanged(avatarFileId);
       onClose();
     } finally {
       setSaving(false);
@@ -205,6 +210,7 @@ export function AvatarFrameSession({
       saving={saving || deleting}
       loadingImage={loadingImage}
       initialFrame={initialFrame}
+      exportCroppedFile={false}
       deleteDisabled={!src && !fileId}
       onFilePicked={onFilePicked}
       onDelete={onDelete}

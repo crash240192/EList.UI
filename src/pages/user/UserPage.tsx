@@ -25,7 +25,7 @@ import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { useAvatar, seedAvatarCache } from '@/features/auth/useAvatar';
-import { getAvatarHistory } from '@/entities/user/avatarApi';
+import { getAvatarHistory, useAvatarCropDisplay } from '@/entities/user/avatarApi';
 import { EventListItem, EventList } from '@/entities/event/ui/EventListItem';
 import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
 import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
@@ -95,6 +95,7 @@ function UserCoverBackground({
   headerBlurPercent: number;
 }) {
   const fileId = useAvatar(accountId, avatarId);
+  const { displayFileId: avatarDisplayId, imgStyle: avatarImgStyle } = useAvatarCropDisplay(fileId);
   const headerBlur = headerImageId ? headerBlurFilter(headerBlurPercent) : undefined;
 
   return (
@@ -116,11 +117,12 @@ function UserCoverBackground({
             ...(headerBlur ? { filter: headerBlur } : {}),
           }}
         />
-      ) : fileId ? (
+      ) : avatarDisplayId ? (
         <AuthImage
-          fileId={fileId}
+          fileId={avatarDisplayId}
           alt=""
           className={styles.coverAvatarImg}
+          style={avatarImgStyle}
         />
       ) : (
         <div className={styles.coverPattern} aria-hidden />

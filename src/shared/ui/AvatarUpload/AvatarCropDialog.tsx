@@ -28,6 +28,12 @@ const CIRCLE_RATIO = 0.8;
 
 export type AvatarCropShape = 'circle' | 'rounded-square';
 
+/** Результат «Сохранить»: всегда кадр; JPEG — только если exportCroppedFile. */
+export interface AvatarCropConfirmPayload {
+  frame: AvatarCropFrame;
+  file?: File;
+}
+
 function zoomPercent(zoom: number): number {
   const span = AVATAR_ZOOM_MAX - AVATAR_ZOOM_MIN;
   if (span <= 0) return 0;
@@ -39,7 +45,7 @@ interface AvatarCropDialogProps {
   fileName: string;
   saving: boolean;
   onCancel: () => void;
-  onConfirm: (file: File, frame: AvatarCropFrame) => void | Promise<void>;
+  onConfirm: (payload: AvatarCropConfirmPayload) => void | Promise<void>;
   title?: string;
   lead?: string;
   shape?: AvatarCropShape;
@@ -51,6 +57,11 @@ interface AvatarCropDialogProps {
   onDelete?: () => void | Promise<void>;
   deleteDisabled?: boolean;
   loadingImage?: boolean;
+  /**
+   * true — отдать обрезанный JPEG (логотип орг).
+   * false — только кадр; исходник остаётся как есть (аватар профиля).
+   */
+  exportCroppedFile?: boolean;
 }
 
 export function AvatarCropDialog({
@@ -67,6 +78,7 @@ export function AvatarCropDialog({
   onDelete,
   deleteDisabled = false,
   loadingImage = false,
+  exportCroppedFile = true,
 }: AvatarCropDialogProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -195,18 +207,6 @@ export function AvatarCropDialog({
   const save = useCallback(async () => {
     const image = imgRef.current;
     if (!image || !image.complete || !natural || !disp || !placed || saving || preparing) return;
-    const circle = circleOrigin(stageSize, circleSize);
-    const square = sourceSquare(
-      natural.w,
-      natural.h,
-      placed.left,
-      placed.top,
-      disp.width,
-      disp.height,
-      circle.left,
-      circle.top,
-      circleSize,
-    );
     const focus = frameFocusFromPan(
       stageSize,
       natural.w,
@@ -220,13 +220,32 @@ export function AvatarCropDialog({
     setPreparing(true);
     setError(null);
     try {
+      if (!exportCroppedFile) {
+        await onConfirm({ frame });
+        return;
+      }
+      const circle = circleOrigin(stageSize, circleSize);
+      const square = sourceSquare(
+        natural.w,
+        natural.h,
+        placed.left,
+        placed.top,
+        disp.width,
+        disp.height,
+        circle.left,
+        circle.top,
+        circleSize,
+      );
       const file = await renderAvatarFile(image, square, fileName);
-      await onConfirm(file, frame);
+      await onConfirm({ frame, file });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось сохранить фото');
       setPreparing(false);
     }
-  }, [natural, disp, placed, saving, preparing, stageSize, circleSize, fileName, onConfirm, zoom, pan.x, pan.y]);
+  }, [
+    natural, disp, placed, saving, preparing, stageSize, circleSize, fileName,
+    onConfirm, zoom, pan.x, pan.y, exportCroppedFile,
+  ]);
 
   const busy = saving || preparing;
   const percent = zoomPercent(zoom);

@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '@/app/store';
+import { useAvatarCropDisplay } from '@/entities/user/avatarApi';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { BugReportModal } from '@/features/bug-reports/BugReportModal';
@@ -23,6 +24,7 @@ export function HeaderAvatarMenu() {
   const { theme, toggleTheme } = useThemeStore();
   const myAvatar = useMyAvatar();
   const myAvatarFileId = myAvatar.fileId;
+  const { displayFileId: myAvatarDisplayId, imgStyle: myAvatarImgStyle } = useAvatarCropDisplay(myAvatarFileId);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [bugOpen, setBugOpen] = useState(false);
@@ -98,8 +100,8 @@ export function HeaderAvatarMenu() {
         aria-expanded={menuOpen}
         aria-haspopup="menu"
       >
-        {myAvatarFileId
-          ? <AuthImage fileId={myAvatarFileId} alt="Аватар" className={styles.avatarImg} />
+        {myAvatarDisplayId
+          ? <AuthImage fileId={myAvatarDisplayId} alt="Аватар" className={styles.avatarImg} style={myAvatarImgStyle} />
           : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.avatarFallback} aria-hidden>
               <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
               <circle cx="12" cy="7" r="4" />

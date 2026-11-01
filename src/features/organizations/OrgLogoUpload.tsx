@@ -118,7 +118,7 @@ export function OrgLogoUpload({
           title="Кадр логотипа"
           lead="Перетащите фото и подгоните масштаб. В квадрат попадёт то, что видно в окне."
           onCancel={closeCrop}
-          onConfirm={file => { void uploadCropped(file); }}
+          onConfirm={({ file }) => { if (file) void uploadCropped(file); }}
         />
       )}
     </div>
