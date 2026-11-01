@@ -13,6 +13,8 @@
   composes: hero from '../../shared/styles/hero.module.css';
   /* Слой фото (z-index внутри AuthImage) остаётся внутри шапки и не перекрывает аватар. */
   isolation: isolate;
+  /* Вуаль может чуть выйти вниз до имени; само фото режет .coverBg. */
+  overflow: visible;
 }
 
 .coverBg {
@@ -84,14 +86,22 @@
   min-height: 0;
 }
 
-/* Лёгкое затемнение только у низа: короткий прозрачный хвост, без резкой кромки. */
+/*
+ * Вуаль только у кромки шапки: до имени включительно, выше по фото не лезем.
+ * Имя сидит у нижнего края cover (−44px + flex-end) — полоса ~56px хватает.
+ */
 .coverOverlayPhoto {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: -14px;
+  height: 56px;
   background: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0.42) 0%,
-    rgba(0, 0, 0, 0.16) 14%,
-    rgba(0, 0, 0, 0.04) 28%,
-    transparent 39%
+    rgba(0, 0, 0, 0.52) 0%,
+    rgba(0, 0, 0, 0.28) 38%,
+    rgba(0, 0, 0, 0.08) 72%,
+    transparent 100%
   );
 }
 
