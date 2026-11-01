@@ -10,7 +10,7 @@ import {
   type AlbumListSort,
 } from '@/features/media/albumListSort';
 import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
-import { usePageTitle } from '@/shared/hooks';
+import { useDebounce, usePageTitle } from '@/shared/hooks';
 import styles from './EventAlbumsPage.module.css';
 
 export default function EventAlbumsPage() {
@@ -19,6 +19,8 @@ export default function EventAlbumsPage() {
   const { accountId, loading } = useAccountId();
   const [sort, setSort] = useState<AlbumListSort>(() => readStoredAlbumListSort());
   const [pinUnread, setPinUnread] = useState(() => readStoredPinUnread(true));
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
 
   return (
     <div className={styles.page}>
@@ -42,6 +44,32 @@ export default function EventAlbumsPage() {
             )}
           </div>
 
+          {accountId && (
+            <div className={styles.searchWrap}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={styles.searchIcon} aria-hidden>
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
+              <input
+                className={styles.searchInput}
+                type="search"
+                placeholder="Поиск по мероприятию или альбому..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                aria-label="Поиск по мероприятию или альбому"
+              />
+              {search && (
+                <button
+                  type="button"
+                  className={styles.searchClear}
+                  onClick={() => setSearch('')}
+                  aria-label="Очистить поиск"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
+
           <div className={styles.cardBody}>
             {!loading && !accountId && (
               <div className={styles.emptyState}>
@@ -56,6 +84,7 @@ export default function EventAlbumsPage() {
                 onOpenEvent={eventId => navigate(`/event/${eventId}`)}
                 sort={sort}
                 pinUnread={pinUnread}
+                searchQuery={debouncedSearch}
               />
             )}
           </div>

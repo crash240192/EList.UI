@@ -491,6 +491,30 @@ function EventGroupSection({
   );
 }
 
+/** Клиентский фильтр: по названию события или альбома/описанию. API не трогаем. */
+export function filterEventAlbumGroups(
+  groups: readonly IEventAlbumsGroup[],
+  query: string,
+): IEventAlbumsGroup[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return groups.slice();
+  const out: IEventAlbumsGroup[] = [];
+  for (const group of groups) {
+    const eventHit = group.event.name.toLowerCase().includes(q);
+    if (eventHit) {
+      out.push(group);
+      continue;
+    }
+    const albums = group.albums.filter(album => {
+      if (album.name.toLowerCase().includes(q)) return true;
+      const description = album.description?.toLowerCase() ?? '';
+      return description.includes(q);
+    });
+    if (albums.length > 0) out.push({ ...group, albums });
+  }
+  return out;
+}
+
 interface EventAlbumsGroupsPanelProps {
   /** Альбомы мероприятий, доступные аккаунту */
   accountId?: string;
@@ -505,6 +529,8 @@ interface EventAlbumsGroupsPanelProps {
    * По умолчанию true на странице альбомов; выкл. → чистая сортировка + только glow.
    */
   pinUnread?: boolean;
+  /** Клиентский поиск по событию/альбому (без новых API). */
+  searchQuery?: string;
   emptyTitle?: string;
   emptySub?: string;
   className?: string;
@@ -517,6 +543,7 @@ export function EventAlbumsGroupsPanel({
   onTotalChange,
   sort,
   pinUnread = true,
+  searchQuery = '',
   emptyTitle = 'Альбомов пока нет',
   emptySub = 'Здесь появятся фотоальбомы мероприятий, к которым есть доступ',
   className,
@@ -574,7 +601,7 @@ export function EventAlbumsGroupsPanel({
 
   const sentinelRef = useInfiniteScroll(loadMore, { enabled: hasMore && !loading && !loadingMore });
 
-  const displayGroups = useMemo(() => {
+  const sortedGroups = useMemo(() => {
     // Внутри события свежие альбомы всегда выше.
     const presented = presentAlbumGroupsFreshFirst(
       groups,
@@ -594,6 +621,18 @@ export function EventAlbumsGroupsPanel({
       pinUnread ? groupHasUnreadAlbums : undefined,
     );
   }, [groups, seenAlbumIds, gridAlbum, sort, pinUnread, serverSort]);
+
+  const isSearching = Boolean(searchQuery.trim());
+  const displayGroups = useMemo(
+    () => filterEventAlbumGroups(sortedGroups, searchQuery),
+    [sortedGroups, searchQuery],
+  );
+
+  // Поиск без нового API: догружаем остальные страницы byEvents, пока есть что грузить.
+  useEffect(() => {
+    if (!isSearching || !hasMore || loading || loadingMore) return;
+    loadMore();
+  }, [isSearching, hasMore, loading, loadingMore, groups.length, loadMore]);
 
   const rememberSeen = useCallback((albumId: string) => {
     setSeenAlbumIds(prev => {
@@ -625,10 +664,17 @@ export function EventAlbumsGroupsPanel({
 
         {error && <div className={styles.error}>{error}</div>}
 
-        {!loading && !error && groups.length === 0 && (
+        {!loading && !error && groups.length === 0 && !isSearching && (
           <div className={styles.emptyState}>
             <p className={styles.emptyTitle}>{emptyTitle}</p>
             <p className={styles.emptySub}>{emptySub}</p>
+          </div>
+        )}
+
+        {!loading && !error && isSearching && displayGroups.length === 0 && !hasMore && !loadingMore && (
+          <div className={styles.emptyState}>
+            <p className={styles.emptyTitle}>Ничего не найдено</p>
+            <p className={styles.emptySub}>Попробуйте другое название мероприятия или альбома</p>
           </div>
         )}
 
@@ -644,11 +690,11 @@ export function EventAlbumsGroupsPanel({
         {/* Пагинация: прелоадер/скелетон внизу ленты, где появятся новые группы */}
         {hasMore && !loading && (
           <div
-            ref={sentinelRef}
-            className={loadingMore ? styles.loadMoreZone : styles.sentinel}
-            aria-busy={loadingMore || undefined}
+            ref={isSearching ? undefined : sentinelRef}
+            className={(loadingMore || isSearching) ? styles.loadMoreZone : styles.sentinel}
+            aria-busy={loadingMore || isSearching || undefined}
           >
-            {loadingMore && (
+            {(loadingMore || (isSearching && hasMore)) && (
               <>
                 <div className={styles.skeletonGroup} aria-hidden />
                 <AppPreloader
