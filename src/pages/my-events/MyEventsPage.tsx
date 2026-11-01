@@ -111,11 +111,12 @@ export default function MyEventsPage() {
     price:      filters.price,
     ageLimit:   filters.ageLimit,
     adultOnly:  filters.adultOnly,
+    orderBy:    filters.orderBy,
   // @ts-ignore
     _v:         searchVersion,
   }), [debouncedName, selectedCategories, selectedTypes,
        filters.startTime, filters.endTime, filters.price,
-       filters.ageLimit, filters.adultOnly,
+       filters.ageLimit, filters.adultOnly, filters.orderBy,
        searchVersion]);
 
   const toggleSlice = (key: OwnerFilter) => {

@@ -25,6 +25,13 @@ import {
   ageFiltersActive,
 } from '@/features/event-filters/ageFilter';
 import { useAgeFilterGate } from '@/features/event-filters/useAgeFilterGate';
+import { EventSortMenu } from './EventSortMenu';
+import {
+  DEFAULT_EVENT_LIST_SORT,
+  eventListSortById,
+  eventListSortIdFromOrderBy,
+  type EventListSortId,
+} from './eventListSort';
 import styles from './FilterBar.module.css';
 
 const DEFAULT_RADIUS_M = 25000; // запасной радиус до первой синхронизации с картой
@@ -357,6 +364,16 @@ export function FilterBar({
     (!quickDate && !!filters.endTime)
     || ageFiltersActive(filters);
 
+  const showSort = viewMode === 'list';
+  const sortId = eventListSortIdFromOrderBy(filters.orderBy);
+  const handleSortChange = (next: EventListSortId) => {
+    const option = eventListSortById(next);
+    setFilter(
+      'orderBy',
+      next === DEFAULT_EVENT_LIST_SORT ? undefined : option.orderBy,
+    );
+  };
+
   return (
     <>
     {/* ── Мобильная компактная строка (только на мобиле) ── */}
@@ -368,6 +385,9 @@ export function FilterBar({
           onKeyDown={e => e.key === 'Enter' && syncDraftFiltersFromPicker()} />
         {searchName && <button className={styles.clearBtn} onClick={() => onSearchChange('')}>✕</button>}
       </div>
+      {showSort && (
+        <EventSortMenu value={sortId} onChange={handleSortChange} />
+      )}
       <button className={styles.mobileFilterBtn} onClick={() => setMobileSheet(true)}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <line x1="6" y1="4" x2="6" y2="20"/>
@@ -428,6 +448,9 @@ export function FilterBar({
             onKeyDown={e => e.key === 'Enter' && syncDraftFiltersFromPicker()} />
           {searchName && <button className={styles.clearBtn} onClick={() => onSearchChange('')}>✕</button>}
         </div>
+        {showSort && (
+          <EventSortMenu value={sortId} onChange={handleSortChange} />
+        )}
         {!hideViewToggle && (
           <button className={styles.viewToggle} onClick={() => onViewModeChange(viewMode === 'map' ? 'list' : 'map')}
             title={viewMode === 'map' ? 'Показать списком' : 'Показать на карте'}>

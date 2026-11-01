@@ -127,8 +127,9 @@ export interface IEventsSearchParams {
   /** false — включать неактивные/отменённые (как на «Мои → Организую») */
   active?: boolean;
   /**
-   * Сортировка: "StartTime", "StartTime DESC", "EndTime DESC".
-   * Для прошедших (только endTime) бэкенд по умолчанию ставит EndTime DESC.
+   * Сортировка: StartTime, EndTime, AgeLimit, Cost, Name, CreateDate
+   * (+ опционально " DESC"). Для прошедших (только endTime) без orderBy —
+   * бэкенд по умолчанию ставит EndTime DESC.
    */
   orderBy?: string;
   pageIndex?: number;
