@@ -103,17 +103,50 @@ interface Result {
   loadMore:      () => void;
 }
 
-function mergeEvents(lists: IEvent[][], phase: EventsPhase): IEvent[] {
+function compareNullableNumber(a: number | null | undefined, b: number | null | undefined, desc: boolean): number {
+  const av = a == null || !Number.isFinite(a) ? null : a;
+  const bv = b == null || !Number.isFinite(b) ? null : b;
+  if (av == null && bv == null) return 0;
+  if (av == null) return 1;
+  if (bv == null) return -1;
+  return desc ? bv - av : av - bv;
+}
+
+function mergeEvents(lists: IEvent[][], phase: EventsPhase, orderBy?: string): IEvent[] {
   const byId = new Map<string, IEvent>();
   for (const list of lists) {
     for (const event of list) byId.set(event.id, event);
   }
   const events = [...byId.values()];
+  const key = (orderBy ?? '').trim().toLowerCase();
+  const desc = key.includes('desc');
+
   events.sort((a, b) => {
-    if (phase === 'archive') {
+    if (key.includes('agelimit') || key.includes('age_limit')) {
+      return compareNullableNumber(a.parameters?.ageLimit, b.parameters?.ageLimit, desc);
+    }
+    if (key.includes('cost') || key.includes('price')) {
+      return compareNullableNumber(a.parameters?.cost, b.parameters?.cost, desc);
+    }
+    if (key.includes('name')) {
+      const cmp = (a.name || '').localeCompare(b.name || '', 'ru', { sensitivity: 'base' });
+      return desc ? -cmp : cmp;
+    }
+    if (key.includes('create')) {
+      // createDate в списке поиска может отсутствовать — fallback на startTime
+      const aT = Date.parse((a as { createDate?: string }).createDate || a.startTime);
+      const bT = Date.parse((b as { createDate?: string }).createDate || b.startTime);
+      return desc ? bT - aT : aT - bT;
+    }
+    if (key.includes('start') || (!key && phase !== 'archive')) {
+      const aT = Date.parse(a.startTime);
+      const bT = Date.parse(b.startTime);
+      return desc ? bT - aT : aT - bT;
+    }
+    if (phase === 'archive' || key.includes('end')) {
       const aEnd = Date.parse(a.endTime || a.startTime);
       const bEnd = Date.parse(b.endTime || b.startTime);
-      return bEnd - aEnd;
+      return (desc || !key) ? bEnd - aEnd : aEnd - bEnd;
     }
     return Date.parse(a.startTime) - Date.parse(b.startTime);
   });
@@ -146,6 +179,7 @@ export function useMyEvents({ accountId, slices, tab, extraParams }: Options): R
     price:      extraParams.price,
     ageLimit:   extraParams.ageLimit,
     adultOnly:  extraParams.adultOnly === true,
+    orderBy:    extraParams.orderBy || null,
   });
   const prevFilterKey = useRef(filterKey);
 
@@ -201,9 +235,10 @@ export function useMyEvents({ accountId, slices, tab, extraParams }: Options): R
     }
 
     try {
+      const phaseParams = phaseTimeParams(phase, extraParams, Date.now());
       const result = await fetchEvents({
         ...ownerParams(filter, accountId),
-        ...phaseTimeParams(phase, extraParams, Date.now()),
+        ...phaseParams,
         name:       extraParams.name       || undefined,
         categories: extraParams.categories || undefined,
         types:      extraParams.types      || undefined,
@@ -211,6 +246,7 @@ export function useMyEvents({ accountId, slices, tab, extraParams }: Options): R
         ...(extraParams.ageLimit != null ? { ageLimit: extraParams.ageLimit } : {}),
         ...(extraParams.adultOnly ? { adultOnly: true } : {}),
         ...(filter === 'cancelled' ? { active: false } : {}),
+        orderBy:    extraParams.orderBy || phaseParams.orderBy,
         pageIndex:  page,
         pageSize:   PAGE_SIZE,
       });
@@ -280,6 +316,7 @@ export function useMyEvents({ accountId, slices, tab, extraParams }: Options): R
   const events = mergeEvents(
     slicesRef.current.map(slice => cache.current[tab][slice].events),
     tab,
+    extraParams.orderBy,
   );
 
   return { events, isLoading, isLoadingMore, hasMore, error, loadMore };
