@@ -657,7 +657,10 @@ export default function UserPage() {
             })}
             headerBlurPercent={headerBlurPercent}
           />
-          <div className={`${styles.coverOverlay} ${account.headerImageId ? styles.coverOverlayPhoto : ''}`} />
+          <div
+            className={account.headerImageId ? styles.coverOverlayPhoto : styles.coverOverlay}
+            aria-hidden
+          />
 
           <div className={styles.heroTop}>
             <HeroBackButton onClick={goBack} />
