@@ -105,7 +105,6 @@ export function AlbumSortMenu({
         onClick={() => setOpen(current => !current)}
       >
         Сортировка
-        {pinUnread && <span className={styles.triggerDot} title="Сначала непросмотренные" aria-hidden />}
         <svg
           width="12"
           height="12"
