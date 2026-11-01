@@ -529,7 +529,10 @@ interface EventAlbumsGroupsPanelProps {
    * По умолчанию true на странице альбомов; выкл. → чистая сортировка + только glow.
    */
   pinUnread?: boolean;
-  /** Клиентский поиск по событию/альбому (без новых API). */
+  /**
+   * Поиск по названию мероприятия / альбома.
+   * Для accountId уходит в byEvents?name=; для org — клиентский fallback.
+   */
   searchQuery?: string;
   emptyTitle?: string;
   emptySub?: string;
@@ -560,20 +563,25 @@ export function EventAlbumsGroupsPanel({
   const scopeKey = organizationId ? `org:${organizationId}` : `acc:${accountId ?? ''}`;
   const hasScope = Boolean(organizationId || accountId);
   const hasMore = groups.length < total;
-  /** Сервер сортирует только byEvents (аккаунт); орг. лента — клиентский fallback. */
+  /** Сервер сортирует/ищет только byEvents (аккаунт); орг. лента — клиентский fallback. */
   const serverSort = Boolean(accountId && !organizationId && sort);
+  const serverSearch = Boolean(accountId && !organizationId);
+  const searchTrimmed = searchQuery.trim();
 
   const fetchPage = useCallback(async (idx: number, append: boolean) => {
     if (!organizationId && !accountId) return;
     const data = organizationId
       ? await getAlbumsByOrganizationEvents(organizationId, idx, PAGE_SIZE)
-      : await getAlbumsByEvents(accountId!, idx, PAGE_SIZE, sort ? { sort } : undefined);
+      : await getAlbumsByEvents(accountId!, idx, PAGE_SIZE, {
+          ...(sort ? { sort } : {}),
+          ...(searchTrimmed ? { name: searchTrimmed } : {}),
+        });
     setGroups(prev => append ? [...prev, ...data.result] : data.result);
     if (!append) setSeenAlbumIds(new Set());
     setTotal(data.total);
     onTotalChange?.(data.total);
     setPageIndex(idx);
-  }, [accountId, organizationId, onTotalChange, sort]);
+  }, [accountId, organizationId, onTotalChange, sort, searchTrimmed]);
 
   useEffect(() => {
     if (!hasScope) {
@@ -622,17 +630,18 @@ export function EventAlbumsGroupsPanel({
     );
   }, [groups, seenAlbumIds, gridAlbum, sort, pinUnread, serverSort]);
 
-  const isSearching = Boolean(searchQuery.trim());
+  const isSearching = Boolean(searchTrimmed);
+  // account byEvents?name= — сервер уже отфильтровал; org — локальный fallback.
   const displayGroups = useMemo(
-    () => filterEventAlbumGroups(sortedGroups, searchQuery),
-    [sortedGroups, searchQuery],
+    () => (serverSearch ? sortedGroups : filterEventAlbumGroups(sortedGroups, searchQuery)),
+    [sortedGroups, searchQuery, serverSearch],
   );
 
-  // Поиск без нового API: догружаем остальные страницы byEvents, пока есть что грузить.
+  // Org-поиск без API: догружаем страницы, пока есть что грузить.
   useEffect(() => {
-    if (!isSearching || !hasMore || loading || loadingMore) return;
+    if (serverSearch || !isSearching || !hasMore || loading || loadingMore) return;
     loadMore();
-  }, [isSearching, hasMore, loading, loadingMore, groups.length, loadMore]);
+  }, [serverSearch, isSearching, hasMore, loading, loadingMore, groups.length, loadMore]);
 
   const rememberSeen = useCallback((albumId: string) => {
     setSeenAlbumIds(prev => {

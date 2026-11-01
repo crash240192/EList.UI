@@ -310,13 +310,19 @@ export async function getAlbumsByEvents(
     enrichParameters?: boolean;
     /** date | latestPhotos | name — серверная сортировка групп. */
     sort?: 'date' | 'latestPhotos' | 'name';
+    /** Подстрока: название мероприятия и/или альбома (серверный фильтр). */
+    name?: string;
   },
 ): Promise<PagedList<IEventAlbumsGroup>> {
   const sortParam = options?.sort
     ? `&sort=${encodeURIComponent(options.sort)}`
     : '';
+  const nameTrimmed = options?.name?.trim();
+  const nameParam = nameTrimmed
+    ? `&name=${encodeURIComponent(nameTrimmed)}`
+    : '';
   const res = await apiClient.get<PagedList<IEventAlbumsGroup>>(
-    `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}${sortParam}`,
+    `/api/media/albums/byEvents?accountId=${encodeURIComponent(accountId)}&pageIndex=${pageIndex}&pageSize=${pageSize}${sortParam}${nameParam}`,
   );
   const data = ((res as { result?: PagedList<IEventAlbumsGroup> }).result ?? res) as PagedList<IEventAlbumsGroup>;
   const groups = Array.isArray(data.result) ? data.result.map(normalizeAlbumsGroup) : [];
