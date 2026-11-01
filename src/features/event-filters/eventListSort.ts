@@ -3,12 +3,11 @@
 export type EventListSortId =
   | 'startAsc'
   | 'startDesc'
-  | 'ageAsc'
-  | 'ageDesc'
   | 'costAsc'
   | 'costDesc'
   | 'nameAsc'
-  | 'createdDesc';
+  | 'createdDesc'
+  | 'ratingDesc';
 
 export interface EventListSortOption {
   id: EventListSortId;
@@ -22,45 +21,37 @@ export const EVENT_LIST_SORT_OPTIONS: EventListSortOption[] = [
   {
     id: 'startAsc',
     label: 'Сначала ближайшие',
-    hint: 'По дате начала',
     orderBy: 'StartTime',
   },
   {
     id: 'startDesc',
     label: 'Сначала поздние',
-    hint: 'По дате начала',
     orderBy: 'StartTime DESC',
   },
   {
-    id: 'ageAsc',
-    label: 'Возраст: 0+ → 18+',
-    orderBy: 'AgeLimit',
-  },
-  {
-    id: 'ageDesc',
-    label: 'Возраст: 18+ → 0+',
-    orderBy: 'AgeLimit DESC',
-  },
-  {
     id: 'costAsc',
-    label: 'Сначала дешевле',
+    label: 'Дешевле',
     orderBy: 'Cost',
   },
   {
     id: 'costDesc',
-    label: 'Сначала дороже',
+    label: 'Дороже',
     orderBy: 'Cost DESC',
   },
   {
     id: 'nameAsc',
-    label: 'По названию А–Я',
+    label: 'По названию',
     orderBy: 'Name',
   },
   {
     id: 'createdDesc',
-    label: 'Сначала новые',
-    hint: 'Недавно созданные',
+    label: 'По дате создания',
     orderBy: 'CreateDate DESC',
+  },
+  {
+    id: 'ratingDesc',
+    label: 'По рейтингу',
+    orderBy: 'Rating DESC',
   },
 ];
 
@@ -75,9 +66,7 @@ export function eventListSortIdFromOrderBy(orderBy: string | null | undefined): 
   if (!raw) return DEFAULT_EVENT_LIST_SORT;
   const match = EVENT_LIST_SORT_OPTIONS.find(o => o.orderBy.toLowerCase() === raw);
   if (match) return match.id;
-  if (raw.includes('agelimit') || raw.includes('age')) {
-    return raw.includes('desc') ? 'ageDesc' : 'ageAsc';
-  }
+  if (raw.includes('rating')) return 'ratingDesc';
   if (raw.includes('cost') || raw.includes('price')) {
     return raw.includes('desc') ? 'costDesc' : 'costAsc';
   }

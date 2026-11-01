@@ -122,8 +122,9 @@ function mergeEvents(lists: IEvent[][], phase: EventsPhase, orderBy?: string): I
   const desc = key.includes('desc');
 
   events.sort((a, b) => {
-    if (key.includes('agelimit') || key.includes('age_limit')) {
-      return compareNullableNumber(a.parameters?.ageLimit, b.parameters?.ageLimit, desc);
+    if (key.includes('rating')) {
+      // Пока search не отдаёт рейтинг — чаще null; тогда порядок как с бэка внутри среза.
+      return compareNullableNumber(a.anticipationRating, b.anticipationRating, desc);
     }
     if (key.includes('cost') || key.includes('price')) {
       return compareNullableNumber(a.parameters?.cost, b.parameters?.cost, desc);
