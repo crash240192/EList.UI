@@ -46,7 +46,7 @@ export function EventSortMenu({ value, onChange, className }: EventSortMenuProps
     const el = btnRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const estimatedHeight = 360;
+    const estimatedHeight = 320;
     const spaceBelow = window.innerHeight - rect.bottom;
     const showAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
     setDropStyle({

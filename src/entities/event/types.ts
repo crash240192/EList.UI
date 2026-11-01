@@ -127,9 +127,9 @@ export interface IEventsSearchParams {
   /** false — включать неактивные/отменённые (как на «Мои → Организую») */
   active?: boolean;
   /**
-   * Сортировка: StartTime, EndTime, AgeLimit, Cost, Name, CreateDate
-   * (+ опционально " DESC"). Для прошедших (только endTime) без orderBy —
-   * бэкенд по умолчанию ставит EndTime DESC.
+   * Сортировка: StartTime, EndTime, Cost, Name, CreateDate, Rating
+   * (+ опционально " DESC"). Rating — средний Expectation до старта / Summary после.
+   * Для прошедших (только endTime) без orderBy — бэкенд по умолчанию EndTime DESC.
    */
   orderBy?: string;
   pageIndex?: number;
