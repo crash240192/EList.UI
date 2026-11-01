@@ -65,7 +65,11 @@ export function AddSubscriptionModal({ onClose, onBeforeNavigate }: Props) {
 
         {scanning ? (
           <Suspense fallback={<p className={styles.scanLoading}>Подключение камеры...</p>}>
-            <QrScanner onDetected={handleDetected} onClose={() => setScanning(false)} />
+            <QrScanner
+              onDetected={handleDetected}
+              onClose={() => setScanning(false)}
+              parse={parseUserIdFromText}
+            />
           </Suspense>
         ) : (
           <>

@@ -45,7 +45,28 @@ export function Select({ value, onChange, options, placeholder = 'Выберит
 
   useEffect(() => {
     if (!open) return;
-    computePos();
+    let frame = 0;
+    let last = '';
+    const follow = () => {
+      const el = btnRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        const key = [
+          Math.round(r.left),
+          Math.round(r.top),
+          Math.round(r.bottom),
+          Math.round(r.width),
+          window.innerWidth,
+          window.innerHeight,
+        ].join('|');
+        if (key !== last) {
+          last = key;
+          computePos();
+        }
+      }
+      frame = requestAnimationFrame(follow);
+    };
+    follow();
     const close = (e: MouseEvent) => {
       if (!btnRef.current?.contains(e.target as Node) &&
           !dropRef.current?.contains(e.target as Node)) {
@@ -56,6 +77,7 @@ export function Select({ value, onChange, options, placeholder = 'Выберит
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', esc);
     return () => {
+      cancelAnimationFrame(frame);
       document.removeEventListener('mousedown', close);
       document.removeEventListener('keydown', esc);
     };

@@ -1,22 +1,29 @@
 // app/providers/AppLayout.tsx
 
-import { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useThemeStore, useAuthStore, useFiltersStore, usePlatformRoleStore } from '../store';
 import { LogoutConfirmModal } from '@/shared/ui/LogoutConfirmModal/LogoutConfirmModal';
+import { CreateEventDraftModal } from '@/shared/ui/CreateEventDraftModal/CreateEventDraftModal';
+import { AuthRequiredDialog } from '@/shared/ui/AuthRequiredDialog';
+import { getStoredAccountId } from '@/entities/user/api';
+import { clearCreateEventDraft, loadCreateEventDraft } from '@/pages/create-event/createEventDraft';
 import { getStoredUserCoords } from '@/features/auth/useUserLocation';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
+import { BRAND_NAME } from '@/shared/config/brand';
 import {
   useInvitationsNotViewedCount,
   useInvitationsStore,
 } from '@/features/invitations/invitationsStore';
+import { useAlbumFreshStore, useUnseenAlbumsIndicator } from '@/features/media/albumFreshStore';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { useActivationRedirect } from '@/features/auth/useActivationRedirect';
 import { UserAgreementsGate, UserAgreementsInfoButton } from '@/features/agreements';
 import { BugReportButton } from '@/features/bug-reports';
 import { usePlatformModerationCount } from '@/features/admin/usePlatformModerationCount';
 import { HeaderAvatarMenu } from '@/features/user/HeaderAvatarMenu';
+import { canShowTicketDeskNav } from '@/features/tickets';
 import { useMediaQuery } from '@/shared/hooks';
 import { media } from '@/shared/lib/breakpoints';
 import styles from './AppLayout.module.css';
@@ -24,10 +31,12 @@ import styles from './AppLayout.module.css';
 const MAIN_NAV_ITEMS = [
   { to: '/',             label: 'Поиск событий',    icon: <SearchIcon /> },
   { to: '/my-events',    label: 'Мои события',      icon: <CalendarIcon /> },
+  { to: '/tickets',      label: 'Билеты',           icon: <TicketsIcon /> },
   { to: '/invitations',  label: 'Приглашения',      icon: <InviteIcon /> },
   { to: '/event-albums', label: 'Альбомы мероприятий', icon: <AlbumsIcon /> },
   { to: '/create-event', label: 'Создать событие',  icon: <PlusIcon /> },
 ] as const;
+
 
 const STAFF_NAV_ITEMS = [
   { to: '/moderation',   label: 'Модерация',         icon: <ModerationIcon /> },
@@ -39,9 +48,16 @@ export function AppLayout() {
   const isWide = useMediaQuery(media.wide);
   // На широком десктопе меню закреплено раскрытым (docked), на узких — оверлей.
   const [sidebarExpanded, setSidebarExpanded] = useState(isWide);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [logoutConfirm,   setLogoutConfirm]   = useState(false);
+  const [draftResumeOpen, setDraftResumeOpen] = useState(false);
+  const [showTicketsNav,  setShowTicketsNav]  = useState(false);
+  const [authRequiredOpen, setAuthRequiredOpen] = useState(false);
+  const [authRequiredFrom, setAuthRequiredFrom] = useState<string | undefined>();
   const { theme, toggleTheme } = useThemeStore();
-  const { isAuthenticated, logout } = useAuthStore();
+  const { isAuthenticated, logout, accountId } = useAuthStore();
+  const location = useLocation();
   const authenticated = isAuthenticated();
   const platformRole = usePlatformRoleStore(s => s.role);
   const platformActive = usePlatformRoleStore(s => s.active);
@@ -50,23 +66,43 @@ export function AppLayout() {
   const clearPlatformRole = usePlatformRoleStore(s => s.clear);
   const notViewedInvitations = useInvitationsStore(s => s.notViewedCount);
   useInvitationsNotViewedCount(authenticated);
+  const hasFreshAlbums = useAlbumFreshStore(s => s.hasFresh);
+  useUnseenAlbumsIndicator(authenticated);
   const moderationCount = usePlatformModerationCount(authenticated && hasPlatformAccess);
   const { filters } = useFiltersStore();
   const navigate = useNavigate();
 
+  // Гость попал на RequireAuth / протухшая сессия на ЛК → остаёмся на карте + диалог входа
+  useEffect(() => {
+    const state = location.state as { authRequiredFrom?: string } | null;
+    const from = state?.authRequiredFrom;
+    if (!from || authenticated) return;
+    setAuthRequiredFrom(from);
+    setAuthRequiredOpen(true);
+    navigate(location.pathname + location.search, { replace: true, state: {} });
+  }, [authenticated, location.pathname, location.search, location.state, navigate]);
+
   useEffect(() => {
     if (!authenticated) {
       clearPlatformRole();
+      setShowTicketsNav(false);
       return;
     }
     void refreshPlatformRole();
-  }, [authenticated, refreshPlatformRole, clearPlatformRole]);
+    let cancelled = false;
+    void canShowTicketDeskNav().then((ok) => {
+      if (!cancelled) setShowTicketsNav(ok);
+    });
+    return () => { cancelled = true; };
+  }, [authenticated, refreshPlatformRole, clearPlatformRole, accountId]);
 
-  const visibleMainNavItems = authenticated
+  const visibleMainNavItems = (authenticated
     ? MAIN_NAV_ITEMS
-    : MAIN_NAV_ITEMS.filter(({ to }) => to === '/');
+    : MAIN_NAV_ITEMS.filter(({ to }) => to === '/')
+  ).filter(({ to }) => to !== '/tickets' || showTicketsNav);
 
   const visibleStaffNavItems = authenticated && hasPlatformAccess ? STAFF_NAV_ITEMS : [];
+
 
   useActivationRedirect();
 
@@ -94,13 +130,31 @@ export function AppLayout() {
     return () => document.removeEventListener('keydown', fn);
   }, [isWide]);
 
+  // Оверлей: тап в любое место кроме самого меню его сворачивает.
+  // Шапка (аватар, уведомления, условия) выше подложки, поэтому слушаем документ.
+  // Кнопку-гамбургер не трогаем — у неё свой toggle.
+  useEffect(() => {
+    if (isWide || !sidebarExpanded) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (sidebarRef.current?.contains(target)) return;
+      if (menuBtnRef.current?.contains(target)) return;
+      setSidebarExpanded(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [isWide, sidebarExpanded]);
+
   return (
     <UserAgreementsGate>
     <div className={styles.root}>
+      <div className={styles.appBg} aria-hidden />
       {/* ---- Header ---- */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
           <button
+            ref={menuBtnRef}
             className={styles.menuBtn}
             onClick={() => setSidebarExpanded(v => !v)}
             aria-label={sidebarExpanded ? 'Свернуть меню' : 'Развернуть меню'}
@@ -108,24 +162,28 @@ export function AppLayout() {
           >
             <HamburgerIcon />
           </button>
-          <button className={styles.logo} onClick={() => {
-            navigate('/');
-            // Приоритет: выбранный город в фильтрах → координаты пользователя
-            const userCoords = getStoredUserCoords();
-            const lat = filters.latitude  ?? userCoords?.lat ?? 55.7558;
-            const lng = filters.longitude ?? userCoords?.lng ?? 37.6173;
-            window.dispatchEvent(new CustomEvent('elist:centerMap', {
-              detail: { lat, lng },
-            }));
-          }} aria-label="На главную">
-            <img src={brandLogo} alt="EList" className={styles.logoImg} />
+          <button
+            className={`${styles.logo} noHoverGlow`}
+            onClick={(e) => {
+              navigate('/');
+              // Приоритет: выбранный город в фильтрах → координаты пользователя
+              const userCoords = getStoredUserCoords();
+              const lat = filters.latitude  ?? userCoords?.lat ?? 55.7558;
+              const lng = filters.longitude ?? userCoords?.lng ?? 37.6173;
+              window.dispatchEvent(new CustomEvent('elist:centerMap', {
+                detail: { lat, lng },
+              }));
+              e.currentTarget.blur();
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label="На главную"
+          >
+            <img src={brandLogo} alt={BRAND_NAME} className={styles.logoImg} draggable={false} />
           </button>
         </div>
 
         <div className={styles.headerRight}>
-          <span className={authenticated ? styles.hideOnMobile : undefined}>
-            <UserAgreementsInfoButton />
-          </span>
+          <UserAgreementsInfoButton />
           {authenticated && (
             <span className={styles.hideOnMobile}>
               <BugReportButton />
@@ -162,7 +220,7 @@ export function AppLayout() {
       </header>
 
       {/* ---- Sidebar ---- */}
-      <aside className={`${styles.sidebar} ${sidebarExpanded ? styles.sidebarExpanded : ''}`}>
+      <aside ref={sidebarRef} className={`${styles.sidebar} ${sidebarExpanded ? styles.sidebarExpanded : ''}`}>
         <nav className={styles.nav}>
           {visibleMainNavItems.map(({ to, label, icon }) => (
             <NavLink
@@ -172,7 +230,15 @@ export function AppLayout() {
               className={({ isActive }) =>
                 `${styles.navItem} ${isActive ? styles.navActive : ''}`}
               title={label}
-              onClick={() => { if (!isWide) setSidebarExpanded(false); }}
+              onClick={(e) => {
+                if (!isWide) setSidebarExpanded(false);
+                if (to !== '/create-event') return;
+                if (location.pathname === '/create-event') return;
+                const aid = getStoredAccountId() ?? accountId;
+                if (!loadCreateEventDraft(aid)) return;
+                e.preventDefault();
+                setDraftResumeOpen(true);
+              }}
             >
               <span className={styles.navIcon}>
                 {icon}
@@ -180,6 +246,9 @@ export function AppLayout() {
                   <span className={styles.navCountBadge} aria-label={`Непросмотренных: ${notViewedInvitations}`}>
                     {notViewedInvitations > 99 ? '99+' : notViewedInvitations}
                   </span>
+                )}
+                {authenticated && to === '/event-albums' && hasFreshAlbums && (
+                  <span className={styles.navFreshDot} aria-label="Есть новые фото" />
                 )}
               </span>
               <span className={styles.navLabel}>{label}</span>
@@ -251,6 +320,29 @@ export function AppLayout() {
         <LogoutConfirmModal onConfirm={handleLogout} onCancel={() => setLogoutConfirm(false)} />
       )}
 
+      {draftResumeOpen && (
+        <CreateEventDraftModal
+          onCreateNew={() => {
+            clearCreateEventDraft(getStoredAccountId() ?? accountId);
+            setDraftResumeOpen(false);
+            navigate('/create-event');
+          }}
+          onContinue={() => {
+            setDraftResumeOpen(false);
+            navigate('/create-event');
+          }}
+          onCancel={() => setDraftResumeOpen(false)}
+        />
+      )}
+
+      <AuthRequiredDialog
+        open={authRequiredOpen}
+        onClose={() => setAuthRequiredOpen(false)}
+        title="Требуется авторизация"
+        message="Войдите в аккаунт, чтобы открыть этот раздел. Поиск событий доступен без входа."
+        returnTo={authRequiredFrom}
+      />
+
       {/* ---- Main ---- */}
       <main className={styles.main}>
         <Outlet />
@@ -271,3 +363,4 @@ function LoginIcon()    { return <svg width="18" height="18" viewBox="0 0 24 24"
 function HamburgerIcon(){ return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>; }
 function InviteIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-1a6 6 0 0 1 9.29-5"/><circle cx="19" cy="17" r="4"/><line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/></svg>; }
 function AlbumsIcon()   { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><circle cx="9" cy="15" r="2"/><path d="M14 13l3 4"/></svg>; }
+function TicketsIcon()  { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1a2 2 0 0 0 0 4v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1a2 2 0 0 0 0-4V9z"/><path d="M9 7v10"/></svg>; }

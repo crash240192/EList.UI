@@ -59,6 +59,16 @@ export async function getOrFetchAccountId(): Promise<string> {
  * GET /api/accounts/getData/{accountId}
  */
 export async function fetchAccountById(accountId: string): Promise<AccountData> {
-  const data = await apiClient.get<AccountDataResult>(`/api/accounts/getData/${accountId}`);
-  return data.result;
+  const data = await apiClient.get<AccountDataResult & Record<string, unknown>>(
+    `/api/accounts/getData/${accountId}`,
+  );
+  const raw = (data.result ?? {}) as AccountDataResult & Record<string, unknown>;
+  const avatarRaw = raw.avatarId ?? raw.AvatarId;
+  return {
+    id: String(raw.id ?? raw.Id ?? ''),
+    login: String(raw.login ?? raw.Login ?? ''),
+    avatarId: (avatarRaw === null || avatarRaw === undefined || avatarRaw === ''
+      ? null
+      : String(avatarRaw)),
+  };
 }

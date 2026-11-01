@@ -4,8 +4,8 @@
 // Базовый путь: /api/events  (из swagger)
 // ============================================================
 
-import { parseCoverFocusFromRecord } from '@/shared/lib/coverFocus';
-import { loadCoverFocusFromFile } from './coverFocusApi';
+import { parseCoverFocusFromRecord, readExplicitCoverZoom } from '@/shared/lib/coverFocus';
+import { resolveCoverFocus } from './coverFocusApi';
 import { apiClient } from '@/shared/api/client';
 import type { CommandResult, PagedList } from '@/shared/api/types';
 import type {
@@ -16,6 +16,11 @@ import type {
   ICreateEventRequest,
   IEventParametersRequest,
 } from './types';
+
+function readEventIsOrganizer(ev: Record<string, unknown>): boolean {
+  const raw = ev.isOrganizer ?? ev.IsOrganizer ?? ev.isOrganizator ?? ev.IsOrganizator;
+  return raw === true || raw === 'true';
+}
 
 // ---- Поиск мероприятий (POST /api/events/search) ----
 
@@ -32,7 +37,8 @@ export async function fetchEvents(
 
   const data = await apiClient.post<PagedList<IEvent>>('/api/events/search', body);
   const paged = data.result;
-  // Бэкенд возвращает Types (с заглавной) — нормализуем в eventTypes
+  // Бэкенд возвращает Types (с заглавной) — нормализуем в eventTypes.
+  // Роль организатора приходит как isOrganizator, карточки читают isOrganizer.
   if (paged?.result) {
     paged.result = paged.result.map((ev: any) => ({
       ...ev,
@@ -42,6 +48,8 @@ export async function fetchEvents(
       coverUrl: ev.coverUrl ?? ev.CoverUrl ?? null,
       coverFocusX: parseCoverFocusFromRecord(ev)?.x ?? null,
       coverFocusY: parseCoverFocusFromRecord(ev)?.y ?? null,
+      coverZoom: readExplicitCoverZoom(ev),
+      isOrganizer: readEventIsOrganizer(ev),
     }));
   }
   return paged;
@@ -87,14 +95,9 @@ export async function fetchEventById(id: string): Promise<IEvent> {
   const ev: any = data.result;
   const cancelSourceRaw = ev.cancelSource ?? ev.CancelSource ?? null;
   const coverImageId = ev.coverImageId ?? ev.CoverImageId ?? null;
-  let focus = parseCoverFocusFromRecord(ev);
-  if (!focus && coverImageId) {
-    try {
-      focus = await loadCoverFocusFromFile(String(coverImageId));
-    } catch {
-      focus = null;
-    }
-  }
+  const focus = coverImageId
+    ? await resolveCoverFocus(ev, String(coverImageId))
+    : parseCoverFocusFromRecord(ev);
   return {
     ...ev,
     eventTypes: ev.Types ?? ev.types ?? ev.eventTypes ?? [],
@@ -103,6 +106,7 @@ export async function fetchEventById(id: string): Promise<IEvent> {
     coverUrl: ev.coverUrl ?? ev.CoverUrl ?? null,
     coverFocusX: focus?.x ?? null,
     coverFocusY: focus?.y ?? null,
+    coverZoom: focus?.zoom ?? null,
     cancelledAt: ev.cancelledAt ?? ev.CancelledAt ?? null,
     cancelledByAccountId: ev.cancelledByAccountId ?? ev.CancelledByAccountId ?? null,
     cancelSource: typeof cancelSourceRaw === 'string' && cancelSourceRaw

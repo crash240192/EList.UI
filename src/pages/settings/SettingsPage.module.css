@@ -194,6 +194,65 @@
   line-height: 1.5;
 }
 
+.headerPhotoPreview {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.headerPhotoFrame {
+  position: relative;
+  display: block;
+  height: 132px;
+  overflow: hidden;
+  background: var(--hero-gradient);
+}
+
+.headerPhotoFrame .headerPhotoImg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.headerPhotoAvatar {
+  object-fit: cover;
+  filter: blur(20px) brightness(0.45) saturate(1.05);
+  transform: scale(1.12);
+}
+
+.headerPhotoEmpty {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.18) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.14) 0%, transparent 40%),
+    radial-gradient(circle at 60% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 40%);
+}
+
+.headerPhotoHint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* ── Form rows (без разделителей — группировка отступами, не «клеткой») ── */
 .frow {
   display: flex;
@@ -205,6 +264,67 @@
 .frow:first-child { padding-top: 16px; }
 .frow:last-child { padding-bottom: 16px; }
 
+/* Личная информация: подпись над полем, две колонки. Отчество на всю ширину. */
+.personalFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+.personalFields .frow {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  gap: 4px;
+  min-width: 0;
+}
+
+.personalFields .frow:first-child,
+.personalFields .frow:last-child {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.personalFields .frowLabel {
+  width: auto;
+}
+
+.patronymic {
+  grid-column: 1 / -1;
+}
+
+.aboutField {
+  width: 100%;
+  min-height: 96px;
+  padding: 8px 11px;
+  resize: vertical;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: var(--font-sm);
+  font-family: inherit;
+  line-height: 1.45;
+  outline: none;
+}
+
+.aboutField:focus {
+  border-color: var(--accent);
+}
+
+.aboutField::placeholder {
+  color: var(--text-muted);
+}
+
+.profileSave {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .frowLabel {
   font-size: var(--font-sm);
   color: var(--text-secondary);
@@ -215,6 +335,13 @@
 .frowControl {
   flex: 1;
   min-width: 0;
+}
+
+.frowHint {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-muted);
 }
 
 .input {

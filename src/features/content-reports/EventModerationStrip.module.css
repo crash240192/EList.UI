@@ -47,8 +47,7 @@
   font-size: 13px;
 }
 
-.restoreBtn,
-.revokeBtn {
+.restoreBtn {
   align-self: flex-start;
   border: none;
   border-radius: 8px;
@@ -57,45 +56,13 @@
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-}
-
-.restoreBtn {
   background: var(--accent);
   color: #fff;
 }
 
-.restoreBtn:disabled,
-.revokeBtn:disabled {
+.restoreBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.stats {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text-secondary);
-}
-
-.penalties {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.penaltyRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--text-primary);
-}
-
-.revokeBtn {
-  background: var(--surface-2);
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  font-weight: 500;
 }
 
 .error {

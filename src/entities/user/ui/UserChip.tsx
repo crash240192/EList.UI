@@ -65,7 +65,6 @@ export function UserChip({ user, clickable = true, size = 'md' }: UserChipProps)
           size={size === 'sm' ? 26 : 34}
           className={styles.avatar}
         />
-        {user.isMe && <span className={styles.meDot} title="Это вы" />}
       </div>
 
       {/* Info */}

@@ -9,8 +9,16 @@ import {
   unsubscribe,
   updateSubscriptionNotify,
 } from '@/entities/user/subscriptionApi';
+import {
+  fetchOrgSubscriptions,
+  unsubscribeFromOrganization,
+  updateOrgSubscriptionNotify,
+  getOrganizationAvatar,
+  type IOrgSubscriptionItem,
+} from '@/entities/organization';
 import { useDebounce, useInfiniteScroll } from '@/shared/hooks';
 import { UserChip } from '@/entities/user/ui/UserChip';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { formatPeopleCount } from '@/shared/lib/plural.ru';
 import styles from './SubscribersListModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
@@ -18,6 +26,10 @@ import { SubscribeModal } from './SubscribeModal';
 import { AddSubscriptionModal } from './AddSubscriptionModal';
 
 const PAGE_SIZE = 20;
+
+type ListRow =
+  | { kind: 'user'; item: ISubscriptionItem }
+  | { kind: 'organization'; item: IOrgSubscriptionItem; logoId: string | null };
 
 interface Props {
   title: string;
@@ -31,64 +43,115 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
   const navigate = useNavigate();
 
   const [search,      setSearch]      = useState('');
-  const [items,       setItems]       = useState<ISubscriptionItem[]>([]);
+  const [items,       setItems]       = useState<ListRow[]>([]);
   const [total,       setTotal]       = useState(0);
   const [page,        setPage]        = useState(0);
   const [loading,     setLoading]     = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error,       setError]       = useState<string | null>(null);
   const [pendingUnsubscribes, setPendingUnsubscribes] = useState<Set<string>>(new Set());
-  const [settingsTarget, setSettingsTarget] = useState<ISubscriptionItem | null>(null);
+  const [settingsTarget, setSettingsTarget] = useState<ListRow | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const settingsTargetRef = useRef<ISubscriptionItem | null>(null);
+  const settingsTargetRef = useRef<ListRow | null>(null);
   settingsTargetRef.current = settingsTarget;
   const searchRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useDebounce(search, 350);
-  const fetchFn = listType === 'subscriptions' ? fetchSubscriptions : fetchSubscribers;
+  const includeOrgs = listType === 'subscriptions';
+
+  const loadPage = useCallback(async (pageIndex: number, append: boolean) => {
+    if (listType === 'subscribers') {
+      const data = await fetchSubscribers(accountId, {
+        name: debouncedSearch || undefined,
+        pageIndex,
+        pageSize: PAGE_SIZE,
+      });
+      const rows: ListRow[] = data.items.map(item => ({ kind: 'user', item }));
+      setItems(prev => (append ? [...prev, ...rows] : rows));
+      setTotal(data.total);
+      return;
+    }
+
+    // Подписки: пользователи + организации (объединённый список)
+    const [users, orgs] = await Promise.all([
+      fetchSubscriptions(accountId, {
+        name: debouncedSearch || undefined,
+        pageIndex,
+        pageSize: PAGE_SIZE,
+      }),
+      fetchOrgSubscriptions(accountId, {
+        name: debouncedSearch || undefined,
+        pageIndex,
+        pageSize: PAGE_SIZE,
+      }),
+    ]);
+
+    const logos = await Promise.all(
+      orgs.items.map(async o => {
+        const id = o.organization?.id;
+        if (!id) return [id ?? '', null] as const;
+        const logo = await getOrganizationAvatar(id).catch(() => null);
+        return [id, logo] as const;
+      }),
+    );
+    const logoMap = Object.fromEntries(logos);
+
+    const userRows: ListRow[] = users.items.map(item => ({ kind: 'user', item }));
+    const orgRows: ListRow[] = orgs.items
+      .filter(item => item.organization)
+      .map(item => ({
+        kind: 'organization' as const,
+        item,
+        logoId: logoMap[item.organization!.id] ?? null,
+      }));
+
+    // На каждой странице чередуем: сначала пользователи страницы, затем организации.
+    const rows = [...userRows, ...orgRows];
+    setItems(prev => (append ? [...prev, ...rows] : rows));
+    setTotal(users.total + orgs.total);
+  }, [accountId, debouncedSearch, listType]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
     setPage(0);
-    fetchFn(accountId, { name: debouncedSearch || undefined, pageIndex: 0, pageSize: PAGE_SIZE })
-      .then(data => {
-        if (cancelled) return;
-        setItems(data.items);
-        setTotal(data.total);
-      })
+    loadPage(0, false)
       .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, accountId, listType]);
+  }, [loadPage]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || items.length >= total) return;
     const nextPage = page + 1;
     setLoadingMore(true);
     try {
-      const data = await fetchFn(accountId, {
-        name: debouncedSearch || undefined,
-        pageIndex: nextPage,
-        pageSize: PAGE_SIZE,
-      });
-      setItems(prev => [...prev, ...data.items]);
+      await loadPage(nextPage, true);
       setPage(nextPage);
     } finally { setLoadingMore(false); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadingMore, items.length, total, page, debouncedSearch, accountId, listType]);
+  }, [loadingMore, items.length, total, page, loadPage]);
 
   const sentinelRef = useInfiniteScroll(loadMore);
+
+  const rowKey = (row: ListRow) => (
+    row.kind === 'user'
+      ? `u:${row.item.account.id}`
+      : `o:${row.item.organization!.id}`
+  );
 
   const handleClose = useCallback(async () => {
     if (pendingUnsubscribes.size > 0) {
       const ids = [...pendingUnsubscribes];
-      for (const id of ids) {
+      for (const key of ids) {
         try {
-          // eslint-disable-next-line no-await-in-loop
-          await unsubscribe(id);
+          if (key.startsWith('o:')) {
+            // eslint-disable-next-line no-await-in-loop
+            await unsubscribeFromOrganization(key.slice(2));
+          } else if (key.startsWith('u:')) {
+            // eslint-disable-next-line no-await-in-loop
+            await unsubscribe(key.slice(2));
+          }
         } catch {
           // Игнорируем частичные ошибки, чтобы окно корректно закрылось
         }
@@ -97,25 +160,39 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
     onClose();
   }, [onClose, pendingUnsubscribes]);
 
-  const togglePendingUnsubscribe = useCallback((accountIdToToggle: string) => {
+  const togglePendingUnsubscribe = useCallback((key: string) => {
     setPendingUnsubscribes(prev => {
       const next = new Set(prev);
-      if (next.has(accountIdToToggle)) next.delete(accountIdToToggle);
-      else next.add(accountIdToToggle);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }, []);
 
-  const openSettings = useCallback((item: ISubscriptionItem) => {
-    setSettingsTarget(item);
-  }, []);
-
   const saveSettings = useCallback(async (settings: INotifySettings) => {
     if (!settingsTarget) return;
-    await updateSubscriptionNotify(settingsTarget.account.id, settings);
-    setItems(prev => prev.map(i => i.account.id === settingsTarget.account.id
-      ? { ...i, notifySettings: settings }
-      : i));
+    if (settingsTarget.kind === 'user') {
+      await updateSubscriptionNotify(settingsTarget.item.account.id, settings);
+      setItems(prev => prev.map(row => (
+        row.kind === 'user' && row.item.account.id === settingsTarget.item.account.id
+          ? { ...row, item: { ...row.item, notifySettings: settings } }
+          : row
+      )));
+    } else {
+      const orgId = settingsTarget.item.organization!.id;
+      await updateOrgSubscriptionNotify(orgId, { notifyEventCreated: settings.notifyEventCreated });
+      setItems(prev => prev.map(row => (
+        row.kind === 'organization' && row.item.organization?.id === orgId
+          ? {
+              ...row,
+              item: {
+                ...row.item,
+                notifySettings: { notifyEventCreated: settings.notifyEventCreated },
+              },
+            }
+          : row
+      )));
+    }
     setSettingsTarget(null);
   }, [settingsTarget]);
 
@@ -170,7 +247,7 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
           <input
             ref={searchRef}
             className={styles.searchInput}
-            placeholder="Поиск по имени или логину..."
+            placeholder={includeOrgs ? 'Поиск по имени, логину или организации...' : 'Поиск по имени или логину...'}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -183,58 +260,125 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
           {!loading && !error && items.length === 0 && (
             <p className={styles.state}>{search ? 'Никого не найдено' : 'Список пуст'}</p>
           )}
-          {items.map(item => (
-            <div
-              key={item.account.id}
-              className={`${styles.row} ${pendingUnsubscribes.has(item.account.id) ? styles.rowPending : ''}`}
-            >
-              <button
-                type="button"
-                className={styles.rowMain}
-                onClick={() => {
-                  navigate(`/user/${item.account.id}`);
-                  void handleClose();
-                }}
-              >
-                <UserChip
-                  user={{
-                    accountId: item.account.id,
-                    login:     item.account.login,
-                    avatarId:  item.account.avatarId,
-                    firstName: item.personInfo?.firstName ?? null,
-                    lastName:  item.personInfo?.lastName  ?? null,
-                    isMe:      item.account.id === currentAccountId,
-                  }}
-                  clickable={false}
-                  size="md"
-                />
-              </button>
-              {canManageSubscriptions && (
-                <div className={styles.rowActions}>
+          {items.map(row => {
+            const key = rowKey(row);
+            if (row.kind === 'user') {
+              const item = row.item;
+              return (
+                <div
+                  key={key}
+                  className={`${styles.row} ${pendingUnsubscribes.has(key) ? styles.rowPending : ''}`}
+                >
                   <button
                     type="button"
-                    className={styles.settingsBtn}
-                    onClick={e => {
-                      e.stopPropagation();
-                      openSettings(item);
+                    className={styles.rowMain}
+                    onClick={() => {
+                      navigate(`/user/${item.account.id}`);
+                      void handleClose();
                     }}
-                    disabled={pendingUnsubscribes.has(item.account.id)}
-                    aria-label="Настройки уведомлений"
-                    title="Настройки уведомлений"
                   >
-                    <SettingsGearIcon />
+                    <UserChip
+                      user={{
+                        accountId: item.account.id,
+                        login:     item.account.login,
+                        avatarId:  item.account.avatarId,
+                        firstName: item.personInfo?.firstName ?? null,
+                        lastName:  item.personInfo?.lastName  ?? null,
+                        isMe:      item.account.id === currentAccountId,
+                      }}
+                      clickable={false}
+                      size="md"
+                    />
                   </button>
-                  <button
-                    type="button"
-                    className={pendingUnsubscribes.has(item.account.id) ? styles.undoBtn : styles.unsubscribeBtn}
-                    onClick={() => togglePendingUnsubscribe(item.account.id)}
-                  >
-                    {pendingUnsubscribes.has(item.account.id) ? 'Отменить' : 'Отписаться'}
-                  </button>
+                  {canManageSubscriptions && (
+                    <div className={styles.rowActions}>
+                      <button
+                        type="button"
+                        className={styles.settingsBtn}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setSettingsTarget(row);
+                        }}
+                        disabled={pendingUnsubscribes.has(key)}
+                        aria-label="Настройки уведомлений"
+                        title="Настройки уведомлений"
+                      >
+                        <SettingsGearIcon />
+                      </button>
+                      <button
+                        type="button"
+                        className={pendingUnsubscribes.has(key) ? styles.undoBtn : styles.unsubscribeBtn}
+                        onClick={() => togglePendingUnsubscribe(key)}
+                      >
+                        {pendingUnsubscribes.has(key) ? 'Отменить' : 'Отписаться'}
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              );
+            }
+
+            const org = row.item.organization!;
+            const initials = org.name.slice(0, 2).toUpperCase() || 'ОР';
+            return (
+              <div
+                key={key}
+                className={`${styles.row} ${pendingUnsubscribes.has(key) ? styles.rowPending : ''}`}
+              >
+                <button
+                  type="button"
+                  className={styles.rowMain}
+                  onClick={() => {
+                    navigate(`/organization/${org.id}`);
+                    void handleClose();
+                  }}
+                >
+                  <div className={styles.orgChip}>
+                    <div className={styles.orgAvatar}>
+                      {row.logoId ? (
+                        <FramedAuthImage
+                          fileId={row.logoId}
+                          alt=""
+                          className={styles.orgAvatarImg}
+                          fallback={<span>{initials}</span>}
+                        />
+                      ) : (
+                        <span>{initials}</span>
+                      )}
+                    </div>
+                    <div className={styles.orgText}>
+                      <span className={styles.orgName}>{org.name}</span>
+                      <span className={styles.orgMeta}>Организация</span>
+                    </div>
+                  </div>
+                </button>
+                {canManageSubscriptions && (
+                  <div className={styles.rowActions}>
+                    <button
+                      type="button"
+                      className={styles.settingsBtn}
+                      onClick={e => {
+                        e.stopPropagation();
+                        setSettingsTarget(row);
+                      }}
+                      disabled={pendingUnsubscribes.has(key)}
+                      aria-label="Настройки уведомлений"
+                      title="Настройки уведомлений"
+                    >
+                      <SettingsGearIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className={pendingUnsubscribes.has(key) ? styles.undoBtn : styles.unsubscribeBtn}
+                      onClick={() => togglePendingUnsubscribe(key)}
+                    >
+                      {pendingUnsubscribes.has(key) ? 'Отменить' : 'Отписаться'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {!loading && items.length < total && (
             <div ref={sentinelRef} className={styles.loadMore}>
               {loadingMore ? 'Загрузка...' : `Показать ещё (${total - items.length})`}
@@ -242,15 +386,31 @@ export function SubscribersListModal({ title, accountId, listType, currentAccoun
           )}
         </div>
       </div>
-      {settingsTarget && (
+      {settingsTarget?.kind === 'user' && (
         <SubscribeModal
           stacked
-          targetLogin={settingsTarget.account.login}
-          targetAccountId={settingsTarget.account.id}
-          targetAvatarId={settingsTarget.account.avatarId ?? null}
-          initialSettings={settingsTarget.notifySettings ?? undefined}
-          title={`Настройки уведомлений @${settingsTarget.account.login}`}
+          targetLogin={settingsTarget.item.account.login}
+          targetAccountId={settingsTarget.item.account.id}
+          targetAvatarId={settingsTarget.item.account.avatarId ?? null}
+          initialSettings={settingsTarget.item.notifySettings ?? undefined}
+          title={`Настройки уведомлений @${settingsTarget.item.account.login}`}
           subtitle="Выберите уведомления, которые хотите получать от пользователя:"
+          confirmLabel="Сохранить"
+          onConfirm={saveSettings}
+          onCancel={() => setSettingsTarget(null)}
+        />
+      )}
+      {settingsTarget?.kind === 'organization' && settingsTarget.item.organization && (
+        <SubscribeModal
+          stacked
+          variant="organization"
+          targetLogin={settingsTarget.item.organization.name}
+          organizationLogoId={settingsTarget.logoId}
+          initialSettings={{
+            notifyEventCreated: settingsTarget.item.notifySettings?.notifyEventCreated ?? true,
+          }}
+          title={`Настройки уведомлений — ${settingsTarget.item.organization.name}`}
+          subtitle="Выберите уведомления, которые хотите получать от организации:"
           confirmLabel="Сохранить"
           onConfirm={saveSettings}
           onCancel={() => setSettingsTarget(null)}

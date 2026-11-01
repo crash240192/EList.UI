@@ -9,10 +9,21 @@
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--border));
   border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 28px rgba(139, 92, 246, 0.75);
   overflow: hidden;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.4s cubic-bezier(0.22, 0, 0.2, 1),
+    transform 0.4s cubic-bezier(0.22, 0, 0.2, 1);
+}
+
+.panelClosing {
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
 }
 
 /* На узком экране панель от viewport, не от кнопки — иначе обрезается слева */
@@ -38,6 +49,14 @@
   flex-shrink: 0;
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
 .title {
   margin: 0;
   font-size: 15px;
@@ -48,20 +67,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.linkBtn {
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: 12px;
-  color: var(--accent);
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.linkBtn:hover {
-  text-decoration: underline;
 }
 
 .iconClose {
@@ -76,21 +81,61 @@
   cursor: pointer;
 }
 
-.statusRow {
+.tabsBar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--border);
-  font-size: 11px;
   flex-shrink: 0;
+}
+
+.tabBtn {
+  padding: 10px 12px 9px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tabBtn:hover {
+  color: var(--text-secondary);
+}
+
+.tabBtnActive {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+.tabCnt {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.tabBtnActive .tabCnt {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: color-mix(in srgb, var(--accent) 80%, #fff);
 }
 
 .wsPill {
   padding: 2px 8px;
   border-radius: 20px;
   font-weight: 500;
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .ws_open {
@@ -110,10 +155,6 @@
 }
 
 .ws_idle {
-  color: var(--text-muted);
-}
-
-.statsText {
   color: var(--text-muted);
 }
 
@@ -147,6 +188,23 @@
   align-items: flex-start;
   padding: 12px 0 12px 12px;
   flex-shrink: 0;
+}
+
+.itemAvatarBtn {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  font-family: inherit;
+  line-height: 0;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.itemAvatarBtn:hover {
+  transform: scale(1.07);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 .itemMain {

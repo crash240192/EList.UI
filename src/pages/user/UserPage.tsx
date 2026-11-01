@@ -1,19 +1,20 @@
 // pages/user/UserPage.tsx — профиль пользователя (макет examples/elist_user_page.html)
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { fetchOrganizerRating } from '@/entities/event';
 import { getStoredAccountId, getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import type { IFullProfile, IContactDataItem } from '@/entities/user/profileApi';
+import { loadHeaderPhotoMeta, peekHeaderPhotoMeta } from '@/entities/user/headerApi';
 import { useUserProfileEvents } from '@/features/event-list/useUserProfileEvents';
 import { useInfiniteScroll, usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import {
   fetchSubscriptionsCount,
   fetchSubscribersCount,
-  fetchSubscriptions,
+  fetchIsSubscribed,
   subscribe,
   unsubscribe,
   type INotifySettings,
@@ -23,8 +24,9 @@ import { SubscribersListModal } from '@/features/subscriptions/SubscribersListMo
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { useAvatar, seedAvatarCache } from '@/features/auth/useAvatar';
-import { getAvatarHistory } from '@/entities/user/avatarApi';
+import { getAvatarHistory, useAvatarCropDisplay } from '@/entities/user/avatarApi';
 import { EventListItem, EventList } from '@/entities/event/ui/EventListItem';
 import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
 import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
@@ -33,28 +35,37 @@ import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { useAuthStore } from '@/app/store';
 import { UserShareMenu } from '@/features/user/UserShareMenu';
+import { HeaderPhotoDialog, type HeaderPhotoValue } from '@/features/user/HeaderPhotoDialog/HeaderPhotoDialog';
+import { HeaderPhotoIcon } from '@/features/user/HeaderPhotoDialog/HeaderPhotoIcon';
+import { AvatarFrameSession } from '@/shared/ui/AvatarUpload/AvatarFrameSession';
+import {
+  InviteBlockedDialog,
+  ProfileEventInviteModal,
+  checkCanInviteOrReason,
+} from '@/features/user/ProfileInviteDialogs';
 import { ContentReportModal } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import {
   fetchMyOrganizations,
   fetchOrganizationsByAccount,
+  fetchOrgSubscriptionsCount,
   formatVerificationStatus,
   getOrganizationAvatar,
   type OrganizationResponse,
 } from '@/entities/organization';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import heroStyles from '@/shared/styles/hero.module.css';
 import {
   formatContactHref,
-  formatShortEventDate,
   getContactIconKind,
-  getUpcomingPreview,
   isContactLink,
-  splitEventsByPhase,
   type ContactIconKind,
   type UserEventsPhase,
   type UserEventsScope,
 } from './userPageUtils';
-import { formatAge } from '@/shared/lib/datetime';
+import { formatAge, pluralYears } from '@/shared/lib/datetime';
+import { coverFocusFromEvent, coverFocusImgStyle, coverZoomOf, DEFAULT_COVER_FOCUS } from '@/shared/lib/coverFocus';
+import { HEADER_BLUR_FALLBACK_PERCENT, HEADER_BLUR_FRAME_SCALE, headerBlurFilter } from '@/shared/lib/headerPhoto';
 import styles from './UserPage.module.css';
 
 type MainTab = UserEventsScope | 'albums';
@@ -74,20 +85,45 @@ const MAIN_TABS: { key: MainTab; label: string }[] = [
 function UserCoverBackground({
   accountId,
   avatarId,
+  headerImageId,
+  headerFocus,
+  headerBlurPercent,
 }: {
   accountId: string;
   avatarId: string | null;
+  headerImageId: string | null;
+  headerFocus: { x: number; y: number; zoom?: number } | null;
+  headerBlurPercent: number;
 }) {
   const fileId = useAvatar(accountId, avatarId);
+  const { displayFileId: avatarDisplayId, imgStyle: avatarImgStyle } = useAvatarCropDisplay(fileId);
+  const headerBlur = headerImageId ? headerBlurFilter(headerBlurPercent) : undefined;
 
   return (
     <div className={styles.coverBg}>
       <div className={styles.coverBgGradient} aria-hidden />
-      {fileId ? (
+      {headerImageId ? (
         <AuthImage
-          fileId={fileId}
+          fileId={headerImageId}
+          fullSize
+          imageFit="cover"
+          alt=""
+          className={styles.coverHeaderImg}
+          style={{
+            ...coverFocusImgStyle(headerFocus, {
+              frameScale: headerBlur ? HEADER_BLUR_FRAME_SCALE : 1,
+            }),
+            background: 'transparent',
+            overflow: 'visible',
+            ...(headerBlur ? { filter: headerBlur } : {}),
+          }}
+        />
+      ) : avatarDisplayId ? (
+        <AuthImage
+          fileId={avatarDisplayId}
           alt=""
           className={styles.coverAvatarImg}
+          style={avatarImgStyle}
         />
       ) : (
         <div className={styles.coverPattern} aria-hidden />
@@ -192,6 +228,7 @@ function UserEventsPanel({
   phase,
   onPhaseChange,
   onOpen,
+  viewerOrganizesCreated,
 }: {
   events: IEvent[];
   total: number;
@@ -203,21 +240,12 @@ function UserEventsPanel({
   phase: UserEventsPhase;
   onPhaseChange: (phase: UserEventsPhase) => void;
   onOpen: (eventId: string) => void;
+  /** Свои мероприятия на вкладке «Организует» — значок организатора */
+  viewerOrganizesCreated?: boolean;
 }) {
-  const filtered = useMemo(() => splitEventsByPhase(events, phase), [events, phase]);
-
   const sentinelRef = useInfiniteScroll(onLoadMore, {
     enabled: !isLoading && !isLoadingMore && hasMore,
   });
-
-  // Первая страница может целиком попасть в другую фазу — подгружаем дальше,
-  // пока не появятся карточки или не кончатся данные.
-  useEffect(() => {
-    if (isLoading || isLoadingMore || !hasMore) return;
-    if (filtered.length > 0) return;
-    if (events.length === 0) return;
-    onLoadMore();
-  }, [isLoading, isLoadingMore, hasMore, filtered.length, events.length, onLoadMore]);
 
   return (
     <div className={styles.tabContent}>
@@ -240,7 +268,7 @@ function UserEventsPanel({
         </div>
       )}
 
-      {!isLoading && filtered.length === 0 && !hasMore && (
+      {!isLoading && events.length === 0 && (
         <p className={styles.placeholder}>
           {scope === 'all'
             ? (phase === 'upcoming' ? 'Нет предстоящих мероприятий' : 'Нет прошедших мероприятий')
@@ -250,18 +278,15 @@ function UserEventsPanel({
         </p>
       )}
 
-      {!isLoading && filtered.length === 0 && hasMore && (
-        <p className={styles.placeholder}>Загрузка…</p>
-      )}
-
-      {!isLoading && filtered.length > 0 && (
+      {!isLoading && events.length > 0 && (
         <EventList className={styles.eventsList}>
-          {filtered.map(event => (
+          {events.map(event => (
             <EventListItem
               key={event.id}
               event={event}
               onClick={() => onOpen(event.id)}
               bleedCover
+              organizer={Boolean(event.isOrganizer) || (scope === 'created' && viewerOrganizesCreated)}
             />
           ))}
         </EventList>
@@ -273,7 +298,7 @@ function UserEventsPanel({
         </div>
       )}
 
-      {!isLoading && !hasMore && total > events.length && filtered.length > 0 && (
+      {!isLoading && !hasMore && total > events.length && events.length > 0 && (
         <p className={styles.moreHint}>Показано {events.length} из {total}</p>
       )}
     </div>
@@ -288,7 +313,10 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!authenticated && (id === 'me' || !id)) {
-      navigate('/login', { replace: true, state: { from: `/user/${id ?? 'me'}` } });
+      navigate('/', {
+        replace: true,
+        state: { authRequiredFrom: `/user/${id ?? 'me'}` },
+      });
     }
   }, [authenticated, id, navigate]);
 
@@ -306,6 +334,10 @@ export default function UserPage() {
   const [profile, setProfile] = useState<IFullProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Пока грузится новый профиль, не оставлять карточку предыдущего: иначе его
+  // avatarId записывается в кэш уже нового accountId и остаётся, если у того нет фото.
+  const profileRouteKey = targetId ?? 'me';
+  const [loadedRouteKey, setLoadedRouteKey] = useState(profileRouteKey);
   const [mainTab, setMainTab] = useState<MainTab>('all');
   const [albumsCount, setAlbumsCount] = useState(0);
   const [organizerRating, setOrganizerRating] = useState<number | null>(null);
@@ -315,9 +347,14 @@ export default function UserPage() {
   const [listModal, setListModal] = useState<ListModal>(null);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [inviteChecking, setInviteChecking] = useState(false);
+  const [inviteEventsOpen, setInviteEventsOpen] = useState(false);
+  const [inviteBlockedReason, setInviteBlockedReason] = useState<string | null>(null);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
+  const [ownMenuOpen, setOwnMenuOpen] = useState(false);
+  const [avatarFrameOpen, setAvatarFrameOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
     type: typeof ReportTargetType.Account | typeof ReportTargetType.Photo;
     id: string;
@@ -325,27 +362,120 @@ export default function UserPage() {
   const [accountReported, setAccountReported] = useState(false);
   const [reportedPhotoIds, setReportedPhotoIds] = useState<Set<string>>(() => new Set());
   const reportMenuRef = useRef<HTMLButtonElement>(null);
+  const ownMenuRef = useRef<HTMLButtonElement>(null);
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([]);
   const [orgLogoById, setOrgLogoById] = useState<Record<string, string | null>>({});
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
+  const [headerEditorOpen, setHeaderEditorOpen] = useState(false);
+  const [headerBlurPercent, setHeaderBlurPercent] = useState(0);
+  const [headerZoom, setHeaderZoom] = useState(1);
+  const [headerAspect, setHeaderAspect] = useState<number | undefined>(undefined);
+  const coverRef = useRef<HTMLDivElement>(null);
 
-  const { scopes: eventScopes } = useUserProfileEvents(profileAccountId || null);
+  const headerImageId = profile?.account.headerImageId ?? null;
+  const headerBlurOn = profile?.account.headerBlur === true;
 
   useEffect(() => {
+    if (!headerImageId) {
+      setHeaderBlurPercent(0);
+      setHeaderZoom(1);
+      return;
+    }
+    const cached = peekHeaderPhotoMeta(headerImageId);
+    if (cached) {
+      setHeaderZoom(cached.zoom);
+      setHeaderBlurPercent(headerBlurOn ? cached.blurPercent : 0);
+      return;
+    }
+    let cancelled = false;
+    if (headerBlurOn) setHeaderBlurPercent(HEADER_BLUR_FALLBACK_PERCENT);
+    void loadHeaderPhotoMeta(headerImageId).then(meta => {
+      if (cancelled) return;
+      setHeaderZoom(meta.zoom);
+      setHeaderBlurPercent(headerBlurOn ? meta.blurPercent : 0);
+    }).catch(() => {
+      if (!cancelled) setHeaderZoom(1);
+    });
+    return () => { cancelled = true; };
+  }, [headerImageId, headerBlurOn]);
+
+  const coverReady = !loading && profile != null;
+  useEffect(() => {
+    if (!coverReady) return;
+    const el = coverRef.current;
+    if (!el) return;
+    const update = () => {
+      const { width, height } = el.getBoundingClientRect();
+      if (width <= 0 || height <= 0) return;
+      const next = width / height;
+      setHeaderAspect(prev => (prev != null && Math.abs(prev - next) < 0.001 ? prev : next));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [coverReady]);
+
+  const applyHeaderPhoto = (next: HeaderPhotoValue) => {
+    setHeaderBlurPercent(next.imageId ? next.blurPercent : 0);
+    setHeaderZoom(next.imageId ? coverZoomOf(next.focus) : 1);
+    setProfile(prev => prev ? {
+      ...prev,
+      account: {
+        ...prev.account,
+        headerImageId: next.imageId,
+        headerFocusX: next.imageId ? next.focus.x : null,
+        headerFocusY: next.imageId ? next.focus.y : null,
+        headerBlur: Boolean(next.imageId) && next.blurPercent > 0,
+      },
+    } : prev);
+  };
+
+  const { scopes: eventScopes, scopeTotals } = useUserProfileEvents(
+    profileAccountId || null,
+    eventsPhase,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (!cancelled) setOrganizationsEnabled(f.organizationsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setOrganizationsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     fetchFullProfile(targetId)
-      .then(setProfile)
-      .catch(e => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
-      .finally(() => setLoading(false));
+      .then(data => {
+        if (cancelled) return;
+        setProfile(data);
+        const accountId = data.account?.id;
+        if (accountId) seedAvatarCache(accountId, data.account.avatarId ?? null);
+      })
+      .catch(e => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [targetId]);
 
   useEffect(() => {
     if (!profileAccountId) return;
     Promise.all([
       fetchSubscriptionsCount(profileAccountId),
+      fetchOrgSubscriptionsCount(profileAccountId),
       fetchSubscribersCount(profileAccountId),
-    ]).then(([s, sc]) => {
-      setSubsCount(s);
+    ]).then(([userSubs, orgSubs, sc]) => {
+      setSubsCount(userSubs + orgSubs);
       setSubscrCount(sc);
     });
   }, [profileAccountId]);
@@ -358,7 +488,7 @@ export default function UserPage() {
   }, [profileAccountId]);
 
   useEffect(() => {
-    if (!profileAccountId) {
+    if (!profileAccountId || !organizationsEnabled) {
       setOrganizations([]);
       setOrgLogoById({});
       return;
@@ -389,16 +519,45 @@ export default function UserPage() {
       });
 
     return () => { cancelled = true; };
-  }, [profileAccountId, isOwnProfile]);
+  }, [profileAccountId, isOwnProfile, organizationsEnabled]);
 
   useEffect(() => {
     if (!profileAccountId || !myAccountId || isOwnProfile) return;
-    fetchSubscriptions(myAccountId, { pageSize: 200 })
-      .then(page => {
-        setIsSubscribed(page.items.some((s: { account: { id: string } }) => s.account.id === profileAccountId));
+    let cancelled = false;
+    fetchIsSubscribed(profileAccountId)
+      .then(subscribed => {
+        if (!cancelled) setIsSubscribed(subscribed);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setIsSubscribed(false);
+      });
+    return () => { cancelled = true; };
   }, [profileAccountId, myAccountId, isOwnProfile]);
+
+  useEffect(() => {
+    setInviteEventsOpen(false);
+    setInviteBlockedReason(null);
+    setInviteChecking(false);
+  }, [profileAccountId, myAccountId, isOwnProfile]);
+
+  const handleInviteClick = useCallback(() => {
+    if (!profileAccountId || inviteChecking) return;
+    setInviteChecking(true);
+    void (async () => {
+      try {
+        const check = await checkCanInviteOrReason(profileAccountId);
+        if (!check.ok) {
+          setInviteBlockedReason(check.reason);
+          return;
+        }
+        setInviteEventsOpen(true);
+      } catch (e) {
+        setInviteBlockedReason(e instanceof Error ? e.message : 'Не удалось проверить приглашение');
+      } finally {
+        setInviteChecking(false);
+      }
+    })();
+  }, [profileAccountId, inviteChecking]);
 
   const handleSubscribe = useCallback(async (settings: INotifySettings) => {
     if (!profileAccountId) return;
@@ -444,25 +603,24 @@ export default function UserPage() {
         };
 
   const tabCounts: Record<MainTab, number> = {
-    all: eventScopes.all.total || eventScopes.all.events.length,
-    created: eventScopes.created.total || eventScopes.created.events.length,
-    participating: eventScopes.participating.total || eventScopes.participating.events.length,
+    all: scopeTotals.all,
+    created: scopeTotals.created,
+    participating: scopeTotals.participating,
     albums: albumsCount,
   };
-
-  const upcomingPreview = useMemo(() => {
-    const created = getUpcomingPreview(eventScopes.created.events, 'created', 2);
-    const participating = getUpcomingPreview(eventScopes.participating.events, 'participating', 2);
-    return [...created, ...participating]
-      .sort((a, b) => new Date(a.event.startTime).getTime() - new Date(b.event.startTime).getTime())
-      .slice(0, 3);
-  }, [eventScopes.created.events, eventScopes.participating.events]);
 
   const pageTitle = profile
     ? ([profile.person?.lastName, profile.person?.firstName].filter(Boolean).join(' ')
         || `@${profile.account.login}`)
     : null;
   usePageTitle(pageTitle);
+
+  if (loadedRouteKey !== profileRouteKey) {
+    setLoadedRouteKey(profileRouteKey);
+    setProfile(null);
+    setLoading(true);
+    setError(null);
+  }
 
   if (loading) return <Skeleton />;
   if (error || !profile) {
@@ -476,19 +634,33 @@ export default function UserPage() {
 
   const { account, contacts, person } = profile;
   const fullName = [person?.lastName, person?.firstName].filter(Boolean).join(' ');
-  const ageLabel = person?.birthDate ? formatAge(person.birthDate) : null;
+  const ageLabel = person?.birthDate
+    ? formatAge(person.birthDate)
+    : (typeof person?.ageYears === 'number' ? `${person.ageYears} ${pluralYears(person.ageYears)}` : null);
   const visibleContacts = contacts.filter(c => isOwnProfile || c.show);
   const initials = (fullName || account.login).slice(0, 2).toUpperCase();
+  const profileCity = account.profileCity?.trim() || null;
+  const canOpenProfilePhotos = isOwnProfile || Boolean(account.avatarId);
 
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.cover}>
+        <div className={styles.cover} ref={coverRef}>
           <UserCoverBackground
             accountId={profileAccountId}
             avatarId={account.avatarId ?? null}
+            headerImageId={account.headerImageId ?? null}
+            headerFocus={coverFocusFromEvent({
+              coverFocusX: account.headerFocusX,
+              coverFocusY: account.headerFocusY,
+              coverZoom: headerZoom,
+            })}
+            headerBlurPercent={headerBlurPercent}
           />
-          <div className={styles.coverOverlay} />
+          <div
+            className={account.headerImageId ? styles.coverOverlayPhoto : styles.coverOverlay}
+            aria-hidden
+          />
 
           <div className={styles.heroTop}>
             <HeroBackButton onClick={goBack} />
@@ -502,6 +674,43 @@ export default function UserPage() {
               >
                 <ShareIcon />
               </button>
+              {isOwnProfile && (
+                <>
+                  <button
+                    ref={ownMenuRef}
+                    type="button"
+                    className={`${heroStyles.heroBtn} noHoverGlow`}
+                    onClick={() => setOwnMenuOpen(v => !v)}
+                    aria-label="Действия с профилем"
+                    aria-expanded={ownMenuOpen}
+                    title="Действия с профилем"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
+                    </svg>
+                  </button>
+                  <HeroContextMenu
+                    open={ownMenuOpen}
+                    onClose={() => setOwnMenuOpen(false)}
+                    anchorRef={ownMenuRef}
+                    aria-label="Действия с профилем"
+                    fit
+                  >
+                    <HeroContextMenuItem onClick={() => { setOwnMenuOpen(false); navigate('/settings'); }}>
+                      <ProfileGearIcon />
+                      Настроить профиль
+                    </HeroContextMenuItem>
+                    <HeroContextMenuItem onClick={() => { setOwnMenuOpen(false); setAvatarFrameOpen(true); }}>
+                      <ProfileAvatarIcon />
+                      Сменить аватар
+                    </HeroContextMenuItem>
+                    <HeroContextMenuItem onClick={() => { setOwnMenuOpen(false); setHeaderEditorOpen(true); }}>
+                      <HeaderPhotoIcon />
+                      Сменить обложку
+                    </HeroContextMenuItem>
+                  </HeroContextMenu>
+                </>
+              )}
               {!isOwnProfile && authenticated && (
                 <>
                   <button
@@ -540,22 +749,25 @@ export default function UserPage() {
         <div className={styles.profileHeader}>
           <button
             type="button"
-            className={styles.avatarWrap}
+            className={`noHoverGlow ${styles.avatarWrap}`}
+            disabled={!canOpenProfilePhotos}
             onClick={async () => {
+              if (!canOpenProfilePhotos) return;
               const history = await getAvatarHistory(profileAccountId);
-              setLightboxFileIds(
-                history
-                  .map(h => (typeof h === 'string' ? h : (h as { fileId?: string; id?: string }).fileId ?? (h as { id?: string }).id))
-                  .filter(Boolean) as string[],
-              );
+              const ids = history
+                .map(h => (typeof h === 'string' ? h : (h as { fileId?: string; id?: string }).fileId ?? (h as { id?: string }).id))
+                .filter(Boolean) as string[];
+              if (ids.length === 0 && !account.avatarId) return;
+              setLightboxFileIds(ids.length > 0 ? ids : account.avatarId ? [account.avatarId] : []);
             }}
-            aria-label="Открыть фото профиля"
+            aria-label={canOpenProfilePhotos ? 'Открыть фото профиля' : 'Фото профиля скрыто'}
           >
             <UserAvatar
               accountId={profileAccountId}
               avatarId={account.avatarId ?? null}
               initials={initials}
               size={88}
+              onlineDotSize={22}
               className={styles.avatar}
             />
           </button>
@@ -565,8 +777,15 @@ export default function UserPage() {
               {fullName && <h1 className={styles.fullName}>{fullName}</h1>}
             </div>
             <div className={styles.loginLine}>@{account.login}</div>
-            {(ageLabel || person?.gender) && (
+            {profileCity && (
+              <div className={styles.profileCity}>{profileCity}</div>
+            )}
+            {(ageLabel || person?.gender || person?.isBirthdayToday) && (
               <div className={styles.profileMeta}>
+                {person?.isBirthdayToday && <span className={styles.birthdayAccent}>День рождения</span>}
+                {person?.isBirthdayToday && (ageLabel || person?.gender) && (
+                  <span className={styles.profileMetaDot} aria-hidden>·</span>
+                )}
                 {ageLabel && <span>{ageLabel}</span>}
                 {ageLabel && person?.gender && <span className={styles.profileMetaDot} aria-hidden>·</span>}
                 {person?.gender && <span>{person.gender === 'Male' ? 'Мужской' : 'Женский'}</span>}
@@ -576,12 +795,22 @@ export default function UserPage() {
 
           {!isOwnProfile && authenticated && (
             <div className={styles.profileActions}>
+              <div className={styles.inviteSlot}>
+                <button
+                  type="button"
+                  className={styles.btnInvite}
+                  onClick={handleInviteClick}
+                  disabled={inviteChecking}
+                >
+                  {inviteChecking ? '…' : 'Пригласить'}
+                </button>
+              </div>
               {isSubscribed ? (
                 <button type="button" className={`${styles.btnJoin} ${styles.btnLeave}`} onClick={() => void handleUnsubscribe()}>
                   Отписаться
                 </button>
               ) : (
-                <button type="button" className={styles.btnJoin} onClick={() => setShowSubscribe(true)}>
+                <button type="button" className={`${styles.btnJoin} ${styles.btnSubscribe}`} onClick={() => setShowSubscribe(true)}>
                   Подписаться
                 </button>
               )}
@@ -590,19 +819,6 @@ export default function UserPage() {
         </div>
 
         <div className={styles.statsBar}>
-          <div className={styles.statGroup}>
-            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{eventScopes.created.total || eventScopes.created.events.length}</span>
-              <span className={styles.statLabel}>организовал</span>
-            </div>
-            <div className={`${styles.statItem} ${styles.statItemStatic}`}>
-              <span className={styles.statNum}>{eventScopes.participating.total || eventScopes.participating.events.length}</span>
-              <span className={styles.statLabel}>посетил</span>
-            </div>
-          </div>
-
-          <div className={styles.statGroupDivider} aria-hidden />
-
           <div className={styles.statGroup}>
             <button
               type="button"
@@ -639,20 +855,32 @@ export default function UserPage() {
 
         <div className={styles.mainGrid}>
           <aside className={styles.leftPanel}>
-            {visibleContacts.length > 0 && (
+            {person?.about?.trim() && (
               <section>
-                <div className={styles.secLabel}>Контакты</div>
-                <div className={styles.contactList}>
-                  {visibleContacts.map(contact => (
-                    <ContactRow key={contact.id} contact={contact} />
-                  ))}
-                </div>
+                <div className={styles.secLabel}>О себе</div>
+                <p className={styles.aboutText}>{person.about.trim()}</p>
               </section>
+            )}
+
+            {visibleContacts.length > 0 && (
+              <>
+                {person?.about?.trim() && <div className={styles.sectionDivider} />}
+                <section>
+                  <div className={styles.secLabel}>Контакты</div>
+                  <div className={styles.contactList}>
+                    {visibleContacts.map(contact => (
+                      <ContactRow key={contact.id} contact={contact} />
+                    ))}
+                  </div>
+                </section>
+              </>
             )}
 
             {organizations.length > 0 && (
               <>
-                {visibleContacts.length > 0 && <div className={styles.sectionDivider} />}
+                {(Boolean(person?.about?.trim()) || visibleContacts.length > 0) && (
+                  <div className={styles.sectionDivider} />
+                )}
                 <section>
                   <div className={styles.secLabel}>Организации</div>
                   <div className={styles.orgList}>
@@ -668,7 +896,7 @@ export default function UserPage() {
                         >
                           <div className={styles.orgLogo} aria-hidden>
                             {logoId ? (
-                              <AuthImage
+                              <FramedAuthImage
                                 fileId={logoId}
                                 alt=""
                                 className={styles.orgLogoImg}
@@ -706,47 +934,6 @@ export default function UserPage() {
                 </section>
               </>
             )}
-
-            {upcomingPreview.length > 0 && (
-              <>
-                {(visibleContacts.length > 0 || organizations.length > 0) && (
-                  <div className={styles.sectionDivider} />
-                )}
-                <section>
-                  <div className={styles.secLabel}>Ближайшие события</div>
-                  <div className={styles.upcomingList}>
-                    {upcomingPreview.map(({ event, scope }, index) => (
-                      <button
-                        key={`${event.id}-${scope}`}
-                        type="button"
-                        className={styles.nextEvent}
-                        onClick={() => navigate(`/event/${event.id}`)}
-                      >
-                        <div className={styles.neDotCol}>
-                          <span
-                            className={styles.neDot}
-                            style={{ background: scope === 'created' ? 'var(--accent)' : '#22c55e' }}
-                            aria-hidden
-                          />
-                          {index < upcomingPreview.length - 1 && <span className={styles.neLine} aria-hidden />}
-                        </div>
-                        <div className={styles.neInfo}>
-                          <div className={styles.neDate}>{formatShortEventDate(event.startTime)}</div>
-                          <div className={styles.neName}>{event.name}</div>
-                          <div className={styles.neMeta}>
-                            {event.address && <span>{event.address}</span>}
-                            {event.address && <span> · </span>}
-                            <span className={scope === 'created' ? styles.neBadgeOrganizer : styles.neBadgeParticipant}>
-                              {scope === 'created' ? 'Организую' : 'Участвую'}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              </>
-            )}
           </aside>
 
           <section className={styles.rightPanel}>
@@ -779,12 +966,27 @@ export default function UserPage() {
                 scope={mainTab}
                 phase={eventsPhase}
                 onPhaseChange={setEventsPhase}
+                viewerOrganizesCreated={isOwnProfile}
                 onOpen={eventId => navigate(`/event/${eventId}`)}
               />
             )}
           </section>
         </div>
       </div>
+
+      {inviteEventsOpen && myAccountId && (
+        <ProfileEventInviteModal
+          myAccountId={myAccountId}
+          profileAccountId={profileAccountId}
+          onClose={() => setInviteEventsOpen(false)}
+        />
+      )}
+      {inviteBlockedReason && (
+        <InviteBlockedDialog
+          reason={inviteBlockedReason}
+          onClose={() => setInviteBlockedReason(null)}
+        />
+      )}
 
       {showSubscribe && (
         <SubscribeModal
@@ -841,6 +1043,37 @@ export default function UserPage() {
         />
       )}
 
+      {avatarFrameOpen && isOwnProfile && (
+        <AvatarFrameSession
+          open
+          accountId={profileAccountId}
+          fileId={account.avatarId ?? null}
+          onClose={() => setAvatarFrameOpen(false)}
+          onChanged={next => {
+            seedAvatarCache(profileAccountId, next);
+            setProfile(prev => prev ? {
+              ...prev,
+              account: { ...prev.account, avatarId: next },
+            } : prev);
+          }}
+        />
+      )}
+
+      {headerEditorOpen && profile?.account && isOwnProfile && (
+        <HeaderPhotoDialog
+          imageId={profile.account.headerImageId ?? null}
+          focus={{
+            x: profile.account.headerFocusX ?? DEFAULT_COVER_FOCUS.x,
+            y: profile.account.headerFocusY ?? DEFAULT_COVER_FOCUS.y,
+            zoom: headerZoom,
+          }}
+          blurPercent={headerBlurPercent}
+          aspectRatio={headerAspect}
+          onClose={() => setHeaderEditorOpen(false)}
+          onApply={applyHeaderPhoto}
+        />
+      )}
+
       {showShareMenu && profile?.account && (
         <UserShareMenu
           accountId={profile.account.id}
@@ -864,6 +1097,25 @@ function Skeleton() {
         </div>
       </div>
     </div>
+  );
+}
+
+function ProfileGearIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function ProfileAvatarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="12" cy="10" r="2.2" />
+      <path d="M8.2 17.2c.5-2 2-3.1 3.8-3.1s3.3 1.1 3.8 3.1" />
+    </svg>
   );
 }
 

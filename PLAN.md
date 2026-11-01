@@ -148,18 +148,21 @@ npm run lint     # ESLint
 - AdminPage: категории/типы, контакты, тарифы и валидаторы
 - Уведомления (WebSocket), подписки, медиа-альбомы
 - Tickets stub UI: покупка / мои билеты (зависит от `ticketSalesEnabled` на API)
+- Payments return: `/payments/return` — stub complete или poll order/deposit после T-Bank
 - Zustand-сторы, JWT-аутентификация, тёмная/светлая тема
 
-### ⚠️ Известные разрывы (на 14.09.2026)
-1. **Регистрация** — UI не отправляет `AcceptConsent` / `AcceptAgreement` в `create` (бэк требует) → регистрация падает
-2. **Person sync** после регистрации/активации — ошибки глотаются
-3. **Policy** — только ссылка для ознакомления, **без** обязательной галочки (так и задумано)
-4. **Кошелёк** — рудимент тарифа платформы; не для оплаты билетов и не P2P; top-up UX слабый
-5. **Билеты** — stub ЮKassa; `confirmationUrl` не открывается; gift/refund UI «скоро»
-6. **E2E / unit-тесты** — фреймворк не настроен
+### ⚠️ Известные разрывы (на 06.10.2026)
+
+1. ~~**Регистрация** — UI не отправляет `AcceptConsent` / `AcceptAgreement`~~ — закрыто: флаги + person (ФИО, ДР ≥14) в `create`
+2. ~~**Person sync** после регистрации/активации~~ — закрыто: профиль в TX create
+3. Soft-launch ops: HSTS / uptime — по чеклисту API
+4. **Policy** — только ссылка для ознакомления, **без** обязательной галочки (так и задумано)
+5. **Кошелёк** — тариф платформы (не билеты); top-up через T-Bank/stub + `/payments/return` poll
+6. **Билеты** — T-Bank: redirect на PaymentURL → `/payments/return` poll; stub `?stub=1` → complete; gift/refund UI «скоро»; prod — `ticketSalesEnabled` + env банка
+7. **E2E / unit-тесты** — фреймворк не настроен
 
 ### 🔧 Дальше
-См. P0/P1 в backend `docs/production-readiness-checklist.md`.
+См. backend `docs/tbank-payments.md` и `docs/production-readiness-checklist.md`.
 
 ---
 

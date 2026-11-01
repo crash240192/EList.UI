@@ -2,12 +2,21 @@
 
 import { apiClient } from '@/shared/api/client';
 import { getStoredAccountId } from '@/entities/user/api';
+import { clampCoverFocusValue } from '@/shared/lib/coverFocus';
 import type { Gender } from '@/shared/api/types';
 
 export interface IAccountData {
   id: string;
   login: string;
   avatarId?: string | null;
+  /** Город по координатам аккаунта (если разрешено locationVisibility) */
+  profileCity?: string | null;
+  /** Файл шапки. Пусто — на обложке размытый аватар. */
+  headerImageId?: string | null;
+  headerFocusX?: number | null;
+  headerFocusY?: number | null;
+  /** Сервер хранит только вкл/выкл. Процент шкалы лежит в контексте файла. */
+  headerBlur?: boolean;
 }
 
 export interface IContactType {
@@ -38,6 +47,12 @@ export interface IPersonInfo {
   patronymic: string | null;
   gender: Gender | null;
   birthDate: string | null;
+  /** Возраст без даты — приходит с бэка по политике приватности */
+  ageYears?: number | null;
+  /** Акцент «день рождения сегодня» */
+  isBirthdayToday?: boolean | null;
+  /** Публичный текст «о себе» */
+  about?: string | null;
 }
 
 export interface IFullProfile {
@@ -48,6 +63,33 @@ export interface IFullProfile {
 }
 
 // ---- Helpers ----
+
+function normalizeAccount(raw: IAccountData | null | undefined): IAccountData {
+  if (!raw || typeof raw !== 'object') {
+    return { id: '', login: '' };
+  }
+  const r = raw as IAccountData & Record<string, unknown>;
+  const city = r.profileCity ?? (r as Record<string, unknown>).ProfileCity;
+  const avatarRaw = r.avatarId ?? r.AvatarId;
+  const headerRaw = r.headerImageId ?? r.HeaderImageId;
+  const focusX = r.headerFocusX ?? r.HeaderFocusX;
+  const focusY = r.headerFocusY ?? r.HeaderFocusY;
+  const blurRaw = r.headerBlur ?? r.HeaderBlur;
+  return {
+    id: String(r.id ?? r.Id ?? ''),
+    login: String(r.login ?? r.Login ?? ''),
+    avatarId: (avatarRaw === null || avatarRaw === undefined || avatarRaw === ''
+      ? null
+      : String(avatarRaw)),
+    profileCity: typeof city === 'string' && city.trim() ? city.trim() : null,
+    headerImageId: (headerRaw === null || headerRaw === undefined || headerRaw === ''
+      ? null
+      : String(headerRaw)),
+    headerFocusX: focusX == null || focusX === '' ? null : clampCoverFocusValue(focusX),
+    headerFocusY: focusY == null || focusY === '' ? null : clampCoverFocusValue(focusY),
+    headerBlur: blurRaw === true,
+  };
+}
 
 async function safeContacts(path: string): Promise<{ data: IContactDataItem[]; error: string | null }> {
   try {
@@ -60,8 +102,25 @@ async function safeContacts(path: string): Promise<{ data: IContactDataItem[]; e
 
 async function safePerson(path: string): Promise<IPersonInfo | null> {
   try {
-    const res = await apiClient.get<IPersonInfo>(path);
-    return res.result ?? null;
+    const res = await apiClient.get<Record<string, unknown>>(path);
+    const raw = res.result;
+    if (!raw || typeof raw !== 'object') return null;
+    const p = raw as Record<string, unknown>;
+    const ageRaw = p.ageYears ?? p.AgeYears;
+    const bdayRaw = p.isBirthdayToday ?? p.IsBirthdayToday;
+    const aboutRaw = p.about ?? p.About;
+    return {
+      id: String(p.id ?? p.Id ?? ''),
+      accountId: String(p.accountId ?? p.AccountId ?? ''),
+      firstName: (p.firstName ?? p.FirstName ?? null) as string | null,
+      lastName: (p.lastName ?? p.LastName ?? null) as string | null,
+      patronymic: (p.patronymic ?? p.Patronymic ?? null) as string | null,
+      gender: (p.gender ?? p.Gender ?? null) as IPersonInfo['gender'],
+      birthDate: (p.birthDate ?? p.BirthDate ?? null) as string | null,
+      ageYears: typeof ageRaw === 'number' ? ageRaw : null,
+      isBirthdayToday: typeof bdayRaw === 'boolean' ? bdayRaw : null,
+      about: typeof aboutRaw === 'string' && aboutRaw.trim() ? aboutRaw.trim() : null,
+    };
   } catch {
     return null;
   }
@@ -86,7 +145,7 @@ export async function fetchFullProfile(
     ]);
 
     return {
-      account:       accountRes.result,
+      account:       normalizeAccount(accountRes.result),
       contacts:      contactsRes.data,
       contactsError: contactsRes.error,
       person,
@@ -101,7 +160,7 @@ export async function fetchFullProfile(
   ]);
 
   return {
-    account:       accountRes.result,
+    account:       normalizeAccount(accountRes.result),
     contacts:      contactsRes.data,
     contactsError: contactsRes.error,
     person,

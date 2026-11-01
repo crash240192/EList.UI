@@ -1,0 +1,31 @@
+name: Build
+
+on:
+  push:
+    branches: [develop, main, "cursor/**"]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          # Те же дефолты, что в Dockerfile — сборка не требует секретов.
+          VITE_USE_MOCK: "false"
+          VITE_YANDEX_MAPS_KEY: ea3f78ff-3c27-4101-a391-8c0a1d703833
+          VITE_YANDEX_AD_BLOCK_ID: R-A-20290944-1
+        run: npm run build

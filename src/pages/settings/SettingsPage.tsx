@@ -1,6 +1,6 @@
 // pages/settings/SettingsPage.tsx — макет examples/elist_settings_wallet.html
 
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchContactTypes } from '@/features/auth/registrationApi';
 import type { IContactType } from '@/features/auth/registrationApi';
@@ -10,15 +10,40 @@ import {
   createContact, updateContact, getMyContacts,
   deleteMyAccount,
 } from '@/entities/user/settingsApi';
+import {
+  fetchMyPrivacySettings,
+  updateMyPrivacySettings,
+  WHO_CAN_INVITE_OPTIONS,
+  WHO_CAN_INVITE_HINTS,
+  PRIVACY_AUDIENCE_OPTIONS,
+  PRIVACY_AUDIENCE_HINTS,
+  type IAccountPrivacySettings,
+  type PrivacyAudience,
+} from '@/entities/user/privacyApi';
+import {
+  DocumentType,
+  checkUserAgreement,
+  fetchLastDocument,
+  type IAgreementDocument,
+} from '@/entities/agreement';
+import { UserAgreementAcceptDialog } from '@/features/agreements';
+import { ApiError } from '@/shared/api/client';
+import { isDistributionConsentRequiredCode } from '@/shared/api/errorCodes';
 import { useUserLocation } from '@/features/auth/useUserLocation';
 import { POPULAR_CITIES, useGeoCity, type ICity } from '@/features/auth/useGeoCity';
 import { cookies } from '@/shared/lib/cookies';
 import { AvatarUpload } from '@/shared/ui/AvatarUpload/AvatarUpload';
+import { HeaderPhotoDialog, type HeaderPhotoValue } from '@/features/user/HeaderPhotoDialog/HeaderPhotoDialog';
+import { loadHeaderPhotoMeta } from '@/entities/user/headerApi';
+import { fetchFullProfile } from '@/entities/user/profileApi';
+import { DEFAULT_COVER_FOCUS, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { HEADER_BLUR_FRAME_SCALE, headerBlurFilter } from '@/shared/lib/headerPhoto';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
 import { Select } from '@/shared/ui/Select/Select';
 import { DatePicker } from '@/shared/ui/DatePicker/DatePicker';
-import { birthDateToApiIso, parseBirthDateFromApi, todayLocalDateString } from '@/shared/lib/datetime';
+import { birthDateToApiIso, getAge, parseBirthDateFromApi, todayLocalDateString } from '@/shared/lib/datetime';
 import { useMyAvatar } from '@/features/auth/useAvatar';
 import { useAuthStore, useFiltersStore } from '@/app/store';
 import { PasswordVisibilityButton } from '@/shared/ui/PasswordVisibilityButton';
@@ -27,9 +52,10 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { usePageTitle } from '@/shared/hooks';
 import { OrganizationsSettingsPanel } from '@/features/organizations';
 import { ModerationSettingsPanel } from '@/features/content-reports';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import styles from './SettingsPage.module.css';
 
-type SettingsTab = 'profile' | 'contacts' | 'location' | 'security' | 'organizations' | 'moderation';
+type SettingsTab = 'profile' | 'privacy' | 'security' | 'organizations' | 'moderation';
 
 const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: ReactNode }[] = [
   {
@@ -44,23 +70,12 @@ const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: React
     ),
   },
   {
-    key: 'contacts',
+    key: 'privacy',
     section: 'Аккаунт',
-    label: 'Контакты',
+    label: 'Контакты и приватность',
     icon: (
       <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.56 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'location',
-    section: 'Аккаунт',
-    label: 'Местоположение',
-    icon: (
-      <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-        <circle cx="12" cy="10" r="3" />
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     ),
   },
@@ -91,14 +106,30 @@ const NAV_ITEMS: { key: SettingsTab; label: string; section: string; icon: React
   {
     key: 'moderation',
     section: 'Безопасность',
-    label: 'Модерация',
+    label: 'Жалобы',
     icon: (
-      <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <svg className={styles.snavIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M5 3v18" />
+        <path d="M5 5.2c2.5.9 4-.8 6.4.2 1.6.6 2.9.8 4.8-.2.9 1.6.2 2.7-1.1 3.4 1.4.9 1.3 2.2-.1 3.2-1.7.8-3 .3-4.6-.5C7.2 10.6 5.8 11.5 5 10.8" />
       </svg>
     ),
   },
 ];
+
+function resolveSettingsTab(tabParam: string | null, orgParam: string | null): SettingsTab {
+  if (orgParam) return 'organizations';
+  if (tabParam === 'location') return 'profile';
+  if (tabParam === 'contacts' || tabParam === 'privacy') return 'privacy';
+  if (
+    tabParam === 'security'
+    || tabParam === 'organizations'
+    || tabParam === 'moderation'
+    || tabParam === 'profile'
+  ) {
+    return tabParam;
+  }
+  return 'profile';
+}
 
 export default function SettingsPage() {
   usePageTitle('Настройки');
@@ -106,37 +137,48 @@ export default function SettingsPage() {
   const tabParam = searchParams.get('tab');
   const orgParam = searchParams.get('org');
 
-  const initialTab: SettingsTab =
-    orgParam
-      ? 'organizations'
-      : tabParam === 'contacts'
-        || tabParam === 'location'
-        || tabParam === 'security'
-        || tabParam === 'organizations'
-        || tabParam === 'moderation'
-        || tabParam === 'profile'
-          ? tabParam
-          : 'profile';
+  const initialTab: SettingsTab = resolveSettingsTab(tabParam, orgParam);
 
   const [tab, setTab] = useState<SettingsTab>(initialTab);
-  const sections = [...new Set(NAV_ITEMS.map(i => i.section))];
+  const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
+  const [featuresReady, setFeaturesReady] = useState(false);
 
   useEffect(() => {
-    if (orgParam) {
-      setTab('organizations');
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (cancelled) return;
+        setOrganizationsEnabled(f.organizationsEnabled);
+        setFeaturesReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setOrganizationsEnabled(false);
+        setFeaturesReady(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const visibleNavItems = useMemo(
+    () => NAV_ITEMS.filter(i => i.key !== 'organizations' || organizationsEnabled),
+    [organizationsEnabled],
+  );
+  const sections = [...new Set(visibleNavItems.map(i => i.section))];
+
+  useEffect(() => {
+    const next = resolveSettingsTab(tabParam, orgParam);
+    if (featuresReady && !organizationsEnabled && next === 'organizations') {
+      setTab('profile');
+      setSearchParams(prev => {
+        const nextParams = new URLSearchParams(prev);
+        nextParams.delete('tab');
+        nextParams.delete('org');
+        return nextParams;
+      }, { replace: true });
       return;
     }
-    if (
-      tabParam === 'contacts'
-      || tabParam === 'location'
-      || tabParam === 'security'
-      || tabParam === 'organizations'
-      || tabParam === 'moderation'
-      || tabParam === 'profile'
-    ) {
-      setTab(tabParam);
-    }
-  }, [tabParam, orgParam]);
+    setTab(next);
+  }, [tabParam, orgParam, featuresReady, organizationsEnabled, setSearchParams]);
 
   const selectTab = (next: SettingsTab) => {
     setTab(next);
@@ -165,7 +207,7 @@ export default function SettingsPage() {
           {sections.map(section => (
             <div key={section}>
               <div className={styles.snavSection}>{section}</div>
-              {NAV_ITEMS.filter(i => i.section === section).map(item => (
+              {visibleNavItems.filter(i => i.section === section).map(item => (
                 <button
                   key={item.key}
                   type="button"
@@ -183,20 +225,16 @@ export default function SettingsPage() {
         <div className={styles.scontent}>
           {tab === 'profile' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
-              <ProfileTab />
+              <ProfileDataTab />
             </div>
           )}
-          {tab === 'contacts' && (
+          {tab === 'privacy' && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <ContactsSection />
+              <PrivacySection />
             </div>
           )}
-          {tab === 'location' && (
-            <div className={`${styles.stab} ${styles.stabActive}`}>
-              <CitySection />
-            </div>
-          )}
-          {tab === 'organizations' && (
+          {tab === 'organizations' && organizationsEnabled && (
             <div className={`${styles.stab} ${styles.stabActive}`}>
               <OrganizationsSettingsPanel
                 initialOrganizationId={orgParam}
@@ -222,44 +260,140 @@ export default function SettingsPage() {
   );
 }
 
-function ProfileTab() {
+function ProfileDataTab() {
   const [form, setForm] = useState({
     firstName: '', lastName: '', patronymic: '',
     gender: '' as 'Male' | 'Female' | '',
     birthDate: '',
   });
+  const [about, setAbout] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [headerOpen, setHeaderOpen] = useState(false);
+  const [headerImageId, setHeaderImageId] = useState<string | null>(null);
+  const [headerFocus, setHeaderFocus] = useState(DEFAULT_COVER_FOCUS);
+  const [headerBlurPercent, setHeaderBlurPercent] = useState(0);
 
   const initials = (form.firstName?.[0] ?? '') + (form.lastName?.[0] ?? '');
   const accountId = getStoredAccountId() ?? '';
   const { fileId: myAvatarFileId, refresh: refreshAvatar } = useMyAvatar();
   const displayName = [form.firstName, form.lastName].filter(Boolean).join(' ') || 'Профиль';
 
+  const { coords } = useUserLocation();
+  const { detectedCity, loading: geoLoading } = useGeoCity();
+  const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
+
   useEffect(() => {
-    getMyPersonInfo().then(p => {
-      if (p) setForm({
-        firstName: p.firstName ?? '',
-        lastName: p.lastName ?? '',
-        patronymic: p.patronymic ?? '',
-        gender: (p.gender as 'Male' | 'Female' | '') ?? '',
-        birthDate: p.birthDate ? parseBirthDateFromApi(p.birthDate) : '',
+    let cancelled = false;
+    Promise.all([
+      getMyPersonInfo(),
+      fetchFullProfile(null).catch(() => null),
+    ]).then(async ([p, profile]) => {
+      if (cancelled) return;
+      if (p) {
+        setForm({
+          firstName: p.firstName ?? '',
+          lastName: p.lastName ?? '',
+          patronymic: p.patronymic ?? '',
+          gender: (p.gender as 'Male' | 'Female' | '') ?? '',
+          birthDate: p.birthDate ? parseBirthDateFromApi(p.birthDate) : '',
+        });
+        setAbout(typeof p.about === 'string' ? p.about : '');
+      }
+      const account = profile?.account;
+      const imageId = account?.headerImageId ?? null;
+      setHeaderImageId(imageId);
+      let zoom = DEFAULT_COVER_FOCUS.zoom ?? 1;
+      let blur = 0;
+      if (imageId) {
+        try {
+          const meta = await loadHeaderPhotoMeta(imageId);
+          if (cancelled) return;
+          zoom = meta.zoom;
+          blur = account?.headerBlur ? meta.blurPercent : 0;
+        } catch { /* кадр откроется без сохранённого масштаба */ }
+      }
+      setHeaderFocus({
+        x: account?.headerFocusX ?? DEFAULT_COVER_FOCUS.x,
+        y: account?.headerFocusY ?? DEFAULT_COVER_FOCUS.y,
+        zoom,
       });
-    }).finally(() => setLoading(false));
+      setHeaderBlurPercent(blur);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    let nearest: ICity | null = null;
+    let minDist = Infinity;
+    for (const city of POPULAR_CITIES) {
+      const d = Math.hypot(city.lat - coords.lat, city.lng - coords.lng);
+      if (d < minDist) { minDist = d; nearest = city; }
+    }
+    if (nearest && minDist < 3) setSelectedCity(nearest);
+  }, [coords]);
+
+  const handleAutoDetect = () => {
+    const source = detectedCity
+      ? { lat: detectedCity.lat, lng: detectedCity.lng }
+      : coords;
+
+    let nearest: ICity | null = null;
+    let minDist = Infinity;
+    for (const city of POPULAR_CITIES) {
+      const d = Math.hypot(city.lat - source.lat, city.lng - source.lng);
+      if (d < minDist) { minDist = d; nearest = city; }
+    }
+    if (nearest) setSelectedCity(nearest);
+  };
 
   const handleSave = async () => {
     setSaving(true);
     setMsg(null);
     try {
+      if (!form.firstName.trim() || !form.lastName.trim()) {
+        setMsg({ text: 'Укажите имя и фамилию', ok: false });
+        return;
+      }
+      if (!form.birthDate) {
+        setMsg({ text: 'Укажите дату рождения', ok: false });
+        return;
+      }
+      if (getAge(form.birthDate) < 14) {
+        setMsg({ text: 'Сервис доступен только по достижению 14 лет', ok: false });
+        return;
+      }
       await savePersonInfo({
-        firstName: form.firstName || undefined,
-        lastName: form.lastName || undefined,
-        patronymic: form.patronymic || undefined,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        patronymic: form.patronymic.trim() || undefined,
         gender: form.gender || undefined,
         birthDate: birthDateToApiIso(form.birthDate),
+        about: about.trim() || null,
       });
+      if (selectedCity) {
+        await updateLocation(selectedCity.lat, selectedCity.lng);
+        cookies.set('elist_user_lat', String(selectedCity.lat), 30);
+        cookies.set('elist_user_lng', String(selectedCity.lng), 30);
+        cookies.set('elist_acct_lat', String(selectedCity.lat), 30);
+        cookies.set('elist_acct_lng', String(selectedCity.lng), 30);
+        cookies.delete('elist_city_decided');
+        const cityName = selectedCity.shortName ?? selectedCity.name;
+        cookies.set('elist_home_city_name', cityName, 30);
+        cookies.set('elist_city_name', cityName, 30);
+        window.dispatchEvent(new CustomEvent('elist:homeCityChanged', {
+          detail: { lat: selectedCity.lat, lng: selectedCity.lng, name: cityName },
+        }));
+        const store = useFiltersStore.getState();
+        store.setMapCenter([selectedCity.lat, selectedCity.lng]);
+        store.setMapZoom(12);
+        store.setFilter('latitude', selectedCity.lat);
+        store.setFilter('longitude', selectedCity.lng);
+        cookies.set('elist_city_decided', '1', 30);
+      }
       setMsg({ text: 'Изменения сохранены', ok: true });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
@@ -271,6 +405,8 @@ function ProfileTab() {
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const headerBlur = headerImageId ? headerBlurFilter(headerBlurPercent) : undefined;
 
   if (loading) {
     return <div className={styles.sectionLoader}>Загрузка...</div>;
@@ -292,16 +428,57 @@ function ProfileTab() {
           />
           <div className={styles.avInfo}>
             <h4>{displayName}</h4>
-            <p>JPG, PNG или GIF · до 5 МБ<br />Нажмите на аватар, чтобы загрузить фото</p>
+            <p>JPG, PNG или GIF · до 5 МБ<br />Нажмите на аватар, чтобы выбрать кадр</p>
           </div>
         </div>
       </div>
 
       <div className={styles.scard}>
         <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Фото шапки профиля</div>
+        </div>
+        <button
+          type="button"
+          className={styles.headerPhotoPreview}
+          onClick={() => setHeaderOpen(true)}
+          aria-label="Фото шапки профиля"
+        >
+          <span className={styles.headerPhotoFrame}>
+            {headerImageId ? (
+              <AuthImage
+                fileId={headerImageId}
+                fullSize
+                imageFit="cover"
+                alt=""
+                className={styles.headerPhotoImg}
+                style={{
+                  ...coverFocusImgStyle(headerFocus, {
+                    frameScale: headerBlur ? HEADER_BLUR_FRAME_SCALE : 1,
+                  }),
+                  background: 'transparent',
+                  overflow: 'visible',
+                  ...(headerBlur ? { filter: headerBlur } : {}),
+                }}
+              />
+            ) : myAvatarFileId ? (
+              <AuthImage
+                fileId={myAvatarFileId}
+                alt=""
+                className={`${styles.headerPhotoImg} ${styles.headerPhotoAvatar}`}
+              />
+            ) : (
+              <span className={styles.headerPhotoEmpty} aria-hidden />
+            )}
+            <span className={styles.headerPhotoHint}>Нажмите, чтобы изменить</span>
+          </span>
+        </button>
+      </div>
+
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
           <div className={styles.scardTitle}>Личная информация</div>
         </div>
-        <div className={`${styles.scardBody} ${styles.scardBodyPad0}`}>
+        <div className={`${styles.scardBody} ${styles.scardBodyPad0} ${styles.personalFields}`}>
           <div className={styles.frow}>
             <label className={styles.frowLabel}>Имя</label>
             <div className={styles.frowControl}>
@@ -316,7 +493,7 @@ function ProfileTab() {
                 onFocus={e => e.target.select()} />
             </div>
           </div>
-          <div className={styles.frow}>
+          <div className={`${styles.frow} ${styles.patronymic}`}>
             <label className={styles.frowLabel}>Отчество</label>
             <div className={styles.frowControl}>
               <input className={styles.input} value={form.patronymic} onChange={set('patronymic')} placeholder="Отчество (необязательно)"
@@ -346,112 +523,74 @@ function ProfileTab() {
             </div>
           </div>
         </div>
-        <div className={styles.scardFooter}>
-          {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
-          {!msg && <span />}
-          <Button onClick={handleSave} loading={saving}>Сохранить</Button>
+      </div>
+
+      {headerOpen && (
+        <HeaderPhotoDialog
+          imageId={headerImageId}
+          focus={headerFocus}
+          blurPercent={headerBlurPercent}
+          onClose={() => setHeaderOpen(false)}
+          onApply={(next: HeaderPhotoValue) => {
+            setHeaderImageId(next.imageId);
+            setHeaderFocus(next.focus);
+            setHeaderBlurPercent(next.imageId ? next.blurPercent : 0);
+          }}
+        />
+      )}
+
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Немного о себе</div>
+        </div>
+        <div className={styles.scardBody}>
+          <textarea
+            className={styles.aboutField}
+            value={about}
+            onChange={e => setAbout(e.target.value.slice(0, 2000))}
+            placeholder="Здесь вы можете рассказать о себе и о том, чем занимаетесь"
+            rows={4}
+            maxLength={2000}
+            aria-label="Немного о себе"
+          />
         </div>
       </div>
-    </>
-  );
-}
 
-function CitySection() {
-  const { coords } = useUserLocation();
-  const { detectedCity, loading: geoLoading } = useGeoCity();
-  const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
-
-  useEffect(() => {
-    let nearest: ICity | null = null;
-    let minDist = Infinity;
-    for (const city of POPULAR_CITIES) {
-      const d = Math.hypot(city.lat - coords.lat, city.lng - coords.lng);
-      if (d < minDist) { minDist = d; nearest = city; }
-    }
-    if (nearest && minDist < 3) setSelectedCity(nearest);
-  }, [coords]);
-
-  const handleAutoDetect = () => {
-    const source = detectedCity
-      ? { lat: detectedCity.lat, lng: detectedCity.lng }
-      : coords;
-
-    let nearest: ICity | null = null;
-    let minDist = Infinity;
-    for (const city of POPULAR_CITIES) {
-      const d = Math.hypot(city.lat - source.lat, city.lng - source.lng);
-      if (d < minDist) { minDist = d; nearest = city; }
-    }
-    if (nearest) setSelectedCity(nearest);
-  };
-
-  const handleSave = async () => {
-    if (!selectedCity) return;
-    setSaving(true);
-    setMsg(null);
-    try {
-      await updateLocation(selectedCity.lat, selectedCity.lng);
-      cookies.set('elist_user_lat', String(selectedCity.lat), 30);
-      cookies.set('elist_user_lng', String(selectedCity.lng), 30);
-      cookies.set('elist_acct_lat', String(selectedCity.lat), 30);
-      cookies.set('elist_acct_lng', String(selectedCity.lng), 30);
-      cookies.delete('elist_city_decided');
-      const displayName = selectedCity.shortName ?? selectedCity.name;
-      cookies.set('elist_home_city_name', displayName, 30);
-      cookies.set('elist_city_name', displayName, 30);
-      window.dispatchEvent(new CustomEvent('elist:homeCityChanged', {
-        detail: { lat: selectedCity.lat, lng: selectedCity.lng, name: displayName },
-      }));
-      const store = useFiltersStore.getState();
-      store.setMapCenter([selectedCity.lat, selectedCity.lng]);
-      store.setMapZoom(12);
-      store.setFilter('latitude', selectedCity.lat);
-      store.setFilter('longitude', selectedCity.lng);
-      cookies.set('elist_city_decided', '1', 30);
-      setMsg({ text: `Город изменён на ${selectedCity.name}`, ok: true });
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className={styles.scard}>
-      <div className={styles.scardHead}>
-        <div className={styles.scardTitle}>Текущий город</div>
-        <div className={styles.scardDesc}>Используется для поиска событий поблизости</div>
-      </div>
-      {selectedCity && (
-        <div className={styles.cityBlock}>
-          <div>
-            <div className={styles.cityName}>{selectedCity.name}</div>
-            <div className={styles.citySub}>
-              {selectedCity.lat.toFixed(4)}° N, {selectedCity.lng.toFixed(4)}° E
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Текущее местоположение</div>
+          <div className={styles.scardDesc}>Используется для поиска событий поблизости</div>
+        </div>
+        {selectedCity && (
+          <div className={styles.cityBlock}>
+            <div>
+              <div className={styles.cityName}>{selectedCity.name}</div>
+              <div className={styles.citySub}>
+                {selectedCity.lat.toFixed(4)}° N, {selectedCity.lng.toFixed(4)}° E
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      <div className={styles.scardBody}>
-        <CitySearch
-          value={selectedCity?.name ?? ''}
-          onSelect={setSelectedCity}
-          geoLoading={geoLoading}
-          detectedCoords={coords}
-          onAutoDetect={handleAutoDetect}
-        />
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-          Или введите название города вручную
+        )}
+        <div className={styles.scardBody}>
+          <CitySearch
+            value={selectedCity?.name ?? ''}
+            onSelect={setSelectedCity}
+            geoLoading={geoLoading}
+            detectedCoords={coords}
+            onAutoDetect={handleAutoDetect}
+          />
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+            Или введите название города вручную
+          </div>
         </div>
       </div>
-      <div className={styles.scardFooter}>
+
+      <div className={styles.profileSave}>
         {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
         {!msg && <span />}
-        <Button onClick={handleSave} loading={saving} disabled={!selectedCity}>Сохранить</Button>
+        <Button onClick={() => void handleSave()} loading={saving}>Сохранить</Button>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -525,6 +664,267 @@ function ContactsSection() {
   );
 }
 
+function PrivacySection() {
+  const [settings, setSettings] = useState<IAccountPrivacySettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [distributionDoc, setDistributionDoc] = useState<IAgreementDocument | null>(null);
+  /** Значение аудитории, выбранное до принятия DistributionConsent (иначе select «откатывается»). */
+  const [pendingAudience, setPendingAudience] = useState<{
+    key: keyof IAccountPrivacySettings;
+    value: PrivacyAudience;
+  } | null>(null);
+  /** Отложенный showBirthdayToday=true до принятия DistributionConsent. */
+  const [pendingBirthday, setPendingBirthday] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyPrivacySettings()
+      .then(s => { if (!cancelled) setSettings(s); })
+      .catch(e => {
+        if (!cancelled) {
+          setMsg({ text: e instanceof Error ? e.message : 'Не удалось загрузить настройки', ok: false });
+        }
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const ensureDistributionConsent = async (): Promise<boolean> => {
+    try {
+      const ok = await checkUserAgreement(DocumentType.DistributionConsent);
+      if (ok) return true;
+    } catch {
+      /* документ может отсутствовать — всё равно пробуем открыть */
+    }
+    const doc = await fetchLastDocument(DocumentType.DistributionConsent).catch(() => null);
+    if (!doc) {
+      setMsg({
+        text: 'Согласие на распространение персональных данных ещё не опубликовано',
+        ok: false,
+      });
+      return false;
+    }
+    setDistributionDoc(doc);
+    return false;
+  };
+
+  const setAudience = async (key: keyof IAccountPrivacySettings, value: PrivacyAudience) => {
+    const isPdVisibility =
+      key === 'ageVisibility'
+      || key === 'genderVisibility'
+      || key === 'locationVisibility'
+      || key === 'profilePhotosVisibility';
+    if (isPdVisibility && value !== 'Nobody') {
+      const allowed = await ensureDistributionConsent();
+      if (!allowed) {
+        setPendingAudience({ key, value });
+        return;
+      }
+    }
+    setPendingAudience(null);
+    setSettings(prev => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const applyPendingAfterConsent = () => {
+    setDistributionDoc(null);
+    if (pendingAudience) {
+      const { key, value } = pendingAudience;
+      setPendingAudience(null);
+      setSettings(prev => (prev ? { ...prev, [key]: value } : prev));
+    }
+    if (pendingBirthday) {
+      setPendingBirthday(false);
+      setSettings(prev => (prev ? { ...prev, showBirthdayToday: true } : prev));
+    }
+    setMsg({
+      text: 'Согласие принято. Выбранная видимость применена — не забудьте сохранить настройки.',
+      ok: true,
+    });
+  };
+
+  const handleSave = async () => {
+    if (!settings) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      const saved = await updateMyPrivacySettings({
+        whoCanInviteMe: settings.whoCanInviteMe,
+        ageVisibility: settings.ageVisibility,
+        genderVisibility: settings.genderVisibility,
+        showBirthdayToday: settings.showBirthdayToday,
+        locationVisibility: settings.locationVisibility,
+        profilePhotosVisibility: settings.profilePhotosVisibility,
+      });
+      setSettings(saved);
+      setMsg({ text: 'Настройки приватности сохранены', ok: true });
+    } catch (e) {
+      if (e instanceof ApiError && isDistributionConsentRequiredCode(e.code)) {
+        await ensureDistributionConsent();
+      }
+      setMsg({ text: e instanceof Error ? e.message : 'Ошибка сохранения', ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className={styles.sectionLoader}>Загрузка...</div>;
+  }
+
+  if (!settings) {
+    return (
+      <div className={styles.scard}>
+        <div className={styles.scardHead}>
+          <div className={styles.scardTitle}>Приватность</div>
+          <div className={styles.scardDesc}>
+            {msg?.text ?? 'Не удалось загрузить настройки приватности'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.scard}>
+      <div className={styles.scardHead}>
+        <div className={styles.scardTitle}>Приватность</div>
+        <div className={styles.scardDesc}>Кто может приглашать вас и какие данные видны на профиле</div>
+      </div>
+      <div className={`${styles.scardBody} ${styles.scardBodyPad0}`}>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто может приглашать</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={settings.whoCanInviteMe}
+              onChange={v => { void setAudience('whoCanInviteMe', v as PrivacyAudience); }}
+              options={WHO_CAN_INVITE_OPTIONS}
+            />
+            <div className={styles.frowHint}>{WHO_CAN_INVITE_HINTS[settings.whoCanInviteMe]}</div>
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто видит возраст</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={pendingAudience?.key === 'ageVisibility' ? pendingAudience.value : settings.ageVisibility}
+              onChange={v => { void setAudience('ageVisibility', v as PrivacyAudience); }}
+              options={PRIVACY_AUDIENCE_OPTIONS}
+            />
+            <div className={styles.frowHint}>
+              {PRIVACY_AUDIENCE_HINTS[
+                pendingAudience?.key === 'ageVisibility' ? pendingAudience.value : settings.ageVisibility
+              ]}
+            </div>
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто видит пол</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={pendingAudience?.key === 'genderVisibility' ? pendingAudience.value : settings.genderVisibility}
+              onChange={v => { void setAudience('genderVisibility', v as PrivacyAudience); }}
+              options={PRIVACY_AUDIENCE_OPTIONS}
+            />
+            <div className={styles.frowHint}>
+              {PRIVACY_AUDIENCE_HINTS[
+                pendingAudience?.key === 'genderVisibility' ? pendingAudience.value : settings.genderVisibility
+              ]}
+            </div>
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто видит город</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={pendingAudience?.key === 'locationVisibility' ? pendingAudience.value : settings.locationVisibility}
+              onChange={v => { void setAudience('locationVisibility', v as PrivacyAudience); }}
+              options={PRIVACY_AUDIENCE_OPTIONS}
+            />
+            <div className={styles.frowHint}>
+              {PRIVACY_AUDIENCE_HINTS[
+                pendingAudience?.key === 'locationVisibility' ? pendingAudience.value : settings.locationVisibility
+              ]}
+            </div>
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>Кто видит фото профиля</label>
+          <div className={styles.frowControl}>
+            <Select
+              value={
+                pendingAudience?.key === 'profilePhotosVisibility'
+                  ? pendingAudience.value
+                  : settings.profilePhotosVisibility
+              }
+              onChange={v => { void setAudience('profilePhotosVisibility', v as PrivacyAudience); }}
+              options={PRIVACY_AUDIENCE_OPTIONS}
+            />
+            <div className={styles.frowHint}>
+              {PRIVACY_AUDIENCE_HINTS[
+                pendingAudience?.key === 'profilePhotosVisibility'
+                  ? pendingAudience.value
+                  : settings.profilePhotosVisibility
+              ]}
+            </div>
+          </div>
+        </div>
+        <div className={styles.frow}>
+          <label className={styles.frowLabel}>День рождения</label>
+          <div className={styles.frowControl}>
+            <label className={styles.checkLabel}>
+              <input
+                type="checkbox"
+                checked={settings.showBirthdayToday}
+                onChange={e => {
+                  const checked = e.target.checked;
+                  if (checked) {
+                    void (async () => {
+                      const allowed = await ensureDistributionConsent();
+                      if (!allowed) {
+                        setPendingBirthday(true);
+                        return;
+                      }
+                      setPendingBirthday(false);
+                      setSettings(prev => (prev
+                        ? { ...prev, showBirthdayToday: true }
+                        : prev));
+                    })();
+                    return;
+                  }
+                  setPendingBirthday(false);
+                  setSettings(prev => (prev
+                    ? { ...prev, showBirthdayToday: false }
+                    : prev));
+                }}
+              />
+              Показывать акцент в день рождения
+            </label>
+          </div>
+        </div>
+      </div>
+      <div className={styles.scardFooter}>
+        {msg && <span className={msg.ok ? styles.msgOk : styles.msgErr}>{msg.text}</span>}
+        {!msg && <span />}
+        <Button onClick={() => void handleSave()} loading={saving}>Сохранить</Button>
+      </div>
+
+      {distributionDoc && (
+        <UserAgreementAcceptDialog
+          item={{ type: DocumentType.DistributionConsent, document: distributionDoc }}
+          onCancel={() => {
+            setDistributionDoc(null);
+            setPendingAudience(null);
+            setPendingBirthday(false);
+          }}
+          onComplete={applyPendingAfterConsent}
+        />
+      )}
+    </div>
+  );
+}
+
 function ContactRow({ contact, onEdit }: { contact: any; onEdit: () => void }) {
   const typeName = contact.contactType?.name
     ?? contact.contactType?.localizedName
@@ -564,15 +964,55 @@ function ContactForm({ types, initial, onSave, onCancel }: {
   const [form, setForm] = useState({
     typeId: initial?.contactType?.id ?? (types[0]?.id ?? ''),
     value: initial?.value ?? '',
-    show: initial?.show ?? true,
+    show: initial?.show ?? false,
     isAuthorizationContact: initial?.isAuthorizationContact ?? false,
   });
   const [saving, setSaving] = useState(false);
+  const [distributionDoc, setDistributionDoc] = useState<IAgreementDocument | null>(null);
+  const [localErr, setLocalErr] = useState<string | null>(null);
+
+  const ensureDistributionConsent = async (): Promise<boolean> => {
+    try {
+      if (await checkUserAgreement(DocumentType.DistributionConsent)) return true;
+    } catch {
+      /* ignore */
+    }
+    const doc = await fetchLastDocument(DocumentType.DistributionConsent).catch(() => null);
+    if (!doc) {
+      setLocalErr('Согласие на распространение персональных данных ещё не опубликовано');
+      return false;
+    }
+    setDistributionDoc(doc);
+    return false;
+  };
+
+  const handleShowToggle = async (checked: boolean) => {
+    if (!checked) {
+      setForm(f => ({ ...f, show: false }));
+      return;
+    }
+    const allowed = await ensureDistributionConsent();
+    if (allowed) {
+      setForm(f => ({ ...f, show: true }));
+      return;
+    }
+    // Consent dialog opened — apply show=true after accept (onComplete).
+  };
 
   const handleSave = async () => {
     if (!form.value.trim()) return;
     setSaving(true);
-    try { await onSave(form); } finally { setSaving(false); }
+    setLocalErr(null);
+    try {
+      await onSave(form);
+    } catch (e) {
+      if (e instanceof ApiError && isDistributionConsentRequiredCode(e.code)) {
+        await ensureDistributionConsent();
+      }
+      setLocalErr(e instanceof Error ? e.message : 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -585,16 +1025,29 @@ function ContactForm({ types, initial, onSave, onCancel }: {
       <div className={styles.contactFormFlags}>
         <label className={styles.checkLabel}>
           <input type="checkbox" checked={form.show}
-            onChange={e => setForm(f => ({ ...f, show: e.target.checked }))} />
+            onChange={e => { void handleShowToggle(e.target.checked); }} />
           Показывать публично
         </label>
       </div>
+      {localErr && <div className={styles.msgErr}>{localErr}</div>}
       <div className={styles.contactFormActions}>
         <Button variant="ghost" size="sm" onClick={onCancel}>Отмена</Button>
-        <Button size="sm" onClick={handleSave} loading={saving}>
+        <Button size="sm" onClick={() => { void handleSave(); }} loading={saving}>
           {initial ? 'Сохранить' : 'Добавить'}
         </Button>
       </div>
+      {distributionDoc && (
+        <UserAgreementAcceptDialog
+          item={{ type: DocumentType.DistributionConsent, document: distributionDoc }}
+          onCancel={() => setDistributionDoc(null)}
+          onComplete={() => {
+            setDistributionDoc(null);
+            setForm(f => ({ ...f, show: true }));
+            setForm(f => ({ ...f, show: true }));
+            setLocalErr(null);
+          }}
+        />
+      )}
     </div>
   );
 }

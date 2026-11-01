@@ -9,7 +9,7 @@ import {
   getOrganizationAvatar,
   type OrganizationResponse,
 } from '@/entities/organization';
-import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import styles from './MyOrganizationsModal.module.css';
 
@@ -78,7 +78,7 @@ export function MyOrganizationsModal({ organizations, onClose }: Props) {
                 >
                   <div className={styles.logo} aria-hidden>
                     {logoId ? (
-                      <AuthImage
+                      <FramedAuthImage
                         fileId={logoId}
                         alt=""
                         className={styles.logoImg}

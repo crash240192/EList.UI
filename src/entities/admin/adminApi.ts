@@ -157,9 +157,76 @@ export interface ITariffRequest {
   forOrganization: boolean;
 }
 
+/** Парсит period из API: объект {days,hours,minutes}, TimeSpan-строка или periodDays. */
+export function parseTariffPeriod(
+  rawPeriod: unknown,
+  periodDaysFallback?: unknown,
+): ITariffPeriod {
+  if (rawPeriod && typeof rawPeriod === 'object' && !Array.isArray(rawPeriod)) {
+    const o = rawPeriod as Record<string, unknown>;
+    return {
+      days: Number(o.days ?? o.Days ?? 0) || 0,
+      hours: Number(o.hours ?? o.Hours ?? 0) || 0,
+      minutes: Number(o.minutes ?? o.Minutes ?? 0) || 0,
+      seconds: Number(o.seconds ?? o.Seconds ?? 0) || 0,
+    };
+  }
+
+  if (typeof rawPeriod === 'string' && rawPeriod.trim()) {
+    // .NET TimeSpan: "HH:MM:SS", "D.HH:MM:SS", иногда с дробными секундами
+    const s = rawPeriod.trim();
+    const m = /^(-)?(?:(\d+)\.)?(\d{1,2}):(\d{2}):(\d{2})(?:\.\d+)?$/.exec(s);
+    if (m) {
+      const days = Number(m[2] ?? 0);
+      const hours = Number(m[3] ?? 0);
+      const minutes = Number(m[4] ?? 0);
+      const seconds = Number(m[5] ?? 0);
+      return { days, hours, minutes, seconds };
+    }
+  }
+
+  const daysOnly = Number(periodDaysFallback ?? 30);
+  return {
+    days: Number.isFinite(daysOnly) && daysOnly > 0 ? daysOnly : 30,
+    hours: 0,
+    minutes: 0,
+  };
+}
+
+export function tariffPeriodTotalMinutes(period: ITariffPeriod | undefined | null): number {
+  if (!period) return 30 * 24 * 60;
+  return (period.days || 0) * 24 * 60
+    + (period.hours || 0) * 60
+    + (period.minutes || 0)
+    + Math.ceil((period.seconds || 0) / 60);
+}
+
+/** Человекочитаемый период: «3 мин.», «2 ч.», «30 дн.» */
+export function formatTariffPeriod(tariff: Pick<ITariff, 'period' | 'periodDays' | 'cost'>): string {
+  if (tariff.cost <= 0) return 'базовый';
+  const period = tariff.period
+    ?? (tariff.periodDays != null
+      ? { days: tariff.periodDays, hours: 0, minutes: 0 }
+      : null);
+  const totalMin = tariffPeriodTotalMinutes(period);
+  if (totalMin <= 0) return '—';
+  if (totalMin < 60) return `${totalMin} мин.`;
+  if (totalMin < 24 * 60) {
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return m > 0 ? `${h} ч. ${m} мин.` : `${h} ч.`;
+  }
+  const days = Math.round(totalMin / (24 * 60));
+  return `${days} дн.`;
+}
+
 function normalizeTariff(raw: ITariff & Record<string, unknown>): ITariff {
   const forOrganization = Boolean(
     raw.forOrganization ?? raw.ForOrganization ?? false,
+  );
+  const period = parseTariffPeriod(
+    raw.period ?? raw.Period,
+    raw.periodDays ?? raw.PeriodDays,
   );
   return {
     ...raw,
@@ -168,7 +235,10 @@ function normalizeTariff(raw: ITariff & Record<string, unknown>): ITariff {
     cost: Number(raw.cost ?? 0),
     validatorId: String(raw.validatorId ?? ''),
     forOrganization,
-    period: raw.period ?? { days: Number(raw.periodDays ?? 30), hours: 0, minutes: 0 },
+    period,
+    periodDays: period.days > 0
+      ? period.days
+      : (Number(raw.periodDays ?? raw.PeriodDays) || undefined),
   };
 }
 

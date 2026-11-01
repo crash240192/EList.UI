@@ -1,6 +1,6 @@
 // ============================================================
 // entities/event/types.ts
-// Бизнес-сущность "Мероприятие" — типы из EList Swagger API
+// Бизнес-сущность "Мероприятие" — типы из Swagger API
 // ============================================================
 
 import type { Gender, PagedList } from '@/shared/api/types';
@@ -34,7 +34,11 @@ export interface IEventType {
 
 export interface IEventParameters {
   id: string;
-  cost: number;                 // 0 = бесплатно
+  cost: number;                 // 0 = бесплатно; при tickets = priceMin
+  /** Мин. цена активных типов (или cost без билетов) */
+  priceMin?: number | null;
+  /** Макс. цена активных типов (или = priceMin) */
+  priceMax?: number | null;
   private: boolean;
   maxPersonsCount: number | null;
   ageLimit: number | null;
@@ -77,6 +81,8 @@ export interface IEvent {
   coverFocusX?:   number | null;
   /** Фокус обложки по вертикали, 0…100 */
   coverFocusY?:   number | null;
+  /** Масштаб поверх cover, 1…3. В поиске обычно нет — читается из файла обложки. */
+  coverZoom?:     number | null;
   /** Кол-во участников */
   participantsCount?: number;
   /** Текущий пользователь участвует */
@@ -118,6 +124,14 @@ export interface IEventsSearchParams {
   /** true только для фильтра «только 18+» */
   adultOnly?: boolean;
   allowedGender?: Gender;
+  /** false — включать неактивные/отменённые (как на «Мои → Организую») */
+  active?: boolean;
+  /**
+   * Сортировка: StartTime, EndTime, Cost, Name, CreateDate, Rating
+   * (+ опционально " DESC"). Rating — средний Expectation до старта / Summary после.
+   * Для прошедших (только endTime) без orderBy — бэкенд по умолчанию EndTime DESC.
+   */
+  orderBy?: string;
   pageIndex?: number;
   pageSize?: number;
 }

@@ -107,6 +107,51 @@
   white-space: nowrap;
 }
 
+.orgChip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  text-align: left;
+}
+.orgAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.orgAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.orgText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.orgName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orgMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .settingsBtn,
 .unsubscribeBtn,
 .undoBtn {

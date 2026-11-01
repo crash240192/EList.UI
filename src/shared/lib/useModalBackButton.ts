@@ -40,14 +40,9 @@ export function useModalBackButton(onClose: () => void, isOpen = true): void {
     let closedByBack = false;
 
     const handler = () => {
-      if (ignoringOwnBack) {
-        ignoringOwnBack = false;
-        if (ignoreResetTimer !== null) {
-          clearTimeout(ignoreResetTimer);
-          ignoreResetTimer = null;
-        }
-        return;
-      }
+      // Не сбрасываем флаг здесь: на popstate подписаны все открытые модалки,
+      // и первый обработчик иначе «съедает» игнор, а следующая модалка закрывается.
+      if (ignoringOwnBack) return;
       closedByBack = true;
       onCloseRef.current();
     };

@@ -22,8 +22,10 @@
 
 /* Дропдаун */
 .dropdown {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--border));
+  border-radius: 12px;
+  box-shadow: 0 0 28px rgba(139, 92, 246, 0.75);
   overflow: hidden; max-height: 260px; overflow-y: auto;
   scrollbar-width: thin;
   animation: dropIn .12s ease;

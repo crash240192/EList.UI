@@ -17,6 +17,7 @@ import { getOrFetchAccountId } from '@/entities/user/api';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { Button } from '@/shared/ui/Button';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { apiIsoToLocalParts, formatLocalDateLongRu } from '@/shared/lib/datetime';
@@ -34,6 +35,10 @@ export type CreateEventHost =
 
 interface Props {
   onContinue: (host: CreateEventHost, template: IEventTemplate | null) => void;
+  /** Когда false — только личный хост (без выбора организации). */
+  organizationsEnabled?: boolean;
+  /** Когда false — без билетных подписей в хосте/шаблонах. */
+  ticketsEnabled?: boolean;
 }
 
 interface OrgOption {
@@ -75,6 +80,13 @@ function buildTemplateCardInfo(t: IEventTemplate): TemplateCardInfo {
   const isPrivate = Boolean(params?.private);
   const cost = Number(params?.cost ?? 0);
   const age = params?.ageLimit;
+  const ticketTypesRaw = Array.isArray(params?.ticketTypes) ? params.ticketTypes : [];
+  const activeTicketTypes = ticketTypesRaw.filter(t => {
+    if (!t || typeof t !== 'object') return false;
+    const o = t as { active?: unknown; Active?: unknown };
+    const a = o.active ?? o.Active;
+    return a === undefined || a === null ? true : Boolean(a);
+  });
 
   let when: string | null = null;
   if (ev?.startTime) {
@@ -93,22 +105,55 @@ function buildTemplateCardInfo(t: IEventTemplate): TemplateCardInfo {
   if (inviteAll) inviteLabel = 'Пригласить всех подписчиков';
   else if (inviteIds.length > 0) inviteLabel = `Приглашений: ${inviteIds.length}`;
 
+  let ticketsLabel: string | null = null;
+  if (params?.ticketsEnabled) {
+    const n = activeTicketTypes.length;
+    if (n > 1) ticketsLabel = `Билеты · ${n}`;
+    else if (n === 1) {
+      const only = activeTicketTypes[0] as { name?: unknown; Name?: unknown };
+      const name = String(only.name ?? only.Name ?? '').trim();
+      ticketsLabel = name ? `Билеты: ${name}` : 'Билеты';
+    } else {
+      ticketsLabel = 'Билеты';
+    }
+  }
+
+  const prices = activeTicketTypes
+    .map(t => {
+      const o = t as { price?: unknown; Price?: unknown };
+      const n = Number(o.price ?? o.Price);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    })
+    .filter((n): n is number => n != null);
+  const priceMin = prices.length > 0 ? Math.min(...prices) : cost;
+  const priceMax = prices.length > 0 ? Math.max(...prices) : cost;
+  let costLabel = 'Бесплатно';
+  if (prices.length > 1 && priceMin !== priceMax) {
+    costLabel = `${priceMin.toLocaleString('ru-RU')}–${priceMax.toLocaleString('ru-RU')} ₽`;
+  } else if (priceMin > 0) {
+    costLabel = `${priceMin.toLocaleString('ru-RU')} ₽`;
+  }
+
   return {
     eventName: ev?.name?.trim() || null,
     address: ev?.address?.trim() || null,
     when,
-    costLabel: cost > 0 ? `${cost.toLocaleString('ru-RU')} ₽` : 'Бесплатно',
+    costLabel,
     privacyLabel: isPrivate ? 'Закрытое' : 'Открытое',
     ageLabel: age == null || Number.isNaN(Number(age)) ? null : `${Math.trunc(Number(age))}+`,
     inviteLabel,
     listLabel,
-    ticketsLabel: params?.ticketsEnabled ? 'Билеты' : null,
+    ticketsLabel,
     coverImageId: ev?.coverImageId ? String(ev.coverImageId) : null,
     coverUrl: ev?.coverUrl ? String(ev.coverUrl) : null,
   };
 }
 
-export function CreateEventHostChooser({ onContinue }: Props) {
+export function CreateEventHostChooser({
+  onContinue,
+  organizationsEnabled = false,
+  ticketsEnabled = false,
+}: Props) {
   const goBack = useSafeBack('/');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,10 +177,24 @@ export function CreateEventHostChooser({ onContinue }: Props) {
       setError(null);
       try {
         const id = await getOrFetchAccountId();
-        const [profile, myOrgs] = await Promise.all([
-          fetchFullProfile(null),
-          fetchMyOrganizations(),
-        ]);
+        const profile = await fetchFullProfile(null);
+        if (cancelled) return;
+
+        setAccountId(id);
+        setLogin(profile.account.login);
+        setAvatarId(profile.account.avatarId ?? null);
+        const name = [profile.person?.firstName, profile.person?.lastName]
+          .filter(Boolean)
+          .join(' ');
+        setFullName(name);
+
+        if (!organizationsEnabled) {
+          setOrgs([]);
+          setSelected({ kind: 'user' });
+          return;
+        }
+
+        const myOrgs = await fetchMyOrganizations();
         if (cancelled) return;
 
         const eligible = await filterOrganizationsEligibleToHostEvents(myOrgs);
@@ -149,13 +208,6 @@ export function CreateEventHostChooser({ onContinue }: Props) {
         );
         if (cancelled) return;
 
-        setAccountId(id);
-        setLogin(profile.account.login);
-        setAvatarId(profile.account.avatarId ?? null);
-        const name = [profile.person?.firstName, profile.person?.lastName]
-          .filter(Boolean)
-          .join(' ');
-        setFullName(name);
         setOrgs(withLogos);
       } catch (e) {
         if (!cancelled) {
@@ -166,7 +218,7 @@ export function CreateEventHostChooser({ onContinue }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [organizationsEnabled]);
 
   // Шаблоны для выбранного хоста
   useEffect(() => {
@@ -236,10 +288,16 @@ export function CreateEventHostChooser({ onContinue }: Props) {
 
             <section className={styles.section}>
               <div className={styles.sectionLabel}>От чьего лица</div>
-              <p className={styles.sectionHint}>
-                От организации можно публиковать, если она активна и принята оферта организатора.
-                Продажа билетов — после верификации.
-              </p>
+              {organizationsEnabled ? (
+                <p className={styles.sectionHint}>
+                  От организации можно публиковать, если она активна и принята оферта организатора.
+                  {ticketsEnabled ? ' Продажа билетов — после верификации.' : ''}
+                </p>
+              ) : (
+                <p className={styles.sectionHint}>
+                  Событие будет опубликовано от вашего личного профиля.
+                </p>
+              )}
               <div className={styles.hostGrid}>
                 <button
                   type="button"
@@ -276,6 +334,7 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                   const isSelected =
                     selected.kind === 'organization'
                     && selected.organizationId === org.id;
+                  const canSell = ticketsEnabled && Boolean(org.canSellTickets);
                   return (
                     <button
                       key={org.id}
@@ -285,12 +344,12 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                         kind: 'organization',
                         organizationId: org.id,
                         organizationName: org.name,
-                        canSellTickets: Boolean(org.canSellTickets),
+                        canSellTickets: canSell,
                       })}
                     >
                       <div className={`${styles.hostAvatar} ${styles.hostAvatarSquare}`}>
                         {logoId ? (
-                          <AuthImage
+                          <FramedAuthImage
                             fileId={logoId}
                             alt=""
                             className={styles.hostAvatarImg}
@@ -303,9 +362,11 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                       <div className={styles.hostInfo}>
                         <span className={styles.hostName}>{org.name}</span>
                         <span className={styles.hostMeta}>
-                          {org.canSellTickets
-                            ? 'Организация · билеты доступны'
-                            : 'Организация · анонсы'}
+                          {ticketsEnabled
+                            ? (canSell
+                              ? 'Организация · билеты доступны'
+                              : 'Организация · анонсы')
+                            : 'Организация'}
                         </span>
                       </div>
                       <span className={styles.checkMark} aria-hidden>
@@ -356,7 +417,7 @@ export function CreateEventHostChooser({ onContinue }: Props) {
                     info.privacyLabel,
                     info.costLabel,
                     info.ageLabel,
-                    info.ticketsLabel,
+                    ticketsEnabled ? info.ticketsLabel : null,
                     info.inviteLabel,
                     info.listLabel,
                   ].filter(Boolean) as string[];
