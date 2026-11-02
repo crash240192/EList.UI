@@ -185,12 +185,31 @@ function MessageThreadInner({
     const node = anchorRef.current;
     if (!node || !currentAccountId || !canComment) return;
 
+    // Гистерезис: не размонтировать dock на каждом clamp у низа страницы.
+    let hideTimer = 0;
     const observer = new IntersectionObserver(
-      ([entry]) => setDockVisible(entry.isIntersecting),
-      { threshold: 0, rootMargin: '0px 0px 24px 0px' },
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          if (hideTimer) {
+            window.clearTimeout(hideTimer);
+            hideTimer = 0;
+          }
+          setDockVisible(true);
+          return;
+        }
+        if (hideTimer) return;
+        hideTimer = window.setTimeout(() => {
+          hideTimer = 0;
+          setDockVisible(false);
+        }, 180);
+      },
+      { threshold: 0, rootMargin: '0px 0px 48px 0px' },
     );
     observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      if (hideTimer) window.clearTimeout(hideTimer);
+      observer.disconnect();
+    };
   }, [currentAccountId, canComment, messages.length, loading]);
 
   const closeSheet = useCallback(() => {

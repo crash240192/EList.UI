@@ -8,30 +8,19 @@
  *     main (overflow:hidden)
  *       EventPage .page [data-page-scroll]  ← scrollTop / scroll events
  *         .card
- *           Hero              DYNAMIC height = f(scrollTop)  ← влияет на ВСЁ ниже
- *           mainGrid
- *             descSection     DYNAMIC expand/collapse
- *             sidePanel
- *               EventAlbums   DYNAMIC expand/collapse (+ FLIP transform)
- *               …статичные блоки (органы, участники)
- *             discussions     DYNAMIC высота (дерево↔лента, вкладки)
+ *           .heroSlot         FIXED height = expanded (в потоке)
+ *             .hero           sticky + visual height = f(scrollTop)
+ *           .belowHero        z-index поверх «пустого» хвоста слота
+ *             actionRow / mainGrid / discussions
  *
- * Цепочка при скролле:
- *   1) user/program → page.scrollTop
- *   2) onScroll → heroCollapse → CSS --event-hero-height
- *   3) высота hero меняет document flow → блоки ниже сдвигаются в viewport
- *   4) если не компенсировать Δhero в scrollTop, контент «прыгает»
+ * Хиро: слот держит layout; сжатие только визуальное → нет петли
+ * scrollTop → height → scrollTop (compensateScrollerForHeightDelta для hero не нужен).
  *
  * Цепочка при expand/collapse блока (альбомы / описание):
  *   1) capture: top секции (getBoundingClientRect) + scroller
  *   2) React commit (высота секции изменилась)
- *   3) restore: scrollTop += (topAfter − topBefore) → верх секции на месте,
- *      блок растёт/сжимается вниз
- *   4) возможный clamp maxScroll и/или реакция hero → второй проход в rAF
- *
- * НЕ использовать data-scroll-lock, глушащий onScroll: hero тогда «замирает».
- * НЕ замораживать абсолютный scrollTop при collapse у низа: maxScroll падает,
- * значение clamp’ится → разовый уезд вверх.
+ *   3) restore: scrollTop += (topAfter − topBefore) → верх секции на месте
+ *   4) второй проход в rAF
  */
 
 const PAGE_SCROLL_ATTR = 'data-page-scroll';

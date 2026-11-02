@@ -30,7 +30,6 @@ import { SimilarEventDialog } from './SimilarEventDialog';
 import {
   captureScrollAnchor,
   restoreScrollAnchor,
-  compensateScrollerForHeightDelta,
   markPageScroller,
   type ScrollAnchorSnapshot,
 } from '@/shared/lib/scrollAnchor';
@@ -78,6 +77,7 @@ import {
   calcEventPageCollapsedHeroHeight,
   calcEventPageExpandedHeroHeight,
   calcEventPageHeroHeight,
+  calcHeroCollapseRange,
   EVENT_PAGE_HERO_COLLAPSED_HEIGHT,
   scrollToHeroCollapse,
   type CoverNaturalSize,
@@ -232,7 +232,6 @@ export default function EventPage() {
   const [descExpanded,  setDescExpanded]  = useState(false);
   const descSectionRef = useRef<HTMLDivElement>(null);
   const pendingDescScrollRef = useRef<ScrollAnchorSnapshot | null>(null);
-  const prevHeroHeightRef = useRef<number | null>(null);
   const [descTogglePressed, setDescTogglePressed] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [similarOpen, setSimilarOpen] = useState(false);
@@ -259,6 +258,7 @@ export default function EventPage() {
   const [participantsDenied, setParticipantsDenied] = useState(false);
   const limitNoticeTimerRef = useRef<number | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const heroSlotRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
   const reportMenuRef = useRef<HTMLButtonElement>(null);
@@ -433,16 +433,9 @@ export default function EventPage() {
     hasCover ? heroCollapse : 1,
     collapsedHeroHeight,
   );
-
-  // Hero height ↔ scrollTop: без компенсации контент ниже прыгает при сжатии обложки.
-  // Хуки — до early return (loading / denied).
-  useLayoutEffect(() => {
-    prevHeroHeightRef.current = compensateScrollerForHeightDelta(
-      pageRef.current,
-      prevHeroHeightRef.current,
-      heroHeight,
-    );
-  }, [heroHeight]);
+  // Слот в потоке = expanded; sticky-хиро только визуально сжимается (без правки scrollTop).
+  const heroCollapseRange = calcHeroCollapseRange(expandedHeroHeight, collapsedHeroHeight);
+  const heroSlotHeight = heroCollapseRange > 0 ? expandedHeroHeight : heroHeight;
 
   const handleCoverLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -456,11 +449,11 @@ export default function EventPage() {
   }, [event?.id, event?.coverImageId, event?.coverUrl]);
 
   useEffect(() => {
-    const hero = heroRef.current;
-    if (!hero || !event) return;
+    const slot = heroSlotRef.current;
+    if (!slot || !event) return;
 
     const syncWidth = () => {
-      const width = hero.offsetWidth;
+      const width = slot.offsetWidth;
       setHeroWidth(width);
       setExpandedHeroHeight(
         calcEventPageExpandedHeroHeight(width, {
@@ -472,7 +465,7 @@ export default function EventPage() {
 
     syncWidth();
     const ro = new ResizeObserver(syncWidth);
-    ro.observe(hero);
+    ro.observe(slot);
     return () => ro.disconnect();
   }, [event, event?.id, event?.coverImageId, event?.coverUrl, coverNaturalSize]);
 
@@ -830,7 +823,8 @@ export default function EventPage() {
     <div className={styles.page} ref={pageRef}>
       <div className={styles.card}>
 
-        {/* ── Hero ── */}
+        {/* ── Hero: фиксированный слот + sticky сжатие ── */}
+        <div className={styles.heroSlot} ref={heroSlotRef} style={{ height: heroSlotHeight }}>
         <div
           ref={heroRef}
           className={styles.hero}
@@ -1075,7 +1069,9 @@ export default function EventPage() {
             </div>
           </div>
         </div>
+        </div>{/* end heroSlot */}
 
+        <div className={styles.belowHero}>
         {/* ── Action row: место + действия ── */}
         <div className={styles.actionRow}>
           <div className={styles.actionRowMain}>
@@ -1412,6 +1408,7 @@ export default function EventPage() {
             )}
           </div>
         </div>{/* end mainGrid */}
+        </div>{/* end belowHero */}
       </div>{/* end card */}
 
       {removeOrgConfirm && (
