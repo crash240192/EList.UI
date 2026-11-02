@@ -10,9 +10,9 @@ export const HEADER_BLUR_FRAME_SCALE = 1.08;
 /** Если сервер включил блюр, а процент в файле ещё не прочитан. */
 export const HEADER_BLUR_FALLBACK_PERCENT = 40;
 
-/** Яркость шапки: 0 = оригинал, вниз до −30%, вверх до +30%. Только в метаданных файла. */
-export const HEADER_BRIGHTNESS_MIN_PERCENT = -30;
-export const HEADER_BRIGHTNESS_MAX_PERCENT = 30;
+/** Яркость шапки: 0 = оригинал, вниз до −50%, вверх до +50%. Только в метаданных файла. */
+export const HEADER_BRIGHTNESS_MIN_PERCENT = -50;
+export const HEADER_BRIGHTNESS_MAX_PERCENT = 50;
 
 export function clampHeaderBlurPercent(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value);
@@ -53,7 +53,7 @@ export function headerPhotoFilter(blurPercent: number, brightnessPercent = 0): s
   return parts.length ? parts.join(' ') : undefined;
 }
 
-/** Положение ползунка яркости: 0% низ (−30), 50% центр, 100% верх (+30). */
+/** Положение ползунка яркости: 0% низ (−50), 50% центр, 100% верх (+50). */
 export function headerBrightnessThumbBottom(percent: number): number {
   const p = clampHeaderBrightnessPercent(percent);
   const span = HEADER_BRIGHTNESS_MAX_PERCENT - HEADER_BRIGHTNESS_MIN_PERCENT;
