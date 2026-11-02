@@ -92,6 +92,9 @@ export function HeaderPhotoDialog({
   }, []);
 
   const hasImage = Boolean(previewUrl || imageId);
+  /** Удаление только в черновике: на сервер уйдёт после «Подтвердить». */
+  const pendingRemove = Boolean(savedImageId) && !hasImage;
+  const canConfirm = hasImage || pendingRemove;
   const blurFilter = headerBlurFilter(blurPercent);
   const frameScale = blurFilter ? HEADER_BLUR_FRAME_SCALE : 1;
   const frameStyle = {
@@ -151,30 +154,26 @@ export function HeaderPhotoDialog({
     setBlurPercent(0);
   };
 
-  const onDelete = async () => {
+  const onDelete = () => {
     if (saving) return;
     if (!imageId && !file && !previewUrl) return;
-    setSaving(true);
     setError(null);
-    try {
-      if (imageId) {
-        await setAccountHeader({ imageId: null });
-        onApply({ imageId: null, focus: DEFAULT_COVER_FOCUS, blurPercent: 0 });
-      }
-      setImageId(null);
-      clearLocal();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось удалить фото');
-    } finally {
-      setSaving(false);
-    }
+    setImageId(null);
+    clearLocal();
   };
 
   const onConfirm = async () => {
-    if (saving || !hasImage) return;
+    if (saving || !canConfirm) return;
     setSaving(true);
     setError(null);
     try {
+      if (pendingRemove) {
+        await setAccountHeader({ imageId: null });
+        onApply({ imageId: null, focus: DEFAULT_COVER_FOCUS, blurPercent: 0 });
+        onClose();
+        return;
+      }
+
       let id = imageId;
       if (file) {
         const uploaded = await uploadFile(file);
@@ -364,7 +363,7 @@ export function HeaderPhotoDialog({
                 >
                   Загрузить фото
                 </button>
-                <button type="button" className={styles.deleteBtn} onClick={() => void onDelete()}>
+                <button type="button" className={styles.deleteBtn} onClick={onDelete}>
                   Удалить фото
                 </button>
               </>
@@ -430,7 +429,7 @@ export function HeaderPhotoDialog({
 
         <div className={styles.actions}>
           <Button variant="secondary" className={styles.cancelBtn} fullWidth disabled={saving} onClick={onClose}>Отменить</Button>
-          <Button variant="primary" fullWidth loading={saving} disabled={!hasImage} onClick={() => void onConfirm()}>
+          <Button variant="primary" fullWidth loading={saving} disabled={!canConfirm} onClick={() => void onConfirm()}>
             Подтвердить
           </Button>
         </div>
