@@ -37,7 +37,11 @@ import { HeaderPhotoDialog, type HeaderPhotoValue } from '@/features/user/Header
 import { loadHeaderPhotoMeta } from '@/entities/user/headerApi';
 import { fetchFullProfile } from '@/entities/user/profileApi';
 import { DEFAULT_COVER_FOCUS, coverFocusImgStyle } from '@/shared/lib/coverFocus';
-import { HEADER_BLUR_FRAME_SCALE, headerBlurFilter } from '@/shared/lib/headerPhoto';
+import {
+  HEADER_BLUR_FRAME_SCALE,
+  headerBlurFilter,
+  headerPhotoFilter,
+} from '@/shared/lib/headerPhoto';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { CitySearch } from '@/shared/ui/CitySearch/CitySearch';
 import { getStoredAccountId } from '@/entities/user/api';
@@ -274,6 +278,7 @@ function ProfileDataTab() {
   const [headerImageId, setHeaderImageId] = useState<string | null>(null);
   const [headerFocus, setHeaderFocus] = useState(DEFAULT_COVER_FOCUS);
   const [headerBlurPercent, setHeaderBlurPercent] = useState(0);
+  const [headerBrightnessPercent, setHeaderBrightnessPercent] = useState(0);
 
   const initials = (form.firstName?.[0] ?? '') + (form.lastName?.[0] ?? '');
   const accountId = getStoredAccountId() ?? '';
@@ -306,12 +311,14 @@ function ProfileDataTab() {
       setHeaderImageId(imageId);
       let zoom = DEFAULT_COVER_FOCUS.zoom ?? 1;
       let blur = 0;
+      let brightness = 0;
       if (imageId) {
         try {
           const meta = await loadHeaderPhotoMeta(imageId);
           if (cancelled) return;
           zoom = meta.zoom;
           blur = account?.headerBlur ? meta.blurPercent : 0;
+          brightness = meta.brightnessPercent;
         } catch { /* кадр откроется без сохранённого масштаба */ }
       }
       setHeaderFocus({
@@ -320,6 +327,7 @@ function ProfileDataTab() {
         zoom,
       });
       setHeaderBlurPercent(blur);
+      setHeaderBrightnessPercent(brightness);
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });
@@ -406,7 +414,10 @@ function ProfileDataTab() {
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const headerBlur = headerImageId ? headerBlurFilter(headerBlurPercent) : undefined;
+  const headerFilter = headerImageId
+    ? headerPhotoFilter(headerBlurPercent, headerBrightnessPercent)
+    : undefined;
+  const needsBlurScale = Boolean(headerImageId && headerBlurFilter(headerBlurPercent));
 
   if (loading) {
     return <div className={styles.sectionLoader}>Загрузка...</div>;
@@ -453,11 +464,11 @@ function ProfileDataTab() {
                 className={styles.headerPhotoImg}
                 style={{
                   ...coverFocusImgStyle(headerFocus, {
-                    frameScale: headerBlur ? HEADER_BLUR_FRAME_SCALE : 1,
+                    frameScale: needsBlurScale ? HEADER_BLUR_FRAME_SCALE : 1,
                   }),
                   background: 'transparent',
                   overflow: 'visible',
-                  ...(headerBlur ? { filter: headerBlur } : {}),
+                  ...(headerFilter ? { filter: headerFilter } : {}),
                 }}
               />
             ) : myAvatarFileId ? (
@@ -530,11 +541,13 @@ function ProfileDataTab() {
           imageId={headerImageId}
           focus={headerFocus}
           blurPercent={headerBlurPercent}
+          brightnessPercent={headerBrightnessPercent}
           onClose={() => setHeaderOpen(false)}
           onApply={(next: HeaderPhotoValue) => {
             setHeaderImageId(next.imageId);
             setHeaderFocus(next.focus);
             setHeaderBlurPercent(next.imageId ? next.blurPercent : 0);
+            setHeaderBrightnessPercent(next.imageId ? next.brightnessPercent : 0);
           }}
         />
       )}

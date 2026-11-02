@@ -19,9 +19,14 @@ import {
 } from '@/shared/lib/coverFocus';
 import {
   clampHeaderBlurPercent,
+  clampHeaderBrightnessPercent,
   HEADER_BLUR_FRAME_SCALE,
   HEADER_BLUR_MAX_PERCENT,
+  HEADER_BRIGHTNESS_MAX_PERCENT,
+  HEADER_BRIGHTNESS_MIN_PERCENT,
   headerBlurFilter,
+  headerBrightnessThumbBottom,
+  headerPhotoFilter,
 } from '@/shared/lib/headerPhoto';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
@@ -32,12 +37,14 @@ export interface HeaderPhotoValue {
   imageId: string | null;
   focus: CoverFocus;
   blurPercent: number;
+  brightnessPercent: number;
 }
 
 interface HeaderPhotoDialogProps {
   imageId: string | null;
   focus: CoverFocus;
   blurPercent: number;
+  brightnessPercent?: number;
   /** Ширина/высота живой шапки. Превью держит ту же пропорцию, чтобы object-position совпал. */
   aspectRatio?: number;
   onClose: () => void;
@@ -46,17 +53,50 @@ interface HeaderPhotoDialogProps {
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
+function SoftDiskIcon() {
+  return <span className={styles.softDisk} aria-hidden />;
+}
+
+function SharpDiskIcon() {
+  return <span className={styles.sharpDisk} aria-hidden />;
+}
+
+function SunIcon({ long }: { long?: boolean }) {
+  if (long) {
+    return (
+      <svg className={styles.sunIcon} width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="3.1" fill="#fff" />
+        <g stroke="#fff" strokeWidth="1.85" strokeLinecap="round">
+          <path d="M12 1.6v3.6M12 18.8v3.6M1.6 12h3.6M18.8 12h3.6" />
+          <path d="M4.05 4.05l2.55 2.55M17.4 17.4l2.55 2.55M19.95 4.05l-2.55 2.55M6.6 17.4l-2.55 2.55" />
+        </g>
+      </svg>
+    );
+  }
+  return (
+    <svg className={styles.sunIcon} width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="3.1" fill="#fff" />
+      <g stroke="#fff" strokeWidth="1.85" strokeLinecap="round">
+        <path d="M12 5.2v1.7M12 17.1v1.7M5.2 12h1.7M17.1 12h1.7" />
+        <path d="M6.9 6.9l1.2 1.2M15.9 15.9l1.2 1.2M17.1 6.9l-1.2 1.2M8.1 15.9l-1.2 1.2" />
+      </g>
+    </svg>
+  );
+}
+
 export function HeaderPhotoDialog({
   imageId: savedImageId,
   focus: savedFocus,
   blurPercent: savedBlur,
+  brightnessPercent: savedBrightness = 0,
   aspectRatio,
   onClose,
   onApply,
 }: HeaderPhotoDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const zoneRef = useRef<HTMLDivElement>(null);
-  const scaleRef = useRef<HTMLDivElement>(null);
+  const blurScaleRef = useRef<HTMLDivElement>(null);
+  const brightScaleRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -72,6 +112,9 @@ export function HeaderPhotoDialog({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [focus, setFocus] = useState<CoverFocus>(() => normalizeCoverFocus(savedFocus));
   const [blurPercent, setBlurPercent] = useState(() => clampHeaderBlurPercent(savedBlur));
+  const [brightnessPercent, setBrightnessPercent] = useState(() =>
+    clampHeaderBrightnessPercent(savedBrightness),
+  );
   const [draggingFile, setDraggingFile] = useState(false);
   const [panning, setPanning] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -95,21 +138,27 @@ export function HeaderPhotoDialog({
   /** Удаление только в черновике: на сервер уйдёт после «Подтвердить». */
   const pendingRemove = Boolean(savedImageId) && !hasImage;
   const canConfirm = hasImage || pendingRemove;
-  const blurFilter = headerBlurFilter(blurPercent);
-  const frameScale = blurFilter ? HEADER_BLUR_FRAME_SCALE : 1;
+  const photoFilter = headerPhotoFilter(blurPercent, brightnessPercent);
+  const frameScale = headerBlurFilter(blurPercent) ? HEADER_BLUR_FRAME_SCALE : 1;
   const frameStyle = {
     ...coverFocusImgStyle(focus, { frameScale }),
-    ...(blurFilter ? { filter: blurFilter } : {}),
+    ...(photoFilter ? { filter: photoFilter } : {}),
   };
   const zoneStyle = aspectRatio && aspectRatio > 0 ? { aspectRatio } : undefined;
   const zoom = coverZoomOf(focus);
+  const brightThumb = headerBrightnessThumbBottom(brightnessPercent);
+  const brightFillStyle = brightnessPercent === 0
+    ? undefined
+    : brightnessPercent > 0
+      ? { bottom: '50%', height: `${brightThumb - 50}%` }
+      : { bottom: `${brightThumb}%`, height: `${50 - brightThumb}%` };
 
   useEffect(() => {
     const zone = zoneRef.current;
     if (!zone) return;
     const onWheel = (e: WheelEvent) => {
       if (!hasImage || saving) return;
-      if ((e.target as HTMLElement).closest('[data-header-blur]')) return;
+      if ((e.target as HTMLElement).closest('[data-header-tools]')) return;
       e.preventDefault();
       const step = e.deltaY < 0 ? 0.1 : -0.1;
       setFocus(current => normalizeCoverFocus({
@@ -152,7 +201,15 @@ export function HeaderPhotoDialog({
     replacePreview(null);
     setFocus(DEFAULT_COVER_FOCUS);
     setBlurPercent(0);
+    setBrightnessPercent(0);
   };
+
+  const emptyValue = (): HeaderPhotoValue => ({
+    imageId: null,
+    focus: DEFAULT_COVER_FOCUS,
+    blurPercent: 0,
+    brightnessPercent: 0,
+  });
 
   const onDelete = () => {
     if (saving) return;
@@ -169,7 +226,7 @@ export function HeaderPhotoDialog({
     try {
       if (pendingRemove) {
         await setAccountHeader({ imageId: null });
-        onApply({ imageId: null, focus: DEFAULT_COVER_FOCUS, blurPercent: 0 });
+        onApply(emptyValue());
         onClose();
         return;
       }
@@ -180,16 +237,26 @@ export function HeaderPhotoDialog({
         id = uploaded.id;
       }
       if (!id) return;
-      const percent = clampHeaderBlurPercent(blurPercent);
+      const blur = clampHeaderBlurPercent(blurPercent);
+      const brightness = clampHeaderBrightnessPercent(brightnessPercent);
       const nextFocus = normalizeCoverFocus(focus);
       await setAccountHeader({
         imageId: id,
         focus: nextFocus,
-        blur: percent > 0,
+        blur: blur > 0,
       });
-      const meta = { blurPercent: percent, zoom: coverZoomOf(nextFocus) };
+      const meta = {
+        blurPercent: blur,
+        brightnessPercent: brightness,
+        zoom: coverZoomOf(nextFocus),
+      };
       rememberHeaderPhotoMeta(id, meta);
-      onApply({ imageId: id, focus: nextFocus, blurPercent: percent });
+      onApply({
+        imageId: id,
+        focus: nextFocus,
+        blurPercent: blur,
+        brightnessPercent: brightness,
+      });
       try {
         await saveHeaderPhotoMeta(id, meta);
       } catch (e) {
@@ -215,7 +282,7 @@ export function HeaderPhotoDialog({
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!hasImage || saving) return;
-    if ((e.target as HTMLElement).closest('button, [data-header-blur]')) return;
+    if ((e.target as HTMLElement).closest('button, [data-header-tools]')) return;
     const zone = zoneRef.current;
     if (!zone) return;
     zone.setPointerCapture(e.pointerId);
@@ -262,7 +329,7 @@ export function HeaderPhotoDialog({
   };
 
   const setBlurFromPointer = (clientY: number) => {
-    const scale = scaleRef.current;
+    const scale = blurScaleRef.current;
     if (!scale || !hasImage || saving) return;
     const rect = scale.getBoundingClientRect();
     if (rect.height <= 0) return;
@@ -270,18 +337,41 @@ export function HeaderPhotoDialog({
     setBlurPercent(clampHeaderBlurPercent(ratio * HEADER_BLUR_MAX_PERCENT));
   };
 
-  const onScalePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const setBrightnessFromPointer = (clientY: number) => {
+    const scale = brightScaleRef.current;
+    if (!scale || !hasImage || saving) return;
+    const rect = scale.getBoundingClientRect();
+    if (rect.height <= 0) return;
+    const ratio = 1 - (clientY - rect.top) / rect.height;
+    const span = HEADER_BRIGHTNESS_MAX_PERCENT - HEADER_BRIGHTNESS_MIN_PERCENT;
+    setBrightnessPercent(clampHeaderBrightnessPercent(
+      HEADER_BRIGHTNESS_MIN_PERCENT + ratio * span,
+    ));
+  };
+
+  const onBlurScalePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!hasImage || saving) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     setBlurFromPointer(e.clientY);
   };
 
-  const onScalePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onBlurScalePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
     setBlurFromPointer(e.clientY);
   };
 
-  const onScaleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  const onBrightScalePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!hasImage || saving) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setBrightnessFromPointer(e.clientY);
+  };
+
+  const onBrightScalePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    setBrightnessFromPointer(e.clientY);
+  };
+
+  const onBlurScaleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!hasImage || saving) return;
     const step = e.shiftKey ? 10 : 1;
     if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
@@ -298,6 +388,26 @@ export function HeaderPhotoDialog({
       setBlurPercent(HEADER_BLUR_MAX_PERCENT);
     }
   };
+
+  const onBrightScaleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!hasImage || saving) return;
+    const step = e.shiftKey ? 10 : 1;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      setBrightnessPercent(p => clampHeaderBrightnessPercent(p + step));
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setBrightnessPercent(p => clampHeaderBrightnessPercent(p - step));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setBrightnessPercent(HEADER_BRIGHTNESS_MIN_PERCENT);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setBrightnessPercent(HEADER_BRIGHTNESS_MAX_PERCENT);
+    }
+  };
+
+  const scaleOff = !hasImage ? styles.blurScaleOff : '';
 
   return createPortal(
     <div className={styles.root}>
@@ -371,36 +481,71 @@ export function HeaderPhotoDialog({
             {saving && <div className={styles.busy}><span className={styles.spinner} /></div>}
 
             <div
-              className={styles.blurCol}
-              data-header-blur=""
+              className={styles.tools}
+              data-header-tools=""
               onPointerDown={e => e.stopPropagation()}
             >
-            <div className={styles.blurName}>Блюр</div>
-            <div className={styles.blurEnd}>{HEADER_BLUR_MAX_PERCENT}%</div>
-            <div
-              ref={scaleRef}
-              className={`${styles.blurScale} ${!hasImage ? styles.blurScaleOff : ''}`}
-              role="slider"
-              aria-label="Блюр"
-              aria-valuemin={0}
-              aria-valuemax={HEADER_BLUR_MAX_PERCENT}
-              aria-valuenow={blurPercent}
-              aria-valuetext={`${blurPercent}%`}
-              tabIndex={hasImage && !saving ? 0 : -1}
-              onPointerDown={onScalePointerDown}
-              onPointerMove={onScalePointerMove}
-              onKeyDown={onScaleKeyDown}
-            >
-              <div className={styles.blurRail}>
-                <div className={styles.blurFill} style={{ height: `${(blurPercent / HEADER_BLUR_MAX_PERCENT) * 100}%` }} />
+              <div className={styles.toolCol}>
+                <span className={styles.toolIcon}><SoftDiskIcon /></span>
+                <div
+                  ref={blurScaleRef}
+                  className={`${styles.blurScale} ${scaleOff}`}
+                  role="slider"
+                  aria-label="Размытие"
+                  aria-valuemin={0}
+                  aria-valuemax={HEADER_BLUR_MAX_PERCENT}
+                  aria-valuenow={blurPercent}
+                  aria-valuetext={`${blurPercent}%`}
+                  tabIndex={hasImage && !saving ? 0 : -1}
+                  onPointerDown={onBlurScalePointerDown}
+                  onPointerMove={onBlurScalePointerMove}
+                  onKeyDown={onBlurScaleKeyDown}
+                >
+                  <div className={styles.blurRail}>
+                    <div
+                      className={styles.blurFill}
+                      style={{ height: `${(blurPercent / HEADER_BLUR_MAX_PERCENT) * 100}%` }}
+                    />
+                  </div>
+                  <div
+                    className={styles.blurThumb}
+                    style={{ bottom: `${(blurPercent / HEADER_BLUR_MAX_PERCENT) * 100}%` }}
+                  />
+                </div>
+                <span className={styles.toolIcon}><SharpDiskIcon /></span>
               </div>
-              <div className={styles.blurThumb} style={{ bottom: `${(blurPercent / HEADER_BLUR_MAX_PERCENT) * 100}%` }}>
-                {blurPercent > 0 && blurPercent < HEADER_BLUR_MAX_PERCENT && (
-                  <span className={styles.blurVal}>{blurPercent}%</span>
-                )}
+
+              <div className={styles.toolCol}>
+                <span className={styles.toolIcon}><SunIcon long /></span>
+                <div
+                  ref={brightScaleRef}
+                  className={`${styles.blurScale} ${scaleOff}`}
+                  role="slider"
+                  aria-label="Яркость"
+                  aria-valuemin={HEADER_BRIGHTNESS_MIN_PERCENT}
+                  aria-valuemax={HEADER_BRIGHTNESS_MAX_PERCENT}
+                  aria-valuenow={brightnessPercent}
+                  aria-valuetext={
+                    brightnessPercent === 0
+                      ? 'без изменения'
+                      : brightnessPercent > 0
+                        ? `+${brightnessPercent}%`
+                        : `${brightnessPercent}%`
+                  }
+                  tabIndex={hasImage && !saving ? 0 : -1}
+                  onPointerDown={onBrightScalePointerDown}
+                  onPointerMove={onBrightScalePointerMove}
+                  onKeyDown={onBrightScaleKeyDown}
+                >
+                  <div className={styles.blurRail}>
+                    {brightFillStyle && (
+                      <div className={styles.brightFill} style={brightFillStyle} />
+                    )}
+                  </div>
+                  <div className={styles.blurThumb} style={{ bottom: `${brightThumb}%` }} />
+                </div>
+                <span className={styles.toolIcon}><SunIcon /></span>
               </div>
-            </div>
-            <div className={styles.blurEnd}>0%</div>
             </div>
           </div>
         </div>

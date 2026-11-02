@@ -65,7 +65,12 @@ import {
 } from './userPageUtils';
 import { formatAge, pluralYears } from '@/shared/lib/datetime';
 import { coverFocusFromEvent, coverFocusImgStyle, coverZoomOf, DEFAULT_COVER_FOCUS } from '@/shared/lib/coverFocus';
-import { HEADER_BLUR_FALLBACK_PERCENT, HEADER_BLUR_FRAME_SCALE, headerBlurFilter } from '@/shared/lib/headerPhoto';
+import {
+  HEADER_BLUR_FALLBACK_PERCENT,
+  HEADER_BLUR_FRAME_SCALE,
+  headerBlurFilter,
+  headerPhotoFilter,
+} from '@/shared/lib/headerPhoto';
 import styles from './UserPage.module.css';
 
 type MainTab = UserEventsScope | 'albums';
@@ -88,16 +93,21 @@ function UserCoverBackground({
   headerImageId,
   headerFocus,
   headerBlurPercent,
+  headerBrightnessPercent,
 }: {
   accountId: string;
   avatarId: string | null;
   headerImageId: string | null;
   headerFocus: { x: number; y: number; zoom?: number } | null;
   headerBlurPercent: number;
+  headerBrightnessPercent: number;
 }) {
   const fileId = useAvatar(accountId, avatarId);
   const { displayFileId: avatarDisplayId, imgStyle: avatarImgStyle } = useAvatarCropDisplay(fileId);
-  const headerBlur = headerImageId ? headerBlurFilter(headerBlurPercent) : undefined;
+  const headerFilter = headerImageId
+    ? headerPhotoFilter(headerBlurPercent, headerBrightnessPercent)
+    : undefined;
+  const needsBlurScale = Boolean(headerImageId && headerBlurFilter(headerBlurPercent));
 
   return (
     <div className={styles.coverBg}>
@@ -111,11 +121,11 @@ function UserCoverBackground({
           className={styles.coverHeaderImg}
           style={{
             ...coverFocusImgStyle(headerFocus, {
-              frameScale: headerBlur ? HEADER_BLUR_FRAME_SCALE : 1,
+              frameScale: needsBlurScale ? HEADER_BLUR_FRAME_SCALE : 1,
             }),
             background: 'transparent',
             overflow: 'visible',
-            ...(headerBlur ? { filter: headerBlur } : {}),
+            ...(headerFilter ? { filter: headerFilter } : {}),
           }}
         />
       ) : avatarDisplayId ? (
@@ -368,6 +378,7 @@ export default function UserPage() {
   const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
   const [headerEditorOpen, setHeaderEditorOpen] = useState(false);
   const [headerBlurPercent, setHeaderBlurPercent] = useState(0);
+  const [headerBrightnessPercent, setHeaderBrightnessPercent] = useState(0);
   const [headerZoom, setHeaderZoom] = useState(1);
   const [headerAspect, setHeaderAspect] = useState<number | undefined>(undefined);
   const coverRef = useRef<HTMLDivElement>(null);
@@ -378,6 +389,7 @@ export default function UserPage() {
   useEffect(() => {
     if (!headerImageId) {
       setHeaderBlurPercent(0);
+      setHeaderBrightnessPercent(0);
       setHeaderZoom(1);
       return;
     }
@@ -385,6 +397,7 @@ export default function UserPage() {
     if (cached) {
       setHeaderZoom(cached.zoom);
       setHeaderBlurPercent(headerBlurOn ? cached.blurPercent : 0);
+      setHeaderBrightnessPercent(cached.brightnessPercent);
       return;
     }
     let cancelled = false;
@@ -393,6 +406,7 @@ export default function UserPage() {
       if (cancelled) return;
       setHeaderZoom(meta.zoom);
       setHeaderBlurPercent(headerBlurOn ? meta.blurPercent : 0);
+      setHeaderBrightnessPercent(meta.brightnessPercent);
     }).catch(() => {
       if (!cancelled) setHeaderZoom(1);
     });
@@ -418,6 +432,7 @@ export default function UserPage() {
 
   const applyHeaderPhoto = (next: HeaderPhotoValue) => {
     setHeaderBlurPercent(next.imageId ? next.blurPercent : 0);
+    setHeaderBrightnessPercent(next.imageId ? next.brightnessPercent : 0);
     setHeaderZoom(next.imageId ? coverZoomOf(next.focus) : 1);
     setProfile(prev => prev ? {
       ...prev,
@@ -656,6 +671,7 @@ export default function UserPage() {
               coverZoom: headerZoom,
             })}
             headerBlurPercent={headerBlurPercent}
+            headerBrightnessPercent={headerBrightnessPercent}
           />
           <div
             className={account.headerImageId ? styles.coverOverlayPhoto : styles.coverOverlay}
@@ -1068,6 +1084,7 @@ export default function UserPage() {
             zoom: headerZoom,
           }}
           blurPercent={headerBlurPercent}
+          brightnessPercent={headerBrightnessPercent}
           aspectRatio={headerAspect}
           onClose={() => setHeaderEditorOpen(false)}
           onApply={applyHeaderPhoto}

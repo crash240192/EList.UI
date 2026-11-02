@@ -2,6 +2,8 @@ import { apiClient } from '@/shared/api/client';
 import { attachFileContext, getFileInfo } from '@/shared/api/fileStorageClient';
 import { clampCoverFocusValue, clampCoverZoom, type CoverFocus } from '@/shared/lib/coverFocus';
 import {
+  clampHeaderBlurPercent,
+  clampHeaderBrightnessPercent,
   parseHeaderPhotoContext,
   serializeHeaderPhotoContext,
 } from '@/shared/lib/headerPhoto';
@@ -15,6 +17,7 @@ export interface AccountHeaderPayload {
 
 export interface HeaderPhotoMeta {
   blurPercent: number;
+  brightnessPercent: number;
   zoom: number;
 }
 
@@ -23,7 +26,10 @@ const photoMetaCache = new Map<string, HeaderPhotoMeta>();
 export function rememberHeaderPhotoMeta(fileId: string, meta: Partial<HeaderPhotoMeta>): HeaderPhotoMeta {
   const prev = photoMetaCache.get(fileId);
   const next: HeaderPhotoMeta = {
-    blurPercent: meta.blurPercent ?? prev?.blurPercent ?? 0,
+    blurPercent: clampHeaderBlurPercent(meta.blurPercent ?? prev?.blurPercent ?? 0),
+    brightnessPercent: clampHeaderBrightnessPercent(
+      meta.brightnessPercent ?? prev?.brightnessPercent ?? 0,
+    ),
     zoom: clampCoverZoom(meta.zoom ?? prev?.zoom ?? 1),
   };
   photoMetaCache.set(fileId, next);
@@ -49,6 +55,7 @@ export async function loadHeaderPhotoMeta(fileId: string): Promise<HeaderPhotoMe
   const parsed = parseHeaderPhotoContext(info?.description);
   return rememberHeaderPhotoMeta(fileId, {
     blurPercent: parsed?.blurPercent ?? 0,
+    brightnessPercent: parsed?.brightnessPercent ?? 0,
     zoom: parsed?.zoom ?? 1,
   });
 }
@@ -59,8 +66,8 @@ export async function loadHeaderBlurPercent(fileId: string): Promise<number | nu
 }
 
 /**
- * Процент блюра и масштаб не входят в Account (там x/y и boolean blur).
- * Пишем оба в контекст исходного файла одним JSON: attach заменяет описание целиком.
+ * Процент блюра/яркости и масштаб не входят в Account (там x/y и boolean blur).
+ * Пишем в контекст исходного файла одним JSON: attach заменяет описание целиком.
  */
 export async function saveHeaderPhotoMeta(fileId: string, meta: HeaderPhotoMeta): Promise<void> {
   const next = rememberHeaderPhotoMeta(fileId, meta);
@@ -71,6 +78,7 @@ export async function saveHeaderBlurPercent(fileId: string, percent: number): Pr
   const prev = photoMetaCache.get(fileId);
   await saveHeaderPhotoMeta(fileId, {
     blurPercent: percent,
+    brightnessPercent: prev?.brightnessPercent ?? 0,
     zoom: prev?.zoom ?? 1,
   });
 }
