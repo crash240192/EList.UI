@@ -9,9 +9,15 @@
   flex-direction: column;
   gap: 10px;
   padding: 10px;
-  border: 1px solid var(--border);
+  /* +1 светлее surface-2 (#272932 → #30333e) */
+  border: 1px solid #3c4050;
   border-radius: 12px;
-  background: var(--surface-2);
+  background: #30333e;
+}
+
+:global(.light-theme) .eventGroup {
+  border-color: var(--border);
+  background: var(--surface);
 }
 
 .eventHeader {
