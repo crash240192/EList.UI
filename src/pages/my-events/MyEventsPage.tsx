@@ -340,7 +340,6 @@ export default function MyEventsPage() {
                           pinned={pinnedSet.has(event.id)}
                           organizer={event.isOrganizer}
                           onClick={() => navigate(`/event/${event.id}`)}
-                          className={event.isOrganizer ? styles.cardOrganizer : undefined}
                         />
                       </div>
                       <div className={`${styles.cancelledOnPhoto} ${styles.cancelledOnPhotoRow}`}>
@@ -354,7 +353,6 @@ export default function MyEventsPage() {
                       pinned={pinnedSet.has(event.id)}
                       organizer={event.isOrganizer}
                       onClick={() => navigate(`/event/${event.id}`)}
-                      className={event.isOrganizer ? styles.cardOrganizer : undefined}
                     />
                   )}
                 </PinHit>
@@ -375,7 +373,6 @@ export default function MyEventsPage() {
                       pinned={pinnedSet.has(event.id)}
                       organizer={event.isOrganizer}
                       onClick={() => navigate(`/event/${event.id}`)}
-                      className={event.isOrganizer ? styles.cardOrganizer : undefined}
                     />
                   </div>
                   {cancelledLabel(event) && (
