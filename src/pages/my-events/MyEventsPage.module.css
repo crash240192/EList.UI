@@ -172,12 +172,6 @@
   /* Важно: НЕТ display:contents — div корректно занимает ячейку грида */
 }
 
-/* Организаторская карточка — подсветка слева */
-.cardOrganizer {
-  border-left: 3px solid var(--accent) !important;
-  border-radius: 12px;
-}
-
 .pinHit {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
@@ -249,10 +243,6 @@
   top: 0;
   bottom: 0;
   width: calc(1px + (120px * 4 / 3) * 0.75 + 15px);
-}
-
-.cancelledHost:has(.cardOrganizer) .cancelledOnPhotoRow {
-  width: calc(3px + (120px * 4 / 3) * 0.75 + 15px);
 }
 
 .cancelledPill {
