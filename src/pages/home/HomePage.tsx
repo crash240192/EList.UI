@@ -26,6 +26,7 @@ import {
 import { isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
+import { prefetchAuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './HomePage.module.css';
 
 const HOME_LIST_UI_KEY = 'elist_home_list_ui_v1';
@@ -186,6 +187,8 @@ export default function HomePage() {
   const openMapEventPreview = useCallback(async (eventId: string) => {
     try {
       const ev = await fetchEventById(eventId);
+      // Превью грузит thumb сразу — не ждём монтирования AuthImage / визит на /event/:id.
+      if (ev.coverImageId) prefetchAuthImage(ev.coverImageId, false);
       setSelectedEvent(ev);
       pendingAgeEventIdRef.current = null;
     } catch (e) {
