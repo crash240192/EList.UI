@@ -10,14 +10,14 @@ export function formatInviteEligibilityReason(
   errorCode?: number,
 ): string | null {
   if (errorCode === ApiErrorCode.EventCancelled) return 'Мероприятие отменено';
-  if (errorCode === ApiErrorCode.EventIsFull) return 'Мероприятие заполнено';
+  if (errorCode === ApiErrorCode.EventIsFull) return 'Мест нет';
 
   const text = (reason ?? '').trim();
   if (!text) return null;
 
   if (/отменен/i.test(text)) return 'Мероприятие отменено';
   if (/максимальн|заполнен|мест/i.test(text) && /участ|заполн|человек/i.test(text)) {
-    return 'Мероприятие заполнено';
+    return 'Мест нет';
   }
   return text;
 }
