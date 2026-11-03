@@ -236,10 +236,21 @@ function AuthImageProgressiveFull({
   const [fullUrl, setFullUrl] = useState<string | null>(() => blobCache.get(kFull) ?? null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(() => !blobCache.has(kFull));
+  const [attempt, setAttempt] = useState(0);
+  const maxAttempts = 4;
+
+  useEffect(() => {
+    setAttempt(0);
+    setError(false);
+    setPreviewUrl(blobCache.get(kThumb) ?? null);
+    setFullUrl(blobCache.get(kFull) ?? null);
+    setLoading(!blobCache.has(kFull));
+  }, [fileId, kFull, kThumb]);
 
   useEffect(() => {
     if (!fileId || !ready) return;
     let cancelled = false;
+    let retryTimer: number | undefined;
     setError(false);
 
     const fullKey = cacheKey(fileId, true);
@@ -274,17 +285,31 @@ function AuthImageProgressiveFull({
         if (cancelled) return;
         setFullUrl(full);
         setLoading(false);
-      } catch {
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-          onErrorProp?.();
+      } catch (err: unknown) {
+        if (cancelled) return;
+        if (attempt < maxAttempts - 1) {
+          let delay = 500 * (attempt + 1);
+          if (err instanceof FileStorageHttpError && (err.status === 503 || err.status === 429)) {
+            delay = Math.max(err.retryAfterMs ?? 2000, 1000 * (attempt + 1));
+          }
+          retryTimer = window.setTimeout(() => {
+            if (!cancelled) setAttempt(a => a + 1);
+          }, delay);
+          return;
         }
+        setError(true);
+        setLoading(false);
+        onErrorProp?.();
       }
     })();
 
-    return () => { cancelled = true; };
-  }, [fileId, ready]);
+    return () => {
+      cancelled = true;
+      if (retryTimer != null) window.clearTimeout(retryTimer);
+    };
+    // onErrorProp — опциональный колбэк; не включаем в deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileId, ready, attempt]);
 
   const layerFitStyle: React.CSSProperties =
     imageFit === 'cover'

@@ -32,14 +32,23 @@
 @keyframes slideUp { from { transform: translateX(-50%) translateY(100%); } to { transform: translateX(-50%) translateY(0); } }
 @keyframes scaleIn { from { opacity: 0; transform: translate(-50%,-48%) scale(0.95); } to { opacity: 1; transform: translate(-50%,-50%); } }
 
-/* Ручка */
-/* Cover */
+/* Cover: клип + isolation — иначе scale/zoom и z-index AuthImage лезут на body */
 .cover {
   position: relative;
+  z-index: 0;
   height: var(--event-preview-hero-height);
   flex-shrink: 0;
+  overflow: hidden;
+  isolation: isolate;
 }
-.coverImg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.coverImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .coverGrad {
   position: absolute; inset: 0;
   background: linear-gradient(
@@ -127,11 +136,14 @@
     0 3px 10px rgba(0, 0, 0, 0.28);
 }
 
-/* Body */
+/* Body — выше обложки в stacking context (как belowHero на EventPage) */
 .body {
+  position: relative;
+  z-index: 1;
   padding: 13px 15px 16px;
   overflow-y: auto; flex: 1;
   display: flex; flex-direction: column; gap: 9px;
+  background: var(--surface);
 }
 
 /* Мета */

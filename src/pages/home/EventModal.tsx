@@ -1,11 +1,12 @@
 // pages/home/EventModal.tsx
 
 import { useEffect } from 'react';
-import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
+import { isFileStorageDownloadUrl } from '@/shared/api/fileStorageClient';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
 import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
 import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
@@ -34,10 +35,14 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
   const gender     = readAllowedGender(event.parameters);
   const hasCover   = !!(event.coverImageId || event.coverUrl);
   const focusStyle = coverFocusImgStyle(useResolvedCoverFocus(event));
+  /** Публичный URL; filestorage без JWT в <img> не откроется. */
+  const publicCoverUrl = event.coverUrl && !isFileStorageDownloadUrl(event.coverUrl)
+    ? event.coverUrl
+    : null;
 
   const hasLimits = isPrivate || maxPersons || gender;
 
-  return (
+  return createPortal(
     <>
       <div className={styles.backdrop} onClick={onClose} />
       <div className={styles.modal} role="dialog" aria-modal aria-label={event.name}>
@@ -48,16 +53,19 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
           {event.coverImageId ? (
             <AuthImage
               fileId={event.coverImageId}
-              fullSize
               imageFit="cover"
               lazy={false}
               alt={event.name}
               className={styles.coverImg}
               style={focusStyle}
-              fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} /> : undefined}
+              fallback={
+                publicCoverUrl
+                  ? <img src={publicCoverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} />
+                  : undefined
+              }
             />
-          ) : event.coverUrl ? (
-            <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} />
+          ) : publicCoverUrl ? (
+            <img src={publicCoverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} />
           ) : null}
           <div className={styles.coverGrad} />
 
@@ -159,7 +167,8 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
           {children}
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 
