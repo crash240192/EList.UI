@@ -68,6 +68,7 @@ const ICON_BY_CATEGORY_NAME: Record<string, MarkerIconSlug> = {
   'юмор': 'humor',
 };
 
+/** Цвета справочника API → slug (search/short отдаёт colors[]) */
 const ICON_BY_COLOR: Record<string, MarkerIconSlug> = {
   '#ff0000': 'auto',
   '#876949': 'active',
@@ -88,6 +89,34 @@ const ICON_BY_COLOR: Record<string, MarkerIconSlug> = {
   '#0097bd': 'circus',
   '#ffff00': 'humor',
 };
+
+/** Мягкая палитра кругов на карте (не обязательно = color в справочнике) */
+const DISPLAY_COLOR_BY_SLUG: Record<MarkerIconSlug, string> = {
+  auto: '#c94a3d',
+  active: '#5f9e8a',
+  food: '#e07a8a',
+  animals: '#c4a484',
+  knowledge: '#b8c6e8',
+  cinema: '#2f3140',
+  culture: '#6ebf9c',
+  fashion: '#e87ac8',
+  music: '#9a7fd4',
+  holidays: '#e8a0c0',
+  fun: '#e8e0c4',
+  meetings: '#5a6f8c',
+  sport: '#4f9ae0',
+  tactical: '#758f6a',
+  art: '#c4a0f0',
+  theater: '#7a1f3d',
+  circus: '#f08a3a',
+  humor: '#f0b429',
+};
+
+const DEBUG_API_COLOR = '#f264df';
+const DEBUG_DISPLAY_COLOR = '#b48bc9';
+
+/** Иконка всегда чёрная (даже на среднем фоне) */
+const FORCE_BLACK_ICON = new Set<MarkerIconSlug>(['knowledge', 'art', 'tactical']);
 
 function slugToUrl(slug: MarkerIconSlug): string {
   return `/map-markers/${slug}.png`;
@@ -140,6 +169,49 @@ export function markerIconUrlForColor(color: string | null | undefined): string 
   if (!color) return null;
   const slug = resolveMarkerIconSlug({ color });
   return markerIconUrlForSlug(slug);
+}
+
+/** Цвет круга маркера по API-цвету раздела (мягкая палитра). */
+export function displayMarkerColor(apiColor: string | null | undefined, fallback = '#6366f1'): string {
+  if (!apiColor) return fallback;
+  const slug = resolveMarkerIconSlug({ color: apiColor });
+  if (slug) return DISPLAY_COLOR_BY_SLUG[slug];
+  if (normalizeHexColor(apiColor) === DEBUG_API_COLOR) return DEBUG_DISPLAY_COLOR;
+  return apiColor;
+}
+
+export function markerInkForDisplayColor(
+  displayColor: string,
+  slug: MarkerIconSlug | null,
+): { light: boolean; ink: string; ring: string } {
+  const forceBlack = slug != null && FORCE_BLACK_ICON.has(slug);
+  const light = forceBlack || isLightMarkerColor(displayColor);
+  return {
+    light,
+    ink: light ? '#111827' : '#ffffff',
+    ring: light ? '#c5c7d1' : '#ffffff',
+  };
+}
+
+export function resolveMarkerPaint(apiColor: string | null | undefined, fallback = '#6366f1'): {
+  slug: MarkerIconSlug | null;
+  fill: string;
+  iconUrl: string | null;
+  light: boolean;
+  ink: string;
+  ring: string;
+} {
+  const slug = apiColor ? resolveMarkerIconSlug({ color: apiColor }) : null;
+  const fill = displayMarkerColor(apiColor, fallback);
+  const { light, ink, ring } = markerInkForDisplayColor(fill, slug);
+  return {
+    slug,
+    fill,
+    iconUrl: markerIconUrlForSlug(slug),
+    light,
+    ink,
+    ring,
+  };
 }
 
 const imageCache = new Map<string, HTMLImageElement | null>();

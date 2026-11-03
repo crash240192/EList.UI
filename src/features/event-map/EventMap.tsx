@@ -9,11 +9,11 @@ import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlac
 import { useThemeStore } from '@/app/store';
 import {
   MAP_MARKER_ICON_SIZE,
+  displayMarkerColor,
   drawMarkerIconTinted,
   getCachedMarkerIcon,
-  isLightMarkerColor,
-  markerIconUrlForColor,
   preloadMapCategoryIcons,
+  resolveMarkerPaint,
 } from './mapCategoryIcons';
 import styles from './YandexMap.module.css';
 
@@ -54,26 +54,25 @@ function makeMarkerPng(colors: string[], count = 1): string {
   const ctx = c.getContext('2d')!;
   const cx = size / 2; const cy = size / 2; const r = 14;
 
-  const primary = colors[0] ?? DEFAULT_COLOR;
-  const light = isLightMarkerColor(primary);
-  const ring = light ? '#c5c7d1' : '#ffffff';
-  const ink = light ? '#111827' : '#ffffff';
+  const apiPrimary = colors[0] ?? DEFAULT_COLOR;
+  const paint = resolveMarkerPaint(apiPrimary, DEFAULT_COLOR);
+  const displayColors = colors.map((c) => displayMarkerColor(c, DEFAULT_COLOR));
 
   // Окантовка
   ctx.beginPath();
   ctx.arc(cx, cy, r + 2, 0, 2 * Math.PI);
-  ctx.fillStyle = ring;
+  ctx.fillStyle = paint.ring;
   ctx.fill();
 
-  // Одиночная точка — цвет первого раздела; несколько в точке — пирог цветов как раньше
-  if (count === 1 || colors.length === 1) {
+  // Одиночная точка — цвет первого раздела; несколько в точке — пирог цветов
+  if (count === 1 || displayColors.length === 1) {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-    ctx.fillStyle = primary;
+    ctx.fillStyle = paint.fill;
     ctx.fill();
   } else {
-    const step = (2 * Math.PI) / colors.length;
-    colors.forEach((color, i) => {
+    const step = (2 * Math.PI) / displayColors.length;
+    displayColors.forEach((color, i) => {
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.arc(cx, cy, r, i * step - Math.PI / 2, (i + 1) * step - Math.PI / 2);
@@ -83,7 +82,7 @@ function makeMarkerPng(colors: string[], count = 1): string {
     });
   }
 
-  if (light) {
+  if (paint.light) {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, 2 * Math.PI);
     ctx.strokeStyle = 'rgba(0,0,0,0.18)';
@@ -92,14 +91,13 @@ function makeMarkerPng(colors: string[], count = 1): string {
   }
 
   if (count > 1) {
-    ctx.fillStyle = ink;
+    ctx.fillStyle = paint.ink;
     ctx.font = `bold 11px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(count), cx, cy + 1);
   } else {
-    const iconUrl = markerIconUrlForColor(primary);
-    const icon = getCachedMarkerIcon(iconUrl);
+    const icon = getCachedMarkerIcon(paint.iconUrl);
     if (icon) {
       const iconBox = MAP_MARKER_ICON_SIZE;
       drawMarkerIconTinted(
@@ -108,13 +106,13 @@ function makeMarkerPng(colors: string[], count = 1): string {
         Math.round(cx - iconBox / 2),
         Math.round(cy - iconBox / 2),
         iconBox,
-        ink,
+        paint.ink,
       );
     } else {
       // Дебаг / нет иконки — точка в центре
       ctx.beginPath();
       ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = ink;
+      ctx.fillStyle = paint.ink;
       ctx.fill();
     }
   }
@@ -621,7 +619,7 @@ export function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }:
         </div>
         <div className={styles.groupList} data-group-list style={{ maxHeight: place?.listMaxHeight }}>
           {events.map(ev => {
-            const color = markerColors(ev)[0];
+            const color = displayMarkerColor(markerColors(ev)[0], DEFAULT_COLOR);
             return (
               <button key={ev.id} className={styles.groupItem} onClick={() => onSelect(ev.id)}>
                 <div className={styles.groupDot} style={{ background: color }} />
