@@ -7,6 +7,14 @@ import type { IEventSearchShortItem } from '@/entities/event';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlacement';
 import { useThemeStore } from '@/app/store';
+import {
+  MAP_MARKER_ICON_SIZE,
+  drawMarkerIconTinted,
+  getCachedMarkerIcon,
+  isLightMarkerColor,
+  markerIconUrlForColor,
+  preloadMapCategoryIcons,
+} from './mapCategoryIcons';
 import styles from './YandexMap.module.css';
 
 export interface MapSearchArea {
@@ -35,7 +43,10 @@ function markerColors(item: IEventSearchShortItem): string[] {
   return c.length ? [...new Set(c)] : [DEFAULT_COLOR];
 }
 
-/** Генерируем PNG через Canvas — цвета точные, без артефактов SVG */
+/**
+ * PNG-маркер: одиночная точка — цвет первого раздела + тематическая иконка 16×16;
+ * несколько в точке / счётчик — число (как раньше).
+ */
 function makeMarkerPng(colors: string[], count = 1): string {
   const size = 36;
   const c = document.createElement('canvas');
@@ -43,16 +54,22 @@ function makeMarkerPng(colors: string[], count = 1): string {
   const ctx = c.getContext('2d')!;
   const cx = size / 2; const cy = size / 2; const r = 14;
 
-  // Белая окантовка
+  const primary = colors[0] ?? DEFAULT_COLOR;
+  const light = isLightMarkerColor(primary);
+  const ring = light ? '#c5c7d1' : '#ffffff';
+  const ink = light ? '#111827' : '#ffffff';
+
+  // Окантовка
   ctx.beginPath();
   ctx.arc(cx, cy, r + 2, 0, 2 * Math.PI);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = ring;
   ctx.fill();
 
-  if (colors.length === 1) {
+  // Одиночная точка — цвет первого раздела; несколько в точке — пирог цветов как раньше
+  if (count === 1 || colors.length === 1) {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-    ctx.fillStyle = colors[0];
+    ctx.fillStyle = primary;
     ctx.fill();
   } else {
     const step = (2 * Math.PI) / colors.length;
@@ -66,18 +83,40 @@ function makeMarkerPng(colors: string[], count = 1): string {
     });
   }
 
-  // Белый центр или счётчик
+  if (light) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
   if (count > 1) {
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = ink;
     ctx.font = `bold 11px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(count), cx, cy + 1);
   } else {
-    ctx.beginPath();
-    ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
+    const iconUrl = markerIconUrlForColor(primary);
+    const icon = getCachedMarkerIcon(iconUrl);
+    if (icon) {
+      const iconBox = MAP_MARKER_ICON_SIZE;
+      drawMarkerIconTinted(
+        ctx,
+        icon,
+        Math.round(cx - iconBox / 2),
+        Math.round(cy - iconBox / 2),
+        iconBox,
+        ink,
+      );
+    } else {
+      // Дебаг / нет иконки — точка в центре
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = ink;
+      ctx.fill();
+    }
   }
 
   return c.toDataURL('image/png');
@@ -104,6 +143,16 @@ export function EventMap({
   useEffect(() => { onSearchAreaRef.current = onSearchAreaChange; }, [onSearchAreaChange]);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [iconsReady, setIconsReady] = useState(false);
+
+  // Тематические PNG разделов — ждём прогрев, чтобы маркеры сразу были с иконками
+  useEffect(() => {
+    let cancelled = false;
+    preloadMapCategoryIcons().finally(() => {
+      if (!cancelled) setIconsReady(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Контекстное меню «Искать здесь»
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; lat: number; lng: number } | null>(null);
@@ -330,7 +379,7 @@ export function EventMap({
 
   // Маркеры
   useEffect(() => {
-    if (!ready || !mapRef.current) return;
+    if (!ready || !iconsReady || !mapRef.current) return;
     const ymaps = (window as any).ymaps;
     if (clusterRef.current) {
       mapRef.current.geoObjects.remove(clusterRef.current);
@@ -406,7 +455,7 @@ export function EventMap({
 
     mapRef.current.geoObjects.add(clusterer);
     clusterRef.current = clusterer;
-  }, [events, showGroup, ready]);
+  }, [events, showGroup, ready, iconsReady]);
 
   if (error) return (
     <div className={styles.errorBox} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
