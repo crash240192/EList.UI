@@ -17,6 +17,7 @@ import {
 } from '@/entities/organization';
 import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
+import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './ProfileInviteDialogs.module.css';
 
 type InviteSource = 'self' | 'organization';
@@ -27,6 +28,8 @@ interface InviteEventRow {
   id: string;
   name: string;
   startTime: string;
+  coverImageId: string | null;
+  coverUrl: string | null;
   status: EventRowStatus;
   /** Бейдж справа: блок / уже … / «Нужен билет» */
   statusLabel?: string;
@@ -60,17 +63,27 @@ function statusFromDenyReason(
 }
 
 function rowFromEligibility(
-  event: { id: string; name: string; startTime: string },
+  event: {
+    id: string;
+    name: string;
+    startTime: string;
+    coverImageId?: string | null;
+    coverUrl?: string | null;
+  },
   el: IInviteToEventEligibility | undefined,
   ticketsEnabled = true,
 ): InviteEventRow {
   const ticketsRequired = ticketsEnabled && el?.ticketsRequired === true;
+  const coverImageId = event.coverImageId ?? null;
+  const coverUrl = event.coverUrl ?? null;
 
   if (!el || el.allowed) {
     return {
       id: event.id,
       name: event.name,
       startTime: event.startTime,
+      coverImageId,
+      coverUrl,
       status: 'ok',
       // Модель A: tickets — информативный статус, выбор не блокируем
       statusLabel: ticketsRequired ? 'Нужен билет' : undefined,
@@ -83,6 +96,8 @@ function rowFromEligibility(
     id: event.id,
     name: event.name,
     startTime: event.startTime,
+    coverImageId,
+    coverUrl,
     status: denied.status,
     statusLabel: denied.statusLabel,
     ticketsRequired,
@@ -413,19 +428,30 @@ export function ProfileEventInviteModal({
               <button
                 key={event.id}
                 type="button"
-                role="checkbox"
-                aria-checked={on}
+                role="option"
+                aria-selected={on}
                 aria-disabled={disabled}
                 disabled={disabled}
                 title={event.statusLabel}
                 className={`${styles.item} ${on ? styles.itemOn : ''} ${disabled ? styles.itemDisabled : ''}`}
                 onClick={() => toggle(event.id)}
               >
-                <span className={`${styles.box} ${on ? styles.boxOn : ''}`} aria-hidden>
-                  {on && (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
-                      <path d="M5 12l5 5L20 7" />
-                    </svg>
+                <span className={styles.thumb} aria-hidden>
+                  {event.coverImageId ? (
+                    <AuthImage
+                      fileId={event.coverImageId}
+                      alt=""
+                      className={styles.thumbImg}
+                      fallback={
+                        event.coverUrl
+                          ? <img src={event.coverUrl} alt="" className={styles.thumbImg} />
+                          : <span className={styles.thumbEmpty} />
+                      }
+                    />
+                  ) : event.coverUrl ? (
+                    <img src={event.coverUrl} alt="" className={styles.thumbImg} />
+                  ) : (
+                    <span className={styles.thumbEmpty} />
                   )}
                 </span>
                 <span className={styles.itemText}>
