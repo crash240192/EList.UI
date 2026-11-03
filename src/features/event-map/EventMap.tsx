@@ -58,7 +58,8 @@ function makeMarkerPng(colors: string[], count = 1): string {
   c.height = size * dpr;
   const ctx = c.getContext('2d')!;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   const cx = size / 2; const cy = size / 2; const r = 14;
 
   const apiPrimary = colors[0] ?? DEFAULT_COLOR;

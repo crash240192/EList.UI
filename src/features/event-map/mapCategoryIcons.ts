@@ -1,8 +1,9 @@
 // Иконки маркеров карты по корневым разделам (категориям).
-// Одиночная точка: цвет первого типа + 16×16 PNG раздела.
+// Одиночная точка: цвет первого типа + PNG раздела (64×64 Lanczos из исходников).
 // Дебаг и неизвестные — без иконки (точка в центре).
 
-export const MAP_MARKER_ICON_SIZE = 16;
+/** CSS-размер иконки в круге маркера (исходники в /public/map-markers — 64×64). */
+export const MAP_MARKER_ICON_SIZE = 18;
 
 /** slug файла в /public/map-markers */
 type MarkerIconSlug =
@@ -250,9 +251,9 @@ export function getCachedMarkerIcon(url: string | null | undefined): HTMLImageEl
 }
 
 /**
- * Рисует силуэт иконки (чёрный PNG) белым или чёрным в целевой canvas.
- * Сначала тонируем в нативном разрешении, потом nearest-neighbor в слот —
- * без мыла от bilinear upscale/downscale.
+ * Рисует силуэт иконки (тёмный PNG) белым или чёрным в целевой canvas.
+ * Тонируем в нативном 64×64, затем high-quality downscale в слот маркера —
+ * чётко, без пиксельной сетки и без «мыла» от апскейла 16→N.
  */
 export function drawMarkerIconTinted(
   ctx: CanvasRenderingContext2D,
@@ -271,7 +272,8 @@ export function drawMarkerIconTinted(
   tinted.height = th;
   const tctx = tinted.getContext('2d');
   if (!tctx) return;
-  tctx.imageSmoothingEnabled = false;
+  tctx.imageSmoothingEnabled = true;
+  tctx.imageSmoothingQuality = 'high';
   tctx.drawImage(icon, 0, 0);
   tctx.globalCompositeOperation = 'source-in';
   tctx.fillStyle = tint;
@@ -284,7 +286,10 @@ export function drawMarkerIconTinted(
   const oy = dy + Math.floor((size - dh) / 2);
 
   const prevSmooth = ctx.imageSmoothingEnabled;
-  ctx.imageSmoothingEnabled = false;
+  const prevQuality = ctx.imageSmoothingQuality;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(tinted, ox, oy, dw, dh);
   ctx.imageSmoothingEnabled = prevSmooth;
+  ctx.imageSmoothingQuality = prevQuality;
 }
