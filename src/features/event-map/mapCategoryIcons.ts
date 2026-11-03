@@ -251,7 +251,8 @@ export function getCachedMarkerIcon(url: string | null | undefined): HTMLImageEl
 
 /**
  * Рисует силуэт иконки (чёрный PNG) белым или чёрным в целевой canvas.
- * Вписывает в квадрат size×size с сохранением пропорций.
+ * Сначала тонируем в нативном разрешении, потом nearest-neighbor в слот —
+ * без мыла от bilinear upscale/downscale.
  */
 export function drawMarkerIconTinted(
   ctx: CanvasRenderingContext2D,
@@ -265,20 +266,25 @@ export function drawMarkerIconTinted(
   const th = icon.naturalHeight || icon.height;
   if (!tw || !th) return;
 
+  const tinted = document.createElement('canvas');
+  tinted.width = tw;
+  tinted.height = th;
+  const tctx = tinted.getContext('2d');
+  if (!tctx) return;
+  tctx.imageSmoothingEnabled = false;
+  tctx.drawImage(icon, 0, 0);
+  tctx.globalCompositeOperation = 'source-in';
+  tctx.fillStyle = tint;
+  tctx.fillRect(0, 0, tw, th);
+
   const scale = Math.min(size / tw, size / th);
   const dw = Math.max(1, Math.round(tw * scale));
   const dh = Math.max(1, Math.round(th * scale));
   const ox = dx + Math.floor((size - dw) / 2);
   const oy = dy + Math.floor((size - dh) / 2);
 
-  const tmp = document.createElement('canvas');
-  tmp.width = dw;
-  tmp.height = dh;
-  const tctx = tmp.getContext('2d');
-  if (!tctx) return;
-  tctx.drawImage(icon, 0, 0, dw, dh);
-  tctx.globalCompositeOperation = 'source-in';
-  tctx.fillStyle = tint;
-  tctx.fillRect(0, 0, dw, dh);
-  ctx.drawImage(tmp, ox, oy);
+  const prevSmooth = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tinted, ox, oy, dw, dh);
+  ctx.imageSmoothingEnabled = prevSmooth;
 }
