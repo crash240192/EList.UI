@@ -160,6 +160,17 @@
   height: 100%;
 }
 
+/* Тёмная тема: инвертим тайлы карты, но возвращаем маркерам исходные цвета
+   (повтор того же filter на places/overlaps ≈ отмена invert+hue-rotate). */
+.eventsMapDark {
+  filter: invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9);
+}
+
+.eventsMapDark :global([class*="places-pane"]),
+.eventsMapDark :global([class*="overlaps-pane"]) {
+  filter: invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9);
+}
+
 /* ---- Error ---- */
 
 .errorBox {
