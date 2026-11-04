@@ -63,7 +63,8 @@ export function HeaderAvatarMenu() {
 
   useEffect(() => {
     if (!menuOpen) return;
-    const onDoc = (e: MouseEvent) => {
+    // pointerdown: мышь + тач. capture — даже если кто-то стопит bubble.
+    const onDoc = (e: PointerEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
@@ -71,10 +72,10 @@ export function HeaderAvatarMenu() {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenuOpen(false);
     };
-    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('pointerdown', onDoc, true);
     document.addEventListener('keydown', onEsc);
     return () => {
-      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('pointerdown', onDoc, true);
       document.removeEventListener('keydown', onEsc);
     };
   }, [menuOpen]);
@@ -108,6 +109,18 @@ export function HeaderAvatarMenu() {
             </svg>
         }
       </button>
+
+      {menuOpen && (
+        <div
+          className={styles.dismissLayer}
+          aria-hidden
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeMenu();
+          }}
+        />
+      )}
 
       {menuOpen && (
         <div className={styles.menu} role="menu" aria-label="Меню профиля">
