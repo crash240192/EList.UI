@@ -36,8 +36,10 @@
   position: relative;
   flex: 1 1 0;
   align-self: flex-start;
+  width: 100%;
   min-width: 0;
-  /* Рамка не входит в бокс: пропорция совпадает с живой шапкой. */
+  /* Без aspectRatio — высота живой шапки; с prop — пропорция перекрывает height. */
+  height: var(--hero-height);
   border: none;
   border-radius: 12px;
   overflow: hidden;
@@ -47,7 +49,6 @@
   align-items: center;
   justify-content: center;
   touch-action: none;
-  aspect-ratio: var(--header-zone-aspect, 880 / 180);
   isolation: isolate;
 }
 

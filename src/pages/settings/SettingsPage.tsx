@@ -1,6 +1,6 @@
 // pages/settings/SettingsPage.tsx — макет examples/elist_settings_wallet.html
 
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchContactTypes } from '@/features/auth/registrationApi';
 import type { IContactType } from '@/features/auth/registrationApi';
@@ -279,6 +279,8 @@ function ProfileDataTab() {
   const [headerFocus, setHeaderFocus] = useState(DEFAULT_COVER_FOCUS);
   const [headerBlurPercent, setHeaderBlurPercent] = useState(0);
   const [headerBrightnessPercent, setHeaderBrightnessPercent] = useState(0);
+  const [headerAspect, setHeaderAspect] = useState<number | undefined>(undefined);
+  const headerPreviewRef = useRef<HTMLButtonElement>(null);
 
   const initials = (form.firstName?.[0] ?? '') + (form.lastName?.[0] ?? '');
   const accountId = getStoredAccountId() ?? '';
@@ -419,6 +421,24 @@ function ProfileDataTab() {
     : undefined;
   const needsBlurScale = Boolean(headerImageId && headerBlurFilter(headerBlurPercent));
 
+  // Как на морде профиля: превью диалога = ширина карточки / высота живой шапки (180).
+  useEffect(() => {
+    if (loading) return;
+    const el = headerPreviewRef.current;
+    if (!el) return;
+    const HERO_HEIGHT_PX = 180;
+    const update = () => {
+      const { width } = el.getBoundingClientRect();
+      if (width <= 0) return;
+      const next = width / HERO_HEIGHT_PX;
+      setHeaderAspect(prev => (prev != null && Math.abs(prev - next) < 0.001 ? prev : next));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading]);
+
   if (loading) {
     return <div className={styles.sectionLoader}>Загрузка...</div>;
   }
@@ -449,6 +469,7 @@ function ProfileDataTab() {
           <div className={styles.scardTitle}>Фото шапки профиля</div>
         </div>
         <button
+          ref={headerPreviewRef}
           type="button"
           className={styles.headerPhotoPreview}
           onClick={() => setHeaderOpen(true)}
@@ -542,6 +563,7 @@ function ProfileDataTab() {
           focus={headerFocus}
           blurPercent={headerBlurPercent}
           brightnessPercent={headerBrightnessPercent}
+          aspectRatio={headerAspect}
           onClose={() => setHeaderOpen(false)}
           onApply={(next: HeaderPhotoValue) => {
             setHeaderImageId(next.imageId);

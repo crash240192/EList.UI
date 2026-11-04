@@ -144,7 +144,9 @@ export function HeaderPhotoDialog({
     ...coverFocusImgStyle(focus, { frameScale }),
     ...(photoFilter ? { filter: photoFilter } : {}),
   };
-  const zoneStyle = aspectRatio && aspectRatio > 0 ? { aspectRatio } : undefined;
+  const zoneStyle = aspectRatio && aspectRatio > 0
+    ? { aspectRatio, height: 'auto' as const }
+    : undefined;
   const zoom = coverZoomOf(focus);
   const brightThumb = headerBrightnessThumbBottom(brightnessPercent);
   const brightFillStyle = brightnessPercent === 0
