@@ -20,6 +20,8 @@ import {
   storeLocationAccountId,
   notifyHomeCityChanged,
 } from './locationSession';
+import { findNearestPopularCity } from './useGeoCity';
+import { reverseGeocode } from '@/shared/lib/yandexMaps';
 
 export type { UserCoords };
 
@@ -67,16 +69,9 @@ async function detectCurrentCoords(): Promise<UserCoords | null> {
 }
 
 async function getCityName(c: UserCoords): Promise<string> {
-  const key = import.meta.env.VITE_YANDEX_MAPS_KEY;
-  if (!key) return `${c.lat.toFixed(2)}, ${c.lng.toFixed(2)}`;
-  try {
-    const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${key}`
-      + `&geocode=${c.lng},${c.lat}&format=json&results=1&lang=ru_RU&kind=locality`;
-    const j = await (await fetch(url)).json();
-    return j?.response?.GeoObjectCollection?.featureMember?.[0]
-      ?.GeoObject?.metaDataProperty?.GeocoderMetaData?.text
-      ?? `${c.lat.toFixed(2)}, ${c.lng.toFixed(2)}`;
-  } catch { return `${c.lat.toFixed(2)}, ${c.lng.toFixed(2)}`; }
+  const local = findNearestPopularCity(c.lat, c.lng, 40);
+  if (local) return local.shortName ?? local.name;
+  return reverseGeocode(c.lat, c.lng, { kind: 'locality' });
 }
 
 function refreshHomeCityName(accountCoords: UserCoords, cancelled: () => boolean): void {

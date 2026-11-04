@@ -163,3 +163,44 @@ function findNearestCity(lat: number, lng: number): ICity | null {
 function dist(lat1: number, lng1: number, lat2: number, lng2: number): number {
   return Math.sqrt((lat1 - lat2) ** 2 + (lng1 - lng2) ** 2);
 }
+
+function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371;
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLng = ((bLng - aLng) * Math.PI) / 180;
+  const x = Math.sin(dLat / 2) ** 2
+    + Math.cos((aLat * Math.PI) / 180)
+    * Math.cos((bLat * Math.PI) / 180)
+    * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+/** Ближайший город из POPULAR_CITIES в радиусе maxKm (по умолчанию 40 км). */
+export function findNearestPopularCity(lat: number, lng: number, maxKm = 40): ICity | null {
+  if (!POPULAR_CITIES.length) return null;
+  let nearest: ICity | null = null;
+  let minKm = Infinity;
+  for (const city of POPULAR_CITIES) {
+    const d = haversineKm(lat, lng, city.lat, city.lng);
+    if (d < minKm) { minKm = d; nearest = city; }
+  }
+  return nearest && minKm <= maxKm ? nearest : null;
+}
+
+function normalizeCityQuery(q: string): string {
+  return q.trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
+}
+
+/** Локальный поиск по POPULAR_CITIES без Яндекса. */
+export function matchPopularCities(query: string, limit = 8): ICity[] {
+  const n = normalizeCityQuery(query);
+  if (n.length < 2) return [];
+  const starts: ICity[] = [];
+  const includes: ICity[] = [];
+  for (const city of POPULAR_CITIES) {
+    const name = normalizeCityQuery(city.shortName ?? city.name);
+    if (name.startsWith(n)) starts.push({ ...city, shortName: city.shortName ?? city.name });
+    else if (name.includes(n)) includes.push({ ...city, shortName: city.shortName ?? city.name });
+  }
+  return [...starts, ...includes].slice(0, limit);
+}
