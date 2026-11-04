@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { ICity } from '@/features/auth/useGeoCity';
+import { matchPopularCities, type ICity } from '@/features/auth/useGeoCity';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import styles from './CitySearch.module.css';
 
@@ -29,6 +29,7 @@ export function CitySearch({
   const [searching,   setSearching]   = useState(false);
   const [dropStyle,   setDropStyle]   = useState<React.CSSProperties>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchGenRef = useRef(0);
   const wrapRef     = useRef<HTMLDivElement>(null);
   const inputRef    = useRef<HTMLInputElement>(null);
 
@@ -70,15 +71,28 @@ export function CitySearch({
 
   const search = useCallback(async (q: string) => {
     if (q.length < 2) { setSuggestions([]); setOpen(false); return; }
+
+    const local = matchPopularCities(q, 8);
+    if (local.length > 0) {
+      setSuggestions(local);
+      updateDropPos();
+      setOpen(true);
+      setSearching(false);
+      return;
+    }
+
+    const gen = ++searchGenRef.current;
     setSearching(true);
     try {
       await loadYandexMaps();
+      if (gen !== searchGenRef.current) return;
       const ymaps = (window as any).ymaps;
       const res = await ymaps.geocode(q, {
         results: 8, lang: 'ru_RU',
         boundedBy: [[41.0, 19.0], [81.0, 180.0]],
         strictBounds: false,
       });
+      if (gen !== searchGenRef.current) return;
       const items: ICity[] = [];
       res.geoObjects.each((obj: any) => {
         const kind = obj.properties?.get('metaDataProperty.GeocoderMetaData.kind');
@@ -99,8 +113,12 @@ export function CitySearch({
       setSuggestions(items);
       if (items.length > 0) { updateDropPos(); setOpen(true); }
       else setOpen(false);
-    } catch { setSuggestions([]); }
-    finally { setSearching(false); }
+    } catch {
+      if (gen === searchGenRef.current) setSuggestions([]);
+    }
+    finally {
+      if (gen === searchGenRef.current) setSearching(false);
+    }
   }, [updateDropPos]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
