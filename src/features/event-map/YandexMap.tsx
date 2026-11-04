@@ -102,7 +102,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
       <div
         ref={mapRef}
         className={styles.map}
-        style={theme === 'dark' ? { filter: 'invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9)' } : undefined}
+        style={theme === 'dark' ? { filter: 'invert(1) hue-rotate(180deg)' } : undefined}
       />
     </div>
   );

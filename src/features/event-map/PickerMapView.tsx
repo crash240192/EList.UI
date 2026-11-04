@@ -224,7 +224,7 @@ export function PickerMapView({
 
   if (loadErr) return <div className={styles.errorBox}>{loadErr}</div>;
 
-  const darkFilter = 'invert(0.9) hue-rotate(180deg) saturate(0.75) brightness(0.9)';
+  const darkFilter = 'invert(1) hue-rotate(180deg)';
 
   return (
     <div
