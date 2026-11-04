@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { matchPopularCities, type ICity } from '@/features/auth/useGeoCity';
+import type { ICity } from '@/features/auth/useGeoCity';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import styles from './CitySearch.module.css';
 
@@ -71,15 +71,6 @@ export function CitySearch({
 
   const search = useCallback(async (q: string) => {
     if (q.length < 2) { setSuggestions([]); setOpen(false); return; }
-
-    const local = matchPopularCities(q, 8);
-    if (local.length > 0) {
-      setSuggestions(local);
-      updateDropPos();
-      setOpen(true);
-      setSearching(false);
-      return;
-    }
 
     const gen = ++searchGenRef.current;
     setSearching(true);

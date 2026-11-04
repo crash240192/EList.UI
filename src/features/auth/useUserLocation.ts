@@ -20,7 +20,6 @@ import {
   storeLocationAccountId,
   notifyHomeCityChanged,
 } from './locationSession';
-import { findNearestPopularCity } from './useGeoCity';
 import { reverseGeocode } from '@/shared/lib/yandexMaps';
 
 export type { UserCoords };
@@ -69,8 +68,6 @@ async function detectCurrentCoords(): Promise<UserCoords | null> {
 }
 
 async function getCityName(c: UserCoords): Promise<string> {
-  const local = findNearestPopularCity(c.lat, c.lng, 40);
-  if (local) return local.shortName ?? local.name;
   return reverseGeocode(c.lat, c.lng, { kind: 'locality' });
 }
 

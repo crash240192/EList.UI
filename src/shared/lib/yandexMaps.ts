@@ -1,7 +1,16 @@
 // shared/lib/yandexMaps.ts
 // Яндекс.Карты API 2.1 (стабильный, работает с ключом "JavaScript API")
 
+import {
+  getOrCreateClientHash,
+  getClientPlatform,
+  getAppVersion,
+  getAuthToken,
+} from '@/shared/api/client';
+import type { CommandResult } from '@/shared/api/types';
+
 const YMAPS_API_KEY = import.meta.env.VITE_YANDEX_MAPS_KEY ?? '';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/eList';
 
 let loadPromise: Promise<void> | null = null;
 
@@ -153,77 +162,6 @@ export function attachYandexCopyrightPointLink(
 
 export interface GeocodedPlace { lat: number; lng: number; address: string; }
 
-/** Клиентский кэш геокодера: память + localStorage, TTL 24ч (пока нет бэкенд-кэша). */
-const GEO_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const GEO_CACHE_STORAGE_KEY = 'elist:geocode-cache:v1';
-const GEO_CACHE_MAX_ENTRIES = 200;
-
-type GeoCacheEntry = { value: string; exp: number };
-
-const geoMemoryCache = new Map<string, GeoCacheEntry>();
-let geoStorageHydrated = false;
-
-function hydrateGeoStorage(): void {
-  if (geoStorageHydrated || typeof localStorage === 'undefined') return;
-  geoStorageHydrated = true;
-  try {
-    const raw = localStorage.getItem(GEO_CACHE_STORAGE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw) as Record<string, GeoCacheEntry>;
-    const now = Date.now();
-    for (const [k, v] of Object.entries(parsed)) {
-      if (v?.value != null && typeof v.exp === 'number' && v.exp > now) {
-        geoMemoryCache.set(k, v);
-      }
-    }
-  } catch { /* ignore corrupt cache */ }
-}
-
-function persistGeoStorage(): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    const now = Date.now();
-    for (const [k, v] of geoMemoryCache) {
-      if (v.exp <= now) geoMemoryCache.delete(k);
-    }
-    while (geoMemoryCache.size > GEO_CACHE_MAX_ENTRIES) {
-      const oldest = geoMemoryCache.keys().next().value;
-      if (oldest == null) break;
-      geoMemoryCache.delete(oldest);
-    }
-    const obj: Record<string, GeoCacheEntry> = {};
-    for (const [k, v] of geoMemoryCache) obj[k] = v;
-    localStorage.setItem(GEO_CACHE_STORAGE_KEY, JSON.stringify(obj));
-  } catch { /* quota / private mode */ }
-}
-
-function readGeoCache(key: string): string | null {
-  hydrateGeoStorage();
-  const hit = geoMemoryCache.get(key);
-  if (!hit) return null;
-  if (hit.exp <= Date.now()) {
-    geoMemoryCache.delete(key);
-    return null;
-  }
-  return hit.value;
-}
-
-function writeGeoCache(key: string, value: string): void {
-  hydrateGeoStorage();
-  geoMemoryCache.set(key, { value, exp: Date.now() + GEO_CACHE_TTL_MS });
-  persistGeoStorage();
-}
-
-function normalizeGeocodeQuery(query: string): string {
-  return query.trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
-}
-
-/** Округление ~11 м — повышает попадание в кэш при мелких сдвигах маркера */
-function reverseCacheKey(lat: number, lng: number, kind?: string): string {
-  const suffix = kind ? `:${kind}` : '';
-  return `rev:${lat.toFixed(4)},${lng.toFixed(4)}${suffix}`;
-}
-
 function parseGeocodedPlace(member: any, fallbackAddress: string): GeocodedPlace | null {
   const pos = member?.Point?.pos?.split(' '); // "lng lat"
   if (!pos || pos.length < 2) return null;
@@ -234,18 +172,67 @@ function parseGeocodedPlace(member: any, fallbackAddress: string): GeocodedPlace
   };
 }
 
+function geocodeAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'authorization-jwt': getOrCreateClientHash(),
+    'X-Client-Platform': getClientPlatform(),
+    'X-App-Version': getAppVersion(),
+  };
+  const token = getAuthToken();
+  if (token) headers.Authorization = token;
+  return headers;
+}
+
+/**
+ * Тихий peek серверного MemoryCache (cacheOnly=true).
+ * null — промах / нет данных; undefined — API недоступен (не считаем промахом кэша).
+ */
+async function peekApiGeocode(
+  path: string,
+): Promise<GeocodedPlace | null | undefined> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'GET',
+      headers: geocodeAuthHeaders(),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return undefined;
+    const data = await res.json() as CommandResult<GeocodedPlace | null>;
+    if (!data.success) return undefined;
+    const place = data.result;
+    if (place && typeof place.lat === 'number' && typeof place.lng === 'number') {
+      return {
+        lat: place.lat,
+        lng: place.lng,
+        address: place.address ?? '',
+      };
+    }
+    return null;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Fire-and-forget: положить клиентский ответ Яндекса в API-кэш. */
+function warmApiGeocodeCache(body: Record<string, unknown>): void {
+  void fetch(`${API_BASE}/api/geocode/cache`, {
+    method: 'POST',
+    headers: geocodeAuthHeaders(),
+    body: JSON.stringify(body),
+  }).catch(() => {});
+}
+
 export async function geocodeAddress(query: string): Promise<GeocodedPlace | null> {
   const trimmed = query.trim();
-  if (!trimmed || !YMAPS_API_KEY) return null;
+  if (!trimmed) return null;
 
-  const cacheKey = `fwd:${normalizeGeocodeQuery(trimmed)}`;
-  const cached = readGeoCache(cacheKey);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached) as GeocodedPlace;
-      if (parsed?.lat != null && parsed?.lng != null) return parsed;
-    } catch { /* fall through */ }
-  }
+  const apiHit = await peekApiGeocode(
+    `/api/geocode?q=${encodeURIComponent(trimmed)}&cacheOnly=true`,
+  );
+  if (apiHit) return apiHit;
+
+  if (!YMAPS_API_KEY) return null;
 
   try {
     const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${YMAPS_API_KEY}`
@@ -256,7 +243,9 @@ export async function geocodeAddress(query: string): Promise<GeocodedPlace | nul
     const member = json?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
     if (!member) return null;
     const place = parseGeocodedPlace(member, trimmed);
-    if (place) writeGeoCache(cacheKey, JSON.stringify(place));
+    if (place) {
+      warmApiGeocodeCache({ query: trimmed, place });
+    }
     return place;
   } catch { return null; }
 }
@@ -267,11 +256,15 @@ export async function reverseGeocode(
   opts?: { kind?: string },
 ): Promise<string> {
   const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-  if (!YMAPS_API_KEY) return fallback;
 
-  const cacheKey = reverseCacheKey(lat, lng, opts?.kind);
-  const cached = readGeoCache(cacheKey);
-  if (cached) return cached;
+  const kindQs = opts?.kind ? `&kind=${encodeURIComponent(opts.kind)}` : '';
+  const apiHit = await peekApiGeocode(
+    `/api/geocode/reverse?lat=${encodeURIComponent(String(lat))}`
+      + `&lng=${encodeURIComponent(String(lng))}${kindQs}&cacheOnly=true`,
+  );
+  if (apiHit?.address) return apiHit.address;
+
+  if (!YMAPS_API_KEY) return fallback;
 
   try {
     let url = `https://geocode-maps.yandex.ru/1.x/?apikey=${YMAPS_API_KEY}`
@@ -282,7 +275,14 @@ export async function reverseGeocode(
     const json = await res.json();
     const member = json?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
     const text = member?.metaDataProperty?.GeocoderMetaData?.text ?? fallback;
-    writeGeoCache(cacheKey, text);
+    if (text && text !== fallback) {
+      warmApiGeocodeCache({
+        lat,
+        lng,
+        kind: opts?.kind,
+        place: { lat, lng, address: text },
+      });
+    }
     return text;
   } catch { return fallback; }
 }
