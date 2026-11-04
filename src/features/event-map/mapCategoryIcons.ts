@@ -1,126 +1,35 @@
-// Иконки маркеров карты по корневым разделам (категориям).
-// Одиночная точка: цвет первого типа + 16×16 PNG раздела.
-// Дебаг и неизвестные — без иконки (точка в центре).
+// Иконки маркеров карты из справочника категорий (API: ico + color).
+// Одиночная точка: цвет категории + силуэт ico. Дебаг / без ico — точка в центре.
+// Цвет иконки на маркере не зависит от темы приложения (рисуется в canvas).
 
-export const MAP_MARKER_ICON_SIZE = 16;
+import { fetchEventCategories } from '@/entities/event/dictionariesCache';
+import type { IEventCategory } from '@/entities/event/types';
+import { icoToUrl } from '@/shared/lib/icoToUrl';
 
-/** slug файла в /public/map-markers */
-type MarkerIconSlug =
-  | 'auto'
-  | 'active'
-  | 'food'
-  | 'animals'
-  | 'knowledge'
-  | 'cinema'
-  | 'culture'
-  | 'fashion'
-  | 'music'
-  | 'holidays'
-  | 'fun'
-  | 'meetings'
-  | 'sport'
-  | 'tactical'
-  | 'art'
-  | 'theater'
-  | 'circus'
-  | 'humor';
+/** CSS-размер иконки в круге маркера (исходники в API — 512×512). */
+export const MAP_MARKER_ICON_SIZE = 18;
 
-const ICON_BY_CATEGORY_ID: Record<string, MarkerIconSlug> = {
-  '2066eba5-feda-433d-9599-8020712e0404': 'auto',       // Авто/мото
-  '9b3e4545-a093-4a8e-96b5-aece26dbc1bf': 'active',     // Активный отдых
-  // Дебаг — без иконки
-  'bef66d56-7ab7-462b-8086-849d7fd17be9': 'food',       // Еда
-  'f9efb2d9-40af-4730-b194-8f177430a9ad': 'animals',    // Животные
-  '0c73d8bb-589b-480a-a6fb-e3916e945825': 'knowledge',  // Знания
-  'aab7ad58-0d73-48b6-850c-e5ccb3819cbb': 'cinema',     // Кино
-  'e24a2a0e-6ed5-481e-a205-eae0d0f97ab2': 'culture',    // Культура/субкультура
-  'c760f23e-90b3-4bb5-8ee3-eb9f710097fd': 'fashion',    // Мода
-  '4fa12cfd-396f-43e3-a0fc-13a678c750cb': 'music',      // Музыка
-  'd176bda5-16ad-4912-80e1-0be3d89e654c': 'holidays',   // Праздники
-  '9af4827b-c966-445b-a0ea-2ec8bae765b0': 'fun',        // Развлечения
-  '29eb5091-b6f9-4c03-8bcf-3024f9f41022': 'meetings',   // Собрания
-  'e9a92367-8bf6-41e7-9d6d-cf48c031a47f': 'sport',      // Спорт
-  'b7d5cb98-f8fe-4eeb-bf9e-2792fc72fed7': 'tactical',   // Тактические
-  '7ba606aa-6732-45e1-bbbe-698181888eba': 'art',        // Творчество
-  '37da4480-2dff-41e7-bca6-3ce667043755': 'theater',    // Театр
-  '7dbd5e48-163d-4579-a82a-ef98a296fa88': 'circus',     // Цирк
-  '431ed878-c982-4f8d-842a-bee5fdc3890e': 'humor',      // Юмор
-};
+const INK_DARK = '#111827';
+const INK_LIGHT = '#ffffff';
 
-const ICON_BY_CATEGORY_NAME: Record<string, MarkerIconSlug> = {
-  'авто/мото': 'auto',
-  'активный отдых': 'active',
-  'еда': 'food',
-  'животные': 'animals',
-  'знания': 'knowledge',
-  'кино': 'cinema',
-  'культура/субкультура': 'culture',
-  'мода': 'fashion',
-  'музыка': 'music',
-  'праздники': 'holidays',
-  'развлечения': 'fun',
-  'собрания': 'meetings',
-  'спорт': 'sport',
-  'тактические': 'tactical',
-  'творчество': 'art',
-  'театр': 'theater',
-  'цирк': 'circus',
-  'юмор': 'humor',
-};
+/** Тактические: иконка всегда чёрная, цвет круга не трогаем. */
+const FORCE_BLACK_ICON_CATEGORY_IDS = new Set<string>([
+  'b7d5cb98-f8fe-4eeb-bf9e-2792fc72fed7', // Тактические
+]);
 
-/** Цвета справочника API → slug (search/short отдаёт colors[]) */
-const ICON_BY_COLOR: Record<string, MarkerIconSlug> = {
-  '#ff0000': 'auto',
-  '#876949': 'active',
-  '#e68787': 'food',
-  '#a34a21': 'animals',
-  '#2b448f': 'knowledge',
-  '#ffffff': 'cinema',
-  '#42ff8b': 'culture',
-  '#ff00c8': 'fashion',
-  '#8400ff': 'music',
-  '#dae892': 'holidays',
-  '#f0cca8': 'fun',
-  '#1f4378': 'meetings',
-  '#0000ff': 'sport',
-  '#758f6a': 'tactical',
-  '#a1a7ff': 'art',
-  '#ab5300': 'theater',
-  '#0097bd': 'circus',
-  '#ffff00': 'humor',
-};
+const FORCE_BLACK_ICON_NAMES = new Set<string>(['тактические']);
 
-/** Мягкая палитра кругов на карте (не обязательно = color в справочнике) */
-const DISPLAY_COLOR_BY_SLUG: Record<MarkerIconSlug, string> = {
-  auto: '#c94a3d',
-  active: '#5f9e8a',
-  food: '#e07a8a',
-  animals: '#c4a484',
-  knowledge: '#b8c6e8',
-  cinema: '#2f3140',
-  culture: '#6ebf9c',
-  fashion: '#e87ac8',
-  music: '#9a7fd4',
-  holidays: '#e8a0c0',
-  fun: '#e8e0c4',
-  meetings: '#5a6f8c',
-  sport: '#4f9ae0',
-  tactical: '#758f6a',
-  art: '#c4a0f0',
-  theater: '#7a1f3d',
-  circus: '#f08a3a',
-  humor: '#f0b429',
-};
-
-const DEBUG_API_COLOR = '#f264df';
-const DEBUG_DISPLAY_COLOR = '#b48bc9';
-
-/** Иконка всегда чёрная (даже на среднем фоне) */
-const FORCE_BLACK_ICON = new Set<MarkerIconSlug>(['knowledge', 'art', 'tactical']);
-
-function slugToUrl(slug: MarkerIconSlug): string {
-  return `/map-markers/${slug}.png`;
+interface CategoryMarkerEntry {
+  id: string;
+  name: string;
+  color: string;
+  iconUrl: string | null;
+  forceBlackIcon: boolean;
 }
+
+let byColor = new Map<string, CategoryMarkerEntry>();
+let preloadPromise: Promise<void> | null = null;
+const imageCache = new Map<string, HTMLImageElement | null>();
 
 export function normalizeHexColor(color: string): string {
   const raw = color.trim().toLowerCase();
@@ -143,79 +52,33 @@ export function isLightMarkerColor(color: string): boolean {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.62;
 }
 
-export function resolveMarkerIconSlug(opts: {
-  categoryId?: string | null;
-  categoryName?: string | null;
-  color?: string | null;
-}): MarkerIconSlug | null {
-  const id = opts.categoryId?.trim();
-  if (id && ICON_BY_CATEGORY_ID[id]) return ICON_BY_CATEGORY_ID[id];
-
-  const name = (opts.categoryName ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
-  if (name && ICON_BY_CATEGORY_NAME[name]) return ICON_BY_CATEGORY_NAME[name];
-
-  const color = opts.color ? normalizeHexColor(opts.color) : '';
-  if (color && ICON_BY_COLOR[color]) return ICON_BY_COLOR[color];
-
-  return null;
+function forceBlackIconFor(cat: IEventCategory): boolean {
+  if (FORCE_BLACK_ICON_CATEGORY_IDS.has(cat.id)) return true;
+  const name = cat.name.trim().toLowerCase().replace(/\s+/g, ' ');
+  return FORCE_BLACK_ICON_NAMES.has(name);
 }
 
-export function markerIconUrlForSlug(slug: MarkerIconSlug | null | undefined): string | null {
-  return slug ? slugToUrl(slug) : null;
-}
-
-/** URL иконки по первому цвету точки search/short (цвет первого типа). */
-export function markerIconUrlForColor(color: string | null | undefined): string | null {
+function toEntry(cat: IEventCategory): CategoryMarkerEntry | null {
+  const color = cat.color ? normalizeHexColor(cat.color) : '';
   if (!color) return null;
-  const slug = resolveMarkerIconSlug({ color });
-  return markerIconUrlForSlug(slug);
-}
-
-/** Цвет круга маркера по API-цвету раздела (мягкая палитра). */
-export function displayMarkerColor(apiColor: string | null | undefined, fallback = '#6366f1'): string {
-  if (!apiColor) return fallback;
-  const slug = resolveMarkerIconSlug({ color: apiColor });
-  if (slug) return DISPLAY_COLOR_BY_SLUG[slug];
-  if (normalizeHexColor(apiColor) === DEBUG_API_COLOR) return DEBUG_DISPLAY_COLOR;
-  return apiColor;
-}
-
-export function markerInkForDisplayColor(
-  displayColor: string,
-  slug: MarkerIconSlug | null,
-): { light: boolean; ink: string; ring: string } {
-  const forceBlack = slug != null && FORCE_BLACK_ICON.has(slug);
-  const light = forceBlack || isLightMarkerColor(displayColor);
   return {
-    light,
-    ink: light ? '#111827' : '#ffffff',
-    ring: light ? '#c5c7d1' : '#ffffff',
+    id: cat.id,
+    name: cat.name,
+    color,
+    iconUrl: icoToUrl(cat.ico),
+    forceBlackIcon: forceBlackIconFor(cat),
   };
 }
 
-export function resolveMarkerPaint(apiColor: string | null | undefined, fallback = '#6366f1'): {
-  slug: MarkerIconSlug | null;
-  fill: string;
-  iconUrl: string | null;
-  light: boolean;
-  ink: string;
-  ring: string;
-} {
-  const slug = apiColor ? resolveMarkerIconSlug({ color: apiColor }) : null;
-  const fill = displayMarkerColor(apiColor, fallback);
-  const { light, ink, ring } = markerInkForDisplayColor(fill, slug);
-  return {
-    slug,
-    fill,
-    iconUrl: markerIconUrlForSlug(slug),
-    light,
-    ink,
-    ring,
-  };
+function indexCategories(categories: IEventCategory[]): void {
+  const next = new Map<string, CategoryMarkerEntry>();
+  for (const cat of categories) {
+    const entry = toEntry(cat);
+    if (!entry) continue;
+    next.set(entry.color, entry);
+  }
+  byColor = next;
 }
-
-const imageCache = new Map<string, HTMLImageElement | null>();
-let preloadPromise: Promise<void> | null = null;
 
 function loadImage(url: string): Promise<HTMLImageElement | null> {
   if (imageCache.has(url)) {
@@ -236,11 +99,20 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/** Прогрев всех известных иконок маркеров. */
+/** Прогрев категорий и их ico для маркеров. */
 export function preloadMapCategoryIcons(): Promise<void> {
   if (preloadPromise) return preloadPromise;
-  const urls = [...new Set(Object.values(ICON_BY_CATEGORY_ID).map(slugToUrl))];
-  preloadPromise = Promise.all(urls.map(loadImage)).then(() => undefined);
+  preloadPromise = fetchEventCategories({ includeInactive: true })
+    .then(async (categories) => {
+      indexCategories(categories);
+      const urls = [...new Set(
+        [...byColor.values()].map(e => e.iconUrl).filter((u): u is string => Boolean(u)),
+      )];
+      await Promise.all(urls.map(loadImage));
+    })
+    .catch(() => {
+      // Без справочника маркеры останутся цветными кругами без иконок
+    });
   return preloadPromise;
 }
 
@@ -249,9 +121,58 @@ export function getCachedMarkerIcon(url: string | null | undefined): HTMLImageEl
   return imageCache.get(url) ?? null;
 }
 
+function lookupByColor(apiColor: string | null | undefined): CategoryMarkerEntry | null {
+  if (!apiColor) return null;
+  return byColor.get(normalizeHexColor(apiColor)) ?? null;
+}
+
+/** Цвет круга = color из справочника категорий. */
+export function displayMarkerColor(apiColor: string | null | undefined, fallback = '#6366f1'): string {
+  const entry = lookupByColor(apiColor);
+  if (entry) return entry.color;
+  if (apiColor) return normalizeHexColor(apiColor) || fallback;
+  return fallback;
+}
+
 /**
- * Рисует силуэт иконки (чёрный PNG) белым или чёрным в целевой canvas.
- * Вписывает в квадрат size×size с сохранением пропорций.
+ * Ink маркера не зависит от темы UI: только от яркости круга
+ * (и явного forceBlack для тактических).
+ */
+export function markerInkForDisplayColor(
+  displayColor: string,
+  forceBlackIcon = false,
+): { light: boolean; ink: string; ring: string } {
+  const lightFill = isLightMarkerColor(displayColor);
+  const ink = forceBlackIcon || lightFill ? INK_DARK : INK_LIGHT;
+  return {
+    light: lightFill,
+    ink,
+    ring: lightFill ? '#c5c7d1' : '#ffffff',
+  };
+}
+
+export function resolveMarkerPaint(apiColor: string | null | undefined, fallback = '#6366f1'): {
+  fill: string;
+  iconUrl: string | null;
+  light: boolean;
+  ink: string;
+  ring: string;
+} {
+  const entry = lookupByColor(apiColor);
+  const fill = entry?.color ?? displayMarkerColor(apiColor, fallback);
+  const { light, ink, ring } = markerInkForDisplayColor(fill, entry?.forceBlackIcon ?? false);
+  return {
+    fill,
+    iconUrl: entry?.iconUrl ?? null,
+    light,
+    ink,
+    ring,
+  };
+}
+
+/**
+ * Рисует силуэт ico заданным цветом (не CSS-фильтром темы).
+ * High-quality downscale из 512×512 в слот маркера.
  */
 export function drawMarkerIconTinted(
   ctx: CanvasRenderingContext2D,
@@ -265,20 +186,27 @@ export function drawMarkerIconTinted(
   const th = icon.naturalHeight || icon.height;
   if (!tw || !th) return;
 
+  const tinted = document.createElement('canvas');
+  tinted.width = tw;
+  tinted.height = th;
+  const tctx = tinted.getContext('2d');
+  if (!tctx) return;
+  tctx.drawImage(icon, 0, 0);
+  tctx.globalCompositeOperation = 'source-in';
+  tctx.fillStyle = tint;
+  tctx.fillRect(0, 0, tw, th);
+
   const scale = Math.min(size / tw, size / th);
   const dw = Math.max(1, Math.round(tw * scale));
   const dh = Math.max(1, Math.round(th * scale));
   const ox = dx + Math.floor((size - dw) / 2);
   const oy = dy + Math.floor((size - dh) / 2);
 
-  const tmp = document.createElement('canvas');
-  tmp.width = dw;
-  tmp.height = dh;
-  const tctx = tmp.getContext('2d');
-  if (!tctx) return;
-  tctx.drawImage(icon, 0, 0, dw, dh);
-  tctx.globalCompositeOperation = 'source-in';
-  tctx.fillStyle = tint;
-  tctx.fillRect(0, 0, dw, dh);
-  ctx.drawImage(tmp, ox, oy);
+  const prevSmooth = ctx.imageSmoothingEnabled;
+  const prevQuality = ctx.imageSmoothingQuality;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(tinted, ox, oy, dw, dh);
+  ctx.imageSmoothingEnabled = prevSmooth;
+  ctx.imageSmoothingQuality = prevQuality;
 }
