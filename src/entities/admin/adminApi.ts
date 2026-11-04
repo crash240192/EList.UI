@@ -58,12 +58,19 @@ export const categoriesApi = {
     return (r.result ?? []).map(normalizeAdminCategory);
   },
   create: async (payload: IEventCategoryRequest): Promise<string> => {
-    const r = await apiClient.post<string>('/api/events/eventCategories/create', payload);
+    // ico: byte[] на API — шлём base64-строку или "" (пустой массив)
+    const r = await apiClient.post<string>('/api/events/eventCategories/create', {
+      ...payload,
+      ico: payload.ico ?? '',
+    });
     invalidateEventDictionariesCache();
     return r.result;
   },
   update: async (id: string, payload: IEventCategoryRequest): Promise<void> => {
-    await apiClient.put(`/api/events/eventCategories/update/${id}`, payload);
+    await apiClient.put(`/api/events/eventCategories/update/${id}`, {
+      ...payload,
+      ico: payload.ico ?? '',
+    });
     invalidateEventDictionariesCache();
   },
   delete: async (id: string): Promise<void> => {

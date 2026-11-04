@@ -96,6 +96,121 @@ function icoToDisplayUrl(ico: string): string {
   return `data:${mime};base64,${ico}`;
 }
 
+function CatalogIconPreview({ ico, size = 32 }: { ico: string; size?: number }) {
+  const url = icoToDisplayUrl(ico);
+  if (url.startsWith('data:') || url.startsWith('http') || url.startsWith('/')) {
+    return (
+      <img
+        src={url}
+        alt=""
+        className="event-type-ico"
+        style={{ width: size, height: size, objectFit: 'contain', borderRadius: 4, flexShrink: 0 }}
+      />
+    );
+  }
+  return <span style={{ fontSize: Math.round(size * 0.9), lineHeight: 1, flexShrink: 0 }}>{ico}</span>;
+}
+
+/** Загрузка иконки каталога (категория / тип): файл → чистый base64, как ожидает API. */
+function CatalogIconField({
+  value,
+  onChange,
+  onError,
+  allowTextFallback = true,
+}: {
+  value: string;
+  onChange: (ico: string) => void;
+  onError: (msg: string) => void;
+  /** Типы: varchar — URL/emoji ок. Категории: bytea — только файл/base64. */
+  allowTextFallback?: boolean;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const icoMimeRef = useRef('image/png');
+
+  const handleIconFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 100 * 1024) { onError('Иконка слишком большая (макс. 100 КБ)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      icoMimeRef.current = dataUrl.split(';')[0].replace('data:', '') || 'image/png';
+      const base64 = dataUrl.split(',')[1] ?? dataUrl;
+      onChange(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const preview = value
+    ? (() => {
+        const url = value.startsWith('data:') || value.startsWith('http') || value.startsWith('/')
+          ? value
+          : `data:${
+              icoMimeRef.current
+              || (value.startsWith('PHN') || value.startsWith('PD9') ? 'image/svg+xml' : 'image/png')
+            };base64,${value}`;
+        return (url.startsWith('data:') || url.startsWith('http') || url.startsWith('/'))
+          ? <img src={url} alt="icon" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }} />
+          : <span style={{ fontSize: 28, lineHeight: 1 }}>{value}</span>;
+      })()
+    : null;
+
+  return (
+    <FormField label="Иконка">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          style={{
+            width: 56, height: 56, borderRadius: 10, flexShrink: 0,
+            background: 'var(--surface-2)', border: '1px dashed var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'border-color 0.15s',
+          }}
+          title="Нажмите чтобы загрузить изображение"
+        >
+          {preview ?? <span className={styles.icoPlaceholder}>Нет</span>}
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <button
+            type="button"
+            className={styles.cancelBtn}
+            style={{ fontSize: 12, padding: '6px 12px' }}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {value ? 'Заменить файл' : 'Загрузить файл'}
+          </button>
+          {allowTextFallback && (
+            <input
+              className={styles.input}
+              style={{ fontSize: 12, padding: '5px 10px' }}
+              value={value?.startsWith('data:') || (value && value.length > 80) ? '' : (value ?? '')}
+              onChange={e => onChange(e.target.value)}
+              placeholder="или вставьте URL / эмодзи"
+            />
+          )}
+        </div>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleIconFile}
+      />
+      {value && (
+        <button
+          type="button"
+          style={{ marginTop: 4, fontSize: 11, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          onClick={() => onChange('')}
+        >
+          Удалить иконку
+        </button>
+      )}
+    </FormField>
+  );
+}
+
 export default function AdminPage() {
   usePageTitle('Администрирование');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -278,6 +393,7 @@ function EventTypesTab() {
                   setEditingType(null);
                   setNewTypeCatId(null);
                 }}>
+                  {cat.ico ? <CatalogIconPreview ico={cat.ico} size={20} /> : null}
                   <span className={styles.itemName}>{cat.name}</span>
                   <span className={styles.itemSub}>{cat.localizationPath}</span>
                   {cat.active === false && <span className={styles.tag}>выкл.</span>}
@@ -308,11 +424,7 @@ function EventTypesTab() {
                         setNewTypeCatId(null);
                         setExpandedCat(cat.id);
                       }}>
-                        {tp.ico && (
-                          icoToDisplayUrl(tp.ico).startsWith('data:') || icoToDisplayUrl(tp.ico).startsWith('http')
-                            ? <img src={icoToDisplayUrl(tp.ico)} alt="" className="event-type-ico" style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />
-                            : <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{tp.ico}</span>
-                        )}
+                        {tp.ico ? <CatalogIconPreview ico={tp.ico} size={20} /> : null}
                         <span className={styles.itemName}>{tp.name}</span>
                         <span className={styles.itemSub}>{tp.localizationPath}</span>
                         {tp.active === false && <span className={styles.tag}>выкл.</span>}
@@ -418,6 +530,7 @@ function CategoryForm({
     name:             category?.name             ?? '',
     localizationPath: category?.localizationPath ?? '',
     description:      category?.description      ?? '',
+    // Категории: Ico = byte[] — в JSON только base64 (файл) или пусто; URL/emoji не кладём в bytea
     ico:              category?.ico              ?? '',
     color:            category?.color            ?? '',
   });
@@ -430,8 +543,16 @@ function CategoryForm({
 
   const handleSave = async () => {
     if (!form.name.trim()) { setErr('Укажите название'); return; }
+    const ico = (form.ico ?? '').trim();
+    // В bytea уходит только base64 от файла; короткий URL/emoji отсекаем
+    const looksLikeImageBase64 = ico.length >= 32 && !ico.startsWith('http') && !ico.startsWith('/') && !ico.startsWith('data:');
     setSaving(true); setErr(null);
-    try { await onSave(form); }
+    try {
+      await onSave({
+        ...form,
+        ico: looksLikeImageBase64 ? ico : '',
+      });
+    }
     catch (e) { setErr(e instanceof Error ? e.message : 'Ошибка'); }
     finally { setSaving(false); }
   };
@@ -449,9 +570,12 @@ function CategoryForm({
       <FormField label="Описание">
         <textarea className={styles.textarea} rows={3} value={form.description ?? ''} onChange={set('description')} placeholder="Описание категории..." />
       </FormField>
-      <FormField label="Иконка (URL или emoji)">
-        <input className={styles.input} value={form.ico ?? ''} onChange={set('ico')} placeholder="https://example.com/icon.png" />
-      </FormField>
+      <CatalogIconField
+        value={form.ico ?? ''}
+        onChange={ico => { setErr(null); setForm(f => ({ ...f, ico })); }}
+        onError={setErr}
+        allowTextFallback={false}
+      />
       <FormField label="Цвет категории">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <input
@@ -506,28 +630,10 @@ function TypeForm({
   });
   const [saving, setSaving] = useState(false);
   const [err,    setErr]    = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof IEventTypeRequest) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm(f => ({ ...f, [key]: e.target.value }));
-
-  // Конвертируем файл — сохраняем только чистый base64 без data: префикса
-  const icoMimeRef = useRef<string>('image/png');
-  const handleIconFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 100 * 1024) { setErr('Иконка слишком большая (макс. 100 КБ)'); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      icoMimeRef.current = dataUrl.split(';')[0].replace('data:', '') || 'image/png';
-      // Бэкенд ожидает только чистый base64 без "data:image/...;base64," префикса
-      const base64 = dataUrl.split(',')[1] ?? dataUrl;
-      setForm(f => ({ ...f, ico: base64 }));
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleSave = async () => {
     if (!form.name.trim())     { setErr('Укажите название'); return; }
@@ -537,24 +643,6 @@ function TypeForm({
     catch (e) { setErr(e instanceof Error ? e.message : 'Ошибка'); }
     finally { setSaving(false); }
   };
-
-  // Для превью восстанавливаем data URL из чистого base64
-  const toDisplayUrl = (ico: string): string => {
-    if (ico.startsWith('data:') || ico.startsWith('http') || ico.startsWith('/')) return ico;
-    // PHN = SVG в base64, /9j = JPEG, iVB = PNG
-    const mime = icoMimeRef.current ||
-      (ico.startsWith('PHN') || ico.startsWith('PD9') ? 'image/svg+xml' : 'image/png');
-    return `data:${mime};base64,${ico}`;
-  };
-
-  const icoPreview = form.ico
-    ? (() => {
-        const url = toDisplayUrl(form.ico);
-        return (url.startsWith('data:') || url.startsWith('http'))
-          ? <img src={url} alt="icon" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }} />
-          : <span style={{ fontSize: 28, lineHeight: 1 }}>{form.ico}</span>;
-      })()
-    : null;
 
   return (
     <div className={styles.form}>
@@ -577,56 +665,11 @@ function TypeForm({
       <FormField label="Описание">
         <textarea className={styles.textarea} rows={3} value={form.description ?? ''} onChange={set('description')} placeholder="Описание типа..." />
       </FormField>
-      <FormField label="Иконка">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Превью / заглушка */}
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              width: 56, height: 56, borderRadius: 10, flexShrink: 0,
-              background: 'var(--surface-2)', border: '1px dashed var(--border)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', transition: 'border-color 0.15s',
-            }}
-            title="Нажмите чтобы загрузить изображение"
-          >
-            {icoPreview ?? <span className={styles.icoPlaceholder}>Нет</span>}
-          </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <button
-              type="button"
-              className={styles.cancelBtn}
-              style={{ fontSize: 12, padding: '6px 12px' }}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {form.ico ? 'Заменить файл' : 'Загрузить файл'}
-            </button>
-            <input
-              className={styles.input}
-              style={{ fontSize: 12, padding: '5px 10px' }}
-              value={form.ico?.startsWith('data:') ? '' : (form.ico ?? '')}
-              onChange={set('ico')}
-              placeholder="или вставьте URL / эмодзи"
-            />
-          </div>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={handleIconFile}
-        />
-        {form.ico && (
-          <button
-            type="button"
-            style={{ marginTop: 4, fontSize: 11, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-            onClick={() => setForm(f => ({ ...f, ico: '' }))}
-          >
-            Удалить иконку
-          </button>
-        )}
-      </FormField>
+      <CatalogIconField
+        value={form.ico ?? ''}
+        onChange={ico => { setErr(null); setForm(f => ({ ...f, ico })); }}
+        onError={setErr}
+      />
       <div className={styles.formActions}>
         <button className={styles.cancelBtn} onClick={onCancel}>Отмена</button>
         <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>
