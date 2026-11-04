@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { geocodeAddress } from '@/shared/lib/yandexMaps';
+import { PickerMapView } from './PickerMapView';
 import { MapPickerModal } from './MapPickerModal';
 import styles from './YandexMap.module.css';
 
@@ -31,10 +32,6 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
     }
   }, [address, onPick, onAddressChange]);
 
-  const hasPoint = lat !== null && lng !== null;
-  const previewLabel = address.trim()
-    || (hasPoint ? `${lat!.toFixed(5)}, ${lng!.toFixed(5)}` : 'Точка на карте ещё не выбрана');
-
   return (
     <div className={`${styles.pickerWrap} ${hasError ? styles.pickerWrapError : ''}`}>
       <div className={styles.searchRow}>
@@ -63,18 +60,18 @@ export function YandexMapPicker({ lat, lng, address, hasError, initialCenter, on
         onClick={() => setMapExpanded(true)}
         aria-label="Открыть карту для выбора точки"
       >
-        <div className={`${styles.pickerMap} ${styles.pickerMapPreview} ${styles.pickerMapStatic}`}>
-          <span className={styles.pickerMapStaticPin} aria-hidden>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M12 21s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />
-              <circle cx="12" cy="10" r="2.5" />
-            </svg>
-          </span>
-          <span className={styles.pickerMapStaticText}>{previewLabel}</span>
-          <span className={styles.pickerMapStaticCta}>Открыть карту</span>
-        </div>
+        <PickerMapView
+          lat={lat}
+          lng={lng}
+          address={address}
+          initialCenter={initialCenter}
+          onPick={onPick}
+          onAddressChange={onAddressChange}
+          onGeocodingChange={setGeocoding}
+          className={`${styles.pickerMap} ${styles.pickerMapPreview}`}
+        />
       </button>
-      <p className={styles.hint}>Нажмите, чтобы открыть карту и выбрать точку</p>
+      <p className={styles.hint}>Нажмите на карту, чтобы выбрать точку в полноэкранном режиме</p>
 
       {mapExpanded && (
         <MapPickerModal
