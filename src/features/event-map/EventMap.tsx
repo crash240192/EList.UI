@@ -54,6 +54,7 @@ const coordKey = (lat: number, lng: number) =>
   `${lat.toFixed(5)},${lng.toFixed(5)}`;
 
 async function ensureImage(map: MapLibreMap, id: string, url: string): Promise<void> {
+  if (!map.isStyleLoaded()) return;
   if (map.hasImage(id)) return;
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
@@ -61,70 +62,77 @@ async function ensureImage(map: MapLibreMap, id: string, url: string): Promise<v
     image.onerror = () => reject(new Error(`image load failed: ${id}`));
     image.src = url;
   });
-  if (!map.hasImage(id)) {
-    map.addImage(id, img, { pixelRatio: Math.min(3, Math.round(window.devicePixelRatio || 1)) });
-  }
+  if (!map.isStyleLoaded() || map.hasImage(id)) return;
+  map.addImage(id, img, { pixelRatio: Math.min(3, Math.round(window.devicePixelRatio || 1)) });
 }
 
-function ensureEventLayers(map: MapLibreMap): void {
-  if (map.getSource(EVENTS_SOURCE)) return;
+/** false = стиль ещё не готов, слои появятся на style.load. */
+function ensureEventLayers(map: MapLibreMap): boolean {
+  if (!map.isStyleLoaded()) return false;
+  if (map.getSource(EVENTS_SOURCE)) return true;
 
-  map.addSource(EVENTS_SOURCE, {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [] },
-    cluster: true,
-    clusterMaxZoom: 16,
-    clusterRadius: 60,
-  });
+  try {
+    map.addSource(EVENTS_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      cluster: true,
+      clusterMaxZoom: 16,
+      clusterRadius: 60,
+    });
 
-  map.addLayer({
-    id: LAYER_CLUSTERS,
-    type: 'circle',
-    source: EVENTS_SOURCE,
-    filter: ['has', 'point_count'],
-    paint: {
-      'circle-color': '#6366f1',
-      'circle-stroke-color': 'rgba(255,255,255,0.55)',
-      'circle-stroke-width': 2,
-      'circle-radius': [
-        'step',
-        ['get', 'point_count'],
-        16,
-        10, 20,
-        40, 24,
-      ],
-    },
-  });
+    map.addLayer({
+      id: LAYER_CLUSTERS,
+      type: 'circle',
+      source: EVENTS_SOURCE,
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': '#6366f1',
+        'circle-stroke-color': 'rgba(255,255,255,0.55)',
+        'circle-stroke-width': 2,
+        'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          16,
+          10, 20,
+          40, 24,
+        ],
+      },
+    });
 
-  map.addLayer({
-    id: LAYER_CLUSTER_COUNT,
-    type: 'symbol',
-    source: EVENTS_SOURCE,
-    filter: ['has', 'point_count'],
-    layout: {
-      'text-field': ['get', 'point_count_abbreviated'],
-      'text-size': 12,
-      // demotiles + MapTiler CDN: Open Sans Bold доступен в обоих
-      'text-font': ['Open Sans Bold'],
-      'text-allow-overlap': true,
-    },
-    paint: {
-      'text-color': '#ffffff',
-    },
-  });
+    map.addLayer({
+      id: LAYER_CLUSTER_COUNT,
+      type: 'symbol',
+      source: EVENTS_SOURCE,
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': ['get', 'point_count_abbreviated'],
+        'text-size': 12,
+        // demotiles + MapTiler CDN: Open Sans Bold доступен в обоих
+        'text-font': ['Open Sans Bold'],
+        'text-allow-overlap': true,
+      },
+      paint: {
+        'text-color': '#ffffff',
+      },
+    });
 
-  map.addLayer({
-    id: LAYER_UNCLUSTERED,
-    type: 'symbol',
-    source: EVENTS_SOURCE,
-    filter: ['!', ['has', 'point_count']],
-    layout: {
-      'icon-image': ['get', 'icon'],
-      'icon-size': 1,
-      'icon-allow-overlap': true,
-      'icon-anchor': 'center',
-    },
-  });
+    map.addLayer({
+      id: LAYER_UNCLUSTERED,
+      type: 'symbol',
+      source: EVENTS_SOURCE,
+      filter: ['!', ['has', 'point_count']],
+      layout: {
+        'icon-image': ['get', 'icon'],
+        'icon-size': 1,
+        'icon-allow-overlap': true,
+        'icon-anchor': 'center',
+      },
+    });
+    return true;
+  } catch {
+    // Style is not done loading / mid setStyle — ждём следующий style.load
+    return false;
+  }
 }
 
 export function EventMap({
@@ -142,11 +150,13 @@ export function EventMap({
   const groupsRef = useRef(new Map<string, IEventSearchShortItem[]>());
   const onSearchAreaRef = useRef(onSearchAreaChange);
   const showGroupRef = useRef<(group: IEventSearchShortItem[], x: number, y: number) => void>(() => {});
+  const appliedThemeRef = useRef<MapTheme | null>(null);
   useEffect(() => { onSearchAreaRef.current = onSearchAreaChange; }, [onSearchAreaChange]);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [iconsReady, setIconsReady] = useState(false);
+  /** Инкремент на каждый успешный style.load — пересоздать слои/иконки после setStyle. */
   const [styleEpoch, setStyleEpoch] = useState(0);
 
   useEffect(() => {
@@ -270,17 +280,21 @@ export function EventMap({
       map.on('zoomend', onViewportChange);
 
       const onStyleReady = () => {
+        if (destroyed) return;
         ensureEventLayers(map);
         setStyleEpoch(e => e + 1);
+        setReady(true);
         scheduleSearchArea();
       };
+      // load — первый стиль; style.load — после setStyle (смена темы)
       map.on('load', onStyleReady);
-      map.on('styledata', () => {
-        if (map.isStyleLoaded()) {
-          ensureEventLayers(map);
-          setStyleEpoch(e => e + 1);
-        }
+      map.on('style.load', onStyleReady);
+      map.on('error', (e) => {
+        const msg = e.error?.message ?? 'Ошибка загрузки карты';
+        if (!destroyed) setError(msg);
       });
+
+      appliedThemeRef.current = mapTheme;
 
       map.on('contextmenu', (e) => {
         e.preventDefault();
@@ -371,8 +385,7 @@ export function EventMap({
       el.addEventListener('pointerup', handlePointerUp);
       el.addEventListener('pointermove', handlePointerMove);
       el.addEventListener('pointercancel', handlePointerUp);
-
-      if (!destroyed) setReady(true);
+      // ready — только после load/style.load (см. onStyleReady)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось инициализировать карту');
     }
@@ -394,6 +407,10 @@ export function EventMap({
 
   useEffect(() => {
     if (!ready || !mapRef.current) return;
+    // Не вызывать setStyle на первом ready — стиль уже задан в createMap.
+    // Иначе гонка: addSource до конца загрузки → "Style is not done loading".
+    if (appliedThemeRef.current === mapTheme) return;
+    appliedThemeRef.current = mapTheme;
     applyMapTheme(mapRef.current, mapTheme);
   }, [mapTheme, ready]);
 
@@ -401,7 +418,10 @@ export function EventMap({
     if (!ready || !mapRef.current || !containerRef.current) return;
     const map = mapRef.current;
     const el = containerRef.current;
-    const fit = () => map.resize();
+    const fit = () => {
+      if (map.isStyleLoaded()) map.resize();
+      else map.once('idle', () => map.resize());
+    };
     fit();
     const observer = new ResizeObserver(() => fit());
     observer.observe(el);
@@ -411,18 +431,17 @@ export function EventMap({
   useEffect(() => {
     if (!ready || !mapRef.current) return;
     const map = mapRef.current;
+    if (!map.isStyleLoaded()) return;
     const c = map.getCenter();
     const [lat, lng] = center;
     if (Math.abs(c.lat - lat) < 0.0001 && Math.abs(c.lng - lng) < 0.0001) return;
-    map.easeTo({ center: [lng, lat], zoom, duration: ready ? 400 : 0 });
+    map.easeTo({ center: [lng, lat], zoom, duration: 400 });
   }, [center, zoom, ready]);
 
   useEffect(() => {
     if (!ready || !iconsReady || !mapRef.current) return;
     const map = mapRef.current;
-    if (!map.getSource(EVENTS_SOURCE)) {
-      ensureEventLayers(map);
-    }
+    if (!ensureEventLayers(map)) return;
 
     const groups = new Map<string, IEventSearchShortItem[]>();
     for (const ev of events) {
@@ -433,9 +452,11 @@ export function EventMap({
     }
     groupsRef.current = groups;
 
+    let cancelled = false;
     void (async () => {
       const features: GeoJSON.Feature[] = [];
       for (const [key, group] of groups) {
+        if (cancelled) return;
         const first = group[0];
         const ringSource = group.length === 1
           ? markerColors(first)
@@ -460,10 +481,12 @@ export function EventMap({
         });
       }
 
+      if (cancelled || !map.isStyleLoaded()) return;
       const source = map.getSource(EVENTS_SOURCE) as GeoJSONSource | undefined;
       if (!source) return;
       source.setData({ type: 'FeatureCollection', features });
     })();
+    return () => { cancelled = true; };
   }, [events, ready, iconsReady, filterCategories, filterTypes, styleEpoch, markerFilter]);
 
   if (error) return (

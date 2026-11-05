@@ -49,6 +49,7 @@ export function PickerMapView({
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
+  const appliedThemeRef = useRef<MapTheme | null>(null);
   const callbacksRef = useRef({ onPick, onAddressChange, onGeocodingChange, address });
   const reverseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reverseGenRef = useRef(0);
@@ -154,6 +155,7 @@ export function PickerMapView({
       });
 
       mapRef.current = map;
+      appliedThemeRef.current = mapTheme;
       map.once('load', () => {
         if (!destroyed) setReady(true);
         map.resize();
@@ -177,6 +179,8 @@ export function PickerMapView({
 
   useEffect(() => {
     if (!ready || !mapRef.current) return;
+    if (appliedThemeRef.current === mapTheme) return;
+    appliedThemeRef.current = mapTheme;
     applyMapTheme(mapRef.current, mapTheme);
   }, [mapTheme, ready]);
 

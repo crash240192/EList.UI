@@ -29,6 +29,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInst = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
+  const appliedThemeRef = useRef<MapTheme | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const { theme } = useThemeStore();
@@ -61,6 +62,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
 
       mapInst.current = map;
       markerRef.current = marker;
+      appliedThemeRef.current = mapTheme;
       map.once('load', () => {
         if (!destroyed) setReady(true);
         map.resize();
@@ -82,6 +84,8 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
 
   useEffect(() => {
     if (!ready || !mapInst.current) return;
+    if (appliedThemeRef.current === mapTheme) return;
+    appliedThemeRef.current = mapTheme;
     applyMapTheme(mapInst.current, mapTheme);
   }, [mapTheme, ready]);
 
