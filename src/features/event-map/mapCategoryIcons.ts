@@ -223,6 +223,93 @@ export function resolveMarkerVisual(
   };
 }
 
+export const DEFAULT_MARKER_COLOR = '#6366f1';
+
+/**
+ * PNG-маркер: заливка цветом категории иконки; кант — цвета категорий (секторами).
+ * count > 1 — число вместо иконки. Цвета не зависят от темы UI.
+ */
+export function makeMarkerPng(
+  colors: string[],
+  count = 1,
+  filter?: MarkerTypeCategoryFilter | null,
+): string {
+  const size = 36;
+  const dpr = typeof window !== 'undefined'
+    ? Math.max(1, Math.min(3, Math.round(window.devicePixelRatio || 1)))
+    : 1;
+  const c = document.createElement('canvas');
+  c.width = size * dpr;
+  c.height = size * dpr;
+  const ctx = c.getContext('2d')!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const cx = size / 2;
+  const cy = size / 2;
+  const outerR = 15;
+  const ringW = 3.5;
+  const innerR = outerR - ringW;
+
+  const visual = resolveMarkerVisual(colors, filter, DEFAULT_MARKER_COLOR);
+  const ringColors = visual.ringColors;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR + 1.25, 0, 2 * Math.PI);
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.fill();
+
+  if (ringColors.length === 1) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, 2 * Math.PI);
+    ctx.fillStyle = ringColors[0];
+    ctx.fill();
+  } else {
+    const step = (2 * Math.PI) / ringColors.length;
+    ringColors.forEach((color, i) => {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, outerR, i * step - Math.PI / 2, (i + 1) * step - Math.PI / 2);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, 2 * Math.PI);
+  ctx.fillStyle = visual.fill;
+  ctx.fill();
+
+  if (count > 1) {
+    ctx.fillStyle = visual.ink;
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(count), cx, cy + 1);
+  } else {
+    const icon = getCachedMarkerIcon(visual.iconUrl);
+    if (icon) {
+      const iconBox = MAP_MARKER_ICON_SIZE;
+      drawMarkerIconTinted(
+        ctx,
+        icon,
+        Math.round(cx - iconBox / 2),
+        Math.round(cy - iconBox / 2),
+        iconBox,
+        visual.ink,
+      );
+    } else {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = visual.ink;
+      ctx.fill();
+    }
+  }
+
+  return c.toDataURL('image/png');
+}
+
 /**
  * Рисует силуэт ico заданным цветом (не CSS-фильтром темы).
  * High-quality downscale из 512×512 в слот маркера.
