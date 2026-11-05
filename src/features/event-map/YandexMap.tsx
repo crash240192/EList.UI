@@ -6,6 +6,7 @@ import {
   addCompactZoomControl,
   buildOsmPointUrl,
   createDotIcon,
+  createMap,
   createOsmTileLayer,
   disableMapPageScrollCapture,
 } from '@/shared/lib/osmMap';
@@ -34,7 +35,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
     let destroyed = false;
 
     try {
-      const map = L.map(mapRef.current, {
+      const map = createMap(mapRef.current, {
         center: [lat, lng],
         zoom,
         zoomControl: false,

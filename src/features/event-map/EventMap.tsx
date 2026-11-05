@@ -6,16 +6,13 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import L from 'leaflet';
 import 'leaflet.markercluster';
 import type { IEventSearchShortItem } from '@/entities/event';
-import { createOsmTileLayer, haversineMeters } from '@/shared/lib/osmMap';
+import { createMap, createOsmTileLayer, haversineMeters } from '@/shared/lib/osmMap';
 import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlacement';
 import { useFiltersStore, useThemeStore } from '@/app/store';
 import {
-  MAP_MARKER_ICON_SIZE,
-  displayMarkerColor,
-  drawMarkerIconTinted,
-  getCachedMarkerIcon,
+  DEFAULT_MARKER_COLOR,
+  makeMarkerPng,
   preloadMapCategoryIcons,
-  resolveMarkerVisual,
   type MarkerTypeCategoryFilter,
 } from './mapCategoryIcons';
 import styles from './YandexMap.module.css';
@@ -39,95 +36,9 @@ interface EventMapProps {
   searchAreaDebounceMs?: number;
 }
 
-const DEFAULT_COLOR = '#6366f1';
-
 function markerColors(item: IEventSearchShortItem): string[] {
   const c = item.colors?.filter(Boolean) ?? [];
-  return c.length ? [...new Set(c)] : [DEFAULT_COLOR];
-}
-
-/**
- * PNG-маркер: заливка цветом категории иконки; кант — цвета категорий (секторами).
- * count > 1 — число вместо иконки. Цвета не зависят от темы UI.
- */
-function makeMarkerPng(
-  colors: string[],
-  count = 1,
-  filter?: MarkerTypeCategoryFilter | null,
-): string {
-  const size = 36;
-  const dpr = typeof window !== 'undefined'
-    ? Math.max(1, Math.min(3, Math.round(window.devicePixelRatio || 1)))
-    : 1;
-  const c = document.createElement('canvas');
-  c.width = size * dpr;
-  c.height = size * dpr;
-  const ctx = c.getContext('2d')!;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  const cx = size / 2; const cy = size / 2;
-  const outerR = 15;
-  const ringW = 3.5;
-  const innerR = outerR - ringW;
-
-  const visual = resolveMarkerVisual(colors, filter, DEFAULT_COLOR);
-  const ringColors = visual.ringColors;
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, outerR + 1.25, 0, 2 * Math.PI);
-  ctx.fillStyle = 'rgba(255,255,255,0.28)';
-  ctx.fill();
-
-  if (ringColors.length === 1) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, outerR, 0, 2 * Math.PI);
-    ctx.fillStyle = ringColors[0];
-    ctx.fill();
-  } else {
-    const step = (2 * Math.PI) / ringColors.length;
-    ringColors.forEach((color, i) => {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, outerR, i * step - Math.PI / 2, (i + 1) * step - Math.PI / 2);
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
-    });
-  }
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, innerR, 0, 2 * Math.PI);
-  ctx.fillStyle = visual.fill;
-  ctx.fill();
-
-  if (count > 1) {
-    ctx.fillStyle = visual.ink;
-    ctx.font = `bold 11px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(count), cx, cy + 1);
-  } else {
-    const icon = getCachedMarkerIcon(visual.iconUrl);
-    if (icon) {
-      const iconBox = MAP_MARKER_ICON_SIZE;
-      drawMarkerIconTinted(
-        ctx,
-        icon,
-        Math.round(cx - iconBox / 2),
-        Math.round(cy - iconBox / 2),
-        iconBox,
-        visual.ink,
-      );
-    } else {
-      ctx.beginPath();
-      ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = visual.ink;
-      ctx.fill();
-    }
-  }
-
-  return c.toDataURL('image/png');
+  return c.length ? [...new Set(c)] : [DEFAULT_MARKER_COLOR];
 }
 
 const coordKey = (lat: number, lng: number) =>
@@ -220,7 +131,7 @@ export function EventMap({
     let searchAreaTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const map = L.map(el, {
+      const map = createMap(el, {
         center,
         zoom,
         zoomControl: true,
@@ -397,6 +308,16 @@ export function EventMap({
       maxClusterRadius: 60,
       spiderfyOnMaxZoom: true,
       zoomToBoundsOnClick: false,
+      iconCreateFunction: (cluster) => {
+        const count = cluster.getChildCount();
+        const size = count < 10 ? 36 : count < 40 ? 42 : 48;
+        return L.divIcon({
+          html: `<div>${count}</div>`,
+          className: 'elist-map-cluster',
+          iconSize: L.point(size, size),
+          iconAnchor: L.point(size / 2, size / 2),
+        });
+      },
     });
 
     for (const [, group] of groups) {
@@ -468,7 +389,7 @@ export function EventMap({
             border: '1px solid var(--border)',
             borderRadius: 12,
             boxShadow: '0 4px 24px rgba(0,0,0,0.28)',
-            zIndex: 50,
+            zIndex: 1100,
             minWidth: 180,
             overflow: 'hidden',
           }}
@@ -533,6 +454,12 @@ export function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }:
   const modalRef = useRef<HTMLDivElement>(null);
   const [place, setPlace] = useState<PointGroupPlacement | null>(null);
   const positioned = anchorX >= 0 && anchorY >= 0;
+  const filterCategories = useFiltersStore(s => s.filters.categories);
+  const filterTypes = useFiltersStore(s => s.filters.types);
+  const markerFilter: MarkerTypeCategoryFilter = {
+    categories: filterCategories,
+    types: filterTypes,
+  };
 
   useLayoutEffect(() => {
     const modal = modalRef.current;
@@ -601,10 +528,17 @@ export function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }:
         </div>
         <div className={styles.groupList} data-group-list style={{ maxHeight: place?.listMaxHeight }}>
           {events.map(ev => {
-            const color = displayMarkerColor(markerColors(ev)[0], DEFAULT_COLOR);
+            const iconSrc = makeMarkerPng(markerColors(ev), 1, markerFilter);
             return (
               <button key={ev.id} className={styles.groupItem} onClick={() => onSelect(ev.id)}>
-                <div className={styles.groupDot} style={{ background: color }} />
+                <img
+                  className={styles.groupMarkerIcon}
+                  src={iconSrc}
+                  alt=""
+                  width={28}
+                  height={28}
+                  draggable={false}
+                />
                 <div className={styles.groupItemInfo}>
                   <span className={styles.groupItemName}>{ev.name}</span>
                   <span className={styles.groupItemMeta}>Подробнее</span>

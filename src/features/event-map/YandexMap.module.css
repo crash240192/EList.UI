@@ -171,35 +171,47 @@
   width: 100%;
   height: 100%;
   position: relative;
+  /* Оверлеи выше leaflet-pane / controls */
+  isolation: isolate;
 }
 
 .eventsMap {
   width: 100%;
   height: 100%;
+  z-index: 0;
 }
 
-/* Тёмная тема: инвертим тайлы. На marker/overlay panes — тот же filter ещё раз:
-   invert(1)+hue-rotate(180) дважды = исходные цвета маркеров. */
-.eventsMapDark,
-.mapDark {
-  filter: invert(1) hue-rotate(180deg);
+/* Кластеры MarkerCluster — accent вместо салатового дефолта */
+:global(.elist-map-cluster) {
+  background: color-mix(in srgb, var(--accent) 42%, transparent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.eventsMapDark :global(.leaflet-marker-pane),
-.eventsMapDark :global(.leaflet-shadow-pane),
-.eventsMapDark :global(.leaflet-overlay-pane),
-.eventsMapDark :global(.leaflet-tooltip-pane),
-.eventsMapDark :global(.leaflet-popup-pane),
-.mapDark :global(.leaflet-marker-pane),
-.mapDark :global(.leaflet-shadow-pane),
-.mapDark :global(.leaflet-overlay-pane),
-.mapDark :global(.leaflet-tooltip-pane),
-.mapDark :global(.leaflet-popup-pane) {
-  filter: invert(1) hue-rotate(180deg);
+:global(.elist-map-cluster > div) {
+  width: 78%;
+  height: 78%;
+  margin: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font: 700 13px/1 Manrope, system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 45%, transparent);
+  border: 2px solid color-mix(in srgb, #fff 55%, var(--accent));
 }
 
-.eventsMapDark :global(.leaflet-control),
-.mapDark :global(.leaflet-control) {
+/*
+ * Тёмная тема: инверсия только тайлов, стандартный контраст
+ * (без brightness/contrast/saturate приглушения).
+ * Маркеры/попапы/кластеры без фильтра — исходные цвета.
+ */
+.eventsMapDark :global(.leaflet-tile-pane),
+.mapDark :global(.leaflet-tile-pane) {
   filter: invert(1) hue-rotate(180deg);
 }
 
@@ -218,16 +230,19 @@
 /* ---- Point group modal ---- */
 
 .groupBackdrop {
-  position: absolute; inset: 0; z-index: 10;
+  position: absolute;
+  inset: 0;
+  z-index: 1100;
 }
 
 .groupModal {
   /* Позиция задаётся инлайн-стилями из JS — без transform здесь */
   background: var(--surface);
+  color: var(--text-primary);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.25);
-  z-index: 11;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  z-index: 1101;
   overflow: visible;
   animation: groupFadeIn 0.15s ease;
 }
@@ -286,6 +301,15 @@
 }
 .groupItem:last-child { border-bottom: none; }
 .groupItem:hover { background: var(--surface-2); }
+
+.groupMarkerIcon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+}
 
 .groupDot {
   width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;

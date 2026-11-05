@@ -6,6 +6,7 @@ import { reverseGeocode } from '@/shared/lib/geocode';
 import {
   addCompactZoomControl,
   createDotIcon,
+  createMap,
   createOsmTileLayer,
   DEFAULT_MAP_CENTER,
   setPickerBehaviors,
@@ -72,7 +73,7 @@ export function PickerMapView({
         ? [lat, lng]
         : initialCenter ?? DEFAULT_MAP_CENTER;
 
-      const map = L.map(ref.current, {
+      const map = createMap(ref.current, {
         center,
         zoom: lat !== null ? 15 : 10,
         zoomControl: false,

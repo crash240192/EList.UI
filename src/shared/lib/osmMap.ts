@@ -8,6 +8,19 @@ export const OSM_ATTRIBUTION =
 
 export const DEFAULT_MAP_CENTER: [number, number] = [55.7558, 37.6173];
 
+/**
+ * Leaflet 1.9+ по умолчанию рисует флаг Украины в prefix атрибуции.
+ * Оставляем нейтральный текст; атрибуция OSM на тайловом слое сохраняется.
+ */
+const LEAFLET_ATTRIBUTION_PREFIX =
+  '<a href="https://leafletjs.com" title="A JavaScript library for interactive maps">Leaflet</a>';
+
+export function createMap(el: HTMLElement, options?: L.MapOptions): L.Map {
+  const map = L.map(el, options);
+  map.attributionControl?.setPrefix(LEAFLET_ATTRIBUTION_PREFIX);
+  return map;
+}
+
 export function createOsmTileLayer(): L.TileLayer {
   return L.tileLayer(OSM_TILE_URL, {
     attribution: OSM_ATTRIBUTION,
