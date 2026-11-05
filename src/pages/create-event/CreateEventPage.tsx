@@ -427,6 +427,14 @@ export default function CreateEventPage() {
         setHostGate('form');
         return;
       }
+      // Черновик уже есть — сразу форма, без повторного выбора «от чьего лица»
+      const restoredHost = loadCreateEventDraft(getStoredAccountId())?.host ?? null;
+      if (restoredHost) {
+        setCanChooseHost(true);
+        setEventHost(restoredHost.kind === 'user' ? restoredHost : { kind: 'user' });
+        setHostGate('form');
+        return;
+      }
       setCanChooseHost(true);
       setHostGate('chooser');
       return;
