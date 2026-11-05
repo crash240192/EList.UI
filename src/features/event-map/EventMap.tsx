@@ -18,7 +18,6 @@ import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlac
 import { useFiltersStore, useThemeStore } from '@/app/store';
 import {
   MAP_MARKER_ICON_SIZE,
-  displayMarkerColor,
   drawMarkerIconTinted,
   getCachedMarkerIcon,
   preloadMapCategoryIcons,
@@ -559,6 +558,12 @@ export function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }:
   const modalRef = useRef<HTMLDivElement>(null);
   const [place, setPlace] = useState<PointGroupPlacement | null>(null);
   const positioned = anchorX >= 0 && anchorY >= 0;
+  const filterCategories = useFiltersStore(s => s.filters.categories);
+  const filterTypes = useFiltersStore(s => s.filters.types);
+  const markerFilter: MarkerTypeCategoryFilter = {
+    categories: filterCategories,
+    types: filterTypes,
+  };
 
   useLayoutEffect(() => {
     const modal = modalRef.current;
@@ -627,10 +632,17 @@ export function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }:
         </div>
         <div className={styles.groupList} data-group-list style={{ maxHeight: place?.listMaxHeight }}>
           {events.map(ev => {
-            const color = displayMarkerColor(markerColors(ev)[0], DEFAULT_COLOR);
+            const iconSrc = makeMarkerPng(markerColors(ev), 1, markerFilter);
             return (
               <button key={ev.id} className={styles.groupItem} onClick={() => onSelect(ev.id)}>
-                <div className={styles.groupDot} style={{ background: color }} />
+                <img
+                  className={styles.groupMarkerIcon}
+                  src={iconSrc}
+                  alt=""
+                  width={28}
+                  height={28}
+                  draggable={false}
+                />
                 <div className={styles.groupItemInfo}>
                   <span className={styles.groupItemName}>{ev.name}</span>
                   <span className={styles.groupItemMeta}>Подробнее</span>
