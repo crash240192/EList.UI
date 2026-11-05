@@ -6,7 +6,13 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import L from 'leaflet';
 import 'leaflet.markercluster';
 import type { IEventSearchShortItem } from '@/entities/event';
-import { createOsmTileLayer, haversineMeters } from '@/shared/lib/osmMap';
+import {
+  createBaseTileLayer,
+  haversineMeters,
+  replaceBaseTileLayer,
+  usesCssMapInvert,
+  type MapTheme,
+} from '@/shared/lib/osmMap';
 import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlacement';
 import { useFiltersStore, useThemeStore } from '@/app/store';
 import {
@@ -147,6 +153,7 @@ export function EventMap({
 }: EventMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const baseLayerRef = useRef<L.TileLayer | null>(null);
   const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
   const onSearchAreaRef = useRef(onSearchAreaChange);
   useEffect(() => { onSearchAreaRef.current = onSearchAreaChange; }, [onSearchAreaChange]);
@@ -188,6 +195,7 @@ export function EventMap({
   }, [ctxMenu]);
 
   const { theme } = useThemeStore();
+  const mapTheme: MapTheme = theme === 'dark' ? 'dark' : 'light';
   const filterCategories = useFiltersStore(s => s.filters.categories);
   const filterTypes = useFiltersStore(s => s.filters.types);
   const markerFilter: MarkerTypeCategoryFilter = {
@@ -226,7 +234,7 @@ export function EventMap({
         zoomControl: true,
         attributionControl: true,
       });
-      createOsmTileLayer().addTo(map);
+      baseLayerRef.current = createBaseTileLayer(mapTheme).addTo(map);
       mapRef.current = map;
 
       const emitSearchArea = () => {
@@ -349,11 +357,17 @@ export function EventMap({
         if (handlePointerUp) el.removeEventListener('pointercancel', handlePointerUp);
       }
       clusterRef.current = null;
+      baseLayerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    baseLayerRef.current = replaceBaseTileLayer(mapRef.current, baseLayerRef.current, mapTheme);
+  }, [mapTheme, ready]);
 
   useEffect(() => {
     if (!ready || !mapRef.current || !containerRef.current) return;
@@ -454,7 +468,7 @@ export function EventMap({
     <div className={styles.eventsMapWrap}>
       <div
         ref={containerRef}
-        className={`${styles.eventsMap} ${theme === 'dark' ? styles.eventsMapDark : ''}`}
+        className={`${styles.eventsMap} ${usesCssMapInvert(mapTheme) ? styles.eventsMapDark : ''}`}
       />
 
       {ctxMenu && (

@@ -1,13 +1,16 @@
-// features/event-map/YandexMap.tsx — просмотровая карта (Leaflet + OSM)
+// features/event-map/YandexMap.tsx — просмотровая карта (Leaflet + MapTiler/OSM)
 
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
   addCompactZoomControl,
   buildOsmPointUrl,
+  createBaseTileLayer,
   createDotIcon,
-  createOsmTileLayer,
   disableMapPageScrollCapture,
+  replaceBaseTileLayer,
+  usesCssMapInvert,
+  type MapTheme,
 } from '@/shared/lib/osmMap';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
@@ -24,10 +27,12 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
   const wrapRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInst = useRef<L.Map | null>(null);
+  const baseLayerRef = useRef<L.TileLayer | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const { theme } = useThemeStore();
+  const mapTheme: MapTheme = theme === 'dark' ? 'dark' : 'light';
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -40,7 +45,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
         zoomControl: false,
         attributionControl: true,
       });
-      createOsmTileLayer().addTo(map);
+      baseLayerRef.current = createBaseTileLayer(mapTheme).addTo(map);
       addCompactZoomControl(map);
       if (!draggable) {
         disableMapPageScrollCapture(map);
@@ -63,12 +68,18 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
     return () => {
       destroyed = true;
       markerRef.current = null;
+      baseLayerRef.current = null;
       mapInst.current?.remove();
       mapInst.current = null;
       setReady(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draggable]);
+
+  useEffect(() => {
+    if (!ready || !mapInst.current) return;
+    baseLayerRef.current = replaceBaseTileLayer(mapInst.current, baseLayerRef.current, mapTheme);
+  }, [mapTheme, ready]);
 
   useEffect(() => {
     if (!ready || !mapInst.current) return;
@@ -105,7 +116,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
     <div ref={wrapRef} className={styles.mapViewWrap}>
       <div
         ref={mapRef}
-        className={`${styles.map} ${theme === 'dark' ? styles.mapDark : ''}`}
+        className={`${styles.map} ${usesCssMapInvert(mapTheme) ? styles.mapDark : ''}`}
       />
       <a
         className={styles.osmPointLink}

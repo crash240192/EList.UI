@@ -5,10 +5,13 @@ import L from 'leaflet';
 import { reverseGeocode } from '@/shared/lib/geocode';
 import {
   addCompactZoomControl,
+  createBaseTileLayer,
   createDotIcon,
-  createOsmTileLayer,
   DEFAULT_MAP_CENTER,
+  replaceBaseTileLayer,
   setPickerBehaviors,
+  usesCssMapInvert,
+  type MapTheme,
 } from '@/shared/lib/osmMap';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
@@ -46,6 +49,7 @@ export function PickerMapView({
 }: PickerMapViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const baseLayerRef = useRef<L.TileLayer | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const callbacksRef = useRef({ onPick, onAddressChange, onGeocodingChange, address });
   const reverseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,6 +57,7 @@ export function PickerMapView({
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const { theme } = useThemeStore();
+  const mapTheme: MapTheme = theme === 'dark' ? 'dark' : 'light';
 
   callbacksRef.current = { onPick, onAddressChange, onGeocodingChange, address };
 
@@ -78,7 +83,7 @@ export function PickerMapView({
         zoomControl: false,
         attributionControl: true,
       });
-      createOsmTileLayer().addTo(map);
+      baseLayerRef.current = createBaseTileLayer(mapTheme).addTo(map);
       addCompactZoomControl(map);
       setPickerBehaviors(map, panEnabled);
 
@@ -161,12 +166,18 @@ export function PickerMapView({
       clearReverseTimer();
       reverseGenRef.current += 1;
       markerRef.current = null;
+      baseLayerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
       setReady(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panEnabled]);
+
+  useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    baseLayerRef.current = replaceBaseTileLayer(mapRef.current, baseLayerRef.current, mapTheme);
+  }, [mapTheme, ready]);
 
   useEffect(() => {
     if (!ready || !mapRef.current || lat === null || lng === null) return;
@@ -227,7 +238,7 @@ export function PickerMapView({
   return (
     <div
       ref={ref}
-      className={`${className ?? styles.pickerMap} ${theme === 'dark' ? styles.mapDark : ''}`}
+      className={`${className ?? styles.pickerMap} ${usesCssMapInvert(mapTheme) ? styles.mapDark : ''}`}
     />
   );
 }

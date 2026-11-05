@@ -1,18 +1,84 @@
-// shared/lib/osmMap.ts — Leaflet + тайлы OpenStreetMap
+// shared/lib/osmMap.ts — Leaflet + подложка MapTiler (OSM fallback)
 
 import L from 'leaflet';
 
-export const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-export const OSM_ATTRIBUTION =
+/** Стиль MapTiler без суффикса темы (streets-v2 → streets-v2 / streets-v2-dark). */
+const MAPTILER_STYLE = (import.meta.env.VITE_MAPTILER_STYLE as string | undefined)?.trim() || 'streets-v2';
+const MAPTILER_KEY = (import.meta.env.VITE_MAPTILER_KEY as string | undefined)?.trim() || '';
+
+const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>';
+
+const MAPTILER_ATTRIBUTION =
+  '<a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">&copy; MapTiler</a> '
+  + '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">&copy; OpenStreetMap</a>';
 
 export const DEFAULT_MAP_CENTER: [number, number] = [55.7558, 37.6173];
 
-export function createOsmTileLayer(): L.TileLayer {
+export type MapTheme = 'light' | 'dark';
+
+export function hasMapTilerKey(): boolean {
+  return MAPTILER_KEY.length > 0;
+}
+
+/** Нужен CSS-invert только для OSM-fallback (у MapTiler есть свой dark). */
+export function usesCssMapInvert(theme: MapTheme): boolean {
+  return theme === 'dark' && !hasMapTilerKey();
+}
+
+function mapTilerStyleId(theme: MapTheme): string {
+  if (theme === 'dark') {
+    if (MAPTILER_STYLE.endsWith('-dark')) return MAPTILER_STYLE;
+    return `${MAPTILER_STYLE}-dark`;
+  }
+  return MAPTILER_STYLE.replace(/-dark$/, '');
+}
+
+/**
+ * Базовый слой: MapTiler (если есть ключ) или классический OSM.
+ * MapTiler — 512px тайлы (tileSize + zoomOffset), как в их Leaflet-доках.
+ */
+export function createBaseTileLayer(theme: MapTheme = 'light'): L.TileLayer {
+  if (hasMapTilerKey()) {
+    const style = mapTilerStyleId(theme);
+    return L.tileLayer(
+      `https://api.maptiler.com/maps/${style}/{z}/{x}/{y}.png?key=${encodeURIComponent(MAPTILER_KEY)}`,
+      {
+        tileSize: 512,
+        zoomOffset: -1,
+        minZoom: 1,
+        maxZoom: 20,
+        attribution: MAPTILER_ATTRIBUTION,
+        crossOrigin: true,
+      },
+    );
+  }
+
   return L.tileLayer(OSM_TILE_URL, {
     attribution: OSM_ATTRIBUTION,
     maxZoom: 19,
   });
+}
+
+/** @deprecated используйте createBaseTileLayer */
+export function createOsmTileLayer(): L.TileLayer {
+  return createBaseTileLayer('light');
+}
+
+/** Заменить подложку при смене темы (без пересоздания карты). */
+export function replaceBaseTileLayer(
+  map: L.Map,
+  previous: L.TileLayer | null | undefined,
+  theme: MapTheme,
+): L.TileLayer {
+  if (previous) {
+    map.removeLayer(previous);
+  }
+  const next = createBaseTileLayer(theme);
+  next.addTo(map);
+  next.bringToBack();
+  return next;
 }
 
 /** Ссылка на точку в OSM */
