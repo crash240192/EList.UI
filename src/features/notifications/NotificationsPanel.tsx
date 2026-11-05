@@ -12,6 +12,7 @@ import {
 import { sendTestNotification } from '@/entities/notification/api';
 import { useToastStore } from '@/app/store';
 import { fetchAppFeatures } from '@/shared/api/featuresApi';
+import { makeMarkerPng, preloadMapCategoryIcons } from '@/features/event-map/mapCategoryIcons';
 import { useNotificationsStore } from './notificationsStore';
 import { useDebouncedWsStatus } from './useDebouncedWsStatus';
 import { NotificationRatingPreview } from './NotificationRatingPreview';
@@ -47,6 +48,12 @@ function formatWhen(iso: string): string {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+function notificationEventMarker(colors: string[] | null | undefined): string | null {
+  const list = colors?.filter(Boolean) ?? [];
+  if (!list.length) return null;
+  return makeMarkerPng([...new Set(list)]);
+}
+
 export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const navigate = useNavigate();
   const toast = useToastStore(s => s.add);
@@ -65,12 +72,21 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const [testSending, setTestSending] = useState(false);
   const [closing, setClosing] = useState(false);
   const [organizationsEnabled, setOrganizationsEnabled] = useState(false);
+  const [iconsReady, setIconsReady] = useState(false);
   const closeAfterReadAllRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (closeAfterReadAllRef.current != null) {
       clearTimeout(closeAfterReadAllRef.current);
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void preloadMapCategoryIcons().then(() => {
+      if (!cancelled) setIconsReady(true);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -296,6 +312,20 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
             ) : null;
             const showEventName = !!n.eventShort?.name && (hasTitle || isEventPageNotificationType(n.type));
             const actorAccountId = n.relatedAccountId ?? n.ratingData?.accountId ?? null;
+            const eventMarkerSrc = showEventName
+              ? notificationEventMarker(n.eventShort?.colors)
+              : null;
+            const eventMarker = eventMarkerSrc ? (
+              <img
+                key={iconsReady ? 'icons-ready' : 'icons-pending'}
+                className={styles.itemMarkerIcon}
+                src={eventMarkerSrc}
+                alt=""
+                width={20}
+                height={20}
+                aria-hidden
+              />
+            ) : null;
             return (
             <li key={n.id}>
               <div className={`${styles.item} ${!n.readAt ? styles.itemUnread : ''}`}>
@@ -322,17 +352,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                       <span className={styles.itemTitle}>{n.title}</span>
                       {showEventName && (
                         <span className={styles.itemEventName}>
-                          {n.eventShort!.colors?.length > 0 && (
-                            <span className={styles.itemColorDots} aria-hidden>
-                              {n.eventShort!.colors.slice(0, 4).map((c, i) => (
-                                <span
-                                  key={`${c}-${i}`}
-                                  className={styles.itemColorDot}
-                                  style={{ background: c }}
-                                />
-                              ))}
-                            </span>
-                          )}
+                          {eventMarker}
                           {n.eventShort!.name}
                         </span>
                       )}
@@ -349,17 +369,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
                       <span className={styles.itemMessageOnly}>{messageText}</span>
                       {showEventName && (
                         <span className={styles.itemEventName}>
-                          {n.eventShort!.colors?.length > 0 && (
-                            <span className={styles.itemColorDots} aria-hidden>
-                              {n.eventShort!.colors.slice(0, 4).map((c, i) => (
-                                <span
-                                  key={`${c}-${i}`}
-                                  className={styles.itemColorDot}
-                                  style={{ background: c }}
-                                />
-                              ))}
-                            </span>
-                          )}
+                          {eventMarker}
                           {n.eventShort!.name}
                         </span>
                       )}
