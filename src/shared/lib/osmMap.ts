@@ -1,5 +1,6 @@
 // shared/lib/osmMap.ts — MapLibre GL + MapTiler style.json (OSM raster fallback)
 
+import '@/shared/lib/maplibreWorker';
 import {
   Map as MapLibreMap,
   Marker,
@@ -49,7 +50,7 @@ export function mapDarkClass(
 }
 
 export function mapTilerStyleId(theme: MapTheme): string {
-  const base = getMapTilerStyle() || 'streets-v2';
+  const base = getMapTilerStyle() || 'streets-v4';
   if (theme === 'dark') {
     if (base.endsWith('-dark')) return base;
     return `${base}-dark`;

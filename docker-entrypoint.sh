@@ -11,8 +11,8 @@ trim() {
 export BACKEND_URL="$(trim "${BACKEND_URL:-http://92.118.113.6:35028}")"
 export FILE_STORAGE_URL="$(trim "${FILE_STORAGE_URL:-http://92.118.113.6:35029}")"
 export MAPTILER_KEY="$(trim "${MAPTILER_KEY:-}")"
-export MAPTILER_STYLE="$(trim "${MAPTILER_STYLE:-streets-v2}")"
-[ -n "$MAPTILER_STYLE" ] || MAPTILER_STYLE=streets-v2
+export MAPTILER_STYLE="$(trim "${MAPTILER_STYLE:-streets-v4}")"
+[ -n "$MAPTILER_STYLE" ] || MAPTILER_STYLE=streets-v4
 
 echo ">>> Starting EList UI"
 echo "    BACKEND_URL      = $BACKEND_URL"
