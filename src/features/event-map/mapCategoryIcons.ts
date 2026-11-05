@@ -1,33 +1,30 @@
 // Иконки маркеров карты из справочника категорий (API: ico + color).
-// Одиночная точка: цвет категории + силуэт ico. Дебаг / без ico — точка в центре.
-// Цвет иконки на маркере не зависит от темы приложения (рисуется в canvas).
+// Белый диск + чёрный силуэт ico; кант — color категорий (при нескольких — сектора).
+// Без фильтра типов/категорий — иконка первой категории события.
+// С фильтром — иконка совпавшей категории (несовпадающие события в выдаче не приходят).
 
-import { fetchEventCategories } from '@/entities/event/dictionariesCache';
+import { fetchEventCategories, fetchEventTypes } from '@/entities/event/dictionariesCache';
 import type { IEventCategory } from '@/entities/event/types';
 import { icoToUrl } from '@/shared/lib/icoToUrl';
 
 /** CSS-размер иконки в круге маркера (исходники в API — 512×512). */
 export const MAP_MARKER_ICON_SIZE = 18;
 
-const INK_DARK = '#111827';
-const INK_LIGHT = '#ffffff';
-
-/** Тактические: иконка всегда чёрная, цвет круга не трогаем. */
-const FORCE_BLACK_ICON_CATEGORY_IDS = new Set<string>([
-  'b7d5cb98-f8fe-4eeb-bf9e-2792fc72fed7', // Тактические
-]);
-
-const FORCE_BLACK_ICON_NAMES = new Set<string>(['тактические']);
+/** Чёрная иконка на белом диске — не зависит от темы UI. */
+export const MARKER_ICON_INK = '#111827';
+export const MARKER_FILL = '#ffffff';
 
 interface CategoryMarkerEntry {
   id: string;
   name: string;
   color: string;
   iconUrl: string | null;
-  forceBlackIcon: boolean;
 }
 
 let byColor = new Map<string, CategoryMarkerEntry>();
+let byId = new Map<string, CategoryMarkerEntry>();
+/** typeId → categoryId */
+let typeToCategoryId = new Map<string, string>();
 let preloadPromise: Promise<void> | null = null;
 const imageCache = new Map<string, HTMLImageElement | null>();
 
@@ -52,12 +49,6 @@ export function isLightMarkerColor(color: string): boolean {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.62;
 }
 
-function forceBlackIconFor(cat: IEventCategory): boolean {
-  if (FORCE_BLACK_ICON_CATEGORY_IDS.has(cat.id)) return true;
-  const name = cat.name.trim().toLowerCase().replace(/\s+/g, ' ');
-  return FORCE_BLACK_ICON_NAMES.has(name);
-}
-
 function toEntry(cat: IEventCategory): CategoryMarkerEntry | null {
   const color = cat.color ? normalizeHexColor(cat.color) : '';
   if (!color) return null;
@@ -66,18 +57,20 @@ function toEntry(cat: IEventCategory): CategoryMarkerEntry | null {
     name: cat.name,
     color,
     iconUrl: icoToUrl(cat.ico),
-    forceBlackIcon: forceBlackIconFor(cat),
   };
 }
 
 function indexCategories(categories: IEventCategory[]): void {
-  const next = new Map<string, CategoryMarkerEntry>();
+  const nextColor = new Map<string, CategoryMarkerEntry>();
+  const nextId = new Map<string, CategoryMarkerEntry>();
   for (const cat of categories) {
     const entry = toEntry(cat);
     if (!entry) continue;
-    next.set(entry.color, entry);
+    nextColor.set(entry.color, entry);
+    nextId.set(entry.id, entry);
   }
-  byColor = next;
+  byColor = nextColor;
+  byId = nextId;
 }
 
 function loadImage(url: string): Promise<HTMLImageElement | null> {
@@ -99,19 +92,27 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/** Прогрев категорий и их ico для маркеров. */
+/** Прогрев категорий, типов (для фильтра) и ico. */
 export function preloadMapCategoryIcons(): Promise<void> {
   if (preloadPromise) return preloadPromise;
-  preloadPromise = fetchEventCategories({ includeInactive: true })
-    .then(async (categories) => {
+  preloadPromise = Promise.all([
+    fetchEventCategories({ includeInactive: true }),
+    fetchEventTypes(undefined, { includeInactive: true }),
+  ])
+    .then(async ([categories, types]) => {
       indexCategories(categories);
+      const typeMap = new Map<string, string>();
+      for (const t of types) {
+        if (t.id && t.eventCategoryId) typeMap.set(t.id, t.eventCategoryId);
+      }
+      typeToCategoryId = typeMap;
       const urls = [...new Set(
-        [...byColor.values()].map(e => e.iconUrl).filter((u): u is string => Boolean(u)),
+        [...byId.values()].map(e => e.iconUrl).filter((u): u is string => Boolean(u)),
       )];
       await Promise.all(urls.map(loadImage));
     })
     .catch(() => {
-      // Без справочника маркеры останутся цветными кругами без иконок
+      // Без справочника маркеры останутся с кантом из сырых colors[] без иконок
     });
   return preloadPromise;
 }
@@ -126,7 +127,7 @@ function lookupByColor(apiColor: string | null | undefined): CategoryMarkerEntry
   return byColor.get(normalizeHexColor(apiColor)) ?? null;
 }
 
-/** Цвет круга = color из справочника категорий. */
+/** Цвет категории для UI (список на точке и т.п.). */
 export function displayMarkerColor(apiColor: string | null | undefined, fallback = '#6366f1'): string {
   const entry = lookupByColor(apiColor);
   if (entry) return entry.color;
@@ -134,39 +135,78 @@ export function displayMarkerColor(apiColor: string | null | undefined, fallback
   return fallback;
 }
 
-/**
- * Ink маркера не зависит от темы UI: только от яркости круга
- * (и явного forceBlack для тактических).
- */
-export function markerInkForDisplayColor(
-  displayColor: string,
-  forceBlackIcon = false,
-): { light: boolean; ink: string; ring: string } {
-  const lightFill = isLightMarkerColor(displayColor);
-  const ink = forceBlackIcon || lightFill ? INK_DARK : INK_LIGHT;
-  return {
-    light: lightFill,
-    ink,
-    ring: lightFill ? '#c5c7d1' : '#ffffff',
-  };
+export interface MarkerTypeCategoryFilter {
+  categories?: string[] | null;
+  types?: string[] | null;
 }
 
-export function resolveMarkerPaint(apiColor: string | null | undefined, fallback = '#6366f1'): {
-  fill: string;
+function preferredCategoryIds(filter?: MarkerTypeCategoryFilter | null): Set<string> {
+  const ids = new Set<string>();
+  for (const id of filter?.categories ?? []) {
+    if (id) ids.add(id);
+  }
+  for (const typeId of filter?.types ?? []) {
+    const catId = typeToCategoryId.get(typeId);
+    if (catId) ids.add(catId);
+  }
+  return ids;
+}
+
+/** Уникальные цвета канта по colors[] события (порядок сохранения). */
+export function resolveRingColors(apiColors: string[], fallback = '#6366f1'): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of apiColors) {
+    if (!raw) continue;
+    const color = displayMarkerColor(raw, fallback);
+    if (seen.has(color)) continue;
+    seen.add(color);
+    out.push(color);
+  }
+  return out.length ? out : [fallback];
+}
+
+/**
+ * Иконка маркера: при активном фильтре типов/категорий — совпавшая категория;
+ * иначе — первая категория события.
+ */
+export function resolveMarkerIcon(
+  apiColors: string[],
+  filter?: MarkerTypeCategoryFilter | null,
+): { iconUrl: string | null; entryId: string | null } {
+  const entries = apiColors
+    .map(c => lookupByColor(c))
+    .filter((e): e is CategoryMarkerEntry => e != null);
+
+  if (!entries.length) return { iconUrl: null, entryId: null };
+
+  const preferred = preferredCategoryIds(filter);
+  if (preferred.size > 0) {
+    const match = entries.find(e => preferred.has(e.id));
+    if (match) return { iconUrl: match.iconUrl, entryId: match.id };
+    // Несовпавшие события не должны попадать в выдачу; на всякий случай — первая.
+  }
+
+  return { iconUrl: entries[0].iconUrl, entryId: entries[0].id };
+}
+
+export function resolveMarkerVisual(
+  apiColors: string[],
+  filter?: MarkerTypeCategoryFilter | null,
+  fallback = '#6366f1',
+): {
+  ringColors: string[];
   iconUrl: string | null;
-  light: boolean;
+  fill: string;
   ink: string;
-  ring: string;
 } {
-  const entry = lookupByColor(apiColor);
-  const fill = entry?.color ?? displayMarkerColor(apiColor, fallback);
-  const { light, ink, ring } = markerInkForDisplayColor(fill, entry?.forceBlackIcon ?? false);
+  const ringColors = resolveRingColors(apiColors, fallback);
+  const { iconUrl } = resolveMarkerIcon(apiColors, filter);
   return {
-    fill,
-    iconUrl: entry?.iconUrl ?? null,
-    light,
-    ink,
-    ring,
+    ringColors,
+    iconUrl,
+    fill: MARKER_FILL,
+    ink: MARKER_ICON_INK,
   };
 }
 

@@ -6,14 +6,15 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import type { IEventSearchShortItem } from '@/entities/event';
 import { loadYandexMaps } from '@/shared/lib/yandexMaps';
 import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlacement';
-import { useThemeStore } from '@/app/store';
+import { useFiltersStore, useThemeStore } from '@/app/store';
 import {
   MAP_MARKER_ICON_SIZE,
   displayMarkerColor,
   drawMarkerIconTinted,
   getCachedMarkerIcon,
   preloadMapCategoryIcons,
-  resolveMarkerPaint,
+  resolveMarkerVisual,
+  type MarkerTypeCategoryFilter,
 } from './mapCategoryIcons';
 import styles from './YandexMap.module.css';
 
@@ -44,10 +45,14 @@ function markerColors(item: IEventSearchShortItem): string[] {
 }
 
 /**
- * PNG-маркер: одиночная точка — color категории + ico из справочника;
- * несколько в точке / счётчик — число. Цвета иконок не зависят от темы UI.
+ * PNG-маркер: белый диск + чёрная ico; кант — цвета категорий (секторами).
+ * count > 1 — число вместо иконки. Цвета не зависят от темы UI.
  */
-function makeMarkerPng(colors: string[], count = 1): string {
+function makeMarkerPng(
+  colors: string[],
+  count = 1,
+  filter?: MarkerTypeCategoryFilter | null,
+): string {
   const size = 36;
   const dpr = typeof window !== 'undefined'
     ? Math.max(1, Math.min(3, Math.round(window.devicePixelRatio || 1)))
@@ -59,52 +64,52 @@ function makeMarkerPng(colors: string[], count = 1): string {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  const cx = size / 2; const cy = size / 2; const r = 14;
+  const cx = size / 2; const cy = size / 2;
+  const outerR = 15;
+  const ringW = 3.5;
+  const innerR = outerR - ringW;
 
-  const apiPrimary = colors[0] ?? DEFAULT_COLOR;
-  const paint = resolveMarkerPaint(apiPrimary, DEFAULT_COLOR);
-  const displayColors = colors.map((col) => displayMarkerColor(col, DEFAULT_COLOR));
+  const visual = resolveMarkerVisual(colors, filter, DEFAULT_COLOR);
+  const ringColors = visual.ringColors;
 
-  // Окантовка
+  // Лёгкий внешний ореол для читаемости на карте
   ctx.beginPath();
-  ctx.arc(cx, cy, r + 2, 0, 2 * Math.PI);
-  ctx.fillStyle = paint.ring;
+  ctx.arc(cx, cy, outerR + 1.5, 0, 2 * Math.PI);
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
   ctx.fill();
 
-  // Одиночная точка — цвет первого раздела; несколько в точке — пирог цветов
-  if (count === 1 || displayColors.length === 1) {
+  // Кант цветами категорий (один цвет или сектора)
+  if (ringColors.length === 1) {
     ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-    ctx.fillStyle = paint.fill;
+    ctx.arc(cx, cy, outerR, 0, 2 * Math.PI);
+    ctx.fillStyle = ringColors[0];
     ctx.fill();
   } else {
-    const step = (2 * Math.PI) / displayColors.length;
-    displayColors.forEach((color, i) => {
+    const step = (2 * Math.PI) / ringColors.length;
+    ringColors.forEach((color, i) => {
       ctx.beginPath();
       ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r, i * step - Math.PI / 2, (i + 1) * step - Math.PI / 2);
+      ctx.arc(cx, cy, outerR, i * step - Math.PI / 2, (i + 1) * step - Math.PI / 2);
       ctx.closePath();
       ctx.fillStyle = color;
       ctx.fill();
     });
   }
 
-  if (paint.light) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
+  // Белый внутряк
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, 2 * Math.PI);
+  ctx.fillStyle = visual.fill;
+  ctx.fill();
 
   if (count > 1) {
-    ctx.fillStyle = paint.ink;
+    ctx.fillStyle = visual.ink;
     ctx.font = `bold 11px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(count), cx, cy + 1);
   } else {
-    const icon = getCachedMarkerIcon(paint.iconUrl);
+    const icon = getCachedMarkerIcon(visual.iconUrl);
     if (icon) {
       const iconBox = MAP_MARKER_ICON_SIZE;
       drawMarkerIconTinted(
@@ -113,13 +118,13 @@ function makeMarkerPng(colors: string[], count = 1): string {
         Math.round(cx - iconBox / 2),
         Math.round(cy - iconBox / 2),
         iconBox,
-        paint.ink,
+        visual.ink,
       );
     } else {
       // Дебаг / нет иконки — точка в центре
       ctx.beginPath();
       ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = paint.ink;
+      ctx.fillStyle = visual.ink;
       ctx.fill();
     }
   }
@@ -190,6 +195,12 @@ export function EventMap({
   }, [ctxMenu]);
 
   const { theme } = useThemeStore();
+  const filterCategories = useFiltersStore(s => s.filters.categories);
+  const filterTypes = useFiltersStore(s => s.filters.types);
+  const markerFilter: MarkerTypeCategoryFilter = {
+    categories: filterCategories,
+    types: filterTypes,
+  };
 
   // Список мероприятий на одной точке
   const [groupState, setGroupState] = useState<{ events: IEventSearchShortItem[]; x: number; y: number } | null>(null);
@@ -409,13 +420,16 @@ export function EventMap({
 
     for (const [, group] of groups) {
       const first = group[0];
-      const color = markerColors(first);
+      // Кант: уникальные цвета всех событий в точке; иконка — по первому (или счётчик)
+      const ringSource = group.length === 1
+        ? markerColors(first)
+        : [...new Set(group.flatMap(ev => markerColors(ev)))];
       const pm = new ymaps.Placemark(
         [first.latitude!, first.longitude!],
         {},
         {
           iconLayout:         'default#image',
-          iconImageHref:      makeMarkerPng(color, group.length),
+          iconImageHref:      makeMarkerPng(ringSource, group.length, markerFilter),
           iconImageSize:      [36, 36],
           iconImageOffset:    [-18, -18],
           openBalloonOnClick: false,
@@ -460,7 +474,7 @@ export function EventMap({
 
     mapRef.current.geoObjects.add(clusterer);
     clusterRef.current = clusterer;
-  }, [events, showGroup, ready, iconsReady]);
+  }, [events, showGroup, ready, iconsReady, filterCategories, filterTypes]);
 
   if (error) return (
     <div className={styles.errorBox} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
