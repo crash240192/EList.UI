@@ -7,6 +7,7 @@ import {
   buildOsmPointUrl,
   createBaseTileLayer,
   createDotIcon,
+  createMap,
   disableMapPageScrollCapture,
   replaceBaseTileLayer,
   usesCssMapInvert,
@@ -39,7 +40,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
     let destroyed = false;
 
     try {
-      const map = L.map(mapRef.current, {
+      const map = createMap(mapRef.current, {
         center: [lat, lng],
         zoom,
         zoomControl: false,

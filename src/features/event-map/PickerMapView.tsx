@@ -7,6 +7,7 @@ import {
   addCompactZoomControl,
   createBaseTileLayer,
   createDotIcon,
+  createMap,
   DEFAULT_MAP_CENTER,
   replaceBaseTileLayer,
   setPickerBehaviors,
@@ -77,7 +78,7 @@ export function PickerMapView({
         ? [lat, lng]
         : initialCenter ?? DEFAULT_MAP_CENTER;
 
-      const map = L.map(ref.current, {
+      const map = createMap(ref.current, {
         center,
         zoom: lat !== null ? 15 : 10,
         zoomControl: false,

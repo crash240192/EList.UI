@@ -18,6 +18,20 @@ export const DEFAULT_MAP_CENTER: [number, number] = [55.7558, 37.6173];
 
 export type MapTheme = 'light' | 'dark';
 
+/**
+ * Leaflet 1.9+ по умолчанию рисует флаг Украины в prefix атрибуции.
+ * Для продакшена в РФ оставляем нейтральный текст без символики.
+ * Атрибуция MapTiler/OSM на тайловом слое сохраняется (лицензия).
+ */
+const LEAFLET_ATTRIBUTION_PREFIX =
+  '<a href="https://leafletjs.com" title="A JavaScript library for interactive maps">Leaflet</a>';
+
+export function createMap(el: HTMLElement, options?: L.MapOptions): L.Map {
+  const map = L.map(el, options);
+  map.attributionControl?.setPrefix(LEAFLET_ATTRIBUTION_PREFIX);
+  return map;
+}
+
 export function hasMapTilerKey(): boolean {
   return MAPTILER_KEY.length > 0;
 }

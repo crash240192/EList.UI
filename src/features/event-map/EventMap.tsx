@@ -8,6 +8,7 @@ import 'leaflet.markercluster';
 import type { IEventSearchShortItem } from '@/entities/event';
 import {
   createBaseTileLayer,
+  createMap,
   haversineMeters,
   replaceBaseTileLayer,
   usesCssMapInvert,
@@ -228,7 +229,7 @@ export function EventMap({
     let searchAreaTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const map = L.map(el, {
+      const map = createMap(el, {
         center,
         zoom,
         zoomControl: true,
