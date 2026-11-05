@@ -54,7 +54,5 @@ jobs:
           build-args: |
             VITE_USE_MOCK=false
             VITE_YANDEX_AD_BLOCK_ID=R-A-20290944-1
-            VITE_MAPTILER_KEY=${{ secrets.VITE_MAPTILER_KEY }}
-            VITE_MAPTILER_STYLE=streets-v2
           cache-from: type=gha
           cache-to: type=gha,mode=max

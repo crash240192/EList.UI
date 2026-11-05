@@ -1,10 +1,7 @@
 // shared/lib/osmMap.ts — Leaflet + подложка MapTiler (OSM fallback)
 
 import L from 'leaflet';
-
-/** Стиль MapTiler без суффикса темы (streets-v2 → streets-v2 / streets-v2-dark). */
-const MAPTILER_STYLE = (import.meta.env.VITE_MAPTILER_STYLE as string | undefined)?.trim() || 'streets-v2';
-const MAPTILER_KEY = (import.meta.env.VITE_MAPTILER_KEY as string | undefined)?.trim() || '';
+import { getMapTilerKey, getMapTilerStyle } from '@/shared/lib/runtimeConfig';
 
 const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const OSM_ATTRIBUTION =
@@ -33,7 +30,7 @@ export function createMap(el: HTMLElement, options?: L.MapOptions): L.Map {
 }
 
 export function hasMapTilerKey(): boolean {
-  return MAPTILER_KEY.length > 0;
+  return getMapTilerKey().length > 0;
 }
 
 /** OSM-fallback: нужен soft-invert тайлов. MapTiler dark — только приглушение контраста. */
@@ -55,22 +52,24 @@ export function mapDarkClass(
 }
 
 function mapTilerStyleId(theme: MapTheme): string {
+  const base = getMapTilerStyle();
   if (theme === 'dark') {
-    if (MAPTILER_STYLE.endsWith('-dark')) return MAPTILER_STYLE;
-    return `${MAPTILER_STYLE}-dark`;
+    if (base.endsWith('-dark')) return base;
+    return `${base}-dark`;
   }
-  return MAPTILER_STYLE.replace(/-dark$/, '');
+  return base.replace(/-dark$/, '');
 }
 
 /**
  * Базовый слой: MapTiler (если есть ключ) или классический OSM.
- * MapTiler — 512px тайлы (tileSize + zoomOffset), как в их Leaflet-доках.
+ * Ключ — runtime (/runtime-config.js) или VITE_* для локальной разработки.
  */
 export function createBaseTileLayer(theme: MapTheme = 'light'): L.TileLayer {
-  if (hasMapTilerKey()) {
+  const key = getMapTilerKey();
+  if (key) {
     const style = mapTilerStyleId(theme);
     return L.tileLayer(
-      `https://api.maptiler.com/maps/${style}/{z}/{x}/{y}.png?key=${encodeURIComponent(MAPTILER_KEY)}`,
+      `https://api.maptiler.com/maps/${style}/{z}/{x}/{y}.png?key=${encodeURIComponent(key)}`,
       {
         tileSize: 512,
         zoomOffset: -1,
