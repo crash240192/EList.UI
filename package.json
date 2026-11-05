@@ -13,6 +13,8 @@
     "@fontsource-variable/manrope": "^5.2.8",
     "flatpickr": "^4.6.13",
     "html5-qrcode": "^2.3.8",
+    "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -21,6 +23,8 @@
   },
   "devDependencies": {
     "@types/flatpickr": "^3.0.2",
+    "@types/leaflet": "^1.9.22",
+    "@types/leaflet.markercluster": "^1.5.6",
     "@types/node": "^25.6.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.3",
@@ -30,7 +34,6 @@
     "vite": "^5.4.21"
   },
   "notes": {
-    "optional_map": "npm install react-leaflet leaflet @types/leaflet   (для карты Leaflet)",
-    "optional_ymaps": "npm install @yandex/ymaps3-types               (для Яндекс.Карт)"
+    "maps": "Leaflet + OpenStreetMap tiles; geocode via /api/geocode (Nominatim)"
   }
 }

@@ -3,6 +3,7 @@
 /* ---- Просмотровая карта (EventPage) ---- */
 
 .mapViewWrap {
+  position: relative;
   width: 100%;
   height: 100%;
 }
@@ -11,6 +12,23 @@
   width: 100%;
   height: 100%;
   border-radius: inherit;
+}
+
+.osmPointLink {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 500;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.osmPointLink:hover {
+  color: var(--accent);
 }
 
 /* ---- Пикер карты (CreateEventPage) ---- */
@@ -160,15 +178,28 @@
   height: 100%;
 }
 
-/* Тёмная тема: инвертим тайлы. На places/overlaps — тот же filter ещё раз:
-   invert(1)+hue-rotate(180) дважды = исходные цвета маркеров.
-   saturate/brightness нельзя дублировать — иначе маркеры блекнут. */
-.eventsMapDark {
+/* Тёмная тема: инвертим тайлы. На marker/overlay panes — тот же filter ещё раз:
+   invert(1)+hue-rotate(180) дважды = исходные цвета маркеров. */
+.eventsMapDark,
+.mapDark {
   filter: invert(1) hue-rotate(180deg);
 }
 
-.eventsMapDark :global([class*="places-pane"]),
-.eventsMapDark :global([class*="overlaps-pane"]) {
+.eventsMapDark :global(.leaflet-marker-pane),
+.eventsMapDark :global(.leaflet-shadow-pane),
+.eventsMapDark :global(.leaflet-overlay-pane),
+.eventsMapDark :global(.leaflet-tooltip-pane),
+.eventsMapDark :global(.leaflet-popup-pane),
+.mapDark :global(.leaflet-marker-pane),
+.mapDark :global(.leaflet-shadow-pane),
+.mapDark :global(.leaflet-overlay-pane),
+.mapDark :global(.leaflet-tooltip-pane),
+.mapDark :global(.leaflet-popup-pane) {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+.eventsMapDark :global(.leaflet-control),
+.mapDark :global(.leaflet-control) {
   filter: invert(1) hue-rotate(180deg);
 }
 

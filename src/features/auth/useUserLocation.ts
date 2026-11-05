@@ -20,7 +20,7 @@ import {
   storeLocationAccountId,
   notifyHomeCityChanged,
 } from './locationSession';
-import { reverseGeocode } from '@/shared/lib/yandexMaps';
+import { reverseGeocode } from '@/shared/lib/geocode';
 
 export type { UserCoords };
 

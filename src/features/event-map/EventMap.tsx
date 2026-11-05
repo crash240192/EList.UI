@@ -1,10 +1,12 @@
-// features/event-map/EventMap.tsx — главная карта (API 2.1)
-// Балуны Яндекса полностью отключены — всё через React-компоненты.
+// features/event-map/EventMap.tsx — главная карта (Leaflet + OSM)
+// Балуны отключены — всё через React-компоненты.
 // При совпадении координат показываем список мероприятий на точке.
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import L from 'leaflet';
+import 'leaflet.markercluster';
 import type { IEventSearchShortItem } from '@/entities/event';
-import { loadYandexMaps } from '@/shared/lib/yandexMaps';
+import { createOsmTileLayer, haversineMeters } from '@/shared/lib/osmMap';
 import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlacement';
 import { useFiltersStore, useThemeStore } from '@/app/store';
 import {
@@ -72,13 +74,11 @@ function makeMarkerPng(
   const visual = resolveMarkerVisual(colors, filter, DEFAULT_COLOR);
   const ringColors = visual.ringColors;
 
-  // Тонкий внешний контур для читаемости на карте (не белый диск)
   ctx.beginPath();
   ctx.arc(cx, cy, outerR + 1.25, 0, 2 * Math.PI);
   ctx.fillStyle = 'rgba(255,255,255,0.28)';
   ctx.fill();
 
-  // Кант цветами категорий (один цвет или сектора)
   if (ringColors.length === 1) {
     ctx.beginPath();
     ctx.arc(cx, cy, outerR, 0, 2 * Math.PI);
@@ -96,7 +96,6 @@ function makeMarkerPng(
     });
   }
 
-  // Внутряк цветом категории иконки (без белого разделителя)
   ctx.beginPath();
   ctx.arc(cx, cy, innerR, 0, 2 * Math.PI);
   ctx.fillStyle = visual.fill;
@@ -121,7 +120,6 @@ function makeMarkerPng(
         visual.ink,
       );
     } else {
-      // Дебаг / нет иконки — точка в центре
       ctx.beginPath();
       ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
       ctx.fillStyle = visual.ink;
@@ -132,9 +130,10 @@ function makeMarkerPng(
   return c.toDataURL('image/png');
 }
 
-// Ключ для группировки по координатам (округляем до 5 знаков ~1м точность)
 const coordKey = (lat: number, lng: number) =>
   `${lat.toFixed(5)},${lng.toFixed(5)}`;
+
+type MarkerWithGroup = L.Marker & { _elistGroup?: IEventSearchShortItem[] };
 
 export function EventMap({
   events,
@@ -147,15 +146,14 @@ export function EventMap({
   searchAreaDebounceMs = 400,
 }: EventMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef       = useRef<any>(null);
-  const clusterRef   = useRef<any>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
   const onSearchAreaRef = useRef(onSearchAreaChange);
   useEffect(() => { onSearchAreaRef.current = onSearchAreaChange; }, [onSearchAreaChange]);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [iconsReady, setIconsReady] = useState(false);
 
-  // Тематические PNG разделов — ждём прогрев, чтобы маркеры сразу были с иконками
   useEffect(() => {
     let cancelled = false;
     preloadMapCategoryIcons().finally(() => {
@@ -164,14 +162,11 @@ export function EventMap({
     return () => { cancelled = true; };
   }, []);
 
-  // Контекстное меню «Искать здесь»
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; lat: number; lng: number } | null>(null);
 
-  // Храним актуальный center в ref
   const centerRef = useRef(center);
   useEffect(() => { centerRef.current = center; }, [center]);
 
-  // Центрирование по событию
   useEffect(() => {
     const handler = (e: Event) => {
       if (!mapRef.current) return;
@@ -179,14 +174,12 @@ export function EventMap({
       const target: [number, number] = (detail?.lat && detail?.lng)
         ? [detail.lat, detail.lng]
         : centerRef.current;
-      mapRef.current.setCenter(target, 12, { checkZoomRange: true, duration: 500 });
+      mapRef.current.setView(target, 12, { animate: true });
     };
     window.addEventListener('elist:centerMap', handler);
     return () => window.removeEventListener('elist:centerMap', handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Закрытие контекстного меню при клике вне
   useEffect(() => {
     if (!ctxMenu) return;
     const fn = () => setCtxMenu(null);
@@ -202,7 +195,6 @@ export function EventMap({
     types: filterTypes,
   };
 
-  // Список мероприятий на одной точке
   const [groupState, setGroupState] = useState<{ events: IEventSearchShortItem[]; x: number; y: number } | null>(null);
 
   const showGroup = useCallback((group: IEventSearchShortItem[], x: number, y: number) => {
@@ -213,54 +205,50 @@ export function EventMap({
     setGroupState({ events: group, x, y });
   }, [onMarkerClick]);
 
-  // Применяем «Искать здесь» — пишем координаты и радиус в стор через событие
   const handleSearchHere = (lat: number, lng: number, radius: number) => {
     setCtxMenu(null);
     window.dispatchEvent(new CustomEvent('elist:searchHere', { detail: { lat, lng, radius } }));
   };
 
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
     let destroyed = false;
-    const el = containerRef.current; // захватываем ДО async
     let handlePointerDown: ((e: PointerEvent) => void) | null = null;
-    let handlePointerUp:   (() => void) | null = null;
+    let handlePointerUp: (() => void) | null = null;
     let handlePointerMove: ((e: PointerEvent) => void) | null = null;
     let searchAreaTimer: ReturnType<typeof setTimeout> | null = null;
 
-    loadYandexMaps().then(() => {
-      if (destroyed || !el) return;
-      const ymaps = (window as any).ymaps;
-      const map = new ymaps.Map(el, {
-        center, zoom,
-        controls: ['zoomControl', 'typeSelector'],
-        type: 'yandex#map',
+    try {
+      const map = L.map(el, {
+        center,
+        zoom,
+        zoomControl: true,
+        attributionControl: true,
       });
+      createOsmTileLayer().addTo(map);
       mapRef.current = map;
 
       const emitSearchArea = () => {
         const cb = onSearchAreaRef.current;
         if (!cb || !mapRef.current) return;
-        const ymapsLocal = (window as any).ymaps;
         const m = mapRef.current;
-        const c = m.getCenter() as [number, number];
-        const z = m.getZoom() as number;
-        const bounds = m.getBounds?.() as [[number, number], [number, number]] | undefined;
-        if (!bounds?.[0] || !bounds?.[1]) return;
-        const sw = bounds[0];
-        const ne = bounds[1];
+        const c = m.getCenter();
+        const bounds = m.getBounds();
+        const centerPt: [number, number] = [c.lat, c.lng];
         const corners: [number, number][] = [
-          [sw[0], sw[1]],
-          [sw[0], ne[1]],
-          [ne[0], sw[1]],
-          [ne[0], ne[1]],
+          [bounds.getSouthWest().lat, bounds.getSouthWest().lng],
+          [bounds.getSouthWest().lat, bounds.getNorthEast().lng],
+          [bounds.getNorthEast().lat, bounds.getSouthWest().lng],
+          [bounds.getNorthEast().lat, bounds.getNorthEast().lng],
         ];
         let radiusM = 0;
         for (const q of corners) {
-          const d = ymapsLocal.coordSystem.geo.getDistance(c, q);
+          const d = haversineMeters(centerPt, q);
           if (d > radiusM) radiusM = d;
         }
         radiusM = Math.round(Math.max(200, Math.min(radiusM, 5_000_000)));
-        cb({ lat: c[0], lng: c[1], radiusM });
+        cb({ lat: c.lat, lng: c.lng, radiusM });
       };
 
       const scheduleSearchArea = () => {
@@ -273,36 +261,39 @@ export function EventMap({
       };
 
       const onViewportChange = () => {
-        const c = map.getCenter() as [number, number];
-        const z = map.getZoom() as number;
-        centerRef.current = c;
-        onCenterChange?.(c);
+        const c = map.getCenter();
+        const z = map.getZoom();
+        const next: [number, number] = [c.lat, c.lng];
+        centerRef.current = next;
+        onCenterChange?.(next);
         onZoomChange?.(z);
         scheduleSearchArea();
       };
 
-      map.events.add('actionend', onViewportChange);
-      map.events.add('boundschange', onViewportChange);
-      requestAnimationFrame(() => scheduleSearchArea());
+      map.on('moveend', onViewportChange);
+      map.on('zoomend', onViewportChange);
+      requestAnimationFrame(() => {
+        map.invalidateSize();
+        scheduleSearchArea();
+      });
 
-      // Правый клик — контекстное меню (десктоп)
-      map.events.add('contextmenu', (e: any) => {
-        const coords = e.get('coords');
-        const pixel  = e.get('domEvent').originalEvent;
-        if (!coords || !el) return;
+      map.on('contextmenu', (e: L.LeafletMouseEvent) => {
+        if (!el) return;
+        e.originalEvent.preventDefault();
         const rect = el.getBoundingClientRect();
         setCtxMenu({
-          x: pixel.clientX - rect.left,
-          y: pixel.clientY - rect.top,
-          lat: coords[0], lng: coords[1],
+          x: e.originalEvent.clientX - rect.left,
+          y: e.originalEvent.clientY - rect.top,
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
         });
         setGroupState(null);
       });
 
-      // Долгое нажатие — pointerdown работает и для touch и для mouse
       let longPressTimer: ReturnType<typeof setTimeout> | null = null;
       let longPressMoved = false;
-      let longPressX = 0, longPressY = 0;
+      let longPressX = 0;
+      let longPressY = 0;
 
       handlePointerDown = (e: PointerEvent) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -311,17 +302,14 @@ export function EventMap({
         longPressY = e.clientY;
 
         longPressTimer = setTimeout(() => {
-          if (longPressMoved || !el) return;
+          if (longPressMoved || !el || !mapRef.current) return;
           const rect = el.getBoundingClientRect();
           const x = longPressX - rect.left;
           const y = longPressY - rect.top;
-          try {
-            const coords = map.converter.pageToGeo([longPressX, longPressY]);
-            if (!coords) return;
-            setCtxMenu({ x, y, lat: coords[0], lng: coords[1] });
-            setGroupState(null);
-            if (navigator.vibrate) navigator.vibrate(40);
-          } catch { /* ignore */ }
+          const coords = mapRef.current.containerPointToLatLng(L.point(x, y));
+          setCtxMenu({ x, y, lat: coords.lat, lng: coords.lng });
+          setGroupState(null);
+          if (navigator.vibrate) navigator.vibrate(40);
         }, 600);
       };
 
@@ -338,13 +326,15 @@ export function EventMap({
         }
       };
 
-      el.addEventListener('pointerdown',   handlePointerDown);
-      el.addEventListener('pointerup',     handlePointerUp);
-      el.addEventListener('pointermove',   handlePointerMove);
+      el.addEventListener('pointerdown', handlePointerDown);
+      el.addEventListener('pointerup', handlePointerUp);
+      el.addEventListener('pointermove', handlePointerMove);
       el.addEventListener('pointercancel', handlePointerUp);
 
-      setReady(true);
-    }).catch(e => setError(e.message));
+      if (!destroyed) setReady(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось инициализировать карту');
+    }
 
     return () => {
       destroyed = true;
@@ -353,56 +343,47 @@ export function EventMap({
         searchAreaTimer = null;
       }
       if (el) {
-        if (handlePointerDown)  el.removeEventListener('pointerdown',   handlePointerDown);
-        if (handlePointerUp)    el.removeEventListener('pointerup',     handlePointerUp);
-        if (handlePointerMove)  el.removeEventListener('pointermove',   handlePointerMove);
-        if (handlePointerUp)    el.removeEventListener('pointercancel', handlePointerUp);
+        if (handlePointerDown) el.removeEventListener('pointerdown', handlePointerDown);
+        if (handlePointerUp) el.removeEventListener('pointerup', handlePointerUp);
+        if (handlePointerMove) el.removeEventListener('pointermove', handlePointerMove);
+        if (handlePointerUp) el.removeEventListener('pointercancel', handlePointerUp);
       }
-      mapRef.current?.destroy?.();
+      clusterRef.current = null;
+      mapRef.current?.remove();
       mapRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // При сворачивании/разворачивании сайдбара контейнер меняет ширину —
-  // без fitToViewport карта остаётся со старым размером (пустая полоса справа).
   useEffect(() => {
     if (!ready || !mapRef.current || !containerRef.current) return;
     const map = mapRef.current;
     const el = containerRef.current;
-    const fit = () => {
-      try {
-        map.container.fitToViewport();
-      } catch {
-        /* ignore */
-      }
-    };
+    const fit = () => map.invalidateSize();
     fit();
     const observer = new ResizeObserver(() => fit());
     observer.observe(el);
     return () => observer.disconnect();
   }, [ready]);
 
-  // Следим за центром из пропа (родной город / фильтр) после инициализации карты
   useEffect(() => {
     if (!ready || !mapRef.current) return;
     const map = mapRef.current;
-    const current = map.getCenter() as [number, number];
+    const current = map.getCenter();
     const [lat, lng] = center;
-    if (Math.abs(current[0] - lat) < 0.0001 && Math.abs(current[1] - lng) < 0.0001) return;
-    map.setCenter(center, zoom, { checkZoomRange: true, duration: ready ? 400 : 0 });
+    if (Math.abs(current.lat - lat) < 0.0001 && Math.abs(current.lng - lng) < 0.0001) return;
+    map.setView(center, zoom, { animate: ready });
   }, [center, zoom, ready]);
 
-  // Маркеры
   useEffect(() => {
     if (!ready || !iconsReady || !mapRef.current) return;
-    const ymaps = (window as any).ymaps;
+    const map = mapRef.current;
+
     if (clusterRef.current) {
-      mapRef.current.geoObjects.remove(clusterRef.current);
+      map.removeLayer(clusterRef.current);
       clusterRef.current = null;
     }
 
-    // Группируем мероприятия по координатам
     const groups = new Map<string, IEventSearchShortItem[]>();
     for (const ev of events) {
       if (ev.latitude == null || ev.longitude == null) continue;
@@ -411,68 +392,55 @@ export function EventMap({
       groups.get(key)!.push(ev);
     }
 
-    const clusterer = new ymaps.Clusterer({
-      gridSize: 60,
-      clusterDisableClickZoom:   true,
-      clusterOpenBalloonOnClick: false,
+    const clusterer = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      maxClusterRadius: 60,
+      spiderfyOnMaxZoom: true,
+      zoomToBoundsOnClick: false,
     });
-    const marks: any[] = [];
 
     for (const [, group] of groups) {
       const first = group[0];
-      // Кант: уникальные цвета всех событий в точке; иконка — по первому (или счётчик)
       const ringSource = group.length === 1
         ? markerColors(first)
         : [...new Set(group.flatMap(ev => markerColors(ev)))];
-      const pm = new ymaps.Placemark(
-        [first.latitude!, first.longitude!],
-        {},
-        {
-          iconLayout:         'default#image',
-          iconImageHref:      makeMarkerPng(ringSource, group.length, markerFilter),
-          iconImageSize:      [36, 36],
-          iconImageOffset:    [-18, -18],
-          openBalloonOnClick: false,
-        }
-      );
-      // Сохраняем группу на объекте для доступа из обработчика кластера
-      (pm as any)._elistGroup = group;
-      pm.events.add('click', (e: any) => {
-        // Берём пиксельные координаты из события клика
-        const pageX = e.get('pageX') as number;
-        const pageY = e.get('pageY') as number;
-        if (containerRef.current && pageX != null && pageY != null) {
+      const icon = L.icon({
+        iconUrl: makeMarkerPng(ringSource, group.length, markerFilter),
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+      });
+      const marker = L.marker([first.latitude!, first.longitude!], { icon }) as MarkerWithGroup;
+      marker._elistGroup = group;
+      marker.on('click', (e: L.LeafletMouseEvent) => {
+        if (containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
-          showGroup(group, pageX - rect.left, pageY - rect.top);
+          showGroup(group, e.originalEvent.clientX - rect.left, e.originalEvent.clientY - rect.top);
         } else {
           showGroup(group, -1, -1);
         }
       });
-      marks.push(pm);
+      clusterer.addLayer(marker);
     }
 
-    clusterer.add(marks);
-
-    clusterer.events.add('click', (e: any) => {
-      const target = e.get('target');
-      const placemarks: any[] = target.getGeoObjects?.() ?? [];
+    clusterer.on('clusterclick', (e: L.LeafletEvent) => {
+      const cluster = (e as L.LeafletMouseEvent & { layer: L.MarkerCluster }).layer;
+      const childMarkers = cluster.getAllChildMarkers?.() as MarkerWithGroup[] | undefined;
       const clusterEvents: IEventSearchShortItem[] = [];
-      placemarks.forEach((pm: any) => {
-        (pm._elistGroup ?? []).forEach((ev: IEventSearchShortItem) => clusterEvents.push(ev));
+      childMarkers?.forEach((pm) => {
+        (pm._elistGroup ?? []).forEach((ev) => clusterEvents.push(ev));
       });
       if (clusterEvents.length > 0) {
-        const pageX = e.get('pageX') as number;
-        const pageY = e.get('pageY') as number;
-        if (containerRef.current && pageX != null && pageY != null) {
+        const oe = (e as L.LeafletMouseEvent).originalEvent;
+        if (containerRef.current && oe) {
           const rect = containerRef.current.getBoundingClientRect();
-          showGroup(clusterEvents, pageX - rect.left, pageY - rect.top);
+          showGroup(clusterEvents, oe.clientX - rect.left, oe.clientY - rect.top);
         } else {
           showGroup(clusterEvents, -1, -1);
         }
       }
     });
 
-    mapRef.current.geoObjects.add(clusterer);
+    map.addLayer(clusterer);
     clusterRef.current = clusterer;
   }, [events, showGroup, ready, iconsReady, filterCategories, filterTypes]);
 
@@ -489,14 +457,13 @@ export function EventMap({
         className={`${styles.eventsMap} ${theme === 'dark' ? styles.eventsMapDark : ''}`}
       />
 
-      {/* Контекстное меню «Искать поблизости» */}
       {ctxMenu && (
         <div
           onMouseDown={e => e.stopPropagation()}
           style={{
             position: 'absolute',
             left: Math.min(ctxMenu.x + 4, (containerRef.current?.offsetWidth ?? 300) - 190),
-            top:  Math.min(ctxMenu.y + 4, (containerRef.current?.offsetHeight ?? 400) - 200),
+            top: Math.min(ctxMenu.y + 4, (containerRef.current?.offsetHeight ?? 400) - 200),
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: 12,
@@ -506,7 +473,6 @@ export function EventMap({
             overflow: 'hidden',
           }}
         >
-          {/* Заголовок */}
           <div style={{
             padding: '8px 14px 6px',
             fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
@@ -516,13 +482,12 @@ export function EventMap({
             Искать поблизости
           </div>
 
-          {/* Варианты радиуса */}
           {[
-            { label: '300 м',  radius: 300   },
-            { label: '500 м',  radius: 500   },
-            { label: '1 км',   radius: 1000  },
-            { label: '3 км',   radius: 3000  },
-            { label: '5 км',   radius: 5000  },
+            { label: '300 м', radius: 300 },
+            { label: '500 м', radius: 500 },
+            { label: '1 км', radius: 1000 },
+            { label: '3 км', radius: 3000 },
+            { label: '5 км', radius: 5000 },
           ].map(({ label, radius }) => (
             <button key={radius}
               style={{
@@ -545,7 +510,6 @@ export function EventMap({
         </div>
       )}
 
-      {/* Список мероприятий на одной точке */}
       {groupState && (
         <PointGroupModal
           events={groupState.events}
@@ -558,8 +522,6 @@ export function EventMap({
     </div>
   );
 }
-
-// ---- Модальный список мероприятий в одной точке ----
 
 export function PointGroupModal({ events, anchorX, anchorY, onSelect, onClose }: {
   events: IEventSearchShortItem[];

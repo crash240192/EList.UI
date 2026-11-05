@@ -1,14 +1,15 @@
-// features/event-map/PickerMapView.tsx — карта выбора точки (компактная и в модалке)
+// features/event-map/PickerMapView.tsx — карта выбора точки (Leaflet + OSM)
 
 import { useEffect, useRef, useState } from 'react';
+import L from 'leaflet';
+import { reverseGeocode } from '@/shared/lib/geocode';
 import {
-  loadYandexMaps,
-  reverseGeocode,
-  YMAP_DISABLE_POI_OPTIONS,
   addCompactZoomControl,
-  configurePickerMapBehaviors,
-  configureExpandedPickerMapBehaviors,
-} from '@/shared/lib/yandexMaps';
+  createDotIcon,
+  createOsmTileLayer,
+  DEFAULT_MAP_CENTER,
+  setPickerBehaviors,
+} from '@/shared/lib/osmMap';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
 
@@ -44,8 +45,8 @@ export function PickerMapView({
   onGeocodingChange,
 }: PickerMapViewProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
   const callbacksRef = useRef({ onPick, onAddressChange, onGeocodingChange, address });
   const reverseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reverseGenRef = useRef(0);
@@ -56,6 +57,7 @@ export function PickerMapView({
   callbacksRef.current = { onPick, onAddressChange, onGeocodingChange, address };
 
   useEffect(() => {
+    if (!ref.current) return;
     let destroyed = false;
 
     const clearReverseTimer = () => {
@@ -65,32 +67,20 @@ export function PickerMapView({
       }
     };
 
-    loadYandexMaps().then(() => {
-      if (destroyed || !ref.current) return;
-      const ymaps = (window as any).ymaps;
+    try {
       const center: [number, number] = lat !== null && lng !== null
         ? [lat, lng]
-        : initialCenter ?? [55.7558, 37.6173];
+        : initialCenter ?? DEFAULT_MAP_CENTER;
 
-      const map = new ymaps.Map(ref.current, {
+      const map = L.map(ref.current, {
         center,
         zoom: lat !== null ? 15 : 10,
-        controls: [],
-        type: 'yandex#map',
-      }, YMAP_DISABLE_POI_OPTIONS);
+        zoomControl: false,
+        attributionControl: true,
+      });
+      createOsmTileLayer().addTo(map);
       addCompactZoomControl(map);
-      if (panEnabled) {
-        configureExpandedPickerMapBehaviors(map);
-      } else {
-        configurePickerMapBehaviors(map);
-      }
-
-      const setCenterIfNeeded = (coords: [number, number], zoom = 15) => {
-        const current = map.getCenter() as [number, number];
-        const z = map.getZoom() as number;
-        if (almostSame(current, coords) && Math.abs(z - zoom) < 0.5) return;
-        map.setCenter(coords, zoom, { duration: 300 });
-      };
+      setPickerBehaviors(map, panEnabled);
 
       const runReverse = async (coords: [number, number]) => {
         const gen = ++reverseGenRef.current;
@@ -114,50 +104,64 @@ export function PickerMapView({
         }, REVERSE_DEBOUNCE_MS);
       };
 
-      function ensureMarker(coords: [number, number]) {
-        if (markerRef.current) {
-          const cur = markerRef.current.geometry.getCoordinates() as [number, number];
-          if (!almostSame(cur, coords)) {
-            markerRef.current.geometry.setCoordinates(coords);
-          }
-          return;
-        }
-        const pm = new ymaps.Placemark(coords, {}, { draggable: true, preset: 'islands#redDotIcon' });
-        pm.events.add('dragend', () => {
-          const c = pm.geometry.getCoordinates() as [number, number];
-          scheduleReverse(c);
-        });
-        map.geoObjects.add(pm);
-        markerRef.current = pm;
-      }
+      const setCenterIfNeeded = (coords: [number, number], zoom = 15) => {
+        const current = map.getCenter();
+        const z = map.getZoom();
+        if (almostSame([current.lat, current.lng], coords) && Math.abs(z - zoom) < 0.5) return;
+        map.setView(coords, zoom, { animate: true });
+      };
 
-      async function placeOrMove(coords: [number, number], doGeocode: boolean) {
+      const ensureMarker = (coords: [number, number]) => {
+        if (markerRef.current) {
+          const cur = markerRef.current.getLatLng();
+          if (!almostSame([cur.lat, cur.lng], coords)) {
+            markerRef.current.setLatLng(coords);
+          }
+          return markerRef.current;
+        }
+        const marker = L.marker(coords, {
+          draggable: true,
+          icon: createDotIcon('#ef4444', 16),
+        }).addTo(map);
+        marker.on('dragend', () => {
+          const p = marker.getLatLng();
+          scheduleReverse([p.lat, p.lng]);
+        });
+        markerRef.current = marker;
+        return marker;
+      };
+
+      const placeOrMove = (coords: [number, number], doGeocode: boolean) => {
         const { onPick: pick, address: addr } = callbacksRef.current;
         ensureMarker(coords);
         setCenterIfNeeded(coords, 15);
         if (doGeocode) {
-          // Клик — сразу; dragend идёт через scheduleReverse
           clearReverseTimer();
           void runReverse(coords);
         } else {
           pick(coords[0], coords[1], addr);
         }
-      }
+      };
 
       if (lat !== null && lng !== null) placeOrMove([lat, lng], false);
 
-      map.events.add('click', (e: any) => placeOrMove(e.get('coords') as [number, number], true));
+      map.on('click', (e: L.LeafletMouseEvent) => {
+        placeOrMove([e.latlng.lat, e.latlng.lng], true);
+      });
 
       mapRef.current = map;
       setReady(true);
-    }).catch(e => setLoadErr(e.message));
+      requestAnimationFrame(() => map.invalidateSize());
+    } catch (e) {
+      setLoadErr(e instanceof Error ? e.message : 'Не удалось инициализировать карту');
+    }
 
     return () => {
       destroyed = true;
       clearReverseTimer();
       reverseGenRef.current += 1;
       markerRef.current = null;
-      mapRef.current?.destroy?.();
+      mapRef.current?.remove();
       mapRef.current = null;
       setReady(false);
     };
@@ -166,42 +170,44 @@ export function PickerMapView({
 
   useEffect(() => {
     if (!ready || !mapRef.current || lat === null || lng === null) return;
-    const ymaps = (window as any).ymaps;
+    const map = mapRef.current;
     const coords: [number, number] = [lat, lng];
 
     if (markerRef.current) {
-      const cur = markerRef.current.geometry.getCoordinates() as [number, number];
-      if (!almostSame(cur, coords)) {
-        markerRef.current.geometry.setCoordinates(coords);
+      const cur = markerRef.current.getLatLng();
+      if (!almostSame([cur.lat, cur.lng], coords)) {
+        markerRef.current.setLatLng(coords);
       }
     } else {
-      const pm = new ymaps.Placemark(coords, {}, { draggable: true, preset: 'islands#redDotIcon' });
-      pm.events.add('dragend', () => {
-        const c = pm.geometry.getCoordinates() as [number, number];
+      const marker = L.marker(coords, {
+        draggable: true,
+        icon: createDotIcon('#ef4444', 16),
+      }).addTo(map);
+      marker.on('dragend', () => {
+        const p = marker.getLatLng();
         if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
         reverseTimerRef.current = setTimeout(async () => {
           reverseTimerRef.current = null;
           const gen = ++reverseGenRef.current;
-          const { onPick: p, onAddressChange: setAddr, onGeocodingChange: setGeo } = callbacksRef.current;
+          const { onPick: pick, onAddressChange: setAddr, onGeocodingChange: setGeo } = callbacksRef.current;
           setGeo?.(true);
           try {
-            const a = await reverseGeocode(c[0], c[1]);
+            const a = await reverseGeocode(p.lat, p.lng);
             if (gen !== reverseGenRef.current) return;
             setAddr(a);
-            p(c[0], c[1], a);
+            pick(p.lat, p.lng, a);
           } finally {
             if (gen === reverseGenRef.current) setGeo?.(false);
           }
         }, REVERSE_DEBOUNCE_MS);
       });
-      mapRef.current.geoObjects.add(pm);
-      markerRef.current = pm;
+      markerRef.current = marker;
     }
 
-    const current = mapRef.current.getCenter() as [number, number];
-    const z = mapRef.current.getZoom() as number;
-    if (!almostSame(current, coords) || Math.abs(z - 15) >= 0.5) {
-      mapRef.current.setCenter(coords, 15, { duration: 300 });
+    const current = map.getCenter();
+    const z = map.getZoom();
+    if (!almostSame([current.lat, current.lng], coords) || Math.abs(z - 15) >= 0.5) {
+      map.setView(coords, 15, { animate: true });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, ready]);
@@ -209,13 +215,7 @@ export function PickerMapView({
   useEffect(() => {
     if (!ready || !mapRef.current || !ref.current) return;
     const map = mapRef.current;
-    const fit = () => {
-      try {
-        map.container.fitToViewport();
-      } catch {
-        /* ignore */
-      }
-    };
+    const fit = () => map.invalidateSize();
     fit();
     const observer = new ResizeObserver(() => fit());
     observer.observe(ref.current);
@@ -224,13 +224,10 @@ export function PickerMapView({
 
   if (loadErr) return <div className={styles.errorBox}>{loadErr}</div>;
 
-  const darkFilter = 'invert(1) hue-rotate(180deg)';
-
   return (
     <div
       ref={ref}
-      className={className ?? styles.pickerMap}
-      style={theme === 'dark' ? { filter: darkFilter } : undefined}
+      className={`${className ?? styles.pickerMap} ${theme === 'dark' ? styles.mapDark : ''}`}
     />
   );
 }

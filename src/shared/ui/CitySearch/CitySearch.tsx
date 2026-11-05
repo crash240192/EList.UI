@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { ICity } from '@/features/auth/useGeoCity';
-import { loadYandexMaps } from '@/shared/lib/yandexMaps';
+import { suggestPlaces } from '@/shared/lib/geocode';
 import styles from './CitySearch.module.css';
 
 interface CitySearchProps {
@@ -75,32 +75,14 @@ export function CitySearch({
     const gen = ++searchGenRef.current;
     setSearching(true);
     try {
-      await loadYandexMaps();
+      const rows = await suggestPlaces(q, 8);
       if (gen !== searchGenRef.current) return;
-      const ymaps = (window as any).ymaps;
-      const res = await ymaps.geocode(q, {
-        results: 8, lang: 'ru_RU',
-        boundedBy: [[41.0, 19.0], [81.0, 180.0]],
-        strictBounds: false,
-      });
-      if (gen !== searchGenRef.current) return;
-      const items: ICity[] = [];
-      res.geoObjects.each((obj: any) => {
-        const kind = obj.properties?.get('metaDataProperty.GeocoderMetaData.kind');
-        if (kind && !['locality', 'province', 'area'].includes(kind)) return;
-        const coords = obj.geometry.getCoordinates();
-        if (!coords) return;
-        const meta = obj.properties?.get('metaDataProperty.GeocoderMetaData.Address.Components') as any[] | undefined;
-        let city = ''; let region = ''; let country = '';
-        if (meta) for (const c of meta) {
-          if (c.kind === 'locality') city = c.name;
-          else if (c.kind === 'area' || c.kind === 'province') region = c.name;
-          else if (c.kind === 'country') country = c.name;
-        }
-        const name = city || obj.getAddressLine?.() || q;
-        const suffix = country && country !== 'Россия' ? `, ${country}` : region ? `, ${region}` : '';
-        items.push({ name: name + suffix, shortName: name, lat: coords[0], lng: coords[1] });
-      });
+      const items: ICity[] = rows.map(r => ({
+        name: r.name,
+        shortName: r.shortName || r.name,
+        lat: r.lat,
+        lng: r.lng,
+      }));
       setSuggestions(items);
       if (items.length > 0) { updateDropPos(); setOpen(true); }
       else setOpen(false);
