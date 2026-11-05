@@ -16,6 +16,8 @@ on:
 
 jobs:
   build:
+    # PR develop→main (и т.п.) дублирует push-билд ветки; CI только для feature PR.
+    if: github.event_name != 'pull_request' || (github.head_ref != 'develop' && github.head_ref != 'main')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
