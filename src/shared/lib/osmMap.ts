@@ -1,48 +1,45 @@
-// shared/lib/osmMap.ts — Leaflet + подложка MapTiler (OSM fallback)
+// shared/lib/osmMap.ts — MapLibre GL + MapTiler style.json (OSM raster fallback)
 
-import L from 'leaflet';
+import {
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  Popup,
+  type GeoJSONSource,
+  type MapOptions,
+  type StyleSpecification,
+} from 'maplibre-gl';
 import { getMapTilerKey, getMapTilerStyle } from '@/shared/lib/runtimeConfig';
-
-const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const OSM_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>';
-
-const MAPTILER_ATTRIBUTION =
-  '<a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">&copy; MapTiler</a> '
-  + '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">&copy; OpenStreetMap</a>';
 
 export const DEFAULT_MAP_CENTER: [number, number] = [55.7558, 37.6173];
 
 export type MapTheme = 'light' | 'dark';
 
-/**
- * Leaflet 1.9+ по умолчанию рисует флаг Украины в prefix атрибуции.
- * Для продакшена в РФ оставляем нейтральный текст без символики.
- * Атрибуция MapTiler/OSM на тайловом слое сохраняется (лицензия).
- */
-const LEAFLET_ATTRIBUTION_PREFIX =
-  '<a href="https://leafletjs.com" title="A JavaScript library for interactive maps">Leaflet</a>';
-
-export function createMap(el: HTMLElement, options?: L.MapOptions): L.Map {
-  const map = L.map(el, options);
-  map.attributionControl?.setPrefix(LEAFLET_ATTRIBUTION_PREFIX);
-  return map;
-}
+const OSM_RASTER_STYLE: StyleSpecification = {
+  version: 8,
+  // glyphs для подписей кластеров (без MapTiler style.json)
+  glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+  sources: {
+    osm: {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    },
+  },
+  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+};
 
 export function hasMapTilerKey(): boolean {
   return getMapTilerKey().length > 0;
 }
 
-/** OSM-fallback: нужен soft-invert тайлов. MapTiler dark — только приглушение контраста. */
+/** CSS-invert только для OSM raster fallback в dark. */
 export function usesCssMapInvert(theme: MapTheme): boolean {
   return theme === 'dark' && !hasMapTilerKey();
 }
 
-/**
- * CSS-класс тёмной карты (module.css):
- * - mapDarkInvert — нет MapTiler-ключа (OSM + мягкий invert под палитру UI)
- * - mapDarkNative — есть MapTiler dark, слегка приглушаем контраст к --bg
- */
 export function mapDarkClass(
   theme: MapTheme,
   styles: Record<string, string>,
@@ -51,8 +48,8 @@ export function mapDarkClass(
   return hasMapTilerKey() ? (styles.mapDarkNative ?? '') : (styles.mapDarkInvert ?? '');
 }
 
-function mapTilerStyleId(theme: MapTheme): string {
-  const base = getMapTilerStyle();
+export function mapTilerStyleId(theme: MapTheme): string {
+  const base = getMapTilerStyle() || 'streets-v2';
   if (theme === 'dark') {
     if (base.endsWith('-dark')) return base;
     return `${base}-dark`;
@@ -60,59 +57,64 @@ function mapTilerStyleId(theme: MapTheme): string {
   return base.replace(/-dark$/, '');
 }
 
-/**
- * Базовый слой: MapTiler (если есть ключ) или классический OSM.
- * Ключ — runtime (/runtime-config.js) или VITE_* для локальной разработки.
- */
-export function createBaseTileLayer(theme: MapTheme = 'light'): L.TileLayer {
+/** Vector style URL MapTiler или inline OSM raster style. */
+export function getMapStyle(theme: MapTheme = 'light'): string | StyleSpecification {
   const key = getMapTilerKey();
   if (key) {
     const style = mapTilerStyleId(theme);
-    return L.tileLayer(
-      `https://api.maptiler.com/maps/${style}/{z}/{x}/{y}.png?key=${encodeURIComponent(key)}`,
-      {
-        tileSize: 512,
-        zoomOffset: -1,
-        minZoom: 1,
-        maxZoom: 20,
-        attribution: MAPTILER_ATTRIBUTION,
-        crossOrigin: true,
-      },
-    );
+    return `https://api.maptiler.com/maps/${style}/style.json?key=${encodeURIComponent(key)}`;
+  }
+  return OSM_RASTER_STYLE;
+}
+
+export interface CreateMapLibreOptions {
+  center?: [number, number];
+  zoom?: number;
+  theme?: MapTheme;
+  interactive?: boolean;
+  scrollZoom?: boolean;
+  attributionControl?: boolean;
+}
+
+export function createMap(
+  container: HTMLElement,
+  options: CreateMapLibreOptions = {},
+): MapLibreMap {
+  const {
+    center = DEFAULT_MAP_CENTER,
+    zoom = 12,
+    theme = 'light',
+    interactive = true,
+    scrollZoom = interactive,
+    attributionControl = true,
+  } = options;
+
+  const map = new MapLibreMap({
+    container,
+    style: getMapStyle(theme),
+    center: [center[1], center[0]], // MapLibre: [lng, lat]
+    zoom,
+    interactive,
+    scrollZoom,
+    attributionControl: attributionControl ? undefined : false,
+  } satisfies MapOptions);
+
+  if (interactive) {
+    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
   }
 
-  return L.tileLayer(OSM_TILE_URL, {
-    attribution: OSM_ATTRIBUTION,
-    maxZoom: 19,
-  });
+  return map;
 }
 
-/** @deprecated используйте createBaseTileLayer */
-export function createOsmTileLayer(): L.TileLayer {
-  return createBaseTileLayer('light');
+/** Смена light/dark: setStyle (слои событий нужно вешать заново на styledata). */
+export function applyMapTheme(map: MapLibreMap, theme: MapTheme): void {
+  map.setStyle(getMapStyle(theme));
 }
 
-/** Заменить подложку при смене темы (без пересоздания карты). */
-export function replaceBaseTileLayer(
-  map: L.Map,
-  previous: L.TileLayer | null | undefined,
-  theme: MapTheme,
-): L.TileLayer {
-  if (previous) {
-    map.removeLayer(previous);
-  }
-  const next = createBaseTileLayer(theme);
-  next.addTo(map);
-  next.bringToBack();
-  return next;
-}
-
-/** Ссылка на точку в OSM */
 export function buildOsmPointUrl(lat: number, lng: number, zoom = 16): string {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=${zoom}/${lat}/${lng}`;
 }
 
-/** Расстояние между двумя точками (метры), формула гаверсинуса */
 export function haversineMeters(a: [number, number], b: [number, number]): number {
   const R = 6_371_000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -126,43 +128,40 @@ export function haversineMeters(a: [number, number], b: [number, number]): numbe
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export function createDotIcon(color: string, size = 14): L.DivIcon {
-  return L.divIcon({
-    className: 'elist-map-dot',
-    html: `<span style="
-      display:block;width:${size}px;height:${size}px;border-radius:50%;
-      background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);
-    "></span>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
+export function createDotMarkerElement(color: string, size = 14): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'elist-map-dot';
+  el.style.cssText = `
+    width:${size}px;height:${size}px;border-radius:50%;
+    background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);
+    cursor:grab;
+  `;
+  return el;
 }
 
-/** Компактный зум Leaflet справа сверху */
-export function addCompactZoomControl(map: L.Map): void {
-  L.control.zoom({ position: 'topright' }).addTo(map);
-}
-
-export function setPickerBehaviors(map: L.Map, panEnabled: boolean): void {
-  map.doubleClickZoom.disable();
-  map.boxZoom.disable();
-  map.keyboard.disable();
+export function setPickerBehaviors(map: MapLibreMap, panEnabled: boolean): void {
   if (panEnabled) {
-    map.dragging.enable();
-    map.scrollWheelZoom.enable();
-    map.touchZoom.enable();
+    map.dragPan.enable();
+    map.scrollZoom.enable();
+    map.touchZoomRotate.enable();
   } else {
-    map.dragging.disable();
-    map.scrollWheelZoom.disable();
-    map.touchZoom.disable();
+    map.dragPan.disable();
+    map.scrollZoom.disable();
+    map.touchZoomRotate.disable();
   }
-}
-
-export function disableMapPageScrollCapture(map: L.Map): void {
-  map.dragging.disable();
-  map.scrollWheelZoom.disable();
-  map.touchZoom.disable();
   map.doubleClickZoom.disable();
   map.boxZoom.disable();
   map.keyboard.disable();
 }
+
+export function disableMapPageScrollCapture(map: MapLibreMap): void {
+  map.dragPan.disable();
+  map.scrollZoom.disable();
+  map.touchZoomRotate.disable();
+  map.doubleClickZoom.disable();
+  map.boxZoom.disable();
+  map.keyboard.disable();
+}
+
+export { Marker, Popup, MapLibreMap };
+export type { GeoJSONSource, StyleSpecification };

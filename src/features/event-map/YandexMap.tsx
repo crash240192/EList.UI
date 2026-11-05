@@ -1,16 +1,16 @@
-// features/event-map/YandexMap.tsx — просмотровая карта (Leaflet + MapTiler/OSM)
+// features/event-map/YandexMap.tsx — просмотровая карта (MapLibre)
 
 import { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
 import {
-  addCompactZoomControl,
+  applyMapTheme,
   buildOsmPointUrl,
-  createBaseTileLayer,
-  createDotIcon,
+  createDotMarkerElement,
   createMap,
   disableMapPageScrollCapture,
   mapDarkClass,
-  replaceBaseTileLayer,
+  Marker,
+  Popup,
+  type MapLibreMap,
   type MapTheme,
 } from '@/shared/lib/osmMap';
 import { useThemeStore } from '@/app/store';
@@ -27,9 +27,8 @@ function almostSame(a: [number, number], b: [number, number], eps = COORD_EPS): 
 export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: YandexMapProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInst = useRef<L.Map | null>(null);
-  const baseLayerRef = useRef<L.TileLayer | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+  const mapInst = useRef<MapLibreMap | null>(null);
+  const markerRef = useRef<Marker | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const { theme } = useThemeStore();
@@ -43,33 +42,37 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
       const map = createMap(mapRef.current, {
         center: [lat, lng],
         zoom,
-        zoomControl: false,
-        attributionControl: true,
+        theme: mapTheme,
+        interactive: draggable,
+        scrollZoom: draggable,
       });
-      baseLayerRef.current = createBaseTileLayer(mapTheme).addTo(map);
-      addCompactZoomControl(map);
       if (!draggable) {
         disableMapPageScrollCapture(map);
       }
 
-      const marker = L.marker([lat, lng], {
-        icon: createDotIcon('#7c3aed', 16),
-        title: label ?? '',
-      }).addTo(map);
+      const marker = new Marker({
+        element: createDotMarkerElement('#7c3aed', 16),
+      })
+        .setLngLat([lng, lat])
+        .addTo(map);
+      if (label) {
+        marker.setPopup(new Popup({ offset: 12 }).setText(label));
+      }
 
       mapInst.current = map;
       markerRef.current = marker;
-      if (!destroyed) setReady(true);
-
-      requestAnimationFrame(() => map.invalidateSize());
+      map.once('load', () => {
+        if (!destroyed) setReady(true);
+        map.resize();
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось инициализировать карту');
     }
 
     return () => {
       destroyed = true;
+      markerRef.current?.remove();
       markerRef.current = null;
-      baseLayerRef.current = null;
       mapInst.current?.remove();
       mapInst.current = null;
       setReady(false);
@@ -79,7 +82,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
 
   useEffect(() => {
     if (!ready || !mapInst.current) return;
-    baseLayerRef.current = replaceBaseTileLayer(mapInst.current, baseLayerRef.current, mapTheme);
+    applyMapTheme(mapInst.current, mapTheme);
   }, [mapTheme, ready]);
 
   useEffect(() => {
@@ -89,14 +92,13 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
     const current = map.getCenter();
     const z = map.getZoom();
     if (!almostSame([current.lat, current.lng], coords) || Math.abs(z - zoom) >= 0.5) {
-      map.setView(coords, zoom, { animate: true });
+      map.easeTo({ center: [lng, lat], zoom, duration: 200 });
     }
     if (markerRef.current) {
-      const p = markerRef.current.getLatLng();
+      const p = markerRef.current.getLngLat();
       if (!almostSame([p.lat, p.lng], coords)) {
-        markerRef.current.setLatLng(coords);
+        markerRef.current.setLngLat([lng, lat]);
       }
-      if (label) markerRef.current.bindTooltip(label);
     }
   }, [lat, lng, zoom, label, ready]);
 
@@ -104,7 +106,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
     if (!ready || !mapInst.current || !wrapRef.current) return;
     const map = mapInst.current;
     const el = wrapRef.current;
-    const fit = () => map.invalidateSize();
+    const fit = () => map.resize();
     fit();
     const observer = new ResizeObserver(() => fit());
     observer.observe(el);
