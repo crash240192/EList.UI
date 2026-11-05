@@ -45,7 +45,7 @@ function markerColors(item: IEventSearchShortItem): string[] {
 }
 
 /**
- * PNG-маркер: белый диск + чёрная ico; кант — цвета категорий (секторами).
+ * PNG-маркер: заливка цветом категории иконки; кант — цвета категорий (секторами).
  * count > 1 — число вместо иконки. Цвета не зависят от темы UI.
  */
 function makeMarkerPng(
@@ -72,10 +72,10 @@ function makeMarkerPng(
   const visual = resolveMarkerVisual(colors, filter, DEFAULT_COLOR);
   const ringColors = visual.ringColors;
 
-  // Лёгкий внешний ореол для читаемости на карте
+  // Тонкий внешний контур для читаемости на карте (не белый диск)
   ctx.beginPath();
-  ctx.arc(cx, cy, outerR + 1.5, 0, 2 * Math.PI);
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.arc(cx, cy, outerR + 1.25, 0, 2 * Math.PI);
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
   ctx.fill();
 
   // Кант цветами категорий (один цвет или сектора)
@@ -96,7 +96,7 @@ function makeMarkerPng(
     });
   }
 
-  // Белый внутряк
+  // Внутряк цветом категории иконки (без белого разделителя)
   ctx.beginPath();
   ctx.arc(cx, cy, innerR, 0, 2 * Math.PI);
   ctx.fillStyle = visual.fill;

@@ -1,5 +1,6 @@
 // Иконки маркеров карты из справочника категорий (API: ico + color).
-// Белый диск + чёрный силуэт ico; кант — color категорий (при нескольких — сектора).
+// Заливка — color категории иконки; кант — color категорий (при нескольких — сектора).
+// Ink иконки: светлый/тёмный по яркости заливки (не от темы UI).
 // Без фильтра типов/категорий — иконка первой категории события.
 // С фильтром — иконка совпавшей категории (несовпадающие события в выдаче не приходят).
 
@@ -10,9 +11,8 @@ import { icoToUrl } from '@/shared/lib/icoToUrl';
 /** CSS-размер иконки в круге маркера (исходники в API — 512×512). */
 export const MAP_MARKER_ICON_SIZE = 18;
 
-/** Чёрная иконка на белом диске — не зависит от темы UI. */
-export const MARKER_ICON_INK = '#111827';
-export const MARKER_FILL = '#ffffff';
+const INK_ON_LIGHT = '#111827';
+const INK_ON_DARK = '#ffffff';
 
 interface CategoryMarkerEntry {
   id: string;
@@ -167,27 +167,39 @@ export function resolveRingColors(apiColors: string[], fallback = '#6366f1'): st
 }
 
 /**
- * Иконка маркера: при активном фильтре типов/категорий — совпавшая категория;
+ * Категория для иконки: при активном фильтре типов/категорий — совпавшая;
  * иначе — первая категория события.
  */
-export function resolveMarkerIcon(
+function resolveMarkerIconEntry(
   apiColors: string[],
   filter?: MarkerTypeCategoryFilter | null,
-): { iconUrl: string | null; entryId: string | null } {
+): CategoryMarkerEntry | null {
   const entries = apiColors
     .map(c => lookupByColor(c))
     .filter((e): e is CategoryMarkerEntry => e != null);
 
-  if (!entries.length) return { iconUrl: null, entryId: null };
+  if (!entries.length) return null;
 
   const preferred = preferredCategoryIds(filter);
   if (preferred.size > 0) {
     const match = entries.find(e => preferred.has(e.id));
-    if (match) return { iconUrl: match.iconUrl, entryId: match.id };
+    if (match) return match;
     // Несовпавшие события не должны попадать в выдачу; на всякий случай — первая.
   }
 
-  return { iconUrl: entries[0].iconUrl, entryId: entries[0].id };
+  return entries[0];
+}
+
+export function resolveMarkerIcon(
+  apiColors: string[],
+  filter?: MarkerTypeCategoryFilter | null,
+): { iconUrl: string | null; entryId: string | null } {
+  const entry = resolveMarkerIconEntry(apiColors, filter);
+  return { iconUrl: entry?.iconUrl ?? null, entryId: entry?.id ?? null };
+}
+
+export function markerInkForFill(fill: string): string {
+  return isLightMarkerColor(fill) ? INK_ON_LIGHT : INK_ON_DARK;
 }
 
 export function resolveMarkerVisual(
@@ -201,12 +213,13 @@ export function resolveMarkerVisual(
   ink: string;
 } {
   const ringColors = resolveRingColors(apiColors, fallback);
-  const { iconUrl } = resolveMarkerIcon(apiColors, filter);
+  const entry = resolveMarkerIconEntry(apiColors, filter);
+  const fill = entry?.color ?? ringColors[0] ?? fallback;
   return {
     ringColors,
-    iconUrl,
-    fill: MARKER_FILL,
-    ink: MARKER_ICON_INK,
+    iconUrl: entry?.iconUrl ?? null,
+    fill,
+    ink: markerInkForFill(fill),
   };
 }
 
