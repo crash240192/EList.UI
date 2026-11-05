@@ -222,10 +222,7 @@
     saturate(0.42);
 }
 
-/* MapTiler *-dark: нативный стиль, но чуть тише контраст/насыщенность */
-.mapDarkNative :global(.leaflet-tile-pane) {
-  filter: brightness(0.9) contrast(0.84) saturate(0.68);
-}
+/* MapTiler *-dark: без CSS-коррекции — как отдаёт провайдер */
 
 /* Контролы и атрибуция в токенах приложения */
 .mapDarkInvert :global(.leaflet-control-attribution),
