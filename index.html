@@ -36,6 +36,8 @@
     <!-- Yandex.RTB — загрузчик один на весь сайт; блоки через Ya.Context.AdvManager.render() -->
     <script>window.yaContextCb=window.yaContextCb||[]</script>
     <script src="https://yandex.ru/ads/system/context.js" async></script>
+    <!-- Runtime-конфиг (Docker entrypoint подставляет MAPTILER_*); до бандла приложения -->
+    <script src="/runtime-config.js"></script>
   </head>
   <body>
     <!-- Яндекс.Метрика грузится после согласия на cookies (CookieConsentBanner). -->

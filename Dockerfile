@@ -27,18 +27,13 @@ RUN if [ -f package-lock.json ]; then \
 ARG CACHE_BUST=1
 COPY . .
 
-# Переменные окружения для сборки.
-# Переопределяются через --build-arg при docker build
-# или через .env файл (см. ниже)
+# Build-time только то, что реально нужно в бандле.
+# MapTiler-ключ — runtime (MAPTILER_KEY в docker-compose → entrypoint → runtime-config.js).
 ARG VITE_USE_MOCK=false
 ARG VITE_YANDEX_AD_BLOCK_ID=R-A-20290944-1
-ARG VITE_MAPTILER_KEY=
-ARG VITE_MAPTILER_STYLE=streets-v2
 
 ENV VITE_USE_MOCK=$VITE_USE_MOCK
 ENV VITE_YANDEX_AD_BLOCK_ID=$VITE_YANDEX_AD_BLOCK_ID
-ENV VITE_MAPTILER_KEY=$VITE_MAPTILER_KEY
-ENV VITE_MAPTILER_STYLE=$VITE_MAPTILER_STYLE
 
 # TypeScript проверка + Vite production build
 RUN npm run build
