@@ -36,9 +36,22 @@ export function hasMapTilerKey(): boolean {
   return MAPTILER_KEY.length > 0;
 }
 
-/** Нужен CSS-invert только для OSM-fallback (у MapTiler есть свой dark). */
+/** OSM-fallback: нужен soft-invert тайлов. MapTiler dark — только приглушение контраста. */
 export function usesCssMapInvert(theme: MapTheme): boolean {
   return theme === 'dark' && !hasMapTilerKey();
+}
+
+/**
+ * CSS-класс тёмной карты (module.css):
+ * - mapDarkInvert — нет MapTiler-ключа (OSM + мягкий invert под палитру UI)
+ * - mapDarkNative — есть MapTiler dark, слегка приглушаем контраст к --bg
+ */
+export function mapDarkClass(
+  theme: MapTheme,
+  styles: Record<string, string>,
+): string {
+  if (theme !== 'dark') return '';
+  return hasMapTilerKey() ? (styles.mapDarkNative ?? '') : (styles.mapDarkInvert ?? '');
 }
 
 function mapTilerStyleId(theme: MapTheme): string {

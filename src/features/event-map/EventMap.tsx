@@ -10,8 +10,8 @@ import {
   createBaseTileLayer,
   createMap,
   haversineMeters,
+  mapDarkClass,
   replaceBaseTileLayer,
-  usesCssMapInvert,
   type MapTheme,
 } from '@/shared/lib/osmMap';
 import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlacement';
@@ -469,7 +469,7 @@ export function EventMap({
     <div className={styles.eventsMapWrap}>
       <div
         ref={containerRef}
-        className={`${styles.eventsMap} ${usesCssMapInvert(mapTheme) ? styles.eventsMapDark : ''}`}
+        className={`${styles.eventsMap} ${mapDarkClass(mapTheme, styles)}`}
       />
 
       {ctxMenu && (

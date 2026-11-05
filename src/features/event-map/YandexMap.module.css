@@ -178,29 +178,60 @@
   height: 100%;
 }
 
-/* Тёмная тема: инвертим тайлы. На marker/overlay panes — тот же filter ещё раз:
-   invert(1)+hue-rotate(180) дважды = исходные цвета маркеров. */
-.eventsMapDark,
-.mapDark {
-  filter: invert(1) hue-rotate(180deg);
+/*
+ * Тёмная карта: фильтр только на .leaflet-tile-pane —
+ * маркеры/попапы/кластеры остаются в исходных цветах (без двойного invert).
+ * Целевая гамма UI: --bg #16171e, --surface #1f2028 (сине-серый, не pitch-black).
+ */
+
+/* OSM fallback: мягкий invert + приглушение, ближе к --bg */
+.mapDarkInvert :global(.leaflet-tile-pane),
+.eventsMapDark :global(.leaflet-tile-pane) {
+  filter:
+    invert(1)
+    hue-rotate(180deg)
+    brightness(0.88)
+    contrast(0.78)
+    saturate(0.42);
 }
 
-.eventsMapDark :global(.leaflet-marker-pane),
-.eventsMapDark :global(.leaflet-shadow-pane),
-.eventsMapDark :global(.leaflet-overlay-pane),
-.eventsMapDark :global(.leaflet-tooltip-pane),
-.eventsMapDark :global(.leaflet-popup-pane),
-.mapDark :global(.leaflet-marker-pane),
-.mapDark :global(.leaflet-shadow-pane),
-.mapDark :global(.leaflet-overlay-pane),
-.mapDark :global(.leaflet-tooltip-pane),
-.mapDark :global(.leaflet-popup-pane) {
-  filter: invert(1) hue-rotate(180deg);
+/* MapTiler *-dark: нативный стиль, но чуть тише контраст/насыщенность */
+.mapDarkNative :global(.leaflet-tile-pane) {
+  filter: brightness(0.9) contrast(0.84) saturate(0.68);
 }
 
-.eventsMapDark :global(.leaflet-control),
-.mapDark :global(.leaflet-control) {
-  filter: invert(1) hue-rotate(180deg);
+/* Контролы и атрибуция в токенах приложения */
+.mapDarkInvert :global(.leaflet-control-attribution),
+.mapDarkNative :global(.leaflet-control-attribution),
+.eventsMapDark :global(.leaflet-control-attribution) {
+  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+  color: var(--text-muted);
+  border-radius: 4px;
+}
+
+.mapDarkInvert :global(.leaflet-control-attribution a),
+.mapDarkNative :global(.leaflet-control-attribution a),
+.eventsMapDark :global(.leaflet-control-attribution a) {
+  color: var(--text-secondary);
+}
+
+.mapDarkInvert :global(.leaflet-control-zoom a),
+.mapDarkNative :global(.leaflet-control-zoom a),
+.eventsMapDark :global(.leaflet-control-zoom a) {
+  background: var(--surface) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+.mapDarkInvert :global(.leaflet-control-zoom a:hover),
+.mapDarkNative :global(.leaflet-control-zoom a:hover),
+.eventsMapDark :global(.leaflet-control-zoom a:hover) {
+  background: var(--surface-2) !important;
+}
+
+/* Alias: старое имя eventsMapDark = invert-режим */
+.eventsMapDark {
+  /* контейнер без filter — только дочерние правила выше */
 }
 
 /* ---- Error ---- */

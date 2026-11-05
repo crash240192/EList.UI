@@ -9,9 +9,9 @@ import {
   createDotIcon,
   createMap,
   DEFAULT_MAP_CENTER,
+  mapDarkClass,
   replaceBaseTileLayer,
   setPickerBehaviors,
-  usesCssMapInvert,
   type MapTheme,
 } from '@/shared/lib/osmMap';
 import { useThemeStore } from '@/app/store';
@@ -239,7 +239,7 @@ export function PickerMapView({
   return (
     <div
       ref={ref}
-      className={`${className ?? styles.pickerMap} ${usesCssMapInvert(mapTheme) ? styles.mapDark : ''}`}
+      className={`${className ?? styles.pickerMap} ${mapDarkClass(mapTheme, styles)}`}
     />
   );
 }

@@ -9,8 +9,8 @@ import {
   createDotIcon,
   createMap,
   disableMapPageScrollCapture,
+  mapDarkClass,
   replaceBaseTileLayer,
-  usesCssMapInvert,
   type MapTheme,
 } from '@/shared/lib/osmMap';
 import { useThemeStore } from '@/app/store';
@@ -117,7 +117,7 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
     <div ref={wrapRef} className={styles.mapViewWrap}>
       <div
         ref={mapRef}
-        className={`${styles.map} ${usesCssMapInvert(mapTheme) ? styles.mapDark : ''}`}
+        className={`${styles.map} ${mapDarkClass(mapTheme, styles)}`}
       />
       <a
         className={styles.osmPointLink}
