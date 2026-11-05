@@ -412,6 +412,17 @@ export function EventMap({
       maxClusterRadius: 60,
       spiderfyOnMaxZoom: true,
       zoomToBoundsOnClick: false,
+      // Вместо салатового дефолта MarkerCluster — акцент приложения
+      iconCreateFunction: (cluster) => {
+        const count = cluster.getChildCount();
+        const size = count < 10 ? 36 : count < 40 ? 42 : 48;
+        return L.divIcon({
+          html: `<div>${count}</div>`,
+          className: 'elist-map-cluster',
+          iconSize: L.point(size, size),
+          iconAnchor: L.point(size / 2, size / 2),
+        });
+      },
     });
 
     for (const [, group] of groups) {
@@ -483,7 +494,7 @@ export function EventMap({
             border: '1px solid var(--border)',
             borderRadius: 12,
             boxShadow: '0 4px 24px rgba(0,0,0,0.28)',
-            zIndex: 50,
+            zIndex: 1100,
             minWidth: 180,
             overflow: 'hidden',
           }}
