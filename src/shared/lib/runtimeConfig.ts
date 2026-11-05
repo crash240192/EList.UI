@@ -25,5 +25,5 @@ export function getMapTilerKey(): string {
 export function getMapTilerStyle(): string {
   const fromRuntime = getRuntimeConfig().mapTilerStyle?.trim() ?? '';
   if (fromRuntime) return fromRuntime;
-  return (import.meta.env.VITE_MAPTILER_STYLE as string | undefined)?.trim() || 'streets-v2';
+  return (import.meta.env.VITE_MAPTILER_STYLE as string | undefined)?.trim() || 'streets-v4';
 }
