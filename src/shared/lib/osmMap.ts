@@ -25,6 +25,10 @@ export function createOsmTileLayer(): L.TileLayer {
   return L.tileLayer(OSM_TILE_URL, {
     attribution: OSM_ATTRIBUTION,
     maxZoom: 19,
+    // DPR≥2 (мобилки): иначе 256px-тайл растягивается → мыло/пиксели.
+    // Leaflet берёт z+1 и рисует в половинном CSS-size; maxZoom станет 18
+    // (zoomOffset+1 → нативный OSM z19 на крайнем зуме, без запроса z20).
+    detectRetina: true,
   });
 }
 
