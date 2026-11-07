@@ -1,43 +1,85 @@
-// shared/lib/osmMap.ts — Leaflet + тайлы OpenStreetMap
+// shared/lib/osmMap.ts — MapLibre GL + OpenFreeMap (данные OSM, без API-ключа)
 
-import L from 'leaflet';
-
-export const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-export const OSM_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>';
+import '@/shared/lib/maplibreWorker';
+import {
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  Popup,
+  type GeoJSONSource,
+  type MapOptions,
+  type StyleSpecification,
+} from 'maplibre-gl';
 
 export const DEFAULT_MAP_CENTER: [number, number] = [55.7558, 37.6173];
 
-/**
- * Leaflet 1.9+ по умолчанию рисует флаг Украины в prefix атрибуции.
- * Оставляем нейтральный текст; атрибуция OSM на тайловом слое сохраняется.
- */
-const LEAFLET_ATTRIBUTION_PREFIX =
-  '<a href="https://leafletjs.com" title="A JavaScript library for interactive maps">Leaflet</a>';
+export type MapTheme = 'light' | 'dark';
 
-export function createMap(el: HTMLElement, options?: L.MapOptions): L.Map {
-  const map = L.map(el, options);
-  map.attributionControl?.setPrefix(LEAFLET_ATTRIBUTION_PREFIX);
+/** Публичные стили OpenFreeMap (коммерческое использование разрешено). */
+export const OPENFREEMAP_STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
+export const OPENFREEMAP_STYLE_DARK = 'https://tiles.openfreemap.org/styles/dark';
+
+export function getMapStyle(theme: MapTheme = 'light'): string {
+  return theme === 'dark' ? OPENFREEMAP_STYLE_DARK : OPENFREEMAP_STYLE_LIGHT;
+}
+
+/** OFM dark — нативный стиль, CSS-invert не нужен. */
+export function mapDarkClass(
+  theme: MapTheme,
+  styles: Record<string, string>,
+): string {
+  if (theme !== 'dark') return '';
+  return styles.mapDarkNative ?? '';
+}
+
+export interface CreateMapLibreOptions {
+  center?: [number, number];
+  zoom?: number;
+  theme?: MapTheme;
+  interactive?: boolean;
+  scrollZoom?: boolean;
+  attributionControl?: boolean;
+}
+
+export function createMap(
+  container: HTMLElement,
+  options: CreateMapLibreOptions = {},
+): MapLibreMap {
+  const {
+    center = DEFAULT_MAP_CENTER,
+    zoom = 12,
+    theme = 'light',
+    interactive = true,
+    scrollZoom = interactive,
+    attributionControl = true,
+  } = options;
+
+  const map = new MapLibreMap({
+    container,
+    style: getMapStyle(theme),
+    center: [center[1], center[0]], // MapLibre: [lng, lat]
+    zoom,
+    interactive,
+    scrollZoom,
+    attributionControl: attributionControl ? undefined : false,
+  } satisfies MapOptions);
+
+  if (interactive) {
+    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+  }
+
   return map;
 }
 
-export function createOsmTileLayer(): L.TileLayer {
-  return L.tileLayer(OSM_TILE_URL, {
-    attribution: OSM_ATTRIBUTION,
-    maxZoom: 19,
-    // DPR≥2 (мобилки): иначе 256px-тайл растягивается → мыло/пиксели.
-    // Leaflet берёт z+1 и рисует в половинном CSS-size; maxZoom станет 18
-    // (zoomOffset+1 → нативный OSM z19 на крайнем зуме, без запроса z20).
-    detectRetina: true,
-  });
+/** Смена light/dark: setStyle (слои событий перевешиваются на style.load). */
+export function applyMapTheme(map: MapLibreMap, theme: MapTheme): void {
+  map.setStyle(getMapStyle(theme));
 }
 
-/** Ссылка на точку в OSM */
 export function buildOsmPointUrl(lat: number, lng: number, zoom = 16): string {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=${zoom}/${lat}/${lng}`;
 }
 
-/** Расстояние между двумя точками (метры), формула гаверсинуса */
 export function haversineMeters(a: [number, number], b: [number, number]): number {
   const R = 6_371_000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -51,43 +93,40 @@ export function haversineMeters(a: [number, number], b: [number, number]): numbe
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export function createDotIcon(color: string, size = 14): L.DivIcon {
-  return L.divIcon({
-    className: 'elist-map-dot',
-    html: `<span style="
-      display:block;width:${size}px;height:${size}px;border-radius:50%;
-      background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);
-    "></span>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
+export function createDotMarkerElement(color: string, size = 14): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'elist-map-dot';
+  el.style.cssText = `
+    width:${size}px;height:${size}px;border-radius:50%;
+    background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);
+    cursor:grab;
+  `;
+  return el;
 }
 
-/** Компактный зум Leaflet справа сверху */
-export function addCompactZoomControl(map: L.Map): void {
-  L.control.zoom({ position: 'topright' }).addTo(map);
-}
-
-export function setPickerBehaviors(map: L.Map, panEnabled: boolean): void {
-  map.doubleClickZoom.disable();
-  map.boxZoom.disable();
-  map.keyboard.disable();
+export function setPickerBehaviors(map: MapLibreMap, panEnabled: boolean): void {
   if (panEnabled) {
-    map.dragging.enable();
-    map.scrollWheelZoom.enable();
-    map.touchZoom.enable();
+    map.dragPan.enable();
+    map.scrollZoom.enable();
+    map.touchZoomRotate.enable();
   } else {
-    map.dragging.disable();
-    map.scrollWheelZoom.disable();
-    map.touchZoom.disable();
+    map.dragPan.disable();
+    map.scrollZoom.disable();
+    map.touchZoomRotate.disable();
   }
-}
-
-export function disableMapPageScrollCapture(map: L.Map): void {
-  map.dragging.disable();
-  map.scrollWheelZoom.disable();
-  map.touchZoom.disable();
   map.doubleClickZoom.disable();
   map.boxZoom.disable();
   map.keyboard.disable();
 }
+
+export function disableMapPageScrollCapture(map: MapLibreMap): void {
+  map.dragPan.disable();
+  map.scrollZoom.disable();
+  map.touchZoomRotate.disable();
+  map.doubleClickZoom.disable();
+  map.boxZoom.disable();
+  map.keyboard.disable();
+}
+
+export { Marker, Popup, MapLibreMap };
+export type { GeoJSONSource, StyleSpecification };
