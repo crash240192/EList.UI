@@ -15,9 +15,16 @@ export const DEFAULT_MAP_CENTER: [number, number] = [55.7558, 37.6173];
 
 export type MapTheme = 'light' | 'dark';
 
-/** Публичные стили OpenFreeMap (коммерческое использование разрешено). */
+/**
+ * Публичные стили OpenFreeMap (коммерческое OK, без ключа).
+ * style.json не в репо — грузится по URL (MapLibre Style Spec).
+ *
+ * light: liberty (есть building-3d — мы его гасим).
+ * dark:  fiord, не «dark» — stock dark почти чёрный (bg rgb(12,12,12)),
+ *        дороги/кварталы сливаются; fiord читаемее на мобилке.
+ */
 export const OPENFREEMAP_STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
-export const OPENFREEMAP_STYLE_DARK = 'https://tiles.openfreemap.org/styles/dark';
+export const OPENFREEMAP_STYLE_DARK = 'https://tiles.openfreemap.org/styles/fiord';
 
 export function getMapStyle(theme: MapTheme = 'light'): string {
   return theme === 'dark' ? OPENFREEMAP_STYLE_DARK : OPENFREEMAP_STYLE_LIGHT;
@@ -30,6 +37,22 @@ export function mapDarkClass(
 ): string {
   if (theme !== 'dark') return '';
   return styles.mapDarkNative ?? '';
+}
+
+/** Убрать 3D-здания и зафиксировать «плоский» вид (дешевле на мобилке). */
+export function flattenMapView(map: MapLibreMap): void {
+  map.setPitch(0);
+  map.setBearing(0);
+  if (!map.isStyleLoaded()) return;
+  for (const layer of map.getStyle().layers ?? []) {
+    if (layer.type === 'fill-extrusion') {
+      try {
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
+      } catch {
+        /* слой мог исчезнуть при смене стиля */
+      }
+    }
+  }
 }
 
 export interface CreateMapLibreOptions {
@@ -62,7 +85,17 @@ export function createMap(
     interactive,
     scrollZoom,
     attributionControl: attributionControl ? undefined : false,
+    // без наклона/поворота — нет «3D-карты», меньше нагрузка на GPU
+    pitch: 0,
+    maxPitch: 0,
+    dragRotate: false,
+    touchPitch: false,
+    pitchWithRotate: false,
   } satisfies MapOptions);
+
+  const onStyle = () => flattenMapView(map);
+  map.on('load', onStyle);
+  map.on('style.load', onStyle);
 
   if (interactive) {
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
