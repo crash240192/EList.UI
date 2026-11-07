@@ -90,27 +90,46 @@ function applyPaletteToStyle(style: StyleSpecification): void {
     'fill-opacity': 0.92,
   });
 
+  // Улицы: цвет + лёгкий line-blur (нативный, без доп. слоёв / post-process).
+  // Casing = мягкое «halo», inner = чуть более чёткое ядро.
   for (const id of [
     'highway_major_inner',
-    'highway_major_subtle',
-    'highway_major_casing',
     'highway_motorway_inner',
-    'highway_motorway_subtle',
-    'highway_motorway_casing',
-    'tunnel_motorway_casing',
     'tunnel_motorway_inner',
   ]) {
-    setLayerPaint(style, id, { 'line-color': p.streetMaj });
+    setLayerPaint(style, id, {
+      'line-color': p.streetMaj,
+      'line-blur': 0.6,
+      'line-opacity': 0.92,
+    });
+  }
+  for (const id of [
+    'highway_major_casing',
+    'highway_motorway_casing',
+    'tunnel_motorway_casing',
+    'highway_major_subtle',
+    'highway_motorway_subtle',
+  ]) {
+    setLayerPaint(style, id, {
+      'line-color': p.streetMaj,
+      'line-blur': 2.4,
+      'line-opacity': 0.38,
+    });
   }
 
+  for (const id of ['highway_minor', 'highway_path']) {
+    setLayerPaint(style, id, {
+      'line-color': p.streetMin,
+      'line-blur': 1.4,
+      'line-opacity': 0.88,
+    });
+  }
   for (const id of [
-    'highway_minor',
-    'highway_path',
     'aeroway-taxiway',
     'aeroway-runway-casing',
     'aeroway-runway',
   ]) {
-    setLayerPaint(style, id, { 'line-color': p.streetMin });
+    setLayerPaint(style, id, { 'line-color': p.streetMin, 'line-blur': 1 });
   }
   setLayerPaint(style, 'aeroway-area', { 'fill-color': p.streetMin });
 
