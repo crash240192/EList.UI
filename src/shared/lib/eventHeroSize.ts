@@ -32,7 +32,9 @@ export function calcHeroCollapseRange(expandedHeight: number, collapsedHeight: n
  * (в пределах диапазона) → при position:sticky щель до belowHero = 0.
  */
 export function scrollToHeroCollapse(scrollTop: number, collapseRangePx: number): number {
-  if (collapseRangePx <= 0) return 1;
+  // range=0 на первом кадре (expanded ещё = collapsed) — не считаем «схлопнуто»,
+  // иначе слот потом вырастет, а heroCollapse останется 1 → щель до первого скролла.
+  if (collapseRangePx <= 0) return 0;
   return Math.min(1, Math.max(0, scrollTop / collapseRangePx));
 }
 

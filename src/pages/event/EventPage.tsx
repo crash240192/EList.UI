@@ -487,7 +487,9 @@ export default function EventPage() {
     onScroll();
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
-  }, [event?.id]);
+    // expanded/collapsed: после ResizeObserver range появляется — пересчитать
+    // без ожидания скролла (иначе heroCollapse=1 от range=0 залипает со щелью).
+  }, [event?.id, expandedHeroHeight, collapsedHeroHeight]);
 
   useEffect(() => {
     if (!loading) return;

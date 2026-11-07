@@ -90,48 +90,34 @@ function applyPaletteToStyle(style: StyleSpecification): void {
     'fill-opacity': 0.92,
   });
 
-  // Улицы: цвет + лёгкий line-blur (нативный, без доп. слоёв / post-process).
-  // Casing = мягкое «halo», inner = чуть более чёткое ядро.
   for (const id of [
     'highway_major_inner',
-    'highway_motorway_inner',
-    'tunnel_motorway_inner',
-  ]) {
-    setLayerPaint(style, id, {
-      'line-color': p.streetMaj,
-      'line-blur': 0.6,
-      'line-opacity': 0.92,
-    });
-  }
-  for (const id of [
+    'highway_major_subtle',
     'highway_major_casing',
+    'highway_motorway_inner',
+    'highway_motorway_subtle',
     'highway_motorway_casing',
     'tunnel_motorway_casing',
-    'highway_major_subtle',
-    'highway_motorway_subtle',
+    'tunnel_motorway_inner',
   ]) {
-    setLayerPaint(style, id, {
-      'line-color': p.streetMaj,
-      'line-blur': 2.4,
-      'line-opacity': 0.38,
-    });
+    setLayerPaint(style, id, { 'line-color': p.streetMaj });
   }
 
-  for (const id of ['highway_minor', 'highway_path']) {
-    setLayerPaint(style, id, {
-      'line-color': p.streetMin,
-      'line-blur': 1.4,
-      'line-opacity': 0.88,
-    });
-  }
   for (const id of [
+    'highway_minor',
+    'highway_path',
     'aeroway-taxiway',
     'aeroway-runway-casing',
     'aeroway-runway',
   ]) {
-    setLayerPaint(style, id, { 'line-color': p.streetMin, 'line-blur': 1 });
+    setLayerPaint(style, id, { 'line-color': p.streetMin });
   }
   setLayerPaint(style, 'aeroway-area', { 'fill-color': p.streetMin });
+
+  // Ядро улиц чуть смягчаем; основной glow — отдельные underlay-слои ниже.
+  for (const id of ['highway_minor', 'highway_major_inner', 'highway_motorway_inner']) {
+    setLayerPaint(style, id, { 'line-blur': 0.4, 'line-opacity': 0.95 });
+  }
 
   const landText = '#f0f1f7';
   const landHalo = 'rgba(22, 23, 30, 0.85)';
@@ -156,6 +142,54 @@ function applyPaletteToStyle(style: StyleSpecification): void {
     'text-color': '#f0f1f7',
     'text-halo-color': 'rgba(26, 16, 64, 0.75)',
   });
+}
+
+function scaleLineWidth(width: unknown, factor: number): unknown {
+  if (typeof width === 'number') return width * factor;
+  if (Array.isArray(width)) return ['*', factor, width];
+  return 4 * factor;
+}
+
+/**
+ * Neon glow: копии street-слоёв под оригиналом (шире + line-blur).
+ * Три underlay — заметно сильнее одного line-blur на ядре, без тяжёлого post-process.
+ */
+function injectStreetGlow(style: StyleSpecification): void {
+  if (!style.layers) return;
+  const p = ELIST_DARK_MAP_PALETTE;
+  const targets: Array<{
+    id: string;
+    color: string;
+    widthFactor: number;
+    blur: number;
+    opacity: number;
+  }> = [
+    { id: 'highway_minor', color: p.streetMin, widthFactor: 3.2, blur: 10, opacity: 0.5 },
+    { id: 'highway_major_inner', color: p.streetMaj, widthFactor: 2.8, blur: 12, opacity: 0.45 },
+    { id: 'highway_motorway_inner', color: p.streetMaj, widthFactor: 2.8, blur: 12, opacity: 0.45 },
+  ];
+
+  for (const t of targets) {
+    const glowId = `${t.id}-elist-glow`;
+    if (style.layers.some(l => l.id === glowId)) continue;
+    const idx = style.layers.findIndex(l => l.id === t.id);
+    if (idx < 0) continue;
+    const src = style.layers[idx];
+    if (src.type !== 'line') continue;
+
+    const glow = structuredClone(src) as LayerSpecification & {
+      paint?: Record<string, unknown>;
+    };
+    glow.id = glowId;
+    const paint: Record<string, unknown> = { ...(glow.paint ?? {}) };
+    paint['line-color'] = t.color;
+    paint['line-opacity'] = t.opacity;
+    paint['line-blur'] = t.blur;
+    paint['line-width'] = scaleLineWidth(paint['line-width'], t.widthFactor);
+    delete paint['line-dasharray'];
+    glow.paint = paint;
+    style.layers.splice(idx, 0, glow);
+  }
 }
 
 /**
@@ -203,6 +237,7 @@ async function getElistDarkStyle(): Promise<StyleSpecification> {
       })
       .then(style => {
         applyPaletteToStyle(style);
+        injectStreetGlow(style);
         injectBuilding3d(style);
         return style;
       })
