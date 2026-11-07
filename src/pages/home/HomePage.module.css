@@ -170,10 +170,10 @@
 :global(.light-theme) .mapMock {
   background: repeating-linear-gradient(
     45deg,
-    #ccd2dc,
-    #ccd2dc 10px,
-    #e6e9f0 10px,
-    #e6e9f0 20px
+    #e8d5bc,
+    #e8d5bc 10px,
+    #f6eee4 10px,
+    #f6eee4 20px
   );
 }
 

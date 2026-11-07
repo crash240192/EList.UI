@@ -36,14 +36,30 @@
 }
 
 .light-theme {
-  /* v2: белая точка на поверхностях — карточки читаются объёмом, а не тенями */
-  --bg:             #eef1f5;
-  --surface:        #ffffff;
-  --surface-2:      #f2f4f9;
-  --border:         #dde2ec;
-  --text-primary:   #1a1f2e;
-  --text-secondary: #4d5464;
-  --text-muted:     #667085;  /* ≥4.5:1 на белом */
+  /*
+   * Oak / Berry / Linen / Blueberry / Sage
+   *   Warm Oak #A57650 · Berry Red #851C24 · Toasted Linen #D5B38E
+   *   Blueberry Blue #414757 · Sage Green #84896D
+   */
+  --bg:             #f6eee4;   /* linen, осветлённый */
+  --surface:        #fffaf5;   /* тёплый «бумажный» белый */
+  --surface-2:      #e8d5bc;   /* linen, чуть светлее ядра #D5B38E */
+  --border:         #A57650;   /* Warm Oak */
+  --accent:         #851C24;   /* Berry Red */
+  --accent-hover:   #A57650;   /* Warm Oak */
+  --text-primary:   #414757;   /* Blueberry Blue */
+  --text-secondary: #84896D;   /* Sage Green */
+  --text-muted:     #6f7460;   /* sage, чуть глубже для мелкого текста */
+
+  /* Hero — berry → blueberry → oak → sage */
+  --hero-gradient: linear-gradient(
+    135deg,
+    #851C24 0%,
+    #414757 42%,
+    #A57650 78%,
+    #84896D 100%
+  );
+  --hero-border: 1px solid color-mix(in srgb, #A57650 40%, transparent);
 }
 
 html {
