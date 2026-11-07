@@ -1,7 +1,7 @@
 // features/event-map/YandexMapPicker.tsx — единое поле адреса + карта с темой
 
 import { useState, useCallback } from 'react';
-import { geocodeAddress } from '@/shared/lib/yandexMaps';
+import { geocodeAddress } from '@/shared/lib/geocode';
 import { PickerMapView } from './PickerMapView';
 import { MapPickerModal } from './MapPickerModal';
 import styles from './YandexMap.module.css';

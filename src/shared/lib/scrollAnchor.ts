@@ -16,6 +16,10 @@
  * Хиро: слот держит layout; сжатие только визуальное → нет петли
  * scrollTop → height → scrollTop (compensateScrollerForHeightDelta для hero не нужен).
  *
+ * Важно: между .page (scrollport) и .hero не должно быть overflow:hidden/auto
+ * (типичный виновник — pageShell .card). Иначе sticky не цепляется к .page,
+ * хиро уезжает вверх, а в слоте остаётся пустой зазор до .belowHero.
+ *
  * Цепочка при expand/collapse блока (альбомы / описание):
  *   1) capture: top секции (getBoundingClientRect) + scroller
  *   2) React commit (высота секции изменилась)

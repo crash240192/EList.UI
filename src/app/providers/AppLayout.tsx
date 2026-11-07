@@ -329,7 +329,18 @@ export function AppLayout() {
           }}
           onContinue={() => {
             setDraftResumeOpen(false);
-            navigate('/create-event');
+            const draft = loadCreateEventDraft(getStoredAccountId() ?? accountId);
+            const host = draft?.host;
+            if (host?.kind === 'organization') {
+              const q = new URLSearchParams({
+                host: 'org',
+                organizationId: host.organizationId,
+              });
+              navigate(`/create-event?${q}`);
+              return;
+            }
+            // Личный хост / нет host в черновике — сразу форма, без chooser
+            navigate('/create-event?host=user');
           }}
           onCancel={() => setDraftResumeOpen(false)}
         />

@@ -1,12 +1,15 @@
-// features/event-map/YandexMap.tsx — просмотровая карта
+// features/event-map/YandexMap.tsx — просмотровая карта (Leaflet + OSM)
 
 import { useEffect, useRef, useState } from 'react';
+import L from 'leaflet';
 import {
-  loadYandexMaps,
   addCompactZoomControl,
-  attachYandexCopyrightPointLink,
+  buildOsmPointUrl,
+  createDotIcon,
+  createMap,
+  createOsmTileLayer,
   disableMapPageScrollCapture,
-} from '@/shared/lib/yandexMaps';
+} from '@/shared/lib/osmMap';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
 
@@ -19,81 +22,83 @@ function almostSame(a: [number, number], b: [number, number], eps = COORD_EPS): 
 }
 
 export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: YandexMapProps) {
-  const wrapRef  = useRef<HTMLDivElement>(null);
-  const mapRef   = useRef<HTMLDivElement>(null);
-  const mapInst  = useRef<any>(null);
-  const placemarkRef = useRef<any>(null);
-  const detachCopyrightRef = useRef<(() => void) | undefined>(undefined);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInst = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const { theme } = useThemeStore();
 
-  // Инстанс карты создаём один раз; смена draggable — редкий remount
   useEffect(() => {
+    if (!mapRef.current) return;
     let destroyed = false;
 
-    loadYandexMaps().then(() => {
-      if (destroyed || !mapRef.current) return;
-      const ymaps = (window as any).ymaps;
-      const map = new ymaps.Map(mapRef.current, {
-        center: [lat, lng], zoom,
-        controls: [],
-        type: 'yandex#map',
-        behaviors: draggable ? ['default'] : [],
-      }, { suppressMapOpenBlock: true, yandexMapDisablePoiInteractivity: true });
+    try {
+      const map = createMap(mapRef.current, {
+        center: [lat, lng],
+        zoom,
+        zoomControl: false,
+        attributionControl: true,
+      });
+      createOsmTileLayer().addTo(map);
       addCompactZoomControl(map);
       if (!draggable) {
         disableMapPageScrollCapture(map);
       }
-      const pm = new ymaps.Placemark(
-        [lat, lng],
-        { balloonContent: label ?? '' },
-        { preset: 'islands#violetDotIcon' },
-      );
-      map.geoObjects.add(pm);
-      mapInst.current = map;
-      placemarkRef.current = pm;
 
-      if (wrapRef.current) {
-        detachCopyrightRef.current = attachYandexCopyrightPointLink(wrapRef.current, lat, lng, zoom);
-      }
-      setReady(true);
-    }).catch(e => setError(e.message));
+      const marker = L.marker([lat, lng], {
+        icon: createDotIcon('#7c3aed', 16),
+        title: label ?? '',
+      }).addTo(map);
+
+      mapInst.current = map;
+      markerRef.current = marker;
+      if (!destroyed) setReady(true);
+
+      requestAnimationFrame(() => map.invalidateSize());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось инициализировать карту');
+    }
 
     return () => {
       destroyed = true;
-      detachCopyrightRef.current?.();
-      detachCopyrightRef.current = undefined;
-      placemarkRef.current = null;
-      mapInst.current?.destroy?.();
+      markerRef.current = null;
+      mapInst.current?.remove();
       mapInst.current = null;
       setReady(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draggable]);
 
-  // Обновляем центр / метку без destroy карты (меньше тайлов)
   useEffect(() => {
     if (!ready || !mapInst.current) return;
     const map = mapInst.current;
     const coords: [number, number] = [lat, lng];
-    const current = map.getCenter() as [number, number];
-    const z = map.getZoom() as number;
-    if (!almostSame(current, coords) || Math.abs(z - zoom) >= 0.5) {
-      map.setCenter(coords, zoom, { duration: 200 });
+    const current = map.getCenter();
+    const z = map.getZoom();
+    if (!almostSame([current.lat, current.lng], coords) || Math.abs(z - zoom) >= 0.5) {
+      map.setView(coords, zoom, { animate: true });
     }
-    if (placemarkRef.current) {
-      const pmCoords = placemarkRef.current.geometry.getCoordinates() as [number, number];
-      if (!almostSame(pmCoords, coords)) {
-        placemarkRef.current.geometry.setCoordinates(coords);
+    if (markerRef.current) {
+      const p = markerRef.current.getLatLng();
+      if (!almostSame([p.lat, p.lng], coords)) {
+        markerRef.current.setLatLng(coords);
       }
-      placemarkRef.current.properties.set('balloonContent', label ?? '');
-    }
-    detachCopyrightRef.current?.();
-    if (wrapRef.current) {
-      detachCopyrightRef.current = attachYandexCopyrightPointLink(wrapRef.current, lat, lng, zoom);
+      if (label) markerRef.current.bindTooltip(label);
     }
   }, [lat, lng, zoom, label, ready]);
+
+  useEffect(() => {
+    if (!ready || !mapInst.current || !wrapRef.current) return;
+    const map = mapInst.current;
+    const el = wrapRef.current;
+    const fit = () => map.invalidateSize();
+    fit();
+    const observer = new ResizeObserver(() => fit());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ready]);
 
   if (error) return <div className={styles.errorBox}>{error}</div>;
 
@@ -101,9 +106,16 @@ export function YandexMap({ lat, lng, label, zoom = 15, draggable = true }: Yand
     <div ref={wrapRef} className={styles.mapViewWrap}>
       <div
         ref={mapRef}
-        className={styles.map}
-        style={theme === 'dark' ? { filter: 'invert(1) hue-rotate(180deg)' } : undefined}
+        className={`${styles.map} ${theme === 'dark' ? styles.mapDark : ''}`}
       />
+      <a
+        className={styles.osmPointLink}
+        href={buildOsmPointUrl(lat, lng, zoom)}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Открыть в OpenStreetMap
+      </a>
     </div>
   );
 }

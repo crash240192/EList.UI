@@ -52,7 +52,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VITE_YANDEX_MAPS_KEY=ea3f78ff-3c27-4101-a391-8c0a1d703833
             VITE_USE_MOCK=false
             VITE_YANDEX_AD_BLOCK_ID=R-A-20290944-1
           cache-from: type=gha
