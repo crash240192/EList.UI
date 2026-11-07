@@ -12,8 +12,27 @@ import { isAccessDeniedApiCode, isAgreementNotFoundCode } from './errorCodes';
 
 export const COOKIE_CLIENT_HASH = 'elist_client_hash';
 export const COOKIE_AUTH_TOKEN  = 'elist_auth_token';
+/** Версия приложения на момент логина — токен на бэкенде привязан к ClientHash(jwt|platform|version). */
+export const COOKIE_AUTH_APP_VERSION = 'elist_auth_app_version';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/eList';
+
+/** Must match elist.api / filestorage ClientHash inputs (X-Client-Platform). */
+export function getClientPlatform(): string {
+  return 'web';
+}
+
+/** Must match elist.api / filestorage ClientHash inputs (X-App-Version). */
+export function getAppVersion(): string {
+  return (import.meta.env.VITE_APP_VERSION as string | undefined) || '0.1.0';
+}
+
+function clientIdentityHeaders(): Record<string, string> {
+  return {
+    'X-Client-Platform': getClientPlatform(),
+    'X-App-Version': getAppVersion(),
+  };
+}
 
 export class ApiError extends Error {
   constructor(
@@ -21,7 +40,28 @@ export class ApiError extends Error {
     message: string,
     public readonly serverMessage: string | null = null,
     public readonly missingDocuments: string[] | null = null,
+    public readonly correlationId: string | null = null,
   ) { super(message); this.name = 'ApiError'; }
+}
+
+/** Достаёт correlation id из JSON тела или заголовка X-Correlation-Id. */
+export function readCorrelationId(
+  body: { correlationId?: string | null } | null | undefined,
+  response?: Response | null,
+): string | null {
+  const fromBody = body?.correlationId?.trim();
+  if (fromBody) return fromBody;
+  const fromHeader = response?.headers.get('X-Correlation-Id')?.trim()
+    || response?.headers.get('x-correlation-id')?.trim();
+  return fromHeader || null;
+}
+
+/** Добавляет (id: …) к тексту ошибки, если id есть и ещё не в тексте. */
+export function withCorrelationId(message: string, correlationId: string | null | undefined): string {
+  const id = correlationId?.trim();
+  if (!id) return message;
+  if (message.includes(id)) return message;
+  return `${message} (id: ${id})`;
 }
 
 function generateClientHash(): string {
@@ -33,16 +73,57 @@ function generateClientHash(): string {
 
 export function getOrCreateClientHash(): string {
   let hash = cookies.get(COOKIE_CLIENT_HASH);
-  if (!hash) { hash = generateClientHash(); cookies.set(COOKIE_CLIENT_HASH, hash, 3650); }
+  if (!hash) {
+    hash = generateClientHash();
+    cookies.set(COOKIE_CLIENT_HASH, hash, 3650);
+    // Токен привязан к ClientHash от authorization-jwt. Новый jwt → старый токен мёртв.
+    if (cookies.get(COOKIE_AUTH_TOKEN)) {
+      clearAuthToken();
+    }
+  }
   return hash;
 }
 
 export function getAuthToken(): string | null { return cookies.get(COOKIE_AUTH_TOKEN); }
-export function setAuthToken(token: string): void { cookies.set(COOKIE_AUTH_TOKEN, token, 30); }
-export function clearAuthToken(): void { cookies.delete(COOKIE_AUTH_TOKEN); }
+
+export function setAuthToken(token: string): void {
+  cookies.set(COOKIE_AUTH_TOKEN, token, 30);
+  cookies.set(COOKIE_AUTH_APP_VERSION, getAppVersion(), 30);
+}
+
+export function clearAuthToken(): void {
+  cookies.delete(COOKIE_AUTH_TOKEN);
+  cookies.delete(COOKIE_AUTH_APP_VERSION);
+}
+
 export function isAuthenticated(): boolean { return !!getAuthToken(); }
 
-/** Сброс сессии и редирект на /login (кроме публичных auth-страниц) */
+/**
+ * Сбрасывает заведомо невалидную сессию до запросов UI (re-consent, platform role).
+ * Не бьёт в API: только локальные cookies.
+ * @returns 'cleared' если токен убрали; иначе 'ok' / 'guest'
+ */
+export function reconcileClientAuthSession(): 'ok' | 'cleared' | 'guest' {
+  const token = cookies.get(COOKIE_AUTH_TOKEN);
+  if (!token) return 'guest';
+
+  const clientHash = cookies.get(COOKIE_CLIENT_HASH);
+  if (!clientHash) {
+    clearAuthToken();
+    getOrCreateClientHash();
+    return 'cleared';
+  }
+
+  const boundVersion = cookies.get(COOKIE_AUTH_APP_VERSION);
+  if (boundVersion != null && boundVersion !== getAppVersion()) {
+    clearAuthToken();
+    return 'cleared';
+  }
+
+  return 'ok';
+}
+
+/** Сброс сессии; редирект на /login только с маршрутов RequireAuth */
 export function notifyUnauthorized(): void {
   handleSessionUnauthorized();
 }
@@ -68,6 +149,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'authorization-jwt': clientHash,
+    ...clientIdentityHeaders(),
     ...(options.headers as Record<string, string>),
   };
   if (authToken) headers['Authorization'] = authToken;
@@ -80,35 +162,49 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
     }
     if (!response.ok) {
       // ReConsentMiddleware отвечает 403 + JSON { errorCode, missingDocuments }.
+      // 500 ErrorHandlingMiddleware: message + correlationId (+ stack на Staging/Dev).
       try {
         const errBody = await response.json() as {
           errorCode?: number;
           message?: string | null;
           missingDocuments?: string[];
+          correlationId?: string | null;
         };
         const code = errBody.errorCode ?? response.status;
-        const msg = errBody.message || `HTTP ${response.status}: ${response.statusText}`;
+        const correlationId = readCorrelationId(errBody, response);
+        const msg = withCorrelationId(
+          errBody.message || `HTTP ${response.status}: ${response.statusText}`,
+          correlationId,
+        );
         if (isAgreementNotFoundCode(code)) {
           window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
             detail: { missingDocuments: errBody.missingDocuments ?? [] },
           }));
         }
-        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null);
+        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null, correlationId);
       } catch (e) {
         if (e instanceof ApiError) throw e;
-        throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+        const correlationId = readCorrelationId(null, response);
+        throw new ApiError(
+          response.status,
+          withCorrelationId(`HTTP ${response.status}: ${response.statusText}`, correlationId),
+          null,
+          null,
+          correlationId,
+        );
       }
     }
     const data: CommandResult<T> = await response.json();
     if (!data.success) {
       const code = data.errorCode ?? 0;
-      const msg = data.message || 'Ошибка API';
+      const correlationId = readCorrelationId(data, response);
+      const msg = withCorrelationId(data.message || 'Ошибка API', correlationId);
       if (shouldForceLogoutForApi(path, Boolean(authToken)) && isUnauthorizedApiErrorCode(code)) {
         notifyUnauthorized();
       }
       // Ошибки доступа показываем в UI блока/страницы, без тоста
       if (data.message && !isAccessDeniedApiCode(code) && !isAgreementNotFoundCode(code)) {
-        onApiError?.(data.message);
+        onApiError?.(msg);
       }
       if (isAgreementNotFoundCode(code)) {
         window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
@@ -120,6 +216,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<Comm
         msg,
         data.message,
         (data as { missingDocuments?: string[] }).missingDocuments ?? null,
+        correlationId,
       );
     }
     return data;
@@ -139,6 +236,7 @@ async function requestWithClientJwtOnly<T>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'authorization-jwt': clientHash,
+    ...clientIdentityHeaders(),
     ...(options.headers as Record<string, string>),
   };
 
@@ -154,29 +252,42 @@ async function requestWithClientJwtOnly<T>(
           errorCode?: number;
           message?: string | null;
           missingDocuments?: string[];
+          correlationId?: string | null;
         };
         const code = errBody.errorCode ?? response.status;
-        const msg = errBody.message || `HTTP ${response.status}: ${response.statusText}`;
+        const correlationId = readCorrelationId(errBody, response);
+        const msg = withCorrelationId(
+          errBody.message || `HTTP ${response.status}: ${response.statusText}`,
+          correlationId,
+        );
         if (isAgreementNotFoundCode(code)) {
           window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
             detail: { missingDocuments: errBody.missingDocuments ?? [] },
           }));
         }
-        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null);
+        throw new ApiError(code, msg, errBody.message ?? null, errBody.missingDocuments ?? null, correlationId);
       } catch (e) {
         if (e instanceof ApiError) throw e;
-        throw new ApiError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+        const correlationId = readCorrelationId(null, response);
+        throw new ApiError(
+          response.status,
+          withCorrelationId(`HTTP ${response.status}: ${response.statusText}`, correlationId),
+          null,
+          null,
+          correlationId,
+        );
       }
     }
     const data: CommandResult<T> = await response.json();
     if (!data.success) {
       const code = data.errorCode ?? 0;
-      const msg = data.message || 'Ошибка API';
+      const correlationId = readCorrelationId(data, response);
+      const msg = withCorrelationId(data.message || 'Ошибка API', correlationId);
       if (shouldForceLogoutForApi(path, hadAuthToken) && isUnauthorizedApiErrorCode(code)) {
         notifyUnauthorized();
       }
       if (data.message && !isAccessDeniedApiCode(code) && !isAgreementNotFoundCode(code)) {
-        onApiError?.(data.message);
+        onApiError?.(msg);
       }
       if (isAgreementNotFoundCode(code)) {
         window.dispatchEvent(new CustomEvent('elist:recheck-agreements', {
@@ -188,6 +299,7 @@ async function requestWithClientJwtOnly<T>(
         msg,
         data.message,
         (data as { missingDocuments?: string[] }).missingDocuments ?? null,
+        correlationId,
       );
     }
     return data;
@@ -199,6 +311,9 @@ async function requestWithClientJwtOnly<T>(
 /**
  * GET со стандартными заголовками (client JWT + Authorization при наличии).
  * Не бросает при success:false и не показывает тост — для статусных проверок.
+ *
+ * Важно: HTTP 401 / коды «сессия невалидна» при наличии токена → сброс сессии,
+ * а не «false» (иначе UserAgreementsGate показывает re-consent гостю с мёртвым cookie).
  */
 async function getStatus(path: string): Promise<boolean> {
   const clientHash = getOrCreateClientHash();
@@ -206,13 +321,27 @@ async function getStatus(path: string): Promise<boolean> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'authorization-jwt': clientHash,
+    ...clientIdentityHeaders(),
   };
   if (authToken) headers['Authorization'] = authToken;
 
   const fetchPromise = fetch(`${BASE_URL}${path}`, { method: 'GET', headers }).then(async response => {
-    if (!response.ok) return false;
+    if (response.status === 401) {
+      if (shouldForceLogoutForApi(path, Boolean(authToken))) notifyUnauthorized();
+      return false;
+    }
     try {
       const data: CommandResult<unknown> = await response.json();
+      const code = data.errorCode ?? 0;
+      if (
+        Boolean(authToken)
+        && shouldForceLogoutForApi(path, true)
+        && isUnauthorizedApiErrorCode(code)
+      ) {
+        notifyUnauthorized();
+        return false;
+      }
+      if (!response.ok) return false;
       return Boolean(data.success);
     } catch {
       return false;
@@ -231,6 +360,7 @@ async function getStatusWithClientJwt(path: string): Promise<boolean> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'authorization-jwt': clientHash,
+    ...clientIdentityHeaders(),
   };
 
   const fetchPromise = fetch(`${BASE_URL}${path}`, { method: 'GET', headers }).then(async response => {

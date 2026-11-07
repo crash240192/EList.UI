@@ -1,16 +1,18 @@
 // features/organizations/OrgLogoUpload.tsx
+// Логотип организации: кадр как у аватара — новый файл только при выборе фото.
 
-import { useEffect, useRef, useState } from 'react';
-import { uploadFile } from '@/shared/api/fileStorageClient';
+import { useEffect, useState } from 'react';
 import { setOrganizationAvatar } from '@/entities/organization';
+import { useAvatarCropDisplay } from '@/entities/user/avatarApi';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { PhotoFrameSession } from '@/shared/ui/AvatarUpload/PhotoFrameSession';
 import styles from './OrganizationsSettingsPanel.module.css';
 
 interface OrgLogoUploadProps {
   organizationId: string;
   fileId?: string | null;
   initials: string;
-  onChanged?: (fileId: string) => void;
+  onChanged?: (fileId: string | null) => void;
 }
 
 export function OrgLogoUpload({
@@ -19,65 +21,51 @@ export function OrgLogoUpload({
   initials,
   onChanged,
 }: OrgLogoUploadProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [fileId, setFileId] = useState<string | null>(initialFileId ?? null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [frameOpen, setFrameOpen] = useState(false);
+  const { displayFileId, imgStyle } = useAvatarCropDisplay(fileId ?? initialFileId ?? null);
 
   useEffect(() => {
     setFileId(initialFileId ?? null);
   }, [initialFileId]);
-
-  const displayFileId = fileId ?? initialFileId ?? null;
-
-  const handleFile = async (file: File) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const uploaded = await uploadFile(file);
-      await setOrganizationAvatar(organizationId, uploaded.id);
-      setFileId(uploaded.id);
-      onChanged?.(uploaded.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить логотип');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className={styles.logoUpload}>
       <button
         type="button"
         className={styles.logoBtn}
-        onClick={() => inputRef.current?.click()}
-        disabled={loading}
-        aria-label="Загрузить логотип"
+        onClick={() => setFrameOpen(true)}
+        aria-label="Изменить логотип"
+        title="Нажмите, чтобы выбрать кадр"
       >
         {displayFileId ? (
           <AuthImage
             fileId={displayFileId}
             alt=""
             className={styles.logoImg}
+            style={imgStyle}
             fallback={<span className={styles.logoInitials}>{initials.slice(0, 2).toUpperCase()}</span>}
           />
         ) : (
           <span className={styles.logoInitials}>{initials.slice(0, 2).toUpperCase()}</span>
         )}
-        {loading && <span className={styles.logoSpinner} />}
       </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={e => {
-          const f = e.target.files?.[0];
-          if (f) void handleFile(f);
-          e.target.value = '';
+      <PhotoFrameSession
+        open={frameOpen}
+        fileId={fileId ?? initialFileId ?? null}
+        onClose={() => setFrameOpen(false)}
+        onChanged={next => {
+          setFileId(next);
+          onChanged?.(next);
         }}
+        assignFile={async nextId => {
+          await setOrganizationAvatar(organizationId, nextId);
+        }}
+        shape="rounded-square"
+        title="Кадр логотипа"
+        lead="Перетащите фото и подгоните масштаб. В квадрат попадёт то, что видно в окне."
+        emptyFileName="logo"
       />
-      {error && <p className={styles.inlineErr}>{error}</p>}
     </div>
   );
 }

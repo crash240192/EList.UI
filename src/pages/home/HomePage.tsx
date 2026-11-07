@@ -5,10 +5,12 @@ import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'rea
 import { useNavigate } from 'react-router-dom';
 import type { IEvent, IEventsSearchParams } from '@/entities/event';
 import { EventCard, fetchEventById, EVENTS_MAP_SHORT_PAGE_SIZE } from '@/entities/event';
+import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
 import { useEvents } from '@/features/event-list/useEvents';
 import { useEventsMapShort } from '@/features/event-list/useEventsMapShort';
 import { useFiltersStore, useToastStore } from '@/app/store';
-import { useInfiniteScroll, useDebounce, usePageTitle } from '@/shared/hooks';
+import { useInfiniteScroll, useDebounce, usePageTitle, useMediaQuery } from '@/shared/hooks';
+import { media } from '@/shared/lib/breakpoints';
 import { EventModal } from './EventModal';
 import { FilterBar } from '@/features/event-filters/FilterBar';
 import { useHomeFilterUrlSync } from '@/features/event-filters/filterUrlSync';
@@ -24,6 +26,7 @@ import {
 import { isEventAccessDeniedError } from '@/shared/api/apiErrorUtils';
 import { AdSlot } from '@/shared/ui/AdSlot/AdSlot';
 import { shouldInsertAdAfterIndex } from '@/shared/lib/adConfig';
+import { prefetchAuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './HomePage.module.css';
 
 const HOME_LIST_UI_KEY = 'elist_home_list_ui_v1';
@@ -44,7 +47,8 @@ function readStoredListUi(): StoredListUi | null {
 }
 
 export default function HomePage() {
-  usePageTitle('Поиск событий');
+  usePageTitle();
+  const isMobileList = useMediaQuery(media.mobile);
   const [selectedEvent, setSelectedEvent] = useState<IEvent | null>(null);
   const [searchName, setSearchName] = useState(() => {
     try {
@@ -183,6 +187,8 @@ export default function HomePage() {
   const openMapEventPreview = useCallback(async (eventId: string) => {
     try {
       const ev = await fetchEventById(eventId);
+      // Превью грузит thumb сразу — не ждём монтирования AuthImage / визит на /event/:id.
+      if (ev.coverImageId) prefetchAuthImage(ev.coverImageId, false);
       setSelectedEvent(ev);
       pendingAgeEventIdRef.current = null;
     } catch (e) {
@@ -319,19 +325,38 @@ export default function HomePage() {
                 <p style={{ fontSize: 12 }}>Попробуйте сдвинуть карту, сменить масштаб, выбрать другой город или убрать часть фильтров</p>
               </div>
             ) : (
-              <div className={styles.grid}>
-                {events.map((event, idx) => (
-                  <Fragment key={event.id}>
-                    <EventCard.Preset
-                      event={event}
-                      onClick={e => handleListEventClick(e)}
-                    />
-                    {shouldInsertAdAfterIndex(idx) && (
-                      <AdSlot key={`ad-${event.id}`} />
-                    )}
-                  </Fragment>
-                ))}
-              </div>
+              isMobileList ? (
+                <EventList>
+                  {events.map((event, idx) => (
+                    <Fragment key={event.id}>
+                      <EventListItem
+                        event={event}
+                        bleedCover
+                        organizer={event.isOrganizer}
+                        onClick={() => handleListEventClick(event)}
+                      />
+                      {shouldInsertAdAfterIndex(idx) && (
+                        <AdSlot key={`ad-${event.id}`} />
+                      )}
+                    </Fragment>
+                  ))}
+                </EventList>
+              ) : (
+                <div className={styles.grid}>
+                  {events.map((event, idx) => (
+                    <Fragment key={event.id}>
+                      <EventCard.Preset
+                        event={event}
+                        organizer={event.isOrganizer}
+                        onClick={e => handleListEventClick(e)}
+                      />
+                      {shouldInsertAdAfterIndex(idx) && (
+                        <AdSlot key={`ad-${event.id}`} />
+                      )}
+                    </Fragment>
+                  ))}
+                </div>
+              )
             )}
 
             {hasMore && (

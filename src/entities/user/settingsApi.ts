@@ -32,6 +32,8 @@ export interface IPersonRequest {
   patronymic?: string;
   gender?: 'Male' | 'Female';
   birthDate?: string;
+  /** Публичный текст «о себе» */
+  about?: string | null;
 }
 
 export async function savePersonInfo(payload: IPersonRequest): Promise<void> {

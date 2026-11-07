@@ -28,6 +28,23 @@ export interface ICreateAccountRequest {
   acceptConsent: boolean;
   /** Обязательно: согласие с пользовательским соглашением (Agreement). */
   acceptAgreement: boolean;
+  /**
+   * Опционально: согласие на распространение ПДн (DistributionConsent).
+   * false → согласие не сохраняется, контакт скрыт, приватность закрыта (Nobody).
+   */
+  acceptDistributionConsent?: boolean;
+  /** Профиль создаётся в той же TX create (имя, фамилия, ДР ≥ 14 обязательны на бэке). */
+  firstName: string;
+  lastName: string;
+  patronymic?: string;
+  gender?: Gender;
+  birthDate: string; // ISO 8601
+}
+
+export interface ICheckRegistrationAvailabilityRequest {
+  login: string;
+  authorizationContactValue: string;
+  authorizationContactType: string;
 }
 
 export interface IPersonRequest {
@@ -36,6 +53,7 @@ export interface IPersonRequest {
   patronymic?: string;
   gender?: Gender;
   birthDate?: string;  // ISO 8601
+  about?: string | null;
 }
 
 // ---- API ----
@@ -50,12 +68,22 @@ export async function fetchContactTypes(): Promise<IContactType[]> {
 }
 
 /**
- * Создать аккаунт.
+ * Создать аккаунт (+ профиль и согласия в одной TX).
  * POST /api/accounts/create
  * Не требует авторизации (authorization-jwt клиентского хеша достаточно).
  */
 export async function createAccount(payload: ICreateAccountRequest): Promise<void> {
   await apiClient.post('/api/accounts/create', payload);
+}
+
+/**
+ * Проверить, что логин и контакт авторизации свободны (шаг 1 → шаг 2).
+ * POST /api/accounts/checkAvailability
+ */
+export async function checkRegistrationAvailability(
+  payload: ICheckRegistrationAvailabilityRequest,
+): Promise<void> {
+  await apiClient.post('/api/accounts/checkAvailability', payload);
 }
 
 /**

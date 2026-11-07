@@ -41,6 +41,12 @@ export async function confirmAnonymousAgeAgreement(): Promise<void> {
   await agreeAnonymousAge();
   cachedOk = true;
   cachedAt = Date.now();
+  // Дождаться, пока GET agreement увидит запись (редкий read-after-write лаг)
+  for (let i = 0; i < 4; i += 1) {
+    const ok = await checkAnonymousAgeAgreement(true);
+    if (ok) return;
+    await new Promise((r) => window.setTimeout(r, 80 * (i + 1)));
+  }
 }
 
 export function clearAnonymousAgeAgreementCache(): void {

@@ -28,6 +28,23 @@
   gap: 14px;
 }
 
+@media (max-width: 639px) {
+  .list {
+    padding: 10px 12px 16px;
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .skeleton {
+    height: 120px;
+    border-radius: 14px;
+  }
+}
+
 /* ---- Map ---- */
 
 .mapPlaceholder {
@@ -153,10 +170,10 @@
 :global(.light-theme) .mapMock {
   background: repeating-linear-gradient(
     45deg,
-    #ccd2dc,
-    #ccd2dc 10px,
-    #e6e9f0 10px,
-    #e6e9f0 20px
+    #e8d5bc,
+    #e8d5bc 10px,
+    #f6eee4 10px,
+    #f6eee4 20px
   );
 }
 

@@ -1,16 +1,19 @@
 import type { ReactNode } from 'react';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
-import { EventTypeChip } from '@/shared/ui/EventTypeChip';
+import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
 import {
   formatEventListItemDate,
   formatEventListItemPrice,
   getEventListCoverBackground,
   getEventListParams,
-  getEventListTypes,
+  getEventTypes,
   type EventListItemData,
 } from '@/entities/event/lib/eventListItemUtils';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
+import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
+import { OrganizerCoverBadge, PinnedCoverBadge } from '@/entities/event/ui/PinnedCoverBadge/PinnedCoverBadge';
 import styles from './EventListItem.module.css';
 
 export type EventListUrgencyKind = 'hot' | 'soon' | 'ok';
@@ -32,6 +35,10 @@ interface EventListItemProps {
   showChevron?: boolean;
   /** На мобилке обложка на всю высоту слева с градиентным затуханием */
   bleedCover?: boolean;
+  /** Значок закрепа в левом верхнем углу обложки */
+  pinned?: boolean;
+  /** Значок организатора рядом с закрепом: без закрепа стоит в углу, с закрепом сдвигается вправо */
+  organizer?: boolean;
 }
 
 function ClockIcon() {
@@ -62,6 +69,15 @@ function PeopleIcon() {
   );
 }
 
+function LockIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0110 0v4" />
+    </svg>
+  );
+}
+
 export function EventListItem({
   event,
   onClick,
@@ -73,12 +89,14 @@ export function EventListItem({
   actions,
   showChevron,
   bleedCover,
+  pinned,
+  organizer,
 }: EventListItemProps) {
-  const types = getEventListTypes(event);
   const params = getEventListParams(event);
-  const price = formatEventListItemPrice(params.cost);
+  const price = formatEventListItemPrice(params.priceMin, params.priceMax);
   const coverBg = getEventListCoverBackground(event);
   const dateLabel = formatEventListItemDate(event.startTime);
+  const hasTypes = getEventTypes(event).length > 0;
 
   const urgClass = urgency?.kind === 'hot'
     ? styles.urgHot
@@ -87,7 +105,7 @@ export function EventListItem({
       : styles.urgOk;
 
   const showParticipants = params.participantsCount != null;
-  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const focusStyle = coverFocusImgStyle(useResolvedCoverFocus(event));
 
   return (
     <div
@@ -123,6 +141,12 @@ export function EventListItem({
           ) : (
             <div className={styles.coverPlaceholder} />
           )}
+          {(pinned || organizer) && (
+            <div className={styles.coverMarks}>
+              {pinned && <PinnedCoverBadge />}
+              {organizer && <OrganizerCoverBadge />}
+            </div>
+          )}
           {urgency && (
             <span className={`${styles.urgBadge} ${urgClass}`}>{urgency.label}</span>
           )}
@@ -131,41 +155,56 @@ export function EventListItem({
         <div className={styles.content}>
           {header && <div className={styles.header}>{header}</div>}
 
+          {/* 1 — название */}
           <div className={styles.name}>{event.name}</div>
 
-          <div className={styles.meta}>
-            {dateLabel && (
-              <span className={styles.metaItem}>
-                <ClockIcon />
-                {dateLabel}
-              </span>
-            )}
-            {event.address && (
-              <span className={styles.metaItem}>
-                <PinIcon />
-                {event.address}
-              </span>
-            )}
-            <span className={`${styles.metaItem} ${price.free ? styles.metaFree : styles.metaPaid}`}>
+          {/* 2 — дата и место */}
+          {(dateLabel || event.address) && (
+            <div className={styles.whenWhere}>
+              {dateLabel && (
+                <span className={styles.metaItem}>
+                  <ClockIcon />
+                  {dateLabel}
+                </span>
+              )}
+              {event.address && (
+                <span className={`${styles.metaItem} ${styles.metaPlace}`}>
+                  <PinIcon />
+                  {event.address}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* 3 — цена, возраст, закрытость */}
+          <div className={styles.badges}>
+            <span className={`${styles.badge} ${price.free ? styles.metaFree : styles.metaPaid}`}>
               {price.label}
             </span>
-            <span className={`${styles.metaItem} ${styles.metaAge}`}>
+            <span className={`${styles.badge} ${styles.metaAge}`}>
               {resolveAgeLimitBadge(params.ageLimit)}
+            </span>
+            <span
+              className={`${styles.badge} ${params.isPrivate ? styles.badgePrivate : styles.badgePublic}`}
+            >
+              {params.isPrivate ? <LockIcon /> : null}
+              {params.isPrivate ? 'Закрытое' : 'Открытое'}
             </span>
           </div>
 
-          {types.length > 0 && (
-            <div className={styles.chips}>
-              {types.map(type => (
-                <EventTypeChip
-                  key={type.id}
-                  type={type}
-                  variant="soft"
-                  className={styles.chip}
-                  iconSize={10}
-                />
-              ))}
-            </div>
+          <GenderLimitBadge gender={params.allowedGender} />
+
+          {/* 4 — типы (сколько влезет) + «ещё» */}
+          {hasTypes && (
+            <EventTypeChipsOverflow
+              event={event}
+              fitWidth
+              variant="soft"
+              moreVariant="soft"
+              iconSize={10}
+              chipClassName={styles.chip}
+              className={styles.chips}
+            />
           )}
 
           {(footer || showParticipants) && (

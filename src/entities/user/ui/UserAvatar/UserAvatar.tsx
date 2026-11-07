@@ -1,7 +1,10 @@
 // entities/user/ui/UserAvatar/UserAvatar.tsx
-// Аватар пользователя — fileId из avatarId аккаунта, без отдельного запроса
+// Аватар: fileId из avatarId; при наличии меты кадра — исходник + CSS (как шапка).
 
+import type { CSSProperties } from 'react';
 import { useAvatar } from '@/features/auth/useAvatar';
+import { useOnlinePresence } from '@/features/presence';
+import { useAvatarCropDisplay } from '@/entities/user/avatarApi';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import styles from './UserAvatar.module.css';
 
@@ -11,26 +14,60 @@ interface UserAvatarProps {
   avatarId?: string | null;
   size?:     number;
   className?: string;
-  style?:    React.CSSProperties;
+  style?:    CSSProperties;
+  /** Показывать зелёную точку, если пользователь онлайн (по умолчанию да) */
+  showOnline?: boolean;
+  /** Явный статус; если не задан — берётся из presence store */
+  online?: boolean | null;
+  /** Диаметр точки онлайна; по умолчанию 28% от size (мин. 8px) */
+  onlineDotSize?: number;
 }
 
-export function UserAvatar({ accountId, initials, avatarId, size = 32, className, style: styleProp }: UserAvatarProps) {
+export function UserAvatar({
+  accountId,
+  initials,
+  avatarId,
+  size = 32,
+  className,
+  style: styleProp,
+  showOnline = true,
+  online: onlineProp,
+  onlineDotSize,
+}: UserAvatarProps) {
   const fileId = useAvatar(accountId, avatarId);
+  const { displayFileId, imgStyle } = useAvatarCropDisplay(fileId);
+  const presenceOnline = useOnlinePresence(showOnline && onlineProp == null ? accountId : null);
+  const isOnline = onlineProp ?? presenceOnline;
 
   const style = {
-    width:    size,
-    height:   size,
     fontSize: size * 0.38,
     borderRadius: '50%',
     ...styleProp,
   };
 
+  const dotSize = onlineDotSize ?? Math.max(8, Math.round(size * 0.28));
+
   return (
-    <div className={`${styles.avatar} ${className ?? ''}`} style={style}>
-      {fileId
-        ? <AuthImage fileId={fileId} alt={initials} className={styles.img}
-            fallback={<span>{initials}</span>} />
-        : <span>{initials}</span>}
+    <div className={`${styles.wrap} ${className ?? ''}`} style={{ width: size, height: size }}>
+      <div className={styles.avatar} style={style}>
+        {displayFileId
+          ? <AuthImage
+              fileId={displayFileId}
+              alt={initials}
+              className={styles.img}
+              style={imgStyle}
+              fallback={<span>{initials}</span>}
+            />
+          : <span>{initials}</span>}
+      </div>
+      {showOnline && isOnline && (
+        <span
+          className={styles.onlineDot}
+          style={{ width: dotSize, height: dotSize }}
+          title="Онлайн"
+          aria-label="Онлайн"
+        />
+      )}
     </div>
   );
 }

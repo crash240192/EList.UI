@@ -22,6 +22,34 @@ import styles from './AlbumGridModal.module.css';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
 
+/** Совпадает с .grid / .loadingGrid: minmax(108px, 1fr), gap 8, padding body 16×2. */
+const GRID_CELL_MIN = 108;
+const GRID_GAP = 8;
+const BODY_PAD_X = 32;
+const MODAL_MAX_W = 720;
+const SKELETON_FALLBACK = 12;
+/** Совпадает с pageSize загрузки файлов — скелетон ≈ финальная сетка. */
+const SKELETON_CAP = 200;
+
+function estimateGridMinHeight(photoCount: number): number {
+  const count = Math.max(0, Math.trunc(photoCount));
+  if (count <= 0) return 0;
+  const viewportW = typeof window !== 'undefined' ? window.innerWidth : MODAL_MAX_W;
+  const modalW = Math.min(MODAL_MAX_W, viewportW * (viewportW <= 639 ? 1 : 0.96));
+  const inner = Math.max(GRID_CELL_MIN, modalW - BODY_PAD_X);
+  const cols = Math.max(1, Math.floor((inner + GRID_GAP) / (GRID_CELL_MIN + GRID_GAP)));
+  const cell = (inner - GRID_GAP * (cols - 1)) / cols;
+  const rows = Math.ceil(count / cols);
+  return rows * cell + GRID_GAP * (rows - 1);
+}
+
+/** Сколько скелетонов показать: photoCount с ленты, иначе запасной ряд. */
+function skeletonSlotCount(photoCount: number | undefined): number {
+  if (photoCount == null) return SKELETON_FALLBACK;
+  if (photoCount <= 0) return 0;
+  return Math.min(Math.trunc(photoCount), SKELETON_CAP);
+}
+
 function nextUploadId(): string {
   return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -146,7 +174,8 @@ export function AlbumGridModal({
 }: AlbumGridModalProps) {
   const [files, setFiles] = useState<IAlbumFile[]>([]);
   const [uploadingItems, setUploadingItems] = useState<UploadingItem[]>([]);
-  const [initialLoading, setInitialLoading] = useState(false);
+  // key=album.id → при открытии сразу loading, без кадра «пустой альбом».
+  const [initialLoading, setInitialLoading] = useState(true);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [selectMode, setSelectMode] = useState(false);
@@ -180,21 +209,48 @@ export function AlbumGridModal({
   useModalBackButton(handleClose, open);
 
   useEffect(() => {
+    uploadingRef.current = uploadingItems;
+  }, [uploadingItems]);
+
+  // layout: сброс до paint — иначе один кадр со старыми фото предыдущего альбома.
+  useLayoutEffect(() => {
     if (!open || !album) {
-      if (!open) loadedForAlbumIdRef.current = null;
+      if (!open) {
+        loadedForAlbumIdRef.current = null;
+        setFiles([]);
+        setInitialLoading(false);
+        setLightboxIdx(null);
+        setSelectMode(false);
+        setSelectedIds(new Set());
+        setDeleteConfirm(false);
+        setReportFileId(null);
+        setUploadError(null);
+        revokeUploadingPreviews(uploadingRef.current);
+        setUploadingItems([]);
+        dirtyRef.current = false;
+      }
       return;
     }
 
     if (loadedForAlbumIdRef.current === album.id) return;
 
-    let cancelled = false;
-    loadedForAlbumIdRef.current = album.id;
+    const albumId = album.id;
+    loadedForAlbumIdRef.current = albumId;
+    setFiles([]);
     setInitialLoading(true);
     setUploadError(null);
+    setLightboxIdx(null);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setDeleteConfirm(false);
+    setReportFileId(null);
+    revokeUploadingPreviews(uploadingRef.current);
+    setUploadingItems([]);
 
+    let cancelled = false;
     void (async () => {
       try {
-        const list = await getAlbumFiles(album.id, 1, 200);
+        const list = await getAlbumFiles(albumId, 0, 200);
         if (!cancelled) setFiles(list);
       } catch {
         if (!cancelled) setFiles([]);
@@ -204,23 +260,7 @@ export function AlbumGridModal({
     })();
 
     return () => { cancelled = true; };
-  }, [open, album?.id]);
-
-  useEffect(() => {
-    uploadingRef.current = uploadingItems;
-  }, [uploadingItems]);
-
-  useEffect(() => {
-    if (open) return;
-    setLightboxIdx(null);
-    setSelectMode(false);
-    setSelectedIds(new Set());
-    setDeleteConfirm(false);
-    revokeUploadingPreviews(uploadingRef.current);
-    setUploadingItems([]);
-    setUploadError(null);
-    dirtyRef.current = false;
-  }, [open, revokeUploadingPreviews]);
+  }, [open, album?.id, revokeUploadingPreviews]);
 
   useEffect(() => () => revokeUploadingPreviews(uploadingRef.current), [revokeUploadingPreviews]);
 
@@ -320,7 +360,14 @@ export function AlbumGridModal({
 
   const hasGridContent = files.length > 0 || uploadingItems.length > 0;
   const uploadingCount = uploadingItems.filter(u => !u.error).length;
-  const showSkeleton = initialLoading && uploadingItems.length === 0 && files.length === 0;
+  const knownCount = album.photoCount;
+  const slots = skeletonSlotCount(knownCount);
+  // Известно, что пусто — сразу empty, без скелетона на 6 клеток.
+  const knownEmpty = knownCount === 0;
+  const showSkeleton = initialLoading && uploadingItems.length === 0 && !knownEmpty;
+  const showEmpty = !showSkeleton && !hasGridContent;
+  const reserveCount = Math.max(knownCount ?? 0, files.length, showSkeleton ? slots : 0);
+  const gridMinHeight = reserveCount > 0 ? estimateGridMinHeight(reserveCount) : undefined;
   const fileIds = files.map(f => f.fileId);
   const selectedCount = selectedIds.size;
   const canSelectPhotos = canManage && files.length > 0;
@@ -379,10 +426,17 @@ export function AlbumGridModal({
           {uploadError && <div className={styles.uploadError}>{uploadError}</div>}
 
           {showSkeleton ? (
-            <div className={styles.loadingGrid}>
-              {[0, 1, 2, 3, 4, 5].map(i => <div key={i} className={styles.skeleton} />)}
+            <div
+              className={styles.loadingGrid}
+              style={gridMinHeight ? { minHeight: gridMinHeight } : undefined}
+              aria-busy
+              aria-label="Загрузка фотографий"
+            >
+              {Array.from({ length: Math.max(slots, 1) }, (_, i) => (
+                <div key={i} className={styles.skeleton} />
+              ))}
             </div>
-          ) : !hasGridContent ? (
+          ) : showEmpty ? (
             <div className={styles.empty}>
               {canUploadPhotos ? (
                 <AlbumPhotoUploadZone
@@ -396,7 +450,10 @@ export function AlbumGridModal({
               )}
             </div>
           ) : (
-            <div className={styles.grid}>
+            <div
+              className={styles.grid}
+              style={gridMinHeight ? { minHeight: gridMinHeight } : undefined}
+            >
               {files.map((f, i) => (
                 <GridThumbnail
                   key={f.fileId}

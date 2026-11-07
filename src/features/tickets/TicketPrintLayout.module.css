@@ -1,0 +1,142 @@
+/* Лист билета; на экране — в модалке, при print — только этот host */
+
+.printRoot {
+  display: block;
+}
+
+.sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 28px 24px 32px;
+  border: 1px solid #d0d4dc;
+  border-radius: 12px;
+  background: #fff;
+  color: #111827;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.brand {
+  margin: 0 0 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.eventName {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #111827;
+}
+
+.when,
+.address {
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #374151;
+}
+
+.address {
+  margin-bottom: 14px;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 0 0 18px;
+  padding: 12px 0;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.metaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 72px;
+}
+
+.metaLabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.metaValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.qrWrap {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 12px;
+}
+
+.code {
+  margin: 0;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+  color: #111827;
+}
+
+.hint {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+    size: auto;
+  }
+
+  :global(html),
+  :global(body) {
+    background: #fff !important;
+  }
+
+  /* Прячем всё приложение, кроме host печати */
+  :global(body) > :not([data-ticket-print-host]) {
+    display: none !important;
+  }
+
+  :global([data-ticket-print-host]) {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    z-index: auto !important;
+  }
+
+  :global([data-ticket-print-host]) :global(.previewChrome) {
+    display: none !important;
+  }
+
+  .sheet {
+    max-width: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+}

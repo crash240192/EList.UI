@@ -9,10 +9,12 @@ import type {
   OrganizationMemberResponse,
   OrganizationPayoutRequest,
   OrganizationPayoutResponse,
+  OrganizationProviderOnboardingResponse,
   OrganizationRegistryParty,
   OrganizationRequest,
   OrganizationResponse,
   TransferOwnershipRequest,
+  UpdateOrganizationMemberRoleRequest,
 } from './types';
 import { OrganizationLegalForm } from './types';
 
@@ -83,6 +85,22 @@ export async function addOrganizationManager(
   payload: AddOrganizationMemberRequest,
 ): Promise<void> {
   await apiClient.post(`/api/organizations/managers/add/${organizationId}`, payload);
+}
+
+/** POST /api/organizations/ticket-takers/add/{organizationId} */
+export async function addOrganizationTicketTaker(
+  organizationId: string,
+  payload: AddOrganizationMemberRequest,
+): Promise<void> {
+  await apiClient.post(`/api/organizations/ticket-takers/add/${organizationId}`, payload);
+}
+
+/** PUT /api/organizations/members/role/{organizationId} */
+export async function updateOrganizationMemberRole(
+  organizationId: string,
+  payload: UpdateOrganizationMemberRoleRequest,
+): Promise<void> {
+  await apiClient.put(`/api/organizations/members/role/${organizationId}`, payload);
 }
 
 /** DELETE /api/organizations/members/remove/{organizationId}/{accountId} */
@@ -215,6 +233,21 @@ export async function saveOrganizationPayout(
   payload: OrganizationPayoutRequest,
 ): Promise<void> {
   await apiClient.put(`/api/organizations/payout/${organizationId}`, payload);
+}
+
+/** POST /api/organizations/payout/{organizationId}/provider-onboarding/start */
+export async function startOrganizationProviderOnboarding(
+  organizationId: string,
+  returnUrl?: string | null,
+): Promise<OrganizationProviderOnboardingResponse> {
+  const r = await apiClient.post<OrganizationProviderOnboardingResponse>(
+    `/api/organizations/payout/${organizationId}/provider-onboarding/start`,
+    { returnUrl: returnUrl ?? null },
+  );
+  if (!r.result) {
+    throw new Error(r.message || 'Не удалось запустить онбординг');
+  }
+  return r.result;
 }
 
 /** POST /api/organizations/verification/submit/{organizationId} */

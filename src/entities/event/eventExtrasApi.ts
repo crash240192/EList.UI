@@ -3,12 +3,15 @@
 
 import { apiClient } from '@/shared/api/client';
 import type { Gender } from '@/shared/api/types';
+import type { IEventTicketTypeRequest } from './ticketTypesApi';
 
 // ---- EventParameters ----
 
 export interface IEventParameters {
   id: string;
   cost: number;
+  priceMin?: number | null;
+  priceMax?: number | null;
   private: boolean;
   maxPersonsCount: number | null;
   ageLimit: number | null;
@@ -26,6 +29,8 @@ export interface IAssignEventParametersRequest {
   allowedGender?: Gender | null;
   allowUsersToInvite: boolean;
   ticketsEnabled: boolean;
+  /** Типы билетов (replace). При ticketsEnabled — ≥1 active. */
+  ticketTypes?: IEventTicketTypeRequest[] | null;
 }
 
 /**
@@ -86,9 +91,21 @@ export async function fetchEventParameters(eventId: string): Promise<IEventParam
           ? ageRaw
           : Number(ageRaw);
 
+    const cost = Number(raw.cost ?? raw.Cost ?? 0);
+    const minRaw = raw.priceMin ?? raw.PriceMin;
+    const maxRaw = raw.priceMax ?? raw.PriceMax;
+    const priceMin = minRaw == null || minRaw === ''
+      ? cost
+      : Number(minRaw);
+    const priceMax = maxRaw == null || maxRaw === ''
+      ? priceMin
+      : Number(maxRaw);
+
     return {
       id: String(raw.id ?? raw.Id ?? ''),
-      cost: Number(raw.cost ?? raw.Cost ?? 0),
+      cost,
+      priceMin: Number.isFinite(priceMin) ? priceMin : cost,
+      priceMax: Number.isFinite(priceMax) ? priceMax : (Number.isFinite(priceMin) ? priceMin : cost),
       private: Boolean(raw.private ?? raw.Private ?? false),
       maxPersonsCount: (raw.maxPersonsCount ?? raw.MaxPersonsCount ?? null) as number | null,
       ageLimit: ageLimit != null && Number.isFinite(ageLimit) ? ageLimit : null,

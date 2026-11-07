@@ -150,7 +150,7 @@ export function ModerationSettingsPanel() {
   return (
     <div className={styles.panel}>
       <div className={styles.intro}>
-        <h2 className={styles.title}>Модерация</h2>
+        <h2 className={styles.title}>Жалобы</h2>
         <p className={styles.hint}>
           Новые предупреждения приходят в уведомления (колокольчик в шапке).
           Здесь — ограничения аккаунта, недавние предупреждения и переходы к спискам жалоб.

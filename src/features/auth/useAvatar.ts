@@ -52,6 +52,11 @@ export function seedAvatarCache(accountId: string, avatarId: string | null): voi
   notifyListeners(accountId, avatarId);
 }
 
+export function getCachedAvatarId(accountId: string): string | null | undefined {
+  if (!cache.has(accountId)) return undefined;
+  return cache.get(accountId) ?? null;
+}
+
 export function useAvatar(
   accountId: string | null | undefined,
   avatarId?: string | null,

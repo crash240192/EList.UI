@@ -78,8 +78,10 @@ export function useEventAgeAccessDialog(onGranted: () => void | Promise<void>) {
     setBusy(true);
     try {
       await confirmAnonymousAgeAgreement();
-      setAnonymousDialogOpen(false);
+      // Сначала догружаем событие с AdultConfirmed, потом закрываем модалку —
+      // иначе альбомы/обсуждения успевают сходить в API до применения согласия.
       await onGranted();
+      setAnonymousDialogOpen(false);
     } catch {
       // toast из apiClient
     } finally {

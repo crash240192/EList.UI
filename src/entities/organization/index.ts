@@ -7,6 +7,8 @@ export {
   setOrganizationActive,
   fetchOrganizationMembers,
   addOrganizationManager,
+  addOrganizationTicketTaker,
+  updateOrganizationMemberRole,
   removeOrganizationMember,
   setOrganizationMemberActive,
   transferOrganizationOwnership,
@@ -15,6 +17,7 @@ export {
   lookupOrganizationByInn,
   fetchOrganizationPayout,
   saveOrganizationPayout,
+  startOrganizationProviderOnboarding,
   submitOrganizationVerification,
   setOrganizationTicketsEnabled,
 } from './api';
@@ -30,6 +33,21 @@ export {
   setOrganizationAvatar,
   getOrganizationAvatarHistory,
 } from './avatarApi';
+
+export {
+  fetchOrgSubscriptionsCount,
+  fetchOrgSubscribersCount,
+  fetchIsSubscribedToOrganization,
+  fetchOrgSubscriptions,
+  fetchOrgSubscribers,
+  subscribeToOrganization,
+  updateOrgSubscriptionNotify,
+  unsubscribeFromOrganization,
+  type IOrgNotifySettings,
+  type IOrgSubscriptionItem,
+  type IOrgSubscriptionPage,
+  type IOrgSubscriptionSearchParams,
+} from './organizationSubscriptionApi';
 
 export {
   createOrganizationContact,
@@ -61,10 +79,12 @@ export {
   type PaymentProviderValue,
   type OrganizationRequest,
   type AddOrganizationMemberRequest,
+  type UpdateOrganizationMemberRoleRequest,
   type TransferOwnershipRequest,
   type OrganizationLegalRequest,
   type OrganizationPayoutRequest,
   type OrganizationRegistryParty,
+  type OrganizationProviderOnboardingResponse,
   type OrganizationAccountPublicData,
   type OrganizationPersonInfo,
   type OrganizationMemberResponse,

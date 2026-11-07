@@ -19,6 +19,179 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* ── Current plan hero (heroBanner) ── */
+.planHero {
+  composes: heroBanner from '../../shared/styles/hero.module.css';
+  padding: 22px 24px;
+  gap: 10px;
+  min-height: 140px;
+}
+
+.planHeroStub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.planHeroTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.planHeroEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.planHeroPill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  position: relative;
+  z-index: 1;
+}
+
+.planHeroPillOk {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.planHeroPillMuted {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.planHeroName {
+  position: relative;
+  z-index: 1;
+  font-size: 26px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.planHeroMeta {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.68);
+  max-width: 28rem;
+}
+
+.planHeroActions {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.planHeroFeatures {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.planHeroFeatRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.planHeroFeatIcon {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.planHeroFeatOk {
+  background: rgba(134, 239, 172, 0.22);
+  color: #86efac;
+}
+
+.planHeroFeatWarn {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+.planHeroFeatNo {
+  background: rgba(252, 165, 165, 0.2);
+  color: #fca5a5;
+}
+
+.planHeroCta {
+  padding: 10px 16px;
+  background: #fff;
+  color: #1e1b4b;
+  border: none;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.planHeroCta:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.planHeroCta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.planHeroCancel {
+  padding: 10px 14px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.planHeroCancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.planHeroCancel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .walletBody {
   padding: 20px 28px 48px;
   display: flex;
@@ -114,6 +287,14 @@
   font-size: 14px;
   opacity: 0.6;
   margin-left: 4px;
+}
+
+.cardTariffStatus {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 28rem;
 }
 
 .cardBottom {
@@ -320,6 +501,15 @@
   cursor: default;
 }
 
+.tcInactiveSelected {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.tcFallback {
+  border-color: color-mix(in srgb, var(--border) 60%, var(--text-muted));
+}
+
 .tariffCarousel {
   display: flex;
   align-items: center;
@@ -389,6 +579,16 @@
 .tcBadgeActive {
   background: rgba(34, 197, 94, 0.15);
   color: var(--success);
+}
+
+.tcBadgeInactive {
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+.tcBadgeFallback {
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  color: var(--text-secondary);
 }
 
 .tcName {

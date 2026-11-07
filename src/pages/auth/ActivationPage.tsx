@@ -5,14 +5,13 @@ import { useNavigate } from 'react-router-dom';
 import { activateAccount } from '@/features/auth/api';
 import { apiClient, ApiError } from '@/shared/api/client';
 import { ApiErrorCode } from '@/shared/api/errorCodes';
-import { setPersonInfo } from '@/features/auth/registrationApi';
-import { loadPendingPersonData, clearPendingPersonData } from '@/features/auth/pendingPersonData';
+import { clearPendingPersonData } from '@/features/auth/pendingPersonData';
 import { takeActivationNotice } from '@/features/auth/activationNotice';
-import { useAuthStore, useToastStore } from '@/app/store';
+import { useAuthStore } from '@/app/store';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { OtpCodeInput } from '@/shared/ui/OtpCodeInput';
 import { usePageTitle } from '@/shared/hooks';
-import brandLogo from '@/shared/assets/city_pulse_logo_opacity_small.png';
+import { AuthLogoImg } from './AuthBrand';
 import styles from './AuthPage.module.css';
 import actStyles from './ActivationPage.module.css';
 
@@ -31,7 +30,6 @@ export default function ActivationPage() {
   usePageTitle('Активация аккаунта');
   const navigate = useNavigate();
   const { confirmActivation, logout } = useAuthStore();
-  const toast = useToastStore(s => s.add);
 
   const [code, setCode]         = useState('');
   const [loading, setLoading]   = useState(false);
@@ -81,20 +79,8 @@ export default function ActivationPage() {
     try {
       await activateAccount(code);
       confirmActivation();
-      const pending = loadPendingPersonData();
-      if (pending) {
-        try {
-          await setPersonInfo(pending);
-          clearPendingPersonData();
-        } catch (personErr) {
-          toast(
-            personErr instanceof Error
-              ? `Аккаунт активирован, но профиль не сохранён: ${personErr.message}`
-              : 'Аккаунт активирован, но профиль не сохранён. Заполните данные в настройках.',
-            'error',
-          );
-        }
-      }
+      // Профиль уже создан в TX регистрации; чистим legacy pending на всякий случай.
+      clearPendingPersonData();
       setSuccess(true);
       setTimeout(() => navigate('/', { replace: true }), 1200);
     } catch (err) {
@@ -110,7 +96,7 @@ export default function ActivationPage() {
   if (success) return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.logoWrap}><img src={brandLogo} alt="EList" className={styles.logoImg} /></div>
+        <div className={styles.logoWrap} onContextMenu={e => e.preventDefault()}><AuthLogoImg /></div>
         <h1 className={styles.heading}>Аккаунт активирован!</h1>
         <p className={styles.subheading}>Переходим на главную...</p>
       </div>
@@ -122,8 +108,8 @@ export default function ActivationPage() {
     <div className={styles.page}>
       <div className={styles.card}>
 
-        <div className={styles.logoWrap}>
-          <img src={brandLogo} alt="EList" className={styles.logoImg} />
+        <div className={styles.logoWrap} onContextMenu={e => e.preventDefault()}>
+          <AuthLogoImg />
         </div>
 
         <h1 className={styles.heading}>Подтверждение</h1>

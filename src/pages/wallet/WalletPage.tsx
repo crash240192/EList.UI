@@ -1,9 +1,31 @@
-// pages/wallet/WalletPage.tsx — макет examples/elist_settings_wallet.html
+// pages/wallet/WalletPage.tsx — страница «Тариф» (PeriodPurchase)
 
-import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import { createWallet, getWalletByAccount, setWalletTariff, type IWallet } from '@/entities/user/walletApi';
-import { getMyPersonInfo } from '@/entities/user/settingsApi';
-import { tariffApi, tariffValidatorApi, type ITariff, type ITariffValidator } from '@/entities/admin/adminApi';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  createWallet,
+  getWalletByAccount,
+  createTariffPurchase,
+  cancelTariffPurchase,
+  quoteTariffCancel,
+  fetchWalletDeposits,
+  fetchWalletTariffCharges,
+  fetchWalletTariffRefunds,
+  purchaseKindLabel,
+  walletActiveUntil,
+  isPeriodPurchaseMode,
+  type IWallet,
+  type IWalletDeposit,
+  type IWalletTariffCharge,
+  type IWalletTariffRefund,
+  type ITariffCancelQuote,
+} from '@/entities/user/walletApi';
+import {
+  formatTariffPeriod,
+  tariffApi,
+  tariffValidatorApi,
+  type ITariff,
+  type ITariffValidator,
+} from '@/entities/admin/adminApi';
 import {
   fetchMyOrders,
   formatMoney,
@@ -12,8 +34,9 @@ import {
 } from '@/entities/order';
 import { fetchEventById } from '@/entities/event';
 import { getOrFetchAccountId } from '@/entities/user/api';
+import { formatValidatorRows, TariffPlansPicker } from '@/features/wallet';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog/ConfirmDialog';
 import { usePageTitle } from '@/shared/hooks';
-import { formatTariffAgeCapability } from '@/shared/lib/ageLimit';
 import styles from './WalletPage.module.css';
 
 type HistoryKind = 'in' | 'out' | 'tariff';
@@ -39,174 +62,192 @@ const HIST_AMT_CLASS = {
   tariff: styles.histAmtTariff,
 } as const;
 
-function formatValidatorRows(v: ITariffValidator): { label: string; value: string; type: 'ok' | 'warn' | 'no' }[] {
-  return [
-    {
-      label: 'Приватные события',
-      value: v.allowPrivate ? 'Разрешены' : 'Недоступны',
-      type: v.allowPrivate ? 'ok' : 'no',
-    },
-    {
-      label: 'Фильтр по полу',
-      value: v.allowGenderSegregation ? 'Разрешён' : 'Недоступен',
-      type: v.allowGenderSegregation ? 'ok' : 'no',
-    },
-    {
-      label: 'Макс. стоимость',
-      value: v.costLimit == null ? 'Без ограничений' : v.costLimit === 0 ? 'Только бесплатные' : `до ${v.costLimit.toLocaleString()} ₽`,
-      type: v.costLimit == null ? 'ok' : v.costLimit === 0 ? 'no' : 'warn',
-    },
-    {
-      label: 'Макс. участников',
-      value: v.personsLimit == null ? 'Без ограничений' : v.personsLimit === 0 ? 'Нельзя ограничивать' : `до ${v.personsLimit} чел.`,
-      type: v.personsLimit == null ? 'ok' : v.personsLimit === 0 ? 'no' : 'warn',
-    },
-    {
-      label: 'Возрастной ценз',
-      value: formatTariffAgeCapability(v.ageLimit),
-      type: v.ageLimit == null ? 'ok' : v.ageLimit === 0 ? 'no' : 'warn',
-    },
-  ];
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
-const TARIFF_CAROUSEL_MIN = 4;
+function formatDateShort(iso: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
 
-function TariffPlansCarousel({ children, count }: { children: ReactNode; count: number }) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [canScrollPrev, setCanScrollPrev] = useState(false);
-  const [canScrollNext, setCanScrollNext] = useState(false);
-
-  const updateScrollState = useCallback(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    setCanScrollPrev(el.scrollLeft > 4);
-    setCanScrollNext(el.scrollLeft < maxScroll - 4);
-  }, []);
-
-  useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    updateScrollState();
-    el.addEventListener('scroll', updateScrollState, { passive: true });
-    const ro = new ResizeObserver(updateScrollState);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener('scroll', updateScrollState);
-      ro.disconnect();
-    };
-  }, [count, updateScrollState]);
-
-  const scrollByPage = (dir: -1 | 1) => {
-    const el = trackRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' });
-  };
-
-  if (count < TARIFF_CAROUSEL_MIN) {
-    return <div className={styles.tariffGrid}>{children}</div>;
+function formatActiveUntil(iso: string): string {
+  const end = new Date(iso);
+  const ms = end.getTime() - Date.now();
+  if (ms < 48 * 60 * 60 * 1000) {
+    return end.toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   }
+  return formatDateShort(iso);
+}
 
-  return (
-    <div className={styles.tariffCarousel}>
-      <button
-        type="button"
-        className={styles.tariffCarouselBtn}
-        onClick={() => scrollByPage(-1)}
-        disabled={!canScrollPrev}
-        aria-label="Предыдущие тарифы"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-      </button>
-      <div ref={trackRef} className={styles.tariffCarouselTrack}>
-        {children}
-      </div>
-      <button
-        type="button"
-        className={styles.tariffCarouselBtn}
-        onClick={() => scrollByPage(1)}
-        disabled={!canScrollNext}
-        aria-label="Следующие тарифы"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-      </button>
-    </div>
-  );
+function formatTimeLeft(iso: string): string | null {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return null;
+  if (ms <= 0) return 'истёк';
+  const mins = Math.max(1, Math.ceil(ms / 60_000));
+  if (mins < 60) return `осталось ${mins} мин.`;
+  const hours = Math.ceil(ms / 3_600_000);
+  if (hours < 48) return `осталось ${hours} ч.`;
+  const days = Math.ceil(ms / 86_400_000);
+  return `осталось ${days} дн.`;
 }
 
 export default function WalletPage() {
-  usePageTitle('Кошелёк');
+  usePageTitle('Тариф');
   const [wallet, setWallet] = useState<IWallet | null>(null);
   const [tariff, setTariff] = useState<ITariff | null>(null);
-  const [holderName, setHolderName] = useState('');
   const [allTariffs, setAllTariffs] = useState<ITariff[]>([]);
   const [validators, setValidators] = useState<Record<string, ITariffValidator | null>>({});
   const [loading, setLoading] = useState(true);
-  const [selectedTariffId, setSelectedTariffId] = useState('');
-  const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelQuote, setCancelQuote] = useState<ITariffCancelQuote | null>(null);
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
 
-  const loadHistory = useCallback(async (currentTariff: ITariff | null, currentWallet: IWallet | null) => {
+  useEffect(() => {
+    let cancelled = false;
+    import('@/shared/api/featuresApi')
+      .then(m => m.fetchAppFeatures())
+      .then(f => {
+        if (!cancelled) setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const loadHistory = useCallback(async (
+    currentTariff: ITariff | null,
+    currentWallet: IWallet | null,
+    tariffsCatalog: ITariff[] = [],
+    includeTicketOrders = false,
+  ) => {
     setHistoryLoading(true);
     try {
-      const orders = await fetchMyOrders().catch(() => [] as IOrder[]);
-      const eventIds = [...new Set(orders.map(o => o.eventId).filter(Boolean))];
-      const nameById = new Map<string, string>();
-      await Promise.all(eventIds.map(async (eventId) => {
-        try {
-          const ev = await fetchEventById(eventId);
-          if (ev?.name) nameById.set(eventId, ev.name);
-        } catch { /* ignore */ }
-      }));
+      const rows: HistoryRow[] = [];
+      const tariffNameById = new Map<string, string>();
+      for (const t of tariffsCatalog) {
+        if (t.id) tariffNameById.set(t.id, t.name);
+      }
+      if (currentTariff?.id) tariffNameById.set(currentTariff.id, currentTariff.name);
 
-      const rows: HistoryRow[] = orders.map((order) => {
-        const when = order.paidAt || order.createDate;
-        const sortAt = when ? new Date(when).getTime() : 0;
-        const dateLabel = when
-          ? new Date(when).toLocaleString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-          : '';
-        const status = ORDER_STATUS_LABELS[order.status] ?? order.status;
-        const qty = order.quantity > 1 ? ` · ${order.quantity} билета` : ' · Билет';
-        const isRefund = order.status === 'Refunded' || order.status === 'PartiallyRefunded';
-        const amountAbs = formatMoney(order.amountTotal, order.currency);
-        return {
-          id: order.id,
-          kind: isRefund ? 'in' : 'out',
-          name: nameById.get(order.eventId) || 'Билет на мероприятие',
-          meta: `${dateLabel}${qty} · ${status}`,
-          amount: isRefund ? `+ ${amountAbs}` : `− ${amountAbs}`,
-          sortAt,
-        };
-      });
+      if (currentWallet?.id) {
+        const [deposits, charges, refunds] = await Promise.all([
+          fetchWalletDeposits(currentWallet.id).catch(() => [] as IWalletDeposit[]),
+          fetchWalletTariffCharges(currentWallet.id).catch(() => [] as IWalletTariffCharge[]),
+          fetchWalletTariffRefunds(currentWallet.id).catch(() => [] as IWalletTariffRefund[]),
+        ]);
 
-      if (currentWallet?.lastChargeDate && currentTariff) {
-        const sortAt = new Date(currentWallet.lastChargeDate).getTime();
-        rows.push({
-          id: `tariff-${currentWallet.id}`,
-          kind: 'tariff',
-          name: `Тариф «${currentTariff.name}»`,
-          meta: `${new Date(currentWallet.lastChargeDate).toLocaleString('ru-RU', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })} · Списание тарифа`,
-          amount: currentTariff.cost > 0
-            ? `− ${formatMoney(currentTariff.cost)}`
-            : '0 ₽',
-          sortAt: Number.isFinite(sortAt) ? sortAt : 0,
-        });
+        for (const d of deposits.filter(x => x.status === 'Succeeded')) {
+          const when = d.paidAt || d.createDate;
+          const sortAt = when ? new Date(when).getTime() : 0;
+          const dateLabel = when ? formatDateTime(when) : '';
+          const planName = d.tariffId ? tariffNameById.get(d.tariffId) : null;
+          const kindLabel = purchaseKindLabel(d.purchaseKind);
+          const name = planName ? `${kindLabel} «${planName}»` : kindLabel;
+          rows.push({
+            id: `deposit-${d.id}`,
+            kind: 'tariff',
+            name,
+            meta: [dateLabel, d.periodEnd ? `до ${formatDateShort(d.periodEnd)}` : null]
+              .filter(Boolean)
+              .join(' · '),
+            amount: `${d.amount.toLocaleString('ru-RU')} ₽`,
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
+
+        // Legacy charges only if no purchase-kind deposits cover the story
+        const hasPurchaseDeposits = deposits.some(
+          d => d.status === 'Succeeded' && d.purchaseKind != null && d.purchaseKind !== 'TopUp' && d.purchaseKind !== 0,
+        );
+        if (!hasPurchaseDeposits) {
+          for (const c of charges) {
+            const sortAt = c.chargedAt ? new Date(c.chargedAt).getTime() : 0;
+            const dateLabel = c.chargedAt ? formatDateTime(c.chargedAt) : '';
+            const name = tariffNameById.get(c.tariffId)
+              ? `Тариф «${tariffNameById.get(c.tariffId)}»`
+              : 'Списание тарифа';
+            rows.push({
+              id: `charge-${c.id}`,
+              kind: 'tariff',
+              name,
+              meta: [dateLabel, 'Списание'].filter(Boolean).join(' · '),
+              amount: `${Number(c.amount).toLocaleString('ru-RU')} ₽`,
+              sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+            });
+          }
+        }
+
+        for (const rf of refunds.filter(x => {
+          const s = String(x.status);
+          return s === 'Succeeded' || s === 'Pending' || s === '1' || s === '0';
+        })) {
+          const when = rf.succeededAt || rf.createDate;
+          const sortAt = when ? new Date(when).getTime() : 0;
+          const dateLabel = when ? formatDateTime(when) : '';
+          const status = String(rf.status);
+          const pending = status === 'Pending' || status === '0';
+          rows.push({
+            id: `refund-${rf.id}`,
+            kind: 'in',
+            name: pending ? 'Возврат тарифа (в обработке)' : 'Возврат за отмену тарифа',
+            meta: [
+              dateLabel,
+              rf.remainingDays > 0 ? `~${Math.ceil(rf.remainingDays)} дн.` : null,
+            ].filter(Boolean).join(' · '),
+            amount: `${rf.amount.toLocaleString('ru-RU')} ₽`,
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
+      }
+
+      if (includeTicketOrders) {
+        const orders = await fetchMyOrders().catch(() => [] as IOrder[]);
+        const eventIds = [...new Set(orders.map(o => o.eventId).filter(Boolean))];
+        const nameById = new Map<string, string>();
+        await Promise.all(eventIds.map(async (eventId) => {
+          try {
+            const ev = await fetchEventById(eventId);
+            if (ev?.name) nameById.set(eventId, ev.name);
+          } catch { /* ignore */ }
+        }));
+
+        for (const order of orders) {
+          const when = order.paidAt || order.createDate;
+          const sortAt = when ? new Date(when).getTime() : 0;
+          const dateLabel = when ? formatDateTime(when) : '';
+          const status = ORDER_STATUS_LABELS[order.status] ?? order.status;
+          const qty = order.quantity > 1 ? ` · ${order.quantity} билета` : ' · Билет';
+          const isRefund = order.status === 'Refunded' || order.status === 'PartiallyRefunded';
+          const amountAbs = formatMoney(order.amountTotal, order.currency);
+          rows.push({
+            id: `order-${order.id}`,
+            kind: isRefund ? 'in' : 'out',
+            name: nameById.get(order.eventId) || 'Билет на мероприятие',
+            meta: `${dateLabel}${qty} · ${status}`,
+            amount: amountAbs,
+            sortAt: Number.isFinite(sortAt) ? sortAt : 0,
+          });
+        }
       }
 
       rows.sort((a, b) => b.sortAt - a.sortAt);
@@ -224,24 +265,21 @@ export default function WalletPage() {
       if (!w) w = await createWallet();
       setWallet(w);
 
-      const [tariffs, person] = await Promise.all([
+      const [tariffs, features] = await Promise.all([
         tariffApi.getAll(false).catch(() => []),
-        getMyPersonInfo().catch(() => null),
+        import('@/shared/api/featuresApi').then(m => m.fetchAppFeatures()).catch(() => null),
       ]);
+      const ticketsOn = Boolean(features?.ticketsEnabled);
+      setTicketsEnabled(ticketsOn);
       setAllTariffs([...tariffs].sort((a, b) => a.cost - b.cost));
-
-      if (person) {
-        const name = [person.firstName, person.lastName].filter(Boolean).join(' ');
-        if (name) setHolderName(name);
-      }
 
       if (w?.tariffId) {
         const t = tariffs.find(x => x.id === w!.tariffId) ?? null;
         setTariff(t);
-        await loadHistory(t, w);
+        await loadHistory(t, w, tariffs, ticketsOn);
       } else {
         setTariff(null);
-        await loadHistory(null, w);
+        await loadHistory(null, w, tariffs, ticketsOn);
       }
 
       const validatorEntries = await Promise.all(
@@ -258,30 +296,117 @@ export default function WalletPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
 
-  const handleSetTariff = async () => {
-    if (!wallet || !selectedTariffId) return;
-    setSaving(true);
+  const redirectToPayment = (confirmationUrl: string) => {
+    window.location.assign(
+      confirmationUrl.startsWith('http')
+        ? confirmationUrl
+        : `${window.location.origin}${confirmationUrl.startsWith('/') ? '' : '/'}${confirmationUrl}`,
+    );
+  };
+
+  const handlePeriodPurchase = async (tariffId: string) => {
+    if (!wallet || purchasingId) return;
+    setPurchasingId(tariffId);
     setMsg(null);
     try {
-      await setWalletTariff(wallet.id, selectedTariffId);
-      setMsg({ text: 'Тариф подключён', ok: true });
-      setSelectedTariffId('');
+      const returnUrl = `${window.location.origin}/payments/return`;
+      const result = await createTariffPurchase({
+        walletId: wallet.id,
+        tariffId,
+        returnUrl,
+      });
+
+      try {
+        sessionStorage.setItem('elist_pending_wallet_deposit', JSON.stringify({
+          depositId: result.deposit.id,
+          walletId: wallet.id,
+          providerPaymentId: result.providerPaymentId,
+          purpose: 'tariff',
+        }));
+      } catch { /* ignore */ }
+
+      if (result.paidImmediately) {
+        setMsg({ text: 'Тариф активирован', ok: true });
+        await load();
+        return;
+      }
+
+      const confirmationUrl = result.confirmationUrl?.trim() || null;
+      if (confirmationUrl) {
+        redirectToPayment(confirmationUrl);
+        return;
+      }
+
+      setMsg({ text: 'Платёж создан, ожидание подтверждения', ok: true });
       await load();
     } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Ошибка', ok: false });
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось оформить тариф', ok: false });
     } finally {
-      setSaving(false);
+      setPurchasingId(null);
     }
   };
+
+  const handleExtendCurrent = () => {
+    if (!tariff?.id) return;
+    void handlePeriodPurchase(tariff.id);
+  };
+
+  const openCancelDialog = async () => {
+    if (!wallet || cancelBusy) return;
+    setCancelBusy(true);
+    setMsg(null);
+    try {
+      const q = await quoteTariffCancel({ walletId: wallet.id });
+      setCancelQuote(q);
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось рассчитать возврат', ok: false });
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
+  const confirmCancel = async () => {
+    if (!wallet || !cancelQuote || cancelBusy) return;
+    setCancelBusy(true);
+    try {
+      const result = await cancelTariffPurchase({
+        walletId: wallet.id,
+        confirmRefundAmount: cancelQuote.refundAmount,
+        reason: 'user_cancel',
+      });
+      setCancelQuote(null);
+      setMsg({
+        text: result.message
+          || (result.refundAmount > 0
+            ? `Тариф отменён. Возврат ${result.refundAmount.toLocaleString('ru-RU')} ₽`
+            : 'Тариф отменён'),
+        ok: true,
+      });
+      await load();
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'Не удалось отменить тариф', ok: false });
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
+  const activeUntil = walletActiveUntil(wallet);
+  const timeLeft = activeUntil ? formatTimeLeft(activeUntil) : null;
+  const paidActive = Boolean(
+    tariff && tariff.cost > 0 && wallet?.isSelectedTariffActive && activeUntil,
+  );
+  const periodMode = isPeriodPurchaseMode(wallet);
+  const currentValidator = tariff?.id ? validators[tariff.id] : null;
+  const heroFeatures = currentValidator ? formatValidatorRows(currentValidator) : null;
 
   if (loading) {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
           <div className={styles.cardHead}>
-            <div className={`${styles.bankCard} ${styles.bankCardStub}`}>
+            <div className={`${styles.planHero} ${styles.planHeroStub}`}>
               <div className={styles.loader}>Загрузка...</div>
             </div>
           </div>
@@ -295,61 +420,80 @@ export default function WalletPage() {
       <div className={styles.card}>
         {wallet && (
           <div className={styles.cardHead}>
-            <div className={styles.bankCard}>
-              <div className={styles.cardTop}>
-                <div className={styles.cardBrand}>EList Pay</div>
-                <div className={styles.cardChip}>
-                  <div className={styles.chipLine} />
-                  <div className={styles.chipLine} />
-                  <div className={styles.chipLine} />
+            <div className={styles.planHero}>
+              <div className={styles.planHeroTop}>
+                <span className={styles.planHeroEyebrow}>Тариф</span>
+                <span className={`${styles.planHeroPill} ${paidActive ? styles.planHeroPillOk : styles.planHeroPillMuted}`}>
+                  {paidActive ? 'Активен' : 'Базовый'}
+                </span>
+              </div>
+              <div className={styles.planHeroName}>
+                {tariff?.name ?? 'Бесплатный'}
+              </div>
+              <div className={styles.planHeroMeta}>
+                {paidActive && activeUntil
+                  ? `до ${formatActiveUntil(activeUntil)}${timeLeft ? ` · ${timeLeft}` : ''}`
+                  : 'Базовые лимиты · платные планы ниже'}
+              </div>
+              {heroFeatures && heroFeatures.length > 0 && (
+                <div className={styles.planHeroFeatures}>
+                  {heroFeatures.map(row => (
+                    <div key={row.label} className={styles.planHeroFeatRow}>
+                      <span
+                        className={`${styles.planHeroFeatIcon} ${
+                          row.type === 'ok'
+                            ? styles.planHeroFeatOk
+                            : row.type === 'warn'
+                              ? styles.planHeroFeatWarn
+                              : styles.planHeroFeatNo
+                        }`}
+                        aria-hidden
+                      />
+                      <span>{row.label}: {row.value}</span>
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <div className={styles.cardMid}>
-                <div className={styles.cardLabel}>Баланс</div>
-                <div className={styles.cardBalance}>
-                  {(wallet.balance ?? 0).toLocaleString('ru-RU')}
-                  <span className={styles.cardCurrency}>₽</span>
+              )}
+              {paidActive && tariff && (
+                <div className={styles.planHeroActions}>
+                  <button
+                    type="button"
+                    className={styles.planHeroCta}
+                    disabled={Boolean(purchasingId) || cancelBusy}
+                    onClick={handleExtendCurrent}
+                  >
+                    {purchasingId === tariff.id
+                      ? '…'
+                      : `Продлить на ${formatTariffPeriod(tariff)} · ${tariff.cost.toLocaleString('ru-RU')} ₽`}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.planHeroCancel}
+                    disabled={Boolean(purchasingId) || cancelBusy}
+                    onClick={() => { void openCancelDialog(); }}
+                  >
+                    {cancelBusy && !cancelQuote ? '…' : 'Отказаться от тарифа'}
+                  </button>
                 </div>
-              </div>
-              <div className={styles.cardBottom}>
-                <div>
-                  {holderName && (
-                    <>
-                      <div className={styles.cardHolder}>Владелец</div>
-                      <div className={styles.cardHolderName}>{holderName}</div>
-                    </>
-                  )}
-                </div>
-                {wallet.id && (
-                  <div className={styles.cardId}>ID: {wallet.id.slice(0, 8)}...</div>
-                )}
-              </div>
-
-              <div className={styles.cardActionsRow}>
-                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <polyline points="19 12 12 19 5 12" />
-                  </svg>
-                  Пополнить
-                </button>
-                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <line x1="12" y1="19" x2="12" y2="5" />
-                    <polyline points="5 12 12 5 19 12" />
-                  </svg>
-                  Вывести
-                </button>
-                <button type="button" className={styles.cardActionBtn} disabled title="Скоро">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <rect x="5" y="2" width="14" height="20" rx="2" />
-                    <line x1="12" y1="18" x2="12.01" y2="18" />
-                  </svg>
-                  Реквизиты
-                </button>
-              </div>
+              )}
             </div>
           </div>
+        )}
+
+        {cancelQuote && (
+          <ConfirmDialog
+            title="Отказаться от тарифа?"
+            message={
+              cancelQuote.refundAmount > 0
+                ? `Вернём ${cancelQuote.refundAmount.toLocaleString('ru-RU')} ₽ за неиспользованный остаток «${cancelQuote.tariffName}». Сразу перейдёте на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
+                : `Тариф «${cancelQuote.tariffName}» будет снят без возврата на карту. Переход на «${cancelQuote.fallbackTariffName ?? 'бесплатный'}».`
+            }
+            confirmLabel={cancelBusy ? '…' : (cancelQuote.refundAmount > 0 ? 'Отказаться и вернуть' : 'Отказаться')}
+            cancelLabel="Оставить"
+            variant="danger"
+            onConfirm={() => { void confirmCancel(); }}
+            onCancel={() => { if (!cancelBusy) setCancelQuote(null); }}
+          />
         )}
 
         <div className={styles.walletBody}>
@@ -361,82 +505,26 @@ export default function WalletPage() {
 
           {wallet && (
             <>
-              <div className={styles.topUpSection}>
-                <div className={styles.sectionTitle}>Пополнение кошелька</div>
-                <div className={styles.topUpStub}>
-                  <div className={styles.topUpStubForm}>
-                    <label className={styles.topUpLabel}>
-                      Сумма пополнения
-                      <div className={styles.topUpInputRow}>
-                        <input
-                          type="text"
-                          className={styles.topUpInput}
-                          placeholder="1 000"
-                          disabled
-                          aria-disabled
-                        />
-                        <span className={styles.topUpCurrency}>₽</span>
-                      </div>
-                    </label>
-                    <button type="button" className={styles.topUpBtn} disabled>
-                      Перейти к оплате
-                    </button>
-                  </div>
-                  <p className={styles.topUpHint}>
-                    Механизм пополнения в разработке. Здесь появится выбор способа оплаты: банковская карта, СБП и другие.
-                  </p>
-                </div>
-              </div>
-
               <div>
-                <div className={styles.tariffHeader}>
-                  <div>
-                    <div className={styles.sectionTitle}>Тарифный план</div>
-                    <div className={styles.sectionSubtitle}>
-                      Выберите план для доступа к расширенным возможностям создания событий
-                    </div>
-                  </div>
-                </div>
-
-                {allTariffs.length === 0 ? (
-                  <div className={styles.noTariff}>
-                    Тарифы пока не добавлены. Обратитесь к администратору.
-                  </div>
-                ) : (
-                  <>
-                    <TariffPlansCarousel count={allTariffs.length}>
-                      {allTariffs.map(t => (
-                        <TariffCard
-                          key={t.id}
-                          tariff={t}
-                          validator={validators[t.id] ?? null}
-                          isCurrent={tariff?.id === t.id}
-                          isSelected={selectedTariffId === t.id}
-                          onSelect={() => setSelectedTariffId(prev => prev === t.id ? '' : t.id)}
-                        />
-                      ))}
-                    </TariffPlansCarousel>
-                    {selectedTariffId && selectedTariffId !== tariff?.id && (
-                      <div className={styles.selectActions}>
-                        <button type="button" className={styles.cancelBtn} onClick={() => setSelectedTariffId('')}>
-                          Отмена
-                        </button>
-                        <button type="button" className={styles.confirmBtn} onClick={handleSetTariff} disabled={saving}>
-                          {saving ? 'Подключение...' : 'Подключить'}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
+                <TariffPlansPicker
+                  mode={periodMode ? 'periodPurchase' : 'legacy'}
+                  tariffs={allTariffs}
+                  validators={validators}
+                  walletTariffId={wallet.tariffId}
+                  walletEffectiveTariffId={wallet.effectiveTariffId}
+                  isSelectedTariffActive={wallet.isSelectedTariffActive}
+                  currentTariff={tariff}
+                  activeUntil={activeUntil}
+                  onPeriodPurchase={(id) => { void handlePeriodPurchase(id); }}
+                  purchasingTariffId={purchasingId}
+                  title="Планы"
+                />
               </div>
 
               <div className={styles.historySection}>
                 <div className={styles.tariffHeader}>
                   <div>
                     <div className={styles.sectionTitle}>История операций</div>
-                    <div className={styles.sectionSubtitle}>
-                      Покупки билетов и списания тарифа
-                    </div>
                   </div>
                 </div>
                 {historyLoading ? (
@@ -463,60 +551,6 @@ export default function WalletPage() {
             </>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function TariffCard({
-  tariff,
-  validator,
-  isCurrent,
-  isSelected,
-  onSelect,
-}: {
-  tariff: ITariff;
-  validator: ITariffValidator | null;
-  isCurrent: boolean;
-  isSelected: boolean;
-  onSelect: () => void;
-}) {
-  const days = (tariff as { periodDays?: number }).periodDays ?? tariff.period?.days ?? '?';
-  const rows = validator ? formatValidatorRows(validator) : null;
-
-  const cardClass = [
-    styles.tc,
-    isCurrent ? styles.tcCurrent : '',
-    isSelected && !isCurrent ? styles.tcSelected : '',
-  ].filter(Boolean).join(' ');
-
-  return (
-    <div
-      className={cardClass}
-      onClick={isCurrent ? undefined : onSelect}
-      role="button"
-      tabIndex={isCurrent ? -1 : 0}
-      aria-pressed={isSelected}
-      aria-disabled={isCurrent}
-      onKeyDown={e => { if (e.key === 'Enter' && !isCurrent) onSelect(); }}
-    >
-      {isCurrent && <div className={`${styles.tcBadge} ${styles.tcBadgeActive}`}>Активен</div>}
-      <div className={styles.tcName}>{tariff.name}</div>
-      <div className={`${styles.tcPrice} ${tariff.cost === 0 ? styles.tcPriceFree : ''}`}>
-        {tariff.cost === 0 ? '0 ₽' : `${tariff.cost.toLocaleString('ru-RU')} ₽`}
-      </div>
-      <div className={styles.tcPeriod}>
-        {tariff.cost === 0 ? 'навсегда' : `в месяц · ${days} дн.`}
-      </div>
-      <div className={styles.tcDivider} />
-      <div className={styles.tcFeat}>
-        {!rows && <div className={styles.detailsLoader}>Нет данных об ограничениях</div>}
-        {rows?.map(row => (
-          <div key={row.label} className={styles.tcRow}>
-            <div className={`${styles.tcRowIcon} ${row.type === 'ok' ? styles.iconOk : row.type === 'warn' ? styles.iconWarn : styles.iconNo}`} aria-hidden />
-            <div className={styles.tcRowText}>{row.label}: {row.value}</div>
-          </div>
-        ))}
       </div>
     </div>
   );

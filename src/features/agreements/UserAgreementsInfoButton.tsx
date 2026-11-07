@@ -1,10 +1,11 @@
 // features/agreements/UserAgreementsInfoButton.tsx
-// Информационная кнопка в хедере: 3 пользовательских документа + факт согласия
+// Информационная кнопка в хедере: пользовательские документы + факт согласия
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DocumentType,
   DOCUMENT_TYPE_LABELS,
+  SERVICE_REQUIRED_DOCUMENT_TYPES,
   checkUserAgreement,
   documentRequiresConsent,
   fetchLastDocument,
@@ -23,6 +24,7 @@ const USER_DOCUMENT_TYPES: DocumentTypeValue[] = [
   DocumentType.Policy,
   DocumentType.Consent,
   DocumentType.Agreement,
+  DocumentType.DistributionConsent,
 ];
 
 type ConsentState = 'unknown' | 'yes' | 'no' | 'guest';
@@ -38,8 +40,15 @@ function labelFor(type: DocumentTypeValue): string {
   return DOCUMENT_TYPE_LABELS.find(x => x.value === type)?.label ?? String(type);
 }
 
+function parseMissingDocuments(detail: unknown): string[] {
+  if (!detail || typeof detail !== 'object') return [];
+  const missing = (detail as { missingDocuments?: unknown }).missingDocuments;
+  if (!Array.isArray(missing)) return [];
+  return missing.filter((x): x is string => typeof x === 'string');
+}
+
 interface UserAgreementsInfoButtonProps {
-  /** Скрыть кнопку «i» — панель открывается снаружи (мобильное меню аватара) */
+  /** Скрыть кнопку «i» — панель открывается снаружи */
   hideTrigger?: boolean;
   panelOpen?: boolean;
   onPanelOpenChange?: (open: boolean) => void;
@@ -59,6 +68,7 @@ export function UserAgreementsInfoButton({
   const [rows, setRows] = useState<DocRow[]>([]);
   const [viewDoc, setViewDoc] = useState<IAgreementDocument | null>(null);
   const [acceptItem, setAcceptItem] = useState<PendingUserAgreement | null>(null);
+  const [highlight, setHighlight] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -84,6 +94,15 @@ export function UserAgreementsInfoButton({
         });
       }
       setRows(next);
+
+      if (authenticated) {
+        const serviceMissing = next.some(
+          row => SERVICE_REQUIRED_DOCUMENT_TYPES.includes(row.type) && row.consent === 'no',
+        );
+        setHighlight(serviceMissing);
+      } else {
+        setHighlight(false);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось загрузить документы');
       setRows([]);
@@ -96,6 +115,48 @@ export function UserAgreementsInfoButton({
     if (!open) return;
     void load();
   }, [open, load]);
+
+  // Подсветка кнопки, если сервису не хватает Consent/Agreement (toast / gate).
+  useEffect(() => {
+    if (!authenticated) {
+      setHighlight(false);
+      return;
+    }
+
+    const refreshHighlight = async () => {
+      try {
+        let missing = false;
+        for (const type of SERVICE_REQUIRED_DOCUMENT_TYPES) {
+          const ok = await checkUserAgreement(type);
+          if (!ok) {
+            missing = true;
+            break;
+          }
+        }
+        setHighlight(missing);
+      } catch {
+        /* ignore */
+      }
+    };
+
+    void refreshHighlight();
+
+    const onRecheck = (e: Event) => {
+      const names = parseMissingDocuments((e as CustomEvent).detail);
+      if (names.length === 0) {
+        void refreshHighlight();
+        return;
+      }
+      const serviceMissing = names.some(name =>
+        name === 'Consent' || name === 'Agreement' || name === '1' || name === '2',
+      );
+      setHighlight(serviceMissing);
+      if (!serviceMissing) void refreshHighlight();
+    };
+
+    window.addEventListener('elist:recheck-agreements', onRecheck);
+    return () => window.removeEventListener('elist:recheck-agreements', onRecheck);
+  }, [authenticated]);
 
   useEffect(() => {
     if (!open) return;
@@ -114,12 +175,12 @@ export function UserAgreementsInfoButton({
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onEsc);
     };
-  }, [open, viewDoc, acceptItem]);
+  }, [open, viewDoc, acceptItem, setOpen]);
 
   const openRow = (row: DocRow) => {
     if (!row.document) return;
     const needsAccept = authenticated
-      && documentRequiresConsent(row.type)
+      && documentRequiresConsent(row.type, row.document.requiresAgreement)
       && row.consent !== 'yes';
     if (needsAccept) {
       setAcceptItem({ type: row.type, document: row.document });
@@ -129,7 +190,7 @@ export function UserAgreementsInfoButton({
   };
 
   const consentStatusLabel = (row: DocRow): string => {
-    if (!documentRequiresConsent(row.type)) return 'Информация';
+    if (!documentRequiresConsent(row.type, row.document?.requiresAgreement)) return 'Информация';
     if (row.consent === 'yes') return 'Принято';
     if (row.consent === 'no') return 'Не принято';
     if (row.consent === 'guest') return '—';
@@ -137,7 +198,7 @@ export function UserAgreementsInfoButton({
   };
 
   const consentStatusClass = (row: DocRow): string => {
-    if (!documentRequiresConsent(row.type)) return styles.statusInfo;
+    if (!documentRequiresConsent(row.type, row.document?.requiresAgreement)) return styles.statusInfo;
     if (row.consent === 'yes') return styles.statusOk;
     if (row.consent === 'no') return styles.statusNo;
     return styles.statusMute;
@@ -148,7 +209,7 @@ export function UserAgreementsInfoButton({
       {!hideTrigger && (
       <button
         type="button"
-        className={`${styles.infoBtn} ${open ? styles.infoBtnOpen : ''}`}
+        className={`${styles.infoBtn} ${open ? styles.infoBtnOpen : ''} ${highlight ? styles.infoBtnHighlight : ''}`}
         onClick={() => setOpen(!open)}
         aria-label="Условия использования"
         aria-expanded={open}
@@ -227,6 +288,7 @@ export function UserAgreementsInfoButton({
           onComplete={() => {
             setAcceptItem(null);
             void load();
+            window.dispatchEvent(new Event('elist:recheck-agreements'));
           }}
         />
       )}

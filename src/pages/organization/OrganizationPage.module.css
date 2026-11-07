@@ -73,6 +73,59 @@
   flex-wrap: wrap;
 }
 
+.profileActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: flex-end;
+  gap: 8px;
+}
+
+.btnJoin {
+  composes: btnPrimary from '../../shared/styles/actionButtons.module.css';
+}
+
+.profileActions .btnSubscribe {
+  background: var(--success);
+  color: #fff;
+  border: none;
+}
+
+.profileActions .btnSubscribe:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--success) 82%, #000);
+  color: #fff;
+  border: none;
+}
+
+.btnLeave {
+  composes: btnSecondary from '../../shared/styles/actionButtons.module.css';
+}
+
+.profileActions .btnLeave {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--surface-2);
+}
+
+.profileActions .btnLeave:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-2));
+}
+
+@media (max-width: 639px) {
+  .profileActions {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+
+  .profileActions .btnJoin {
+    flex: 1;
+  }
+}
+
 .avatarWrap {
   position: relative;
   flex-shrink: 0;
@@ -139,6 +192,11 @@
 }
 
 @media (max-width: 639px) {
+  .profileInfo {
+    /* Название целиком на тёмной шапке, адрес остаётся ниже, на белом. */
+    padding-bottom: 24px;
+  }
+
   .nameRowMobile {
     display: flex;
   }
@@ -157,6 +215,11 @@
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+/* Название стоит на тёмной шапке. В светлой теме обычный текст там пропадает. */
+:global(body.light-theme) .fullName {
+  color: #f0f1f7;
 }
 
 .profileMeta {
@@ -268,6 +331,38 @@
   color: var(--text-muted);
   text-align: center;
   line-height: 1.2;
+}
+
+.statItemRating {
+  margin-left: auto;
+  padding-right: 0;
+}
+
+.statItemStatic {
+  cursor: default;
+  border-radius: 0;
+}
+
+.statItemStatic:hover {
+  background: none;
+  box-shadow: none;
+}
+
+.statItemStatic:hover .statNum,
+.statItemStatic:hover .ratingNum {
+  color: var(--text-primary);
+}
+
+.statRating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ratingNum {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .systemInfo {
@@ -465,6 +560,18 @@
   text-align: center;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+.sentinel {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loadingMore {
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .errorState {

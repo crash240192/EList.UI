@@ -1,15 +1,18 @@
 // pages/home/EventModal.tsx
 
 import { useEffect } from 'react';
-import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type { IEvent } from '@/entities/event';
 import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
 import { EventTypeChipsOverflow } from '@/shared/ui/EventTypeChipsOverflow';
+import { isFileStorageDownloadUrl } from '@/shared/api/fileStorageClient';
 import { getEventCoverBackground } from '@/shared/lib/eventCoverGradient';
-import { coverFocusFromEvent, coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { coverFocusImgStyle } from '@/shared/lib/coverFocus';
+import { useResolvedCoverFocus } from '@/entities/event/useResolvedCoverFocus';
 import { resolveAgeLimitBadge } from '@/shared/lib/ageLimit';
-import { getEventTypes } from '@/entities/event/lib/eventListItemUtils';
+import { getEventTypes, readAllowedGender } from '@/entities/event/lib/eventListItemUtils';
+import { GenderLimitBadge } from '@/entities/event/ui/GenderLimitBadge/GenderLimitBadge';
 import styles from './EventModal.module.css';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 
@@ -29,13 +32,17 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
   const ageLimit   = event.parameters?.ageLimit;
   const isPrivate  = event.parameters?.private;
   const maxPersons = event.parameters?.maxPersonsCount;
-  const gender     = event.parameters?.allowedGender;
+  const gender     = readAllowedGender(event.parameters);
   const hasCover   = !!(event.coverImageId || event.coverUrl);
-  const focusStyle = coverFocusImgStyle(coverFocusFromEvent(event));
+  const focusStyle = coverFocusImgStyle(useResolvedCoverFocus(event));
+  /** Публичный URL; filestorage без JWT в <img> не откроется. */
+  const publicCoverUrl = event.coverUrl && !isFileStorageDownloadUrl(event.coverUrl)
+    ? event.coverUrl
+    : null;
 
   const hasLimits = isPrivate || maxPersons || gender;
 
-  return (
+  return createPortal(
     <>
       <div className={styles.backdrop} onClick={onClose} />
       <div className={styles.modal} role="dialog" aria-modal aria-label={event.name}>
@@ -44,11 +51,21 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
         <div className={styles.cover}
           style={{ background: hasCover ? '#111' : getEventCoverBackground(event) }}>
           {event.coverImageId ? (
-            <AuthImage fileId={event.coverImageId} alt={event.name} className={styles.coverImg}
+            <AuthImage
+              fileId={event.coverImageId}
+              imageFit="cover"
+              lazy={false}
+              alt={event.name}
+              className={styles.coverImg}
               style={focusStyle}
-              fallback={event.coverUrl ? <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} /> : undefined} />
-          ) : event.coverUrl ? (
-            <img src={event.coverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} />
+              fallback={
+                publicCoverUrl
+                  ? <img src={publicCoverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} />
+                  : undefined
+              }
+            />
+          ) : publicCoverUrl ? (
+            <img src={publicCoverUrl} alt={event.name} className={styles.coverImg} style={focusStyle} />
           ) : null}
           <div className={styles.coverGrad} />
 
@@ -131,12 +148,7 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
                   до {maxPersons} мест
                 </span>
               )}
-              {gender && (
-                <span className={`${styles.limitBadge} ${styles.limitGender}`}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  {gender === 'Male' ? 'Только мужчины' : 'Только женщины'}
-                </span>
-              )}
+              <GenderLimitBadge gender={gender} />
             </div>
           )}
 
@@ -155,7 +167,8 @@ export function EventModal({ event, onClose, children }: EventModalProps) {
           {children}
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

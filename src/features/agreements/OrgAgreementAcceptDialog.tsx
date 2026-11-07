@@ -9,6 +9,7 @@ import {
 } from '@/entities/agreement';
 import { useModalBackButton } from '@/shared/lib/useModalBackButton';
 import { AgreementDocumentHtml } from './AgreementDocumentHtml';
+import { agreementRevisionLabel } from './agreementRevisionLabel';
 import {
   orgAgreementConsentLabel,
   type PendingOrgAgreement,
@@ -81,6 +82,11 @@ export function OrgAgreementAcceptDialog({
             <h2 id="org-reconsent-title" className={styles.title}>
               {current.document.header || 'Обновление соглашения организации'}
             </h2>
+            {agreementRevisionLabel(current.document.creationDate) && (
+              <p className={styles.revisionLabel}>
+                {agreementRevisionLabel(current.document.creationDate)}
+              </p>
+            )}
             <p className={styles.stepHint}>
               {organizationName
                 ? `От имени «${organizationName}»`

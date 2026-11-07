@@ -1,9 +1,10 @@
 // shared/lib/notificationsWsUrl.ts
 
-import { getAuthToken, getOrCreateClientHash } from '@/shared/api/client';
+import { getAuthToken, getOrCreateClientHash, getClientPlatform, getAppVersion } from '@/shared/api/client';
 
 /**
  * URL WebSocket: ws(s)://host/eList/ws/notifications?authorization=…&authorization-jwt=…
+ * + platform/version so ClientHash matches HTTP (X-Client-Platform / X-App-Version).
  */
 export function buildNotificationsWebSocketUrl(): string | null {
   const clientHash = getOrCreateClientHash();
@@ -13,6 +14,8 @@ export function buildNotificationsWebSocketUrl(): string | null {
   const params = new URLSearchParams();
   params.set('authorization', authToken);
   params.set('authorization-jwt', clientHash);
+  params.set('x-client-platform', getClientPlatform());
+  params.set('x-app-version', getAppVersion());
 
   const apiBase = import.meta.env.VITE_API_BASE_URL ?? '/eList';
   const query = params.toString();

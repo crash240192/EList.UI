@@ -24,6 +24,18 @@
   background: var(--surface-2);
 }
 
+.infoBtnHighlight {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
+  animation: termsPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes termsPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2); }
+}
+
 .panel {
   position: absolute;
   top: calc(100% + 8px);
@@ -34,9 +46,9 @@
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--border));
   border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 28px rgba(139, 92, 246, 0.75);
   overflow: hidden;
 }
 

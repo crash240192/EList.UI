@@ -1,6 +1,6 @@
 // ============================================================
 // shared/api/types.ts
-// Базовые типы ответов API, основанные на Swagger EList API
+// Базовые типы ответов API, основанные на Swagger API
 // ============================================================
 
 /** Стандартная обёртка всех ответов API */
@@ -12,6 +12,8 @@ export interface CommandResult<T = void> {
   result: T;
   /** Заполняется ReConsentMiddleware при 403 AgreementNotFound */
   missingDocuments?: string[];
+  /** Заполняется ErrorHandlingMiddleware при необработанном 500 */
+  correlationId?: string | null;
 }
 
 /** Пагинированный список */

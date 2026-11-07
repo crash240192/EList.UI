@@ -1,4 +1,10 @@
 /* CoverUpload.module.css */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .zone {
   position: relative; width: 100%; height: 160px;
   border: 2px dashed var(--border); border-radius: 12px;
@@ -85,3 +91,36 @@
 }
 
 .hiddenInput { display: none; }
+
+.zoomRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zoomOff { opacity: 0.45; }
+
+.zoomLabel {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.zoomRange {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.zoomRange:disabled { cursor: default; }
+
+.zoomValue {
+  flex-shrink: 0;
+  width: 42px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}

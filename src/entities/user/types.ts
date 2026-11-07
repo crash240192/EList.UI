@@ -10,6 +10,7 @@ export interface IPersonInfo {
   patronymic: string | null;
   gender: Gender | null;
   birthDate: string | null;
+  about?: string | null;
 }
 
 export interface IAccount {

@@ -2,10 +2,14 @@
 // Клиент для сервиса файлохранилища
 // basePath: /elist/filestorage
 
-import { getOrCreateClientHash, getAuthToken, notifyUnauthorized } from './client';
+import { getOrCreateClientHash, getAuthToken, notifyUnauthorized, getClientPlatform, getAppVersion, readCorrelationId, withCorrelationId } from './client';
 import { shouldForceLogoutForApi } from '@/shared/auth/unauthorized';
+import { createConcurrencyLimiter } from '@/shared/lib/concurrencyLimit';
 
 const FILE_STORAGE_BASE = import.meta.env.VITE_FILE_STORAGE_URL ?? '/elist/filestorage';
+
+/** Браузер ~6 conn/host; плюс серверный лимит download — держим клиентский потолок скромнее. */
+const limitAuthedImageFetch = createConcurrencyLimiter(4);
 
 export interface IUploadResult {
   id:  string;
@@ -26,12 +30,72 @@ export interface IFileInfo {
   metadata?:   IFileMetadata[] | null;
 }
 
-function handleFileStorageUnauthorized(status: number): void {
+/** Ошибка HTTP filestorage (в т.ч. 503 при перегрузке download). */
+export class FileStorageHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly retryAfterMs: number | null = null,
+  ) {
+    super(message);
+    this.name = 'FileStorageHttpError';
+  }
+}
+
+function parseRetryAfterMs(res: Response): number | null {
+  const raw = res.headers.get('Retry-After')?.trim();
+  if (!raw) return null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
+  const dateMs = Date.parse(raw);
+  if (!Number.isNaN(dateMs)) return Math.max(0, dateMs - Date.now());
+  return null;
+}
+
+/** Тело от download: «файл не найден»/заблокирован — не сброс сессии (раньше API отдавал Unauthorized). */
+function isFileAccessBusinessError(message: string | null | undefined, errorCode?: number | null): boolean {
+  if (errorCode === 404 || errorCode === 403) return true;
+  const msg = (message ?? '').toLowerCase();
+  if (!msg) return false;
+  return (
+    msg.includes('отсутствует')
+    || msg.includes('не найден')
+    || msg.includes('заблокирован')
+    || msg.includes('утерян')
+  );
+}
+
+function handleFileStorageUnauthorized(
+  status: number,
+  body?: { message?: string | null; errorCode?: number | null },
+): void {
   if (status !== 401) return;
+  if (isFileAccessBusinessError(body?.message, body?.errorCode)) return;
   const hadAuthToken = Boolean(getAuthToken());
   if (shouldForceLogoutForApi('/api/filestorage', hadAuthToken)) {
     notifyUnauthorized();
   }
+}
+
+async function throwFileStorageError(res: Response, fallback: string): Promise<never> {
+  let message = fallback;
+  let correlationId: string | null = null;
+  let errorCode: number | null = null;
+  try {
+    const data = await res.json() as {
+      message?: string | null;
+      correlationId?: string | null;
+      errorCode?: number | null;
+    };
+    correlationId = readCorrelationId(data, res);
+    if (data.message?.trim()) message = data.message.trim();
+    if (typeof data.errorCode === 'number') errorCode = data.errorCode;
+    handleFileStorageUnauthorized(res.status, { message, errorCode });
+  } catch {
+    correlationId = readCorrelationId(null, res);
+    handleFileStorageUnauthorized(res.status);
+  }
+  throw new Error(withCorrelationId(message, correlationId));
 }
 
 function authHeaders(): Record<string, string> {
@@ -39,6 +103,8 @@ function authHeaders(): Record<string, string> {
   const authToken  = getAuthToken();
   const headers: Record<string, string> = {
     'authorization-jwt': clientHash,
+    'X-Client-Platform': getClientPlatform(),
+    'X-App-Version': getAppVersion(),
   };
   if (authToken) headers['Authorization'] = authToken;
   return headers;
@@ -59,11 +125,15 @@ export async function uploadFile(file: File): Promise<IUploadResult> {
   });
 
   if (!res.ok) {
-    handleFileStorageUnauthorized(res.status);
-    throw new Error(`Ошибка загрузки файла: ${res.status}`);
+    await throwFileStorageError(res, `Ошибка загрузки файла: ${res.status}`);
   }
   const data = await res.json();
-  if (!data.success) throw new Error(data.message ?? 'Ошибка загрузки файла');
+  if (!data.success) {
+    throw new Error(withCorrelationId(
+      data.message ?? 'Ошибка загрузки файла',
+      readCorrelationId(data, res),
+    ));
+  }
 
   const id = data.result.id as string;
   return {
@@ -82,8 +152,7 @@ export async function attachFileContext(fileId: string, context: string): Promis
     body: JSON.stringify({ context }),
   });
   if (!res.ok) {
-    handleFileStorageUnauthorized(res.status);
-    throw new Error(`Ошибка привязки контекста: ${res.status}`);
+    await throwFileStorageError(res, `Ошибка привязки контекста: ${res.status}`);
   }
 }
 
@@ -124,6 +193,14 @@ export function fileUrl(fileId: string): string {
   return `${FILE_STORAGE_BASE}/api/download/${fileId}`;
 }
 
+/** URL из `fileUrl()` — обычный `<img src>` не может передать заголовки filestorage. */
+export function isFileStorageDownloadUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const base = FILE_STORAGE_BASE.replace(/\/$/, '');
+  return url.startsWith(`${base}/api/download/`)
+    || url.includes('/elist/filestorage/api/download/');
+}
+
 /** Заголовки для GET /api/download/{fileId}: FullSize=true — оригинал; FullSize=false — превью. */
 function downloadHeaders(options?: { fullSize?: boolean }): Record<string, string> {
   const h = { ...authHeaders() };
@@ -144,11 +221,30 @@ export async function fetchAuthedImage(
   fileId: string,
   options?: { fullSize?: boolean },
 ): Promise<string> {
-  const res = await fetch(fileUrl(fileId), { headers: downloadHeaders(options) });
-  if (!res.ok) {
-    handleFileStorageUnauthorized(res.status);
-    throw new Error(`Файл не найден: ${res.status}`);
-  }
-  const blob = await res.blob();
-  return URL.createObjectURL(blob);
+  return limitAuthedImageFetch(async () => {
+    const res = await fetch(fileUrl(fileId), { headers: downloadHeaders(options) });
+    if (!res.ok) {
+      // Не разлогинивать при 401 с телом «файл отсутствует» (legacy download Unauthorized)
+      let message = `Файл не найден: ${res.status}`;
+      try {
+        const data = await res.clone().json() as {
+          message?: string | null;
+          errorCode?: number | null;
+        };
+        if (data.message?.trim()) message = data.message.trim();
+        handleFileStorageUnauthorized(res.status, {
+          message: data.message,
+          errorCode: data.errorCode,
+        });
+      } catch {
+        handleFileStorageUnauthorized(res.status);
+      }
+      const retryAfterMs = (res.status === 503 || res.status === 429)
+        ? (parseRetryAfterMs(res) ?? 2000)
+        : null;
+      throw new FileStorageHttpError(res.status, message, retryAfterMs);
+    }
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  });
 }

@@ -1,41 +1,41 @@
 .listFlush {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 4px;
+  margin-top: 2px;
 }
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-  margin-left: 10px;
-  padding-left: 10px;
+  gap: 4px;
+  margin-top: 2px;
+  margin-left: 8px;
+  padding-left: 8px;
   border-left: 2px solid color-mix(in srgb, var(--border) 68%, transparent);
 }
 
 .skeletonRoot {
-  margin: 4px 0 0 10px;
-  padding: 8px 0 8px 10px;
+  margin: 2px 0 0 8px;
+  padding: 6px 0 6px 8px;
   border-left: 2px solid color-mix(in srgb, var(--border) 68%, transparent);
 }
 
 .error {
   margin: 0;
-  padding: 8px 0 8px 12px;
+  padding: 6px 0 6px 8px;
   font-size: 12px;
   color: var(--danger, #e74c3c);
 }
 
 .moreBtn {
   width: 100%;
-  height: 32px;
-  border-radius: 8px;
+  height: 28px;
+  border-radius: 6px;
   margin-top: 2px;
   background: none;
   border: 1px solid var(--border);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s;
@@ -55,4 +55,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+@media (max-width: 639px) {
+  .list {
+    margin-left: 6px;
+    padding-left: 6px;
+    gap: 3px;
+  }
+
+  .listFlush {
+    gap: 3px;
+  }
+
+  .moreBtn {
+    height: 26px;
+  }
 }

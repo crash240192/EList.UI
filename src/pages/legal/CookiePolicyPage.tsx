@@ -2,6 +2,7 @@
 
 import { Link } from 'react-router-dom';
 import { usePageTitle } from '@/shared/hooks';
+import { BRAND_NAME } from '@/shared/config/brand';
 import styles from './LegalDocPage.module.css';
 
 export default function CookiePolicyPage() {
@@ -12,7 +13,7 @@ export default function CookiePolicyPage() {
       <article className={styles.card}>
         <h1 className={styles.title}>Политика использования cookies</h1>
         <p className={styles.lead}>
-          Сервис EList использует cookies и похожие технологии, чтобы обеспечивать
+          Сервис «{BRAND_NAME}» использует cookies и похожие технологии, чтобы обеспечивать
           вход в аккаунт, запоминать город и базовые настройки интерфейса.
         </p>
 
@@ -28,6 +29,14 @@ export default function CookiePolicyPage() {
             <strong>elist_user_lat / elist_user_lng / elist_city_*</strong> — выбранный город
             и координаты для карты и фильтров.
           </li>
+          <li>
+            <strong>Яндекс.Метрика</strong> (_ym_uid, _ym_d и др.) — обезличенная статистика
+            посещений, карта кликов и вебвизор. Подробнее:{' '}
+            <a href="https://yandex.ru/legal/metrica_termsofuse/" target="_blank" rel="noreferrer">
+              условия Метрики
+            </a>
+            .
+          </li>
         </ul>
 
         <h2 className={styles.h2}>Согласие</h2>
@@ -35,6 +44,11 @@ export default function CookiePolicyPage() {
           Необходимые cookies (авторизация и безопасность сессии) устанавливаются для
           работы сервиса. Предпочтения города можно сбросить в настройках профиля или
           очистив cookies браузера.
+        </p>
+        <p>
+          Аналитические cookies Яндекс.Метрики подключаются после нажатия «ОК» в уведомлении
+          на сайте (сохраняется в <code>elist_cookie_consent</code>). Отключить сбор также
+          можно в настройках браузера или расширениями для блокировки трекеров.
         </p>
 
         <h2 className={styles.h2}>Срок хранения</h2>

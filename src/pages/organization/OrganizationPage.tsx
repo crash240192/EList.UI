@@ -2,12 +2,16 @@
 // Публичная страница организации — по структуре и оформлению как UserPage
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
   OrganizationRole,
   fetchOrganizationById,
   fetchOrganizationContacts,
   fetchOrganizationMembers,
+  fetchOrgSubscribersCount,
+  fetchIsSubscribedToOrganization,
+  subscribeToOrganization,
+  unsubscribeFromOrganization,
   formatOrganizationRole,
   formatVerificationStatus,
   getOrganizationAvatar,
@@ -19,12 +23,17 @@ import {
   type OrganizationResponse,
 } from '@/entities/organization';
 import { EventList, EventListItem } from '@/entities/event/ui/EventListItem';
+import { fetchOrganizationRating } from '@/entities/event';
 import { UserAvatar } from '@/entities/user/ui/UserAvatar/UserAvatar';
+import { FramedAuthImage } from '@/shared/ui/FramedAuthImage/FramedAuthImage';
 import { getOrFetchAccountId, getStoredAccountId } from '@/entities/user/api';
 import type { IContactDataItem } from '@/entities/user/profileApi';
+import type { INotifySettings } from '@/entities/user/subscriptionApi';
 import { useEvents } from '@/features/event-list/useEvents';
 import { OrganizationShareMenu } from '@/features/organization/OrganizationShareMenu';
 import { OrgMembersListModal } from '@/features/organizations/OrgMembersListModal';
+import { SubscribeModal } from '@/features/subscriptions/SubscribeModal';
+import { OrgSubscribersListModal } from '@/features/subscriptions/OrgSubscribersListModal';
 import { EventAlbumsGroupsPanel } from '@/features/media/EventAlbumsGroupsPanel';
 import {
   formatContactHref,
@@ -33,16 +42,16 @@ import {
   type ContactIconKind,
 } from '@/shared/lib/contactDisplay';
 import { useAuthStore } from '@/app/store';
-import { AuthImage } from '@/shared/ui/AuthImage/AuthImage';
+import { fetchAppFeatures } from '@/shared/api/featuresApi';
 import { AvatarLightbox } from '@/shared/ui/AvatarLightbox/AvatarLightbox';
+import { GradeBadge } from '@/shared/ui/GradeBadge/GradeBadge';
 import { HeroBackButton } from '@/shared/ui/HeroBackButton';
 import { HeroContextMenu, HeroContextMenuItem } from '@/shared/ui/HeroContextMenu';
 import { TabBar } from '@/shared/ui/TabBar';
-import { usePageTitle } from '@/shared/hooks';
+import { useInfiniteScroll, usePageTitle } from '@/shared/hooks';
 import { useSafeBack } from '@/shared/lib/useSafeBack';
 import heroStyles from '@/shared/styles/hero.module.css';
-import { isEventFinished } from '@/features/event/RatingWidget';
-import type { IEvent } from '@/entities/event';
+import type { IEventsSearchParams } from '@/entities/event';
 import { ContentReportModal } from '@/features/content-reports';
 import { ReportTargetType } from '@/entities/contentReport';
 import styles from './OrganizationPage.module.css';
@@ -55,16 +64,17 @@ const MAIN_TABS: { key: MainTab; label: string }[] = [
   { key: 'albums', label: 'Альбомы' },
 ];
 
-function splitEventsByPhase(events: IEvent[], phase: EventsPhase): IEvent[] {
-  const upcoming = events.filter(ev => !isEventFinished(ev.startTime, ev.endTime));
-  const past = events.filter(ev => isEventFinished(ev.startTime, ev.endTime));
-  const list = phase === 'upcoming' ? upcoming : past;
-
-  return [...list].sort((a, b) => {
-    const aTime = new Date(a.startTime).getTime();
-    const bTime = new Date(b.startTime).getTime();
-    return phase === 'upcoming' ? aTime - bTime : bTime - aTime;
-  });
+function orgEventsSearchParams(
+  organizationId: string | undefined,
+  phase: EventsPhase,
+): IEventsSearchParams {
+  const now = new Date().toISOString();
+  return {
+    organizationId,
+    ...(phase === 'past'
+      ? { endTime: now, orderBy: 'EndTime DESC' }
+      : { startTime: now, orderBy: 'StartTime' }),
+  };
 }
 
 function OrgCoverBackground({ logoId }: { logoId: string | null }) {
@@ -72,7 +82,7 @@ function OrgCoverBackground({ logoId }: { logoId: string | null }) {
     <div className={styles.coverBg}>
       <div className={styles.coverBgGradient} aria-hidden />
       {logoId ? (
-        <AuthImage
+        <FramedAuthImage
           fileId={logoId}
           alt=""
           className={styles.coverAvatarImg}
@@ -207,7 +217,12 @@ export default function OrganizationPage() {
   const [mainTab, setMainTab] = useState<MainTab>('events');
   const [eventsPhase, setEventsPhase] = useState<EventsPhase>('upcoming');
   const [albumsCount, setAlbumsCount] = useState(0);
+  const [organizerRating, setOrganizerRating] = useState<number | null>(null);
   const [showTeamModal, setShowTeamModal] = useState(false);
+  const [showSubscribersModal, setShowSubscribersModal] = useState(false);
+  const [showSubscribe, setShowSubscribe] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscribersCount, setSubscribersCount] = useState(0);
   const [lightboxFileIds, setLightboxFileIds] = useState<string[] | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [reportMenuOpen, setReportMenuOpen] = useState(false);
@@ -218,11 +233,40 @@ export default function OrganizationPage() {
   const [orgReported, setOrgReported] = useState(false);
   const [reportedPhotoIds, setReportedPhotoIds] = useState<Set<string>>(() => new Set());
   const reportMenuRef = useRef<HTMLButtonElement>(null);
+  const [organizationsEnabled, setOrganizationsEnabled] = useState<boolean | null>(null);
+  const [ticketsEnabled, setTicketsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAppFeatures()
+      .then(f => {
+        if (cancelled) return;
+        setOrganizationsEnabled(f.organizationsEnabled);
+        setTicketsEnabled(f.ticketsEnabled);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setOrganizationsEnabled(false);
+        setTicketsEnabled(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!authenticated || myAccountId) return;
     getOrFetchAccountId().then(setMyAccountId).catch(() => {});
   }, [authenticated, myAccountId]);
+
+  useEffect(() => {
+    if (organizationsEnabled !== true) return;
+    if (!id) {
+      setOrganizerRating(null);
+      return;
+    }
+    fetchOrganizationRating(id)
+      .then(setOrganizerRating)
+      .catch(() => setOrganizerRating(null));
+  }, [id]);
 
   useEffect(() => {
     if (!id) {
@@ -237,29 +281,69 @@ export default function OrganizationPage() {
       fetchOrganizationMembers(id).catch(() => [] as OrganizationMemberResponse[]),
       getOrganizationAvatar(id),
       fetchOrganizationContacts(id),
+      fetchOrgSubscribersCount(id),
     ])
-      .then(([o, m, av, c]) => {
+      .then(([o, m, av, c, subCount]) => {
         setOrg(o);
         setMembers(m.length ? m : (o.members ?? []));
         setLogoId(av);
         setContacts(c);
+        setSubscribersCount(subCount);
       })
       .catch(e => {
         setError(e instanceof Error ? e.message : 'Ошибка загрузки');
         setOrg(null);
       })
       .finally(() => setLoading(false));
+  }, [id, organizationsEnabled]);
+
+  useEffect(() => {
+    if (!id || !authenticated || !myAccountId) {
+      setIsSubscribed(false);
+      return;
+    }
+    let cancelled = false;
+    fetchIsSubscribedToOrganization(id)
+      .then(v => { if (!cancelled) setIsSubscribed(v); })
+      .catch(() => { if (!cancelled) setIsSubscribed(false); });
+    return () => { cancelled = true; };
+  }, [id, authenticated, myAccountId]);
+
+  const handleSubscribe = useCallback(async (settings: INotifySettings) => {
+    if (!id) return;
+    await subscribeToOrganization(id, { notifyEventCreated: settings.notifyEventCreated });
+    setIsSubscribed(true);
+    setSubscribersCount(c => c + 1);
+    setShowSubscribe(false);
   }, [id]);
 
-  const orgEvents = useEvents(
-    { organizationId: id },
-    !!id,
+  const handleUnsubscribe = useCallback(async () => {
+    if (!id) return;
+    await unsubscribeFromOrganization(id);
+    setIsSubscribed(false);
+    setSubscribersCount(c => Math.max(0, c - 1));
+  }, [id]);
+
+  const orgUpcomingParams = useMemo(
+    () => orgEventsSearchParams(id, 'upcoming'),
+    [id],
+  );
+  const orgPastParams = useMemo(
+    () => orgEventsSearchParams(id, 'past'),
+    [id],
   );
 
-  const filteredEvents = useMemo(
-    () => splitEventsByPhase(orgEvents.events, eventsPhase),
-    [orgEvents.events, eventsPhase],
-  );
+  const orgUpcoming = useEvents(orgUpcomingParams, !!id);
+  const orgPast = useEvents(orgPastParams, !!id);
+  const orgEvents = eventsPhase === 'upcoming' ? orgUpcoming : orgPast;
+
+  const eventsSentinelRef = useInfiniteScroll(orgEvents.loadMore, {
+    enabled:
+      mainTab === 'events'
+      && !orgEvents.isLoading
+      && !orgEvents.isLoadingMore
+      && orgEvents.hasMore,
+  });
 
   const myRole = useMemo(() => {
     if (!myAccountId) return null;
@@ -281,7 +365,7 @@ export default function OrganizationPage() {
   );
 
   const tabCounts: Record<MainTab, number> = {
-    events: orgEvents.total || orgEvents.events.length,
+    events: (orgUpcoming.total || 0) + (orgPast.total || 0),
     albums: albumsCount,
   };
 
@@ -296,7 +380,11 @@ export default function OrganizationPage() {
     else if (logoId) setLightboxFileIds([logoId]);
   }, [id, logoId]);
 
-  if (loading) {
+  if (organizationsEnabled === false) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (organizationsEnabled === null || loading) {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
@@ -406,7 +494,7 @@ export default function OrganizationPage() {
           >
             <div className={styles.avatar}>
               {logoId ? (
-                <AuthImage
+                <FramedAuthImage
                   fileId={logoId}
                   alt={org.name}
                   className={styles.avatarImg}
@@ -433,6 +521,28 @@ export default function OrganizationPage() {
               </div>
             )}
           </div>
+
+          {authenticated && org.active !== false && (
+            <div className={styles.profileActions}>
+              {isSubscribed ? (
+                <button
+                  type="button"
+                  className={`${styles.btnJoin} ${styles.btnLeave}`}
+                  onClick={() => { void handleUnsubscribe(); }}
+                >
+                  Отписаться
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={`${styles.btnJoin} ${styles.btnSubscribe}`}
+                  onClick={() => setShowSubscribe(true)}
+                >
+                  Подписаться
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className={styles.statsBar}>
@@ -449,12 +559,34 @@ export default function OrganizationPage() {
             </button>
             <button
               type="button"
+              className={`${styles.statItem} ${styles.statItemClickable} ${showSubscribersModal ? styles.statItemActive : ''}`}
+              onClick={() => setShowSubscribersModal(true)}
+            >
+              <span className={styles.statNum}>{subscribersCount}</span>
+              <span className={styles.statLabel}>подписчики</span>
+            </button>
+            <button
+              type="button"
               className={`${styles.statItem} ${styles.statItemClickable} ${showTeamModal ? styles.statItemActive : ''}`}
               onClick={() => setShowTeamModal(true)}
             >
               <span className={styles.statNum}>{activeMembers.length}</span>
               <span className={styles.statLabel}>команда</span>
             </button>
+          </div>
+
+          <div className={`${styles.statItem} ${styles.statItemStatic} ${styles.statItemRating}`}>
+            <div className={styles.statRating}>
+              {organizerRating != null && organizerRating > 0 ? (
+                <>
+                  <GradeBadge score={organizerRating} size="sm" />
+                  <span className={styles.ratingNum}>{organizerRating.toFixed(1)}</span>
+                </>
+              ) : (
+                <span className={styles.statNum}>—</span>
+              )}
+            </div>
+            <span className={styles.statLabel}>рейтинг организатора</span>
           </div>
         </div>
 
@@ -471,12 +603,14 @@ export default function OrganizationPage() {
                         {formatVerificationStatus(org.verificationStatus)}
                       </span>
                     </div>
-                    <div className={styles.systemInfoRow}>
-                      <span className={styles.systemInfoKey}>Продажа билетов</span>
-                      <span className={styles.systemInfoVal}>
-                        {org.canSellTickets ? 'Включена' : 'Выключена'}
-                      </span>
-                    </div>
+                    {ticketsEnabled && (
+                      <div className={styles.systemInfoRow}>
+                        <span className={styles.systemInfoKey}>Продажа билетов</span>
+                        <span className={styles.systemInfoVal}>
+                          {org.canSellTickets ? 'Включена' : 'Выключена'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </section>
               )}
@@ -593,7 +727,7 @@ export default function OrganizationPage() {
                   <div className={styles.emptyEvents}>Загрузка...</div>
                 )}
 
-                {!orgEvents.isLoading && filteredEvents.length === 0 && (
+                {!orgEvents.isLoading && orgEvents.events.length === 0 && (
                   <p className={styles.emptyEvents}>
                     {eventsPhase === 'upcoming'
                       ? 'Нет предстоящих мероприятий'
@@ -601,9 +735,9 @@ export default function OrganizationPage() {
                   </p>
                 )}
 
-                {!orgEvents.isLoading && filteredEvents.length > 0 && (
+                {!orgEvents.isLoading && orgEvents.events.length > 0 && (
                   <EventList>
-                    {filteredEvents.map(event => (
+                    {orgEvents.events.map(event => (
                       <EventListItem
                         key={event.id}
                         event={event}
@@ -612,6 +746,14 @@ export default function OrganizationPage() {
                       />
                     ))}
                   </EventList>
+                )}
+
+                {orgEvents.hasMore && (
+                  <div ref={eventsSentinelRef} className={styles.sentinel}>
+                    {orgEvents.isLoadingMore && (
+                      <span className={styles.loadingMore}>Загрузка…</span>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -658,6 +800,24 @@ export default function OrganizationPage() {
           members={members}
           currentAccountId={myAccountId}
           onClose={() => setShowTeamModal(false)}
+        />
+      )}
+
+      {showSubscribersModal && (
+        <OrgSubscribersListModal
+          organizationId={org.id}
+          currentAccountId={myAccountId}
+          onClose={() => setShowSubscribersModal(false)}
+        />
+      )}
+
+      {showSubscribe && (
+        <SubscribeModal
+          variant="organization"
+          targetLogin={org.name}
+          organizationLogoId={logoId}
+          onConfirm={handleSubscribe}
+          onCancel={() => setShowSubscribe(false)}
         />
       )}
     </div>
