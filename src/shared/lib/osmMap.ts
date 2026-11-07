@@ -38,6 +38,26 @@ export const ELIST_DARK_MAP_PALETTE = {
   streetMin: '#3d6386',
 } as const;
 
+/**
+ * Тюнинг neon-glow улиц (тёмная карта).
+ * Крути коэффициенты здесь — эталонные zoom-stop’ы в injectStreetGlow трогать не нужно.
+ * `opacity: 1` = эталон «сильного» glow; `0.5` = вдвое тише.
+ */
+export const ELIST_STREET_GLOW = {
+  /** Прозрачность / «яркость» свечения (множитель к stop opacity) */
+  opacity: 0.5,
+  /** Толщина glow-underlay (множитель к stop width) */
+  width: 1,
+  /** Размытие краёв (множитель к stop blur) */
+  blur: 1,
+  /** Внешний bloom-слой (широкое свечение); false = только плотный inner */
+  outerEnabled: true,
+  /** Цвет glow второстепенных улиц (чуть ярче ядра) */
+  colorMin: '#6a9fc8',
+  /** Цвет glow магистралей */
+  colorMaj: '#c47ae8',
+} as const;
+
 const mapThemeByInstance = new WeakMap<MapLibreMap, MapTheme>();
 
 /** Pending dark style — один fetch на вкладку. */
@@ -158,12 +178,23 @@ function applyPaletteToStyle(style: StyleSpecification): void {
   });
 }
 
-/** Zoom-stops glow: [z, widthPx, blurPx, opacity] */
+/** Zoom-stops glow (эталон): [z, widthPx, blurPx, opacity] — множатся через ELIST_STREET_GLOW */
 type GlowZoomStop = [zoom: number, width: number, blur: number, opacity: number];
 
+function tuneGlowStops(stops: GlowZoomStop[]): GlowZoomStop[] {
+  const { width, blur, opacity } = ELIST_STREET_GLOW;
+  return stops.map(([z, w, b, o]) => [
+    z,
+    w * width,
+    b * blur,
+    Math.min(1, Math.max(0, o * opacity)),
+  ]);
+}
+
 function glowInterpolate(stops: GlowZoomStop[], channel: 1 | 2 | 3): unknown[] {
+  const tuned = tuneGlowStops(stops);
   const expr: unknown[] = ['interpolate', ['linear'], ['zoom']];
-  for (const s of stops) expr.push(s[0], s[channel]);
+  for (const s of tuned) expr.push(s[0], s[channel]);
   return expr;
 }
 
@@ -244,17 +275,13 @@ function splitSecondaryRoads(style: StyleSpecification): void {
   style.layers.splice(idx + 1, 0, service, track);
 }
 
-/** Чуть светлее ядра улиц — glow иначе тонет в #16171e. */
-const STREET_GLOW_MIN = '#6a9fc8';
-const STREET_GLOW_MAJ = '#c47ae8';
-
 /**
  * Glow только у улиц/магистралей (не service/track/path).
- * Два underlay: outer (широкий bloom) + inner (плотное свечение).
- * Opacity раньше падала до ~0.26 на z20 — на большом зуме glow пропадал.
+ * Эталонные stop’ы × ELIST_STREET_GLOW (opacity/width/blur/цвета).
  */
 function injectStreetGlow(style: StyleSpecification): void {
   if (!style.layers) return;
+  const { colorMin, colorMaj, outerEnabled } = ELIST_STREET_GLOW;
   const targets: Array<{
     id: string;
     color: string;
@@ -263,7 +290,7 @@ function injectStreetGlow(style: StyleSpecification): void {
   }> = [
     {
       id: 'highway_minor',
-      color: STREET_GLOW_MIN,
+      color: colorMin,
       outer: [
         [12, 8, 7, 0.4],
         [14, 14, 11, 0.38],
@@ -279,7 +306,7 @@ function injectStreetGlow(style: StyleSpecification): void {
     },
     {
       id: 'highway_major_subtle',
-      color: STREET_GLOW_MAJ,
+      color: colorMaj,
       outer: [
         [5, 7, 5, 0.45],
         [9, 11, 8, 0.4],
@@ -293,7 +320,7 @@ function injectStreetGlow(style: StyleSpecification): void {
     },
     {
       id: 'highway_major_inner',
-      color: STREET_GLOW_MAJ,
+      color: colorMaj,
       outer: [
         [11, 10, 8, 0.42],
         [14, 18, 13, 0.38],
@@ -309,7 +336,7 @@ function injectStreetGlow(style: StyleSpecification): void {
     },
     {
       id: 'highway_motorway_subtle',
-      color: STREET_GLOW_MAJ,
+      color: colorMaj,
       outer: [
         [4, 8, 6, 0.48],
         [6, 12, 9, 0.4],
@@ -321,7 +348,7 @@ function injectStreetGlow(style: StyleSpecification): void {
     },
     {
       id: 'highway_motorway_inner',
-      color: STREET_GLOW_MAJ,
+      color: colorMaj,
       outer: [
         [6, 10, 8, 0.45],
         [12, 18, 13, 0.4],
@@ -365,7 +392,9 @@ function injectStreetGlow(style: StyleSpecification): void {
     if (idx < 0) continue;
     const src = style.layers[idx];
     if (src.type !== 'line') continue;
-    idx = addGlow(idx, src, `${t.id}-elist-glow-outer`, t.color, t.outer);
+    if (outerEnabled) {
+      idx = addGlow(idx, src, `${t.id}-elist-glow-outer`, t.color, t.outer);
+    }
     addGlow(idx, src, `${t.id}-elist-glow`, t.color, t.inner);
   }
 }
