@@ -181,16 +181,114 @@
   z-index: 0;
 }
 
-/* OpenFreeMap dark — нативный стиль; лёгкая подстройка контролов под токены UI */
+/* OpenFreeMap dark — атрибуция под токены UI */
 .mapDarkNative :global(.maplibregl-ctrl-attrib),
 .eventsMapDark :global(.maplibregl-ctrl-attrib) {
   background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
   color: var(--text-muted);
 }
 
-.mapDarkNative :global(.maplibregl-ctrl-group button),
-.eventsMapDark :global(.maplibregl-ctrl-group button) {
-  background: var(--surface) !important;
+/*
+ * Zoom +/- — обе темы через CSS-токены.
+ * Кнопки раздельные (не «склеенный» блок MapLibre), glass-surface + mask-иконки.
+ */
+.eventsMap :global(.maplibregl-ctrl-top-right),
+.map :global(.maplibregl-ctrl-top-right),
+.pickerMap :global(.maplibregl-ctrl-top-right) {
+  top: 10px;
+  right: 10px;
+}
+
+.eventsMap :global(.maplibregl-ctrl-group),
+.map :global(.maplibregl-ctrl-group),
+.pickerMap :global(.maplibregl-ctrl-group) {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eventsMap :global(.maplibregl-ctrl-group button),
+.map :global(.maplibregl-ctrl-group button),
+.pickerMap :global(.maplibregl-ctrl-group button) {
+  width: 36px;
+  height: 36px;
+  margin: 0 !important;
+  padding: 0;
+  border-radius: var(--control-radius) !important;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, var(--text-primary) 12%) !important;
+  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    0 6px 16px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition),
+    opacity var(--transition);
+}
+
+.eventsMap :global(.maplibregl-ctrl-group button + button),
+.map :global(.maplibregl-ctrl-group button + button),
+.pickerMap :global(.maplibregl-ctrl-group button + button) {
+  border-top: 1px solid color-mix(in srgb, var(--border) 88%, var(--text-primary) 12%) !important;
+}
+
+.eventsMap :global(.maplibregl-ctrl-group button:hover:not(:disabled)),
+.map :global(.maplibregl-ctrl-group button:hover:not(:disabled)),
+.pickerMap :global(.maplibregl-ctrl-group button:hover:not(:disabled)) {
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent) !important;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border)) !important;
+  box-shadow: var(--hover-glow);
+}
+
+.eventsMap :global(.maplibregl-ctrl-group button:focus-visible),
+.map :global(.maplibregl-ctrl-group button:focus-visible),
+.pickerMap :global(.maplibregl-ctrl-group button:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.eventsMap :global(.maplibregl-ctrl-group button:disabled),
+.map :global(.maplibregl-ctrl-group button:disabled),
+.pickerMap :global(.maplibregl-ctrl-group button:disabled) {
+  opacity: 0.38;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* Иконки +/− через mask → цвет из --text-primary (dark/light) */
+.eventsMap :global(.maplibregl-ctrl-group button .maplibregl-ctrl-icon),
+.map :global(.maplibregl-ctrl-group button .maplibregl-ctrl-icon),
+.pickerMap :global(.maplibregl-ctrl-group button .maplibregl-ctrl-icon) {
+  background-image: none !important;
+  background-color: var(--text-primary);
+  opacity: 0.92;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 18px 18px;
+  mask-size: 18px 18px;
+}
+
+.eventsMap :global(.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon),
+.map :global(.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon),
+.pickerMap :global(.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon) {
+  -webkit-mask-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+}
+
+.eventsMap :global(.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon),
+.map :global(.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon),
+.pickerMap :global(.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon) {
+  -webkit-mask-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
 }
 
 /* ---- Error ---- */
