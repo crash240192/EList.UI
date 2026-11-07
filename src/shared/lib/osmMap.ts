@@ -144,39 +144,22 @@ function applyPaletteToStyle(style: StyleSpecification): void {
   });
 }
 
-/**
- * Увеличить line-width для glow.
- * Нельзя оборачивать в `['*', f, expr]`: zoom допускается только как input
- * у top-level interpolate/step (иначе MapLibre падает при загрузке стиля).
- */
-function scaleLineWidth(width: unknown, factor: number): unknown {
-  if (typeof width === 'number') return width * factor;
-  if (!Array.isArray(width) || width.length < 2) return 4 * factor;
+/** Zoom-stops: [z, widthPx, blurPx, opacity] */
+type GlowZoomStop = [zoom: number, width: number, blur: number, opacity: number];
 
-  const op = width[0];
-  if (op === 'interpolate' || op === 'interpolate-hcl' || op === 'interpolate-lab') {
-    // ["interpolate", type, input, stop, out, stop, out, ...]
-    const next = width.slice() as unknown[];
-    for (let i = 4; i < next.length; i += 2) {
-      if (typeof next[i] === 'number') next[i] = (next[i] as number) * factor;
-    }
-    return next;
+function glowInterpolate(stops: GlowZoomStop[], channel: 1 | 2 | 3): unknown[] {
+  const expr: unknown[] = ['interpolate', ['linear'], ['zoom']];
+  for (const s of stops) {
+    expr.push(s[0], s[channel]);
   }
-  if (op === 'step') {
-    // ["step", input, default, stop, out, ...]
-    const next = width.slice() as unknown[];
-    if (typeof next[2] === 'number') next[2] = (next[2] as number) * factor;
-    for (let i = 4; i < next.length; i += 2) {
-      if (typeof next[i] === 'number') next[i] = (next[i] as number) * factor;
-    }
-    return next;
-  }
-  return 4 * factor;
+  return expr;
 }
 
 /**
- * Neon glow: копии street-слоёв под оригиналом (шире + line-blur).
- * Три underlay — заметно сильнее одного line-blur на ядре, без тяжёлого post-process.
+ * Neon glow: underlay под улицами.
+ * Width/blur/opacity — свои interpolate по zoom (не scale от ядра):
+ * издалека ядро тонкое, ×factor всё равно не видно; нужен явный минимум.
+ * subtle-слои — major/motorway на дальнем зуме (inner включается позже).
  */
 function injectStreetGlow(style: StyleSpecification): void {
   if (!style.layers) return;
@@ -184,13 +167,56 @@ function injectStreetGlow(style: StyleSpecification): void {
   const targets: Array<{
     id: string;
     color: string;
-    widthFactor: number;
-    blur: number;
-    opacity: number;
+    stops: GlowZoomStop[];
   }> = [
-    { id: 'highway_minor', color: p.streetMin, widthFactor: 3.2, blur: 10, opacity: 0.5 },
-    { id: 'highway_major_inner', color: p.streetMaj, widthFactor: 2.8, blur: 12, opacity: 0.45 },
-    { id: 'highway_motorway_inner', color: p.streetMaj, widthFactor: 2.8, blur: 12, opacity: 0.45 },
+    {
+      id: 'highway_minor',
+      color: p.streetMin,
+      // minzoom слоя ~8
+      stops: [
+        [8, 5, 2.5, 0.72],
+        [12, 9, 5, 0.58],
+        [16, 16, 9, 0.42],
+        [20, 26, 13, 0.32],
+      ],
+    },
+    {
+      id: 'highway_major_subtle',
+      color: p.streetMaj,
+      stops: [
+        [5, 4, 2, 0.7],
+        [9, 7, 4, 0.58],
+        [11, 10, 5.5, 0.48],
+      ],
+    },
+    {
+      id: 'highway_major_inner',
+      color: p.streetMaj,
+      stops: [
+        [11, 8, 4, 0.62],
+        [14, 14, 8, 0.48],
+        [18, 24, 12, 0.36],
+        [20, 32, 14, 0.3],
+      ],
+    },
+    {
+      id: 'highway_motorway_subtle',
+      color: p.streetMaj,
+      stops: [
+        [4, 5, 2.5, 0.75],
+        [6, 8, 4, 0.62],
+      ],
+    },
+    {
+      id: 'highway_motorway_inner',
+      color: p.streetMaj,
+      stops: [
+        [6, 7, 3.5, 0.68],
+        [12, 14, 7, 0.5],
+        [16, 22, 11, 0.38],
+        [20, 34, 14, 0.3],
+      ],
+    },
   ];
 
   for (const t of targets) {
@@ -207,9 +233,9 @@ function injectStreetGlow(style: StyleSpecification): void {
     glow.id = glowId;
     const paint: Record<string, unknown> = { ...(glow.paint ?? {}) };
     paint['line-color'] = t.color;
-    paint['line-opacity'] = t.opacity;
-    paint['line-blur'] = t.blur;
-    paint['line-width'] = scaleLineWidth(paint['line-width'], t.widthFactor);
+    paint['line-width'] = glowInterpolate(t.stops, 1);
+    paint['line-blur'] = glowInterpolate(t.stops, 2);
+    paint['line-opacity'] = glowInterpolate(t.stops, 3);
     delete paint['line-dasharray'];
     glow.paint = paint;
     style.layers.splice(idx, 0, glow);
