@@ -6,6 +6,7 @@ import {
   Marker,
   NavigationControl,
   Popup,
+  type FilterSpecification,
   type GeoJSONSource,
   type LayerSpecification,
   type MapOptions,
@@ -105,6 +106,8 @@ function applyPaletteToStyle(style: StyleSpecification): void {
 
   for (const id of [
     'highway_minor',
+    'highway_service',
+    'highway_track',
     'highway_path',
     'aeroway-taxiway',
     'aeroway-runway-casing',
@@ -113,10 +116,21 @@ function applyPaletteToStyle(style: StyleSpecification): void {
     setLayerPaint(style, id, { 'line-color': p.streetMin });
   }
   setLayerPaint(style, 'aeroway-area', { 'fill-color': p.streetMin });
+  // тропинки тоньше/тусклее ядра улиц
+  setLayerPaint(style, 'highway_path', {
+    'line-opacity': 0.55,
+    'line-width': [
+      'interpolate', ['exponential', 1.2], ['zoom'],
+      13, 0.4,
+      16, 1.2,
+      20, 3,
+    ],
+  });
+  setLayerPaint(style, 'highway_service', { 'line-opacity': 0.78 });
+  setLayerPaint(style, 'highway_track', { 'line-opacity': 0.62 });
 
-  // Ядро улиц чуть смягчаем; основной glow — отдельные underlay-слои ниже.
   for (const id of ['highway_minor', 'highway_major_inner', 'highway_motorway_inner']) {
-    setLayerPaint(style, id, { 'line-blur': 0.4, 'line-opacity': 0.95 });
+    setLayerPaint(style, id, { 'line-blur': 0.35, 'line-opacity': 0.95 });
   }
 
   const landText = '#f0f1f7';
@@ -144,77 +158,146 @@ function applyPaletteToStyle(style: StyleSpecification): void {
   });
 }
 
-/** Zoom-stops: [z, widthPx, blurPx, opacity] */
+/** Zoom-stops glow: [z, widthPx, blurPx, opacity] */
 type GlowZoomStop = [zoom: number, width: number, blur: number, opacity: number];
 
 function glowInterpolate(stops: GlowZoomStop[], channel: 1 | 2 | 3): unknown[] {
   const expr: unknown[] = ['interpolate', ['linear'], ['zoom']];
-  for (const s of stops) {
-    expr.push(s[0], s[channel]);
-  }
+  for (const s of stops) expr.push(s[0], s[channel]);
   return expr;
 }
 
+function roadClassFilter(className: string): FilterSpecification {
+  return [
+    'all',
+    ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
+    ['==', ['get', 'class'], className],
+  ];
+}
+
 /**
- * Neon glow: underlay под улицами.
- * Width/blur/opacity — свои interpolate по zoom (не scale от ядра):
- * издалека ядро тонкое, ×factor всё равно не видно; нужен явный минимум.
- * subtle-слои — major/motorway на дальнем зуме (inner включается позже).
+ * Fiord сваливает minor+service+track в один highway_minor → на dark всё
+ * одной толщины (особенно с glow). Liberty держит иерархию отдельно.
+ * Разделяем слои и задаём ширины как у liberty: улица > двор/сервис > track > path.
+ */
+function splitSecondaryRoads(style: StyleSpecification): void {
+  if (!style.layers) return;
+  if (style.layers.some(l => l.id === 'highway_service')) return;
+  const idx = style.layers.findIndex(l => l.id === 'highway_minor');
+  if (idx < 0) return;
+  const base = style.layers[idx];
+  if (base.type !== 'line') return;
+
+  base.filter = roadClassFilter('minor');
+  if (!base.paint) base.paint = {};
+  // улицы (residential / unclassified)
+  (base.paint as Record<string, unknown>)['line-width'] = [
+    'interpolate', ['exponential', 1.4], ['zoom'],
+    12, 0.9,
+    14, 2.6,
+    16, 7,
+    20, 16,
+  ];
+
+  const mk = (id: string, className: string, minzoom: number, width: unknown[], opacity: number) => {
+    const layer = structuredClone(base) as LayerSpecification & {
+      paint?: Record<string, unknown>;
+      filter?: unknown;
+      minzoom?: number;
+    };
+    layer.id = id;
+    layer.filter = roadClassFilter(className);
+    layer.minzoom = minzoom;
+    layer.paint = {
+      ...(layer.paint ?? {}),
+      'line-width': width,
+      'line-opacity': opacity,
+    };
+    return layer;
+  };
+
+  const service = mk(
+    'highway_service',
+    'service',
+    14,
+    [
+      'interpolate', ['exponential', 1.2], ['zoom'],
+      14, 0.5,
+      16, 2,
+      20, 7,
+    ],
+    0.78,
+  );
+  const track = mk(
+    'highway_track',
+    'track',
+    14,
+    [
+      'interpolate', ['exponential', 1.2], ['zoom'],
+      14, 0.35,
+      16, 1.3,
+      20, 4.5,
+    ],
+    0.62,
+  );
+
+  style.layers.splice(idx + 1, 0, service, track);
+}
+
+/**
+ * Glow только у «настоящих» улиц/магистралей — не у service/track/path,
+ * иначе иерархия толщин снова схлопывается в неоновое месиво.
+ * Width/blur/opacity — interpolate(zoom), не ×factor от ядра.
  */
 function injectStreetGlow(style: StyleSpecification): void {
   if (!style.layers) return;
   const p = ELIST_DARK_MAP_PALETTE;
-  const targets: Array<{
-    id: string;
-    color: string;
-    stops: GlowZoomStop[];
-  }> = [
+  const targets: Array<{ id: string; color: string; stops: GlowZoomStop[] }> = [
     {
       id: 'highway_minor',
       color: p.streetMin,
-      // minzoom слоя ~8
       stops: [
-        [8, 5, 2.5, 0.72],
-        [12, 9, 5, 0.58],
-        [16, 16, 9, 0.42],
-        [20, 26, 13, 0.32],
+        [12, 3.5, 2, 0.55],
+        [14, 6, 3.5, 0.45],
+        [17, 12, 6, 0.32],
+        [20, 18, 8, 0.26],
       ],
     },
     {
       id: 'highway_major_subtle',
       color: p.streetMaj,
       stops: [
-        [5, 4, 2, 0.7],
-        [9, 7, 4, 0.58],
-        [11, 10, 5.5, 0.48],
+        [5, 3.5, 2, 0.65],
+        [9, 6, 3.5, 0.52],
+        [11, 8, 4.5, 0.42],
       ],
     },
     {
       id: 'highway_major_inner',
       color: p.streetMaj,
       stops: [
-        [11, 8, 4, 0.62],
-        [14, 14, 8, 0.48],
-        [18, 24, 12, 0.36],
-        [20, 32, 14, 0.3],
+        [11, 6, 3, 0.55],
+        [14, 11, 5.5, 0.4],
+        [18, 18, 8, 0.3],
+        [20, 24, 10, 0.26],
       ],
     },
     {
       id: 'highway_motorway_subtle',
       color: p.streetMaj,
       stops: [
-        [4, 5, 2.5, 0.75],
-        [6, 8, 4, 0.62],
+        [4, 4, 2, 0.7],
+        [6, 7, 3.5, 0.55],
       ],
     },
     {
       id: 'highway_motorway_inner',
       color: p.streetMaj,
       stops: [
-        [6, 7, 3.5, 0.68],
-        [12, 14, 7, 0.5],
-        [16, 22, 11, 0.38],
-        [20, 34, 14, 0.3],
+        [6, 5.5, 2.5, 0.6],
+        [12, 11, 5, 0.42],
+        [16, 18, 8, 0.32],
+        [20, 26, 10, 0.26],
       ],
     },
   ];
@@ -286,6 +369,7 @@ async function getElistDarkStyle(): Promise<StyleSpecification> {
         return r.json() as Promise<StyleSpecification>;
       })
       .then(style => {
+        splitSecondaryRoads(style);
         applyPaletteToStyle(style);
         injectStreetGlow(style);
         injectBuilding3d(style);
