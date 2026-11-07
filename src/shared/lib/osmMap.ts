@@ -19,9 +19,8 @@ export type MapTheme = 'light' | 'dark';
  * Публичные стили OpenFreeMap (коммерческое OK, без ключа).
  * style.json не в репо — грузится по URL (MapLibre Style Spec).
  *
- * light: liberty (есть building-3d — мы его гасим).
- * dark:  fiord, не «dark» — stock dark почти чёрный (bg rgb(12,12,12)),
- *        дороги/кварталы сливаются; fiord читаемее на мобилке.
+ * light: liberty (с building-3d — оставляем, pitch=0).
+ * dark:  fiord, не stock «dark» (тот почти чёрный); fiord читаемее.
  */
 export const OPENFREEMAP_STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
 export const OPENFREEMAP_STYLE_DARK = 'https://tiles.openfreemap.org/styles/fiord';
@@ -39,20 +38,13 @@ export function mapDarkClass(
   return styles.mapDarkNative ?? '';
 }
 
-/** Убрать 3D-здания и зафиксировать «плоский» вид (дешевле на мобилке). */
+/**
+ * Не даём уйти в сильный наклон (главный GPU-риск на мобилке).
+ * Extrusion зданий liberty при pitch=0 оставляем — лёгкий объём без «полёта».
+ */
 export function flattenMapView(map: MapLibreMap): void {
   map.setPitch(0);
   map.setBearing(0);
-  if (!map.isStyleLoaded()) return;
-  for (const layer of map.getStyle().layers ?? []) {
-    if (layer.type === 'fill-extrusion') {
-      try {
-        map.setLayoutProperty(layer.id, 'visibility', 'none');
-      } catch {
-        /* слой мог исчезнуть при смене стиля */
-      }
-    }
-  }
 }
 
 export interface CreateMapLibreOptions {
@@ -85,7 +77,7 @@ export function createMap(
     interactive,
     scrollZoom,
     attributionControl: attributionControl ? undefined : false,
-    // без наклона/поворота — нет «3D-карты», меньше нагрузка на GPU
+    // здания 3D ок; жесткий pitch/rotate на мобилке режем (дороже GPU)
     pitch: 0,
     maxPitch: 0,
     dragRotate: false,
