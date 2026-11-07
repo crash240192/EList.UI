@@ -244,84 +244,129 @@ function splitSecondaryRoads(style: StyleSpecification): void {
   style.layers.splice(idx + 1, 0, service, track);
 }
 
+/** Чуть светлее ядра улиц — glow иначе тонет в #16171e. */
+const STREET_GLOW_MIN = '#6a9fc8';
+const STREET_GLOW_MAJ = '#c47ae8';
+
 /**
- * Glow только у «настоящих» улиц/магистралей — не у service/track/path,
- * иначе иерархия толщин снова схлопывается в неоновое месиво.
- * Width/blur/opacity — interpolate(zoom), не ×factor от ядра.
+ * Glow только у улиц/магистралей (не service/track/path).
+ * Два underlay: outer (широкий bloom) + inner (плотное свечение).
+ * Opacity раньше падала до ~0.26 на z20 — на большом зуме glow пропадал.
  */
 function injectStreetGlow(style: StyleSpecification): void {
   if (!style.layers) return;
-  const p = ELIST_DARK_MAP_PALETTE;
-  const targets: Array<{ id: string; color: string; stops: GlowZoomStop[] }> = [
+  const targets: Array<{
+    id: string;
+    color: string;
+    outer: GlowZoomStop[];
+    inner: GlowZoomStop[];
+  }> = [
     {
       id: 'highway_minor',
-      color: p.streetMin,
-      stops: [
-        [12, 3.5, 2, 0.55],
-        [14, 6, 3.5, 0.45],
-        [17, 12, 6, 0.32],
-        [20, 18, 8, 0.26],
+      color: STREET_GLOW_MIN,
+      outer: [
+        [12, 8, 7, 0.4],
+        [14, 14, 11, 0.38],
+        [17, 26, 18, 0.34],
+        [20, 40, 24, 0.3],
+      ],
+      inner: [
+        [12, 5, 3, 0.78],
+        [14, 9, 5, 0.72],
+        [17, 16, 8, 0.65],
+        [20, 24, 11, 0.58],
       ],
     },
     {
       id: 'highway_major_subtle',
-      color: p.streetMaj,
-      stops: [
-        [5, 3.5, 2, 0.65],
-        [9, 6, 3.5, 0.52],
-        [11, 8, 4.5, 0.42],
+      color: STREET_GLOW_MAJ,
+      outer: [
+        [5, 7, 5, 0.45],
+        [9, 11, 8, 0.4],
+        [11, 14, 10, 0.36],
+      ],
+      inner: [
+        [5, 4, 2.5, 0.8],
+        [9, 7, 4, 0.72],
+        [11, 9, 5, 0.65],
       ],
     },
     {
       id: 'highway_major_inner',
-      color: p.streetMaj,
-      stops: [
-        [11, 6, 3, 0.55],
-        [14, 11, 5.5, 0.4],
-        [18, 18, 8, 0.3],
-        [20, 24, 10, 0.26],
+      color: STREET_GLOW_MAJ,
+      outer: [
+        [11, 10, 8, 0.42],
+        [14, 18, 13, 0.38],
+        [18, 30, 20, 0.34],
+        [20, 42, 26, 0.3],
+      ],
+      inner: [
+        [11, 6, 3.5, 0.8],
+        [14, 12, 6, 0.72],
+        [18, 20, 10, 0.62],
+        [20, 28, 12, 0.55],
       ],
     },
     {
       id: 'highway_motorway_subtle',
-      color: p.streetMaj,
-      stops: [
-        [4, 4, 2, 0.7],
-        [6, 7, 3.5, 0.55],
+      color: STREET_GLOW_MAJ,
+      outer: [
+        [4, 8, 6, 0.48],
+        [6, 12, 9, 0.4],
+      ],
+      inner: [
+        [4, 5, 3, 0.82],
+        [6, 8, 4.5, 0.7],
       ],
     },
     {
       id: 'highway_motorway_inner',
-      color: p.streetMaj,
-      stops: [
-        [6, 5.5, 2.5, 0.6],
-        [12, 11, 5, 0.42],
-        [16, 18, 8, 0.32],
-        [20, 26, 10, 0.26],
+      color: STREET_GLOW_MAJ,
+      outer: [
+        [6, 10, 8, 0.45],
+        [12, 18, 13, 0.4],
+        [16, 30, 20, 0.35],
+        [20, 44, 26, 0.3],
+      ],
+      inner: [
+        [6, 6, 3.5, 0.82],
+        [12, 12, 6, 0.72],
+        [16, 20, 10, 0.62],
+        [20, 30, 12, 0.55],
       ],
     },
   ];
 
-  for (const t of targets) {
-    const glowId = `${t.id}-elist-glow`;
-    if (style.layers.some(l => l.id === glowId)) continue;
-    const idx = style.layers.findIndex(l => l.id === t.id);
-    if (idx < 0) continue;
-    const src = style.layers[idx];
-    if (src.type !== 'line') continue;
-
+  const addGlow = (
+    srcIdx: number,
+    src: LayerSpecification,
+    glowId: string,
+    color: string,
+    stops: GlowZoomStop[],
+  ) => {
+    if (style.layers!.some(l => l.id === glowId)) return srcIdx;
     const glow = structuredClone(src) as LayerSpecification & {
       paint?: Record<string, unknown>;
     };
     glow.id = glowId;
     const paint: Record<string, unknown> = { ...(glow.paint ?? {}) };
-    paint['line-color'] = t.color;
-    paint['line-width'] = glowInterpolate(t.stops, 1);
-    paint['line-blur'] = glowInterpolate(t.stops, 2);
-    paint['line-opacity'] = glowInterpolate(t.stops, 3);
+    paint['line-color'] = color;
+    paint['line-width'] = glowInterpolate(stops, 1);
+    paint['line-blur'] = glowInterpolate(stops, 2);
+    paint['line-opacity'] = glowInterpolate(stops, 3);
     delete paint['line-dasharray'];
     glow.paint = paint;
-    style.layers.splice(idx, 0, glow);
+    style.layers!.splice(srcIdx, 0, glow);
+    return srcIdx + 1; // исходный слой сдвинулся вправо
+  };
+
+  for (const t of targets) {
+    let idx = style.layers.findIndex(l => l.id === t.id);
+    if (idx < 0) continue;
+    const src = style.layers[idx];
+    if (src.type !== 'line') continue;
+    idx = addGlow(idx, src, `${t.id}-elist-glow-outer`, t.color, t.outer);
+    addGlow(idx, src, `${t.id}-elist-glow`, t.color, t.inner);
   }
 }
 
