@@ -27,9 +27,10 @@ export const OPENFREEMAP_STYLE_DARK = 'https://tiles.openfreemap.org/styles/fior
 
 /** Палитра тёмной темы карты — токены UI (`index.css` / hero). */
 export const ELIST_DARK_MAP_PALETTE = {
-  background: '#f0f1f7', // --text-primary (светлый холст)
+  background: '#16171e', // --bg
   water: '#1a1040', // hero gradient start
   residential: '#272932', // --surface-2
+  park: '#0d2818', // hero gradient end (леса / парки)
   building: '#32343f', // --border
   streetMaj: '#CA54F9',
   streetMin: '#4f46e5', // --accent-hover
@@ -67,7 +68,7 @@ function setPaintSafe(
 
 /**
  * Перекраска fiord под палитру приложения.
- * Фон светлый (#f0f1f7) — подписи суши затемняем для читаемости.
+ * Холст тёмный (#16171e) — подписи суши оставляем светлыми.
  */
 function applyElistDarkPalette(map: MapLibreMap): void {
   if (!map.isStyleLoaded()) return;
@@ -77,6 +78,9 @@ function applyElistDarkPalette(map: MapLibreMap): void {
   setPaintSafe(map, 'water', 'fill-color', p.water);
   setPaintSafe(map, 'waterway', 'line-color', p.water);
   setPaintSafe(map, 'landuse_residential', 'fill-color', p.residential);
+  setPaintSafe(map, 'landcover_wood', 'fill-color', p.park);
+  setPaintSafe(map, 'park', 'fill-color', p.park);
+  setPaintSafe(map, 'park_outline', 'line-color', p.park);
   setPaintSafe(map, 'road_area_pier', 'fill-color', p.background);
   setPaintSafe(map, 'road_pier', 'line-color', p.streetMin);
 
@@ -105,9 +109,8 @@ function applyElistDarkPalette(map: MapLibreMap): void {
   for (const id of min) setPaintSafe(map, id, 'line-color', p.streetMin);
   setPaintSafe(map, 'aeroway-area', 'fill-color', p.streetMin);
 
-  // подписи: светлый холст → тёмный текст; вода → светлый
-  const landText = '#1a1f2e';
-  const landHalo = 'rgba(240, 241, 247, 0.85)';
+  const landText = '#f0f1f7';
+  const landHalo = 'rgba(22, 23, 30, 0.85)';
   for (const id of [
     'highway_name_other',
     'highway_ref',
