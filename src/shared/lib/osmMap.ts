@@ -32,9 +32,9 @@ export const ELIST_DARK_MAP_PALETTE = {
   water: '#1a1040', // hero gradient start
   residential: '#272932', // --surface-2
   park: '#0d2818', // hero gradient end (леса / парки)
-  building: '#32343f', // --border
+  building: '#343646', // --border
   streetMaj: '#793f94',
-  streetMin: '#3c567c',
+  streetMin: '#3d6386',
 } as const;
 
 const mapThemeByInstance = new WeakMap<MapLibreMap, MapTheme>();
