@@ -41,15 +41,25 @@ export const ELIST_DARK_MAP_PALETTE = {
 /**
  * Тюнинг neon-glow улиц (тёмная карта).
  * Крути коэффициенты здесь — эталонные zoom-stop’ы в injectStreetGlow трогать не нужно.
- * `opacity: 1` = эталон «сильного» glow; `0.5` = вдвое тише.
+ *
+ * opacity/width/blur — глобальные множители (1 = эталон stop’ов).
+ * near* — доп. усиление при приближении (z12→z20), чтобы glow не тонул
+ * в толстом ядре улицы на крупном зуме.
  */
 export const ELIST_STREET_GLOW = {
   /** Прозрачность / «яркость» свечения (множитель к stop opacity) */
-  opacity: 0.25,
+  opacity: 0.35,
   /** Толщина glow-underlay (множитель к stop width) */
-  width: 1.3,
+  width: 1.2,
   /** Размытие краёв (множитель к stop blur) */
   blur: 1,
+  /**
+   * Доп. множитель opacity от z12 (×1) к z20 (×nearOpacityBoost).
+   * >1 компенсирует «пропажу» glow при приближении.
+   */
+  nearOpacityBoost: 2.4,
+  /** Доп. множитель ширины от z12 (×1) к z20 (×nearWidthBoost) */
+  nearWidthBoost: 1.55,
   /** Внешний bloom-слой (широкое свечение); false = только плотный inner */
   outerEnabled: true,
   /** Цвет glow второстепенных улиц (чуть ярче ядра) */
@@ -181,14 +191,24 @@ function applyPaletteToStyle(style: StyleSpecification): void {
 /** Zoom-stops glow (эталон): [z, widthPx, blurPx, opacity] — множатся через ELIST_STREET_GLOW */
 type GlowZoomStop = [zoom: number, width: number, blur: number, opacity: number];
 
+/** 0 на z≤12, 1 на z≥20 — линейный баланс «далеко / близко» */
+function nearZoomT(zoom: number): number {
+  return Math.min(1, Math.max(0, (zoom - 12) / 8));
+}
+
 function tuneGlowStops(stops: GlowZoomStop[]): GlowZoomStop[] {
-  const { width, blur, opacity } = ELIST_STREET_GLOW;
-  return stops.map(([z, w, b, o]) => [
-    z,
-    w * width,
-    b * blur,
-    Math.min(1, Math.max(0, o * opacity)),
-  ]);
+  const { width, blur, opacity, nearOpacityBoost, nearWidthBoost } = ELIST_STREET_GLOW;
+  return stops.map(([z, w, b, o]) => {
+    const t = nearZoomT(z);
+    const wMul = width * (1 + (nearWidthBoost - 1) * t);
+    const oMul = opacity * (1 + (nearOpacityBoost - 1) * t);
+    return [
+      z,
+      w * wMul,
+      b * blur,
+      Math.min(1, Math.max(0, o * oMul)),
+    ];
+  });
 }
 
 function glowInterpolate(stops: GlowZoomStop[], channel: 1 | 2 | 3): unknown[] {
@@ -282,6 +302,8 @@ function splitSecondaryRoads(style: StyleSpecification): void {
 function injectStreetGlow(style: StyleSpecification): void {
   if (!style.layers) return;
   const { colorMin, colorMaj, outerEnabled } = ELIST_STREET_GLOW;
+  // Эталон: почти плоская opacity по зуму (раньше падала к z20 → glow «пропадал»
+  // при приближении). Ширина растёт вместе с ядром улицы, ореол сохраняется.
   const targets: Array<{
     id: string;
     color: string;
@@ -292,16 +314,16 @@ function injectStreetGlow(style: StyleSpecification): void {
       id: 'highway_minor',
       color: colorMin,
       outer: [
-        [12, 8, 7, 0.4],
-        [14, 14, 11, 0.38],
-        [17, 26, 18, 0.34],
-        [20, 40, 24, 0.3],
+        [12, 9, 6, 0.42],
+        [14, 16, 9, 0.42],
+        [17, 28, 14, 0.42],
+        [20, 44, 18, 0.42],
       ],
       inner: [
-        [12, 5, 3, 0.78],
-        [14, 9, 5, 0.72],
-        [17, 16, 8, 0.65],
-        [20, 24, 11, 0.58],
+        [12, 5.5, 2.5, 0.82],
+        [14, 10, 4, 0.82],
+        [17, 18, 7, 0.82],
+        [20, 30, 10, 0.82],
       ],
     },
     {
@@ -309,57 +331,57 @@ function injectStreetGlow(style: StyleSpecification): void {
       color: colorMaj,
       outer: [
         [5, 7, 5, 0.45],
-        [9, 11, 8, 0.4],
-        [11, 14, 10, 0.36],
+        [9, 11, 7, 0.45],
+        [11, 14, 9, 0.45],
       ],
       inner: [
-        [5, 4, 2.5, 0.8],
-        [9, 7, 4, 0.72],
-        [11, 9, 5, 0.65],
+        [5, 4, 2.5, 0.85],
+        [9, 7, 3.5, 0.85],
+        [11, 9, 4.5, 0.85],
       ],
     },
     {
       id: 'highway_major_inner',
       color: colorMaj,
       outer: [
-        [11, 10, 8, 0.42],
-        [14, 18, 13, 0.38],
-        [18, 30, 20, 0.34],
-        [20, 42, 26, 0.3],
+        [11, 11, 7, 0.44],
+        [14, 20, 11, 0.44],
+        [18, 34, 16, 0.44],
+        [20, 48, 20, 0.44],
       ],
       inner: [
-        [11, 6, 3.5, 0.8],
-        [14, 12, 6, 0.72],
-        [18, 20, 10, 0.62],
-        [20, 28, 12, 0.55],
+        [11, 7, 3, 0.85],
+        [14, 13, 5, 0.85],
+        [18, 24, 8, 0.85],
+        [20, 34, 11, 0.85],
       ],
     },
     {
       id: 'highway_motorway_subtle',
       color: colorMaj,
       outer: [
-        [4, 8, 6, 0.48],
-        [6, 12, 9, 0.4],
+        [4, 8, 5, 0.48],
+        [6, 12, 7, 0.48],
       ],
       inner: [
-        [4, 5, 3, 0.82],
-        [6, 8, 4.5, 0.7],
+        [4, 5, 2.5, 0.88],
+        [6, 8, 4, 0.88],
       ],
     },
     {
       id: 'highway_motorway_inner',
       color: colorMaj,
       outer: [
-        [6, 10, 8, 0.45],
-        [12, 18, 13, 0.4],
-        [16, 30, 20, 0.35],
-        [20, 44, 26, 0.3],
+        [6, 11, 7, 0.46],
+        [12, 20, 11, 0.46],
+        [16, 34, 16, 0.46],
+        [20, 50, 20, 0.46],
       ],
       inner: [
-        [6, 6, 3.5, 0.82],
-        [12, 12, 6, 0.72],
-        [16, 20, 10, 0.62],
-        [20, 30, 12, 0.55],
+        [6, 7, 3, 0.88],
+        [12, 13, 5, 0.88],
+        [16, 24, 8, 0.88],
+        [20, 36, 11, 0.88],
       ],
     },
   ];
