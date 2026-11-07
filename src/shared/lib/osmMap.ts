@@ -7,6 +7,7 @@ import {
   NavigationControl,
   Popup,
   type GeoJSONSource,
+  type LayerSpecification,
   type MapOptions,
   type StyleSpecification,
 } from 'maplibre-gl';
@@ -20,7 +21,7 @@ export type MapTheme = 'light' | 'dark';
  * style.json не в репо — грузится по URL (MapLibre Style Spec).
  *
  * light: liberty (с building-3d — оставляем, pitch=0).
- * dark:  fiord, не stock «dark» (тот почти чёрный); fiord читаемее.
+ * dark:  fiord → ELIST_DARK_MAP_PALETTE (запекаем в StyleSpecification).
  */
 export const OPENFREEMAP_STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
 export const OPENFREEMAP_STYLE_DARK = 'https://tiles.openfreemap.org/styles/fiord';
@@ -32,14 +33,22 @@ export const ELIST_DARK_MAP_PALETTE = {
   residential: '#272932', // --surface-2
   park: '#0d2818', // hero gradient end (леса / парки)
   building: '#32343f', // --border
-  streetMaj: '#CA54F9',
-  streetMin: '#4f46e5', // --accent-hover
+  streetMaj: '#9F4BC6',
+  streetMin: '#5076AF',
 } as const;
 
 const mapThemeByInstance = new WeakMap<MapLibreMap, MapTheme>();
 
-export function getMapStyle(theme: MapTheme = 'light'): string {
+/** Pending dark style — один fetch на вкладку. */
+let elistDarkStylePromise: Promise<StyleSpecification> | null = null;
+
+export function getMapStyleUrl(theme: MapTheme = 'light'): string {
   return theme === 'dark' ? OPENFREEMAP_STYLE_DARK : OPENFREEMAP_STYLE_LIGHT;
+}
+
+/** @deprecated use getMapStyleUrl / resolveMapStyle */
+export function getMapStyle(theme: MapTheme = 'light'): string {
+  return getMapStyleUrl(theme);
 }
 
 /** OFM dark — нативный стиль, CSS-invert не нужен. */
@@ -51,43 +60,37 @@ export function mapDarkClass(
   return styles.mapDarkNative ?? '';
 }
 
-function setPaintSafe(
-  map: MapLibreMap,
+function setLayerPaint(
+  style: StyleSpecification,
   layerId: string,
-  prop: string,
-  value: unknown,
+  props: Record<string, unknown>,
 ): void {
-  if (!map.getLayer(layerId)) return;
-  try {
-    // prop зависит от типа слоя; вызываем только для известных id
-    map.setPaintProperty(layerId, prop as never, value as never);
-  } catch {
-    /* слой есть, но paint-ключ другой — пропускаем */
-  }
+  const layer = style.layers?.find(l => l.id === layerId);
+  if (!layer || !('paint' in layer) || !layer.paint) return;
+  Object.assign(layer.paint, props);
 }
 
-/**
- * Перекраска fiord под палитру приложения.
- * Холст тёмный (#16171e) — подписи суши оставляем светлыми.
- */
-function applyElistDarkPalette(map: MapLibreMap): void {
-  if (!map.isStyleLoaded()) return;
+function applyPaletteToStyle(style: StyleSpecification): void {
   const p = ELIST_DARK_MAP_PALETTE;
 
-  setPaintSafe(map, 'background', 'background-color', p.background);
-  setPaintSafe(map, 'water', 'fill-color', p.water);
-  setPaintSafe(map, 'waterway', 'line-color', p.water);
-  setPaintSafe(map, 'landuse_residential', 'fill-color', p.residential);
-  setPaintSafe(map, 'landcover_wood', 'fill-color', p.park);
-  setPaintSafe(map, 'park', 'fill-color', p.park);
-  setPaintSafe(map, 'park_outline', 'line-color', p.park);
-  setPaintSafe(map, 'road_area_pier', 'fill-color', p.background);
-  setPaintSafe(map, 'road_pier', 'line-color', p.streetMin);
+  setLayerPaint(style, 'background', { 'background-color': p.background });
+  setLayerPaint(style, 'water', { 'fill-color': p.water });
+  setLayerPaint(style, 'waterway', { 'line-color': p.water });
+  setLayerPaint(style, 'landuse_residential', { 'fill-color': p.residential });
+  // fiord: park opacity 0.3 / wood с alpha → серый «#8C8E9E» на холсте; делаем плотными
+  setLayerPaint(style, 'landcover_wood', { 'fill-color': p.park, 'fill-opacity': 1 });
+  setLayerPaint(style, 'park', { 'fill-color': p.park, 'fill-opacity': 0.92 });
+  setLayerPaint(style, 'park_outline', { 'line-color': p.park });
+  setLayerPaint(style, 'road_area_pier', { 'fill-color': p.background });
+  setLayerPaint(style, 'road_pier', { 'line-color': p.streetMin });
 
-  setPaintSafe(map, 'building', 'fill-color', p.building);
-  setPaintSafe(map, 'building-3d', 'fill-extrusion-color', p.building);
+  // fiord building fill-opacity=0.25 → дома почти сливаются с residential
+  setLayerPaint(style, 'building', {
+    'fill-color': p.building,
+    'fill-opacity': 0.92,
+  });
 
-  const maj = [
+  for (const id of [
     'highway_major_inner',
     'highway_major_subtle',
     'highway_major_casing',
@@ -96,18 +99,20 @@ function applyElistDarkPalette(map: MapLibreMap): void {
     'highway_motorway_casing',
     'tunnel_motorway_casing',
     'tunnel_motorway_inner',
-  ];
-  for (const id of maj) setPaintSafe(map, id, 'line-color', p.streetMaj);
+  ]) {
+    setLayerPaint(style, id, { 'line-color': p.streetMaj });
+  }
 
-  const min = [
+  for (const id of [
     'highway_minor',
     'highway_path',
     'aeroway-taxiway',
     'aeroway-runway-casing',
     'aeroway-runway',
-  ];
-  for (const id of min) setPaintSafe(map, id, 'line-color', p.streetMin);
-  setPaintSafe(map, 'aeroway-area', 'fill-color', p.streetMin);
+  ]) {
+    setLayerPaint(style, id, { 'line-color': p.streetMin });
+  }
+  setLayerPaint(style, 'aeroway-area', { 'fill-color': p.streetMin });
 
   const landText = '#f0f1f7';
   const landHalo = 'rgba(22, 23, 30, 0.85)';
@@ -126,22 +131,97 @@ function applyElistDarkPalette(map: MapLibreMap): void {
     'place_country_major',
     'place_continent',
   ]) {
-    setPaintSafe(map, id, 'text-color', landText);
-    setPaintSafe(map, id, 'text-halo-color', landHalo);
+    setLayerPaint(style, id, { 'text-color': landText, 'text-halo-color': landHalo });
   }
-  setPaintSafe(map, 'water_name', 'text-color', '#f0f1f7');
-  setPaintSafe(map, 'water_name', 'text-halo-color', 'rgba(26, 16, 64, 0.75)');
+  setLayerPaint(style, 'water_name', {
+    'text-color': '#f0f1f7',
+    'text-halo-color': 'rgba(26, 16, 64, 0.75)',
+  });
 }
 
 /**
- * Fiord (dark) по умолчанию без building-3d — добавляем как у liberty,
- * цвет берём из плоского слоя building (после палитры — --border).
+ * 3D-здания в стиле (не через addLayer на лету).
+ * Плоский building не режем по maxzoom — иначе при сбое extrusion дома пропадают.
+ */
+function injectBuilding3d(style: StyleSpecification): void {
+  if (!style.layers) return;
+  if (style.layers.some(l => l.id === 'building-3d')) return;
+
+  const buildingIdx = style.layers.findIndex(l => l.id === 'building');
+  const layer: LayerSpecification = {
+    id: 'building-3d',
+    type: 'fill-extrusion',
+    source: 'openmaptiles',
+    'source-layer': 'building',
+    minzoom: 14,
+    filter: ['!', ['has', 'hide_3d']],
+    paint: {
+      'fill-extrusion-base': [
+        'coalesce',
+        ['to-number', ['get', 'render_min_height']],
+        0,
+      ],
+      'fill-extrusion-color': ELIST_DARK_MAP_PALETTE.building,
+      'fill-extrusion-height': [
+        'max',
+        ['coalesce', ['to-number', ['get', 'render_height']], 0],
+        3,
+      ],
+      'fill-extrusion-opacity': 0.85,
+    },
+  };
+
+  if (buildingIdx >= 0) style.layers.splice(buildingIdx + 1, 0, layer);
+  else style.layers.push(layer);
+}
+
+async function getElistDarkStyle(): Promise<StyleSpecification> {
+  if (!elistDarkStylePromise) {
+    elistDarkStylePromise = fetch(OPENFREEMAP_STYLE_DARK)
+      .then(r => {
+        if (!r.ok) throw new Error(`OFM fiord style HTTP ${r.status}`);
+        return r.json() as Promise<StyleSpecification>;
+      })
+      .then(style => {
+        applyPaletteToStyle(style);
+        injectBuilding3d(style);
+        return style;
+      })
+      .catch(err => {
+        elistDarkStylePromise = null;
+        throw err;
+      });
+  }
+  // clone: MapLibre может мутировать переданный объект
+  const base = await elistDarkStylePromise;
+  return structuredClone(base);
+}
+
+function pendingDarkStyle(): StyleSpecification {
+  return {
+    version: 8,
+    name: 'elist-dark-pending',
+    sources: {},
+    layers: [
+      {
+        id: 'background',
+        type: 'background',
+        paint: { 'background-color': ELIST_DARK_MAP_PALETTE.background },
+      },
+    ],
+  };
+}
+
+/**
+ * Liberty (light) — building-3d уже есть.
+ * Не трогаем zoom-range плоского building: обрезка maxzoom=14 + пустой
+ * extrusion давала «пропажу» домов при пан/зуме.
  */
 function ensureBuilding3d(map: MapLibreMap): void {
   if (!map.isStyleLoaded() || map.getLayer('building-3d')) return;
   if (!map.getSource('openmaptiles')) return;
 
-  let color: string | unknown = ELIST_DARK_MAP_PALETTE.building;
+  let color: string | unknown = '#aaa';
   try {
     if (map.getLayer('building')) {
       color = map.getPaintProperty('building', 'fill-color') ?? color;
@@ -158,38 +238,57 @@ function ensureBuilding3d(map: MapLibreMap): void {
     minzoom: 14,
     filter: ['!', ['has', 'hide_3d']],
     paint: {
-      'fill-extrusion-base': ['get', 'render_min_height'],
+      'fill-extrusion-base': [
+        'coalesce',
+        ['to-number', ['get', 'render_min_height']],
+        0,
+      ],
       'fill-extrusion-color': color as string,
-      'fill-extrusion-height': ['get', 'render_height'],
+      'fill-extrusion-height': [
+        'max',
+        ['coalesce', ['to-number', ['get', 'render_height']], 0],
+        3,
+      ],
       'fill-extrusion-opacity': 0.85,
     },
   });
-
-  // как liberty: плоский fill до z14, дальше extrusion
-  if (map.getLayer('building')) {
-    try {
-      map.setLayerZoomRange('building', 12, 14);
-    } catch {
-      /* ignore */
-    }
-  }
 }
 
 /**
  * Не даём уйти в сильный наклон (главный GPU-риск на мобилке).
- * 3D-здания — и в light (liberty), и в dark (fiord + наш слой).
- * Тёмная тема: поверх fiord — ELIST_DARK_MAP_PALETTE.
+ * Тёмная палитра уже в StyleSpecification — тут только pitch + light 3d.
  */
 export function flattenMapView(map: MapLibreMap): void {
-  map.setPitch(0);
-  map.setBearing(0);
-  const theme = mapThemeByInstance.get(map) ?? 'light';
-  if (theme === 'dark') applyElistDarkPalette(map);
-  ensureBuilding3d(map);
-  if (theme === 'dark') {
-    // building-3d мог появиться после первой перекраски
-    setPaintSafe(map, 'building-3d', 'fill-extrusion-color', ELIST_DARK_MAP_PALETTE.building);
+  if (!map.isMoving()) {
+    map.setPitch(0);
+    map.setBearing(0);
+  } else {
+    map.once('moveend', () => {
+      map.setPitch(0);
+      map.setBearing(0);
+    });
   }
+  const theme = mapThemeByInstance.get(map) ?? 'light';
+  if (theme === 'light') ensureBuilding3d(map);
+}
+
+function applyStyleForTheme(map: MapLibreMap, theme: MapTheme): void {
+  mapThemeByInstance.set(map, theme);
+  if (theme === 'light') {
+    map.setStyle(OPENFREEMAP_STYLE_LIGHT);
+    return;
+  }
+  void getElistDarkStyle()
+    .then(style => {
+      if (mapThemeByInstance.get(map) !== 'dark') return;
+      map.setStyle(style);
+    })
+    .catch(() => {
+      // fallback: сырой fiord, без нашей палитры
+      if (mapThemeByInstance.get(map) === 'dark') {
+        map.setStyle(OPENFREEMAP_STYLE_DARK);
+      }
+    });
 }
 
 export interface CreateMapLibreOptions {
@@ -216,13 +315,13 @@ export function createMap(
 
   const map = new MapLibreMap({
     container,
-    style: getMapStyle(theme),
+    // dark: короткий placeholder, затем запечённый fiord (без setPaintProperty на лету)
+    style: theme === 'dark' ? pendingDarkStyle() : OPENFREEMAP_STYLE_LIGHT,
     center: [center[1], center[0]], // MapLibre: [lng, lat]
     zoom,
     interactive,
     scrollZoom,
     attributionControl: attributionControl ? undefined : false,
-    // здания 3D ок; жесткий pitch/rotate на мобилке режем (дороже GPU)
     pitch: 0,
     maxPitch: 0,
     dragRotate: false,
@@ -236,6 +335,10 @@ export function createMap(
   map.on('load', onStyle);
   map.on('style.load', onStyle);
 
+  if (theme === 'dark') {
+    applyStyleForTheme(map, 'dark');
+  }
+
   if (interactive) {
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
   }
@@ -245,8 +348,7 @@ export function createMap(
 
 /** Смена light/dark: setStyle (слои событий перевешиваются на style.load). */
 export function applyMapTheme(map: MapLibreMap, theme: MapTheme): void {
-  mapThemeByInstance.set(map, theme);
-  map.setStyle(getMapStyle(theme));
+  applyStyleForTheme(map, theme);
 }
 
 export function buildOsmPointUrl(lat: number, lng: number, zoom = 16): string {
