@@ -144,9 +144,33 @@ function applyPaletteToStyle(style: StyleSpecification): void {
   });
 }
 
+/**
+ * Увеличить line-width для glow.
+ * Нельзя оборачивать в `['*', f, expr]`: zoom допускается только как input
+ * у top-level interpolate/step (иначе MapLibre падает при загрузке стиля).
+ */
 function scaleLineWidth(width: unknown, factor: number): unknown {
   if (typeof width === 'number') return width * factor;
-  if (Array.isArray(width)) return ['*', factor, width];
+  if (!Array.isArray(width) || width.length < 2) return 4 * factor;
+
+  const op = width[0];
+  if (op === 'interpolate' || op === 'interpolate-hcl' || op === 'interpolate-lab') {
+    // ["interpolate", type, input, stop, out, stop, out, ...]
+    const next = width.slice() as unknown[];
+    for (let i = 4; i < next.length; i += 2) {
+      if (typeof next[i] === 'number') next[i] = (next[i] as number) * factor;
+    }
+    return next;
+  }
+  if (op === 'step') {
+    // ["step", input, default, stop, out, ...]
+    const next = width.slice() as unknown[];
+    if (typeof next[2] === 'number') next[2] = (next[2] as number) * factor;
+    for (let i = 4; i < next.length; i += 2) {
+      if (typeof next[i] === 'number') next[i] = (next[i] as number) * factor;
+    }
+    return next;
+  }
   return 4 * factor;
 }
 
