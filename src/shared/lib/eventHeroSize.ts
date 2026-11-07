@@ -14,22 +14,26 @@ export const EVENT_PAGE_HERO_MOBILE_HEIGHT = 250;
 /** Свёрнутая высота на мобилке с фото — меньше expanded, иначе collapse = 0 */
 export const EVENT_PAGE_HERO_MOBILE_COLLAPSED_HEIGHT = 160;
 
-/** Диапазон прокрутки (px), за который хиро сворачивается полностью */
+/**
+ * @deprecated Не использовать как длину анимации: для sticky-слота
+ * сжатие должно идти 1:1 с scrollTop на диапазоне (expanded − collapsed),
+ * иначе между хиро и контентом растёт щель.
+ */
 export const EVENT_HERO_COLLAPSE_SCROLL_RANGE = 280;
-
-function easeInOutQuad(t: number): number {
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-}
 
 /** На сколько px визуально сжимается хиро (слот в потоке остаётся expanded) */
 export function calcHeroCollapseRange(expandedHeight: number, collapsedHeight: number): number {
   return Math.max(0, expandedHeight - collapsedHeight);
 }
 
-/** Прогресс сворачивания 0…1 по позиции прокрутки */
-export function scrollToHeroCollapse(scrollTop: number): number {
-  const linear = Math.min(1, Math.max(0, scrollTop / EVENT_HERO_COLLAPSE_SCROLL_RANGE));
-  return easeInOutQuad(linear);
+/**
+ * Прогресс сворачивания 0…1 по scrollTop.
+ * `collapseRangePx` = expanded − collapsed: высота хиро = expanded − scrollTop
+ * (в пределах диапазона) → при position:sticky щель до belowHero = 0.
+ */
+export function scrollToHeroCollapse(scrollTop: number, collapseRangePx: number): number {
+  if (collapseRangePx <= 0) return 1;
+  return Math.min(1, Math.max(0, scrollTop / collapseRangePx));
 }
 
 export interface CoverNaturalSize {

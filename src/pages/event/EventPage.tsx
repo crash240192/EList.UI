@@ -262,6 +262,7 @@ export default function EventPage() {
   const heroRef = useRef<HTMLDivElement>(null);
   const organizerMenuRef = useRef<HTMLButtonElement>(null);
   const reportMenuRef = useRef<HTMLButtonElement>(null);
+  const heroHeightsRef = useRef({ expanded: EVENT_PAGE_HERO_COLLAPSED_HEIGHT, collapsed: EVENT_PAGE_HERO_COLLAPSED_HEIGHT });
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedHeroHeight, setExpandedHeroHeight] = useState(EVENT_PAGE_HERO_COLLAPSED_HEIGHT);
   const [heroWidth, setHeroWidth] = useState(0);
@@ -434,8 +435,10 @@ export default function EventPage() {
     collapsedHeroHeight,
   );
   // Слот в потоке = expanded; sticky-хиро только визуально сжимается (без правки scrollTop).
+  // Высота хиро = expanded − scrollTop → щель до belowHero не растёт.
   const heroCollapseRange = calcHeroCollapseRange(expandedHeroHeight, collapsedHeroHeight);
   const heroSlotHeight = heroCollapseRange > 0 ? expandedHeroHeight : heroHeight;
+  heroHeightsRef.current = { expanded: expandedHeroHeight, collapsed: collapsedHeroHeight };
 
   const handleCoverLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -476,8 +479,9 @@ export default function EventPage() {
 
     const onScroll = () => {
       setShowScrollTop(el.scrollTop > 360);
-      const t = scrollToHeroCollapse(el.scrollTop);
-      setHeroCollapse(t);
+      const { expanded, collapsed } = heroHeightsRef.current;
+      const range = calcHeroCollapseRange(expanded, collapsed);
+      setHeroCollapse(scrollToHeroCollapse(el.scrollTop, range));
     };
 
     onScroll();

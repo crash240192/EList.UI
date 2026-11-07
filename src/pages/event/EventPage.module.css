@@ -10,9 +10,11 @@
   /*
    * pageShell .card даёт overflow:hidden — ломает position:sticky у хиро
    * (слот остаётся expanded, хиро уезжает → щель до контента).
+   * !important: composes кладёт оба класса на элемент, порядок в бандле
+   * не гарантирован — без !important hidden часто побеждает.
    * Клип углов: у хиро/секций свой overflow; на мобилке radius и так 0.
    */
-  overflow: visible;
+  overflow: visible !important;
 }
 
 .deniedBackBtn {
