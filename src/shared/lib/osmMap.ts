@@ -39,12 +39,55 @@ export function mapDarkClass(
 }
 
 /**
+ * Fiord (dark) по умолчанию без building-3d — добавляем как у liberty,
+ * цвет берём из плоского слоя building.
+ */
+function ensureBuilding3d(map: MapLibreMap): void {
+  if (!map.isStyleLoaded() || map.getLayer('building-3d')) return;
+  if (!map.getSource('openmaptiles')) return;
+
+  let color: string | unknown = 'hsla(232, 47%, 18%, 0.9)';
+  try {
+    if (map.getLayer('building')) {
+      color = map.getPaintProperty('building', 'fill-color') ?? color;
+    }
+  } catch {
+    /* нет слоя */
+  }
+
+  map.addLayer({
+    id: 'building-3d',
+    type: 'fill-extrusion',
+    source: 'openmaptiles',
+    'source-layer': 'building',
+    minzoom: 14,
+    filter: ['!', ['has', 'hide_3d']],
+    paint: {
+      'fill-extrusion-base': ['get', 'render_min_height'],
+      'fill-extrusion-color': color as string,
+      'fill-extrusion-height': ['get', 'render_height'],
+      'fill-extrusion-opacity': 0.85,
+    },
+  });
+
+  // как liberty: плоский fill до z14, дальше extrusion
+  if (map.getLayer('building')) {
+    try {
+      map.setLayerZoomRange('building', 12, 14);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
  * Не даём уйти в сильный наклон (главный GPU-риск на мобилке).
- * Extrusion зданий liberty при pitch=0 оставляем — лёгкий объём без «полёта».
+ * 3D-здания — и в light (liberty), и в dark (fiord + наш слой).
  */
 export function flattenMapView(map: MapLibreMap): void {
   map.setPitch(0);
   map.setBearing(0);
+  ensureBuilding3d(map);
 }
 
 export interface CreateMapLibreOptions {
