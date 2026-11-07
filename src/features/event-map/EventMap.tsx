@@ -167,8 +167,6 @@ export function EventMap({
     return () => { cancelled = true; };
   }, []);
 
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; lat: number; lng: number } | null>(null);
-
   const centerRef = useRef(center);
   useEffect(() => { centerRef.current = center; }, [center]);
 
@@ -184,13 +182,6 @@ export function EventMap({
     window.addEventListener('elist:centerMap', handler);
     return () => window.removeEventListener('elist:centerMap', handler);
   }, []);
-
-  useEffect(() => {
-    if (!ctxMenu) return;
-    const fn = () => setCtxMenu(null);
-    document.addEventListener('mousedown', fn);
-    return () => document.removeEventListener('mousedown', fn);
-  }, [ctxMenu]);
 
   const { theme } = useThemeStore();
   const mapTheme: MapTheme = theme === 'dark' ? 'dark' : 'light';
@@ -212,18 +203,10 @@ export function EventMap({
   }, [onMarkerClick]);
   showGroupRef.current = showGroup;
 
-  const handleSearchHere = (lat: number, lng: number, radius: number) => {
-    setCtxMenu(null);
-    window.dispatchEvent(new CustomEvent('elist:searchHere', { detail: { lat, lng, radius } }));
-  };
-
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     let destroyed = false;
-    let handlePointerDown: ((e: PointerEvent) => void) | null = null;
-    let handlePointerUp: (() => void) | null = null;
-    let handlePointerMove: ((e: PointerEvent) => void) | null = null;
     let searchAreaTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
@@ -296,17 +279,8 @@ export function EventMap({
 
       appliedThemeRef.current = mapTheme;
 
-      map.on('contextmenu', (e) => {
-        e.preventDefault();
-        const rect = el.getBoundingClientRect();
-        setCtxMenu({
-          x: e.originalEvent.clientX - rect.left,
-          y: e.originalEvent.clientY - rect.top,
-          lat: e.lngLat.lat,
-          lng: e.lngLat.lng,
-        });
-        setGroupState(null);
-      });
+      // Без меню радиуса: глушим нативный context menu браузера на карте
+      map.on('contextmenu', (e) => { e.preventDefault(); });
 
       map.on('click', LAYER_UNCLUSTERED, (e) => {
         const f = e.features?.[0];
@@ -348,43 +322,6 @@ export function EventMap({
       map.on('mouseleave', LAYER_CLUSTERS, () => { map.getCanvas().style.cursor = ''; });
       map.on('mouseenter', LAYER_UNCLUSTERED, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', LAYER_UNCLUSTERED, () => { map.getCanvas().style.cursor = ''; });
-
-      let longPressTimer: ReturnType<typeof setTimeout> | null = null;
-      let longPressMoved = false;
-      let longPressX = 0;
-      let longPressY = 0;
-
-      handlePointerDown = (e: PointerEvent) => {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        longPressMoved = false;
-        longPressX = e.clientX;
-        longPressY = e.clientY;
-        longPressTimer = setTimeout(() => {
-          if (longPressMoved || !el || !mapRef.current) return;
-          const rect = el.getBoundingClientRect();
-          const x = longPressX - rect.left;
-          const y = longPressY - rect.top;
-          const ll = mapRef.current.unproject([x, y]);
-          setCtxMenu({ x, y, lat: ll.lat, lng: ll.lng });
-          setGroupState(null);
-          if (navigator.vibrate) navigator.vibrate(40);
-        }, 600);
-      };
-      handlePointerUp = () => {
-        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-      };
-      handlePointerMove = (e: PointerEvent) => {
-        const dx = e.clientX - longPressX;
-        const dy = e.clientY - longPressY;
-        if (Math.sqrt(dx * dx + dy * dy) > 8) {
-          longPressMoved = true;
-          if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-        }
-      };
-      el.addEventListener('pointerdown', handlePointerDown);
-      el.addEventListener('pointerup', handlePointerUp);
-      el.addEventListener('pointermove', handlePointerMove);
-      el.addEventListener('pointercancel', handlePointerUp);
       // ready — только после load/style.load (см. onStyleReady)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось инициализировать карту');
@@ -393,12 +330,6 @@ export function EventMap({
     return () => {
       destroyed = true;
       if (searchAreaTimer) clearTimeout(searchAreaTimer);
-      if (el) {
-        if (handlePointerDown) el.removeEventListener('pointerdown', handlePointerDown);
-        if (handlePointerUp) el.removeEventListener('pointerup', handlePointerUp);
-        if (handlePointerMove) el.removeEventListener('pointermove', handlePointerMove);
-        if (handlePointerUp) el.removeEventListener('pointercancel', handlePointerUp);
-      }
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -501,58 +432,6 @@ export function EventMap({
         ref={containerRef}
         className={`${styles.eventsMap} ${mapDarkClass(mapTheme, styles)}`}
       />
-
-      {ctxMenu && (
-        <div
-          onMouseDown={e => e.stopPropagation()}
-          style={{
-            position: 'absolute',
-            left: Math.min(ctxMenu.x + 4, (containerRef.current?.offsetWidth ?? 300) - 190),
-            top: Math.min(ctxMenu.y + 4, (containerRef.current?.offsetHeight ?? 400) - 200),
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 12,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.28)',
-            zIndex: 1100,
-            minWidth: 180,
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{
-            padding: '8px 14px 6px',
-            fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
-            letterSpacing: '0.06em', color: 'var(--text-secondary)',
-            borderBottom: '1px solid var(--border)',
-          }}>
-            Искать поблизости
-          </div>
-          {[
-            { label: '300 м', radius: 300 },
-            { label: '500 м', radius: 500 },
-            { label: '1 км', radius: 1000 },
-            { label: '3 км', radius: 3000 },
-            { label: '5 км', radius: 5000 },
-          ].map(({ label, radius }) => (
-            <button key={radius}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '9px 14px', background: 'none', border: 'none',
-                borderBottom: '1px solid var(--border)',
-                cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', textAlign: 'left',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-              onClick={() => handleSearchHere(ctxMenu.lat, ctxMenu.lng, radius)}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <circle cx="12" cy="12" r="3" fill="var(--accent)" stroke="none"/>
-              </svg>
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {groupState && (
         <PointGroupModal
