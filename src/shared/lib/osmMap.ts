@@ -130,6 +130,8 @@ function applyPaletteToStyle(style: StyleSpecification): void {
     'highway_motorway_casing',
     'tunnel_motorway_casing',
     'tunnel_motorway_inner',
+    'bridge_motorway_casing',
+    'bridge_motorway_inner',
   ]) {
     setLayerPaint(style, id, { 'line-color': p.streetMaj });
   }
@@ -162,7 +164,12 @@ function applyPaletteToStyle(style: StyleSpecification): void {
   setLayerPaint(style, 'highway_service', { 'line-opacity': 0.78 });
   setLayerPaint(style, 'highway_track', { 'line-opacity': 0.62 });
 
-  for (const id of ['highway_minor', 'highway_major_inner', 'highway_motorway_inner']) {
+  for (const id of [
+    'highway_minor',
+    'highway_major_inner',
+    'highway_motorway_inner',
+    'bridge_motorway_inner',
+  ]) {
     setLayerPaint(style, id, { 'line-blur': 0.35, 'line-opacity': 0.95 });
   }
 
@@ -336,6 +343,42 @@ function splitSecondaryRoads(style: StyleSpecification): void {
 }
 
 /**
+ * Fiord: highway_motorway_* исключает brunnel=bridge|tunnel; tunnel_* есть,
+ * bridge_* для motorway — нет (в liberty есть). Итог: КАД/эстакады дырявые.
+ * Добавляем bridge_motorway_casing/inner по образцу highway_motorway_*.
+ */
+function injectMotorwayBridges(style: StyleSpecification): void {
+  if (!style.layers) return;
+  if (style.layers.some(l => l.id === 'bridge_motorway_inner')) return;
+
+  const motorwayBridgeFilter: FilterSpecification = [
+    'all',
+    ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
+    [
+      'all',
+      ['==', ['get', 'brunnel'], 'bridge'],
+      ['==', ['get', 'class'], 'motorway'],
+    ],
+  ];
+
+  const cloneAsBridge = (sourceId: string, bridgeId: string) => {
+    const idx = style.layers!.findIndex(l => l.id === sourceId);
+    if (idx < 0) return;
+    const src = style.layers![idx];
+    if (src.type !== 'line') return;
+    const layer = structuredClone(src) as LayerSpecification & {
+      filter?: FilterSpecification;
+    };
+    layer.id = bridgeId;
+    layer.filter = motorwayBridgeFilter;
+    style.layers!.splice(idx + 1, 0, layer);
+  };
+
+  cloneAsBridge('highway_motorway_casing', 'bridge_motorway_casing');
+  cloneAsBridge('highway_motorway_inner', 'bridge_motorway_inner');
+}
+
+/**
  * Glow только у улиц/магистралей (не service/track/path).
  * Эталонные stop’ы × ELIST_STREET_GLOW (opacity/width/blur/цвета).
  */
@@ -410,6 +453,23 @@ function injectStreetGlow(style: StyleSpecification): void {
     },
     {
       id: 'highway_motorway_inner',
+      color: colorMaj,
+      outer: [
+        [6, 11, 7, 0.46],
+        [12, 20, 11, 0.46],
+        [16, 34, 16, 0.46],
+        [20, 50, 20, 0.46],
+      ],
+      inner: [
+        [6, 7, 3, 0.88],
+        [12, 13, 5, 0.88],
+        [16, 24, 8, 0.88],
+        [20, 36, 11, 0.88],
+      ],
+    },
+    // мосты motorway — те же stop’ы, иначе КАД/МКАД «дырявые» без glow
+    {
+      id: 'bridge_motorway_inner',
       color: colorMaj,
       outer: [
         [6, 11, 7, 0.46],
@@ -506,6 +566,7 @@ async function getElistDarkStyle(): Promise<StyleSpecification> {
       })
       .then(style => {
         splitSecondaryRoads(style);
+        injectMotorwayBridges(style);
         applyPaletteToStyle(style);
         injectStreetGlow(style);
         injectBuilding3d(style);
