@@ -29,6 +29,7 @@ export const OPENFREEMAP_STYLE_DARK = 'https://tiles.openfreemap.org/styles/fior
 export const ELIST_DARK_MAP_PALETTE = {
   background: '#f0f1f7', // --text-primary (светлый холст)
   water: '#1a1040', // hero gradient start
+  residential: '#272932', // --surface-2
   building: '#32343f', // --border
   streetMaj: '#CA54F9',
   streetMin: '#4f46e5', // --accent-hover
@@ -75,6 +76,7 @@ function applyElistDarkPalette(map: MapLibreMap): void {
   setPaintSafe(map, 'background', 'background-color', p.background);
   setPaintSafe(map, 'water', 'fill-color', p.water);
   setPaintSafe(map, 'waterway', 'line-color', p.water);
+  setPaintSafe(map, 'landuse_residential', 'fill-color', p.residential);
   setPaintSafe(map, 'road_area_pier', 'fill-color', p.background);
   setPaintSafe(map, 'road_pier', 'line-color', p.streetMin);
 
