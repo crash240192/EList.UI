@@ -139,6 +139,7 @@ function applyPaletteToStyle(style: StyleSpecification): void {
     'highway_service',
     'highway_track',
     'highway_path',
+    'highway_pedestrian',
     'aeroway-taxiway',
     'aeroway-runway-casing',
     'aeroway-runway',
@@ -146,16 +147,18 @@ function applyPaletteToStyle(style: StyleSpecification): void {
     setLayerPaint(style, id, { 'line-color': p.streetMin });
   }
   setLayerPaint(style, 'aeroway-area', { 'fill-color': p.streetMin });
-  // тропинки тоньше/тусклее ядра улиц
-  setLayerPaint(style, 'highway_path', {
-    'line-opacity': 0.55,
-    'line-width': [
-      'interpolate', ['exponential', 1.2], ['zoom'],
-      13, 0.4,
-      16, 1.2,
-      20, 3,
-    ],
-  });
+  // тропинки / пешеходные — тоньше и тусклее ядра улиц
+  for (const id of ['highway_path', 'highway_pedestrian']) {
+    setLayerPaint(style, id, {
+      'line-opacity': 0.55,
+      'line-width': [
+        'interpolate', ['exponential', 1.2], ['zoom'],
+        13, 0.4,
+        16, 1.2,
+        20, 3,
+      ],
+    });
+  }
   setLayerPaint(style, 'highway_service', { 'line-opacity': 0.78 });
   setLayerPaint(style, 'highway_track', { 'line-opacity': 0.62 });
 
@@ -229,7 +232,12 @@ function roadClassFilter(className: string): FilterSpecification {
 /**
  * Fiord сваливает minor+service+track в один highway_minor → на dark всё
  * одной толщины (особенно с glow). Liberty держит иерархию отдельно.
- * Разделяем слои и задаём ширины как у liberty: улица > двор/сервис > track > path.
+ * Разделяем слои: улица > сервис/двор > track > path/pedestrian.
+ *
+ * Важно: minzoom service/track = 8 как у исходного highway_minor.
+ * Если поднять до 14, куски улиц (часто class=service) пропадают до
+ * сильного приближения — «дырки», которых нет на светлой liberty.
+ * Pedestrian в fiord не было совсем — добавляем (есть в liberty).
  */
 function splitSecondaryRoads(style: StyleSpecification): void {
   if (!style.layers) return;
@@ -250,7 +258,14 @@ function splitSecondaryRoads(style: StyleSpecification): void {
     20, 16,
   ];
 
-  const mk = (id: string, className: string, minzoom: number, width: unknown[], opacity: number) => {
+  const mk = (
+    id: string,
+    className: string,
+    minzoom: number,
+    width: unknown[],
+    opacity: number,
+    extraPaint?: Record<string, unknown>,
+  ) => {
     const layer = structuredClone(base) as LayerSpecification & {
       paint?: Record<string, unknown>;
       filter?: unknown;
@@ -263,18 +278,22 @@ function splitSecondaryRoads(style: StyleSpecification): void {
       ...(layer.paint ?? {}),
       'line-width': width,
       'line-opacity': opacity,
+      ...extraPaint,
     };
     return layer;
   };
 
+  // minzoom 8 — как у исходного fiord highway_minor (не 14!)
   const service = mk(
     'highway_service',
     'service',
-    14,
+    8,
     [
       'interpolate', ['exponential', 1.2], ['zoom'],
-      14, 0.5,
-      16, 2,
+      8, 0.35,
+      12, 0.6,
+      14, 1.2,
+      16, 2.2,
       20, 7,
     ],
     0.78,
@@ -282,17 +301,38 @@ function splitSecondaryRoads(style: StyleSpecification): void {
   const track = mk(
     'highway_track',
     'track',
-    14,
+    8,
     [
       'interpolate', ['exponential', 1.2], ['zoom'],
-      14, 0.35,
-      16, 1.3,
+      8, 0.25,
+      12, 0.45,
+      14, 0.9,
+      16, 1.4,
       20, 4.5,
     ],
     0.62,
   );
 
   style.layers.splice(idx + 1, 0, service, track);
+
+  // liberty рисует pedestrian; fiord — нет → куски сети «пропадают» на dark
+  if (!style.layers.some(l => l.id === 'highway_pedestrian')) {
+    const pedestrian = mk(
+      'highway_pedestrian',
+      'pedestrian',
+      13,
+      [
+        'interpolate', ['exponential', 1.2], ['zoom'],
+        13, 0.4,
+        16, 1.2,
+        20, 3,
+      ],
+      0.55,
+      { 'line-dasharray': [2, 2] },
+    );
+    const pathIdx = style.layers.findIndex(l => l.id === 'highway_path');
+    style.layers.splice(pathIdx >= 0 ? pathIdx + 1 : idx + 3, 0, pedestrian);
+  }
 }
 
 /**
