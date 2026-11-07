@@ -45,9 +45,9 @@ export const ELIST_DARK_MAP_PALETTE = {
  */
 export const ELIST_STREET_GLOW = {
   /** Прозрачность / «яркость» свечения (множитель к stop opacity) */
-  opacity: 0.5,
+  opacity: 0.25,
   /** Толщина glow-underlay (множитель к stop width) */
-  width: 1,
+  width: 1.3,
   /** Размытие краёв (множитель к stop blur) */
   blur: 1,
   /** Внешний bloom-слой (широкое свечение); false = только плотный inner */
