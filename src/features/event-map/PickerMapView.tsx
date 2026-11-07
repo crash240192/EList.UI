@@ -1,15 +1,17 @@
-// features/event-map/PickerMapView.tsx — карта выбора точки (Leaflet + OSM)
+// features/event-map/PickerMapView.tsx — выбор точки (MapLibre)
 
 import { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
 import { reverseGeocode } from '@/shared/lib/geocode';
 import {
-  addCompactZoomControl,
-  createDotIcon,
+  applyMapTheme,
+  createDotMarkerElement,
   createMap,
-  createOsmTileLayer,
   DEFAULT_MAP_CENTER,
+  mapDarkClass,
+  Marker,
   setPickerBehaviors,
+  type MapLibreMap,
+  type MapTheme,
 } from '@/shared/lib/osmMap';
 import { useThemeStore } from '@/app/store';
 import styles from './YandexMap.module.css';
@@ -19,7 +21,6 @@ interface PickerMapViewProps {
   lng: number | null;
   address: string;
   initialCenter?: [number, number];
-  /** Разрешить сдвиг карты зажатием (модалка «Развернуть») */
   panEnabled?: boolean;
   className?: string;
   onPick: (lat: number, lng: number, address: string) => void;
@@ -46,14 +47,16 @@ export function PickerMapView({
   onGeocodingChange,
 }: PickerMapViewProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const markerRef = useRef<Marker | null>(null);
+  const appliedThemeRef = useRef<MapTheme | null>(null);
   const callbacksRef = useRef({ onPick, onAddressChange, onGeocodingChange, address });
   const reverseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reverseGenRef = useRef(0);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const { theme } = useThemeStore();
+  const mapTheme: MapTheme = theme === 'dark' ? 'dark' : 'light';
 
   callbacksRef.current = { onPick, onAddressChange, onGeocodingChange, address };
 
@@ -76,11 +79,10 @@ export function PickerMapView({
       const map = createMap(ref.current, {
         center,
         zoom: lat !== null ? 15 : 10,
-        zoomControl: false,
-        attributionControl: true,
+        theme: mapTheme,
+        interactive: true,
+        scrollZoom: panEnabled,
       });
-      createOsmTileLayer().addTo(map);
-      addCompactZoomControl(map);
       setPickerBehaviors(map, panEnabled);
 
       const runReverse = async (coords: [number, number]) => {
@@ -105,27 +107,29 @@ export function PickerMapView({
         }, REVERSE_DEBOUNCE_MS);
       };
 
-      const setCenterIfNeeded = (coords: [number, number], zoom = 15) => {
+      const setCenterIfNeeded = (coords: [number, number], z = 15) => {
         const current = map.getCenter();
-        const z = map.getZoom();
-        if (almostSame([current.lat, current.lng], coords) && Math.abs(z - zoom) < 0.5) return;
-        map.setView(coords, zoom, { animate: true });
+        const zoom = map.getZoom();
+        if (almostSame([current.lat, current.lng], coords) && Math.abs(zoom - z) < 0.5) return;
+        map.easeTo({ center: [coords[1], coords[0]], zoom: z, duration: 300 });
       };
 
       const ensureMarker = (coords: [number, number]) => {
         if (markerRef.current) {
-          const cur = markerRef.current.getLatLng();
+          const cur = markerRef.current.getLngLat();
           if (!almostSame([cur.lat, cur.lng], coords)) {
-            markerRef.current.setLatLng(coords);
+            markerRef.current.setLngLat([coords[1], coords[0]]);
           }
           return markerRef.current;
         }
-        const marker = L.marker(coords, {
+        const marker = new Marker({
+          element: createDotMarkerElement('#ef4444', 16),
           draggable: true,
-          icon: createDotIcon('#ef4444', 16),
-        }).addTo(map);
+        })
+          .setLngLat([coords[1], coords[0]])
+          .addTo(map);
         marker.on('dragend', () => {
-          const p = marker.getLatLng();
+          const p = marker.getLngLat();
           scheduleReverse([p.lat, p.lng]);
         });
         markerRef.current = marker;
@@ -146,13 +150,16 @@ export function PickerMapView({
 
       if (lat !== null && lng !== null) placeOrMove([lat, lng], false);
 
-      map.on('click', (e: L.LeafletMouseEvent) => {
-        placeOrMove([e.latlng.lat, e.latlng.lng], true);
+      map.on('click', (e) => {
+        placeOrMove([e.lngLat.lat, e.lngLat.lng], true);
       });
 
       mapRef.current = map;
-      setReady(true);
-      requestAnimationFrame(() => map.invalidateSize());
+      appliedThemeRef.current = mapTheme;
+      map.once('load', () => {
+        if (!destroyed) setReady(true);
+        map.resize();
+      });
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : 'Не удалось инициализировать карту');
     }
@@ -161,6 +168,7 @@ export function PickerMapView({
       destroyed = true;
       clearReverseTimer();
       reverseGenRef.current += 1;
+      markerRef.current?.remove();
       markerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
@@ -170,22 +178,31 @@ export function PickerMapView({
   }, [panEnabled]);
 
   useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    if (appliedThemeRef.current === mapTheme) return;
+    appliedThemeRef.current = mapTheme;
+    applyMapTheme(mapRef.current, mapTheme);
+  }, [mapTheme, ready]);
+
+  useEffect(() => {
     if (!ready || !mapRef.current || lat === null || lng === null) return;
     const map = mapRef.current;
     const coords: [number, number] = [lat, lng];
 
     if (markerRef.current) {
-      const cur = markerRef.current.getLatLng();
+      const cur = markerRef.current.getLngLat();
       if (!almostSame([cur.lat, cur.lng], coords)) {
-        markerRef.current.setLatLng(coords);
+        markerRef.current.setLngLat([coords[1], coords[0]]);
       }
     } else {
-      const marker = L.marker(coords, {
+      const marker = new Marker({
+        element: createDotMarkerElement('#ef4444', 16),
         draggable: true,
-        icon: createDotIcon('#ef4444', 16),
-      }).addTo(map);
+      })
+        .setLngLat([coords[1], coords[0]])
+        .addTo(map);
       marker.on('dragend', () => {
-        const p = marker.getLatLng();
+        const p = marker.getLngLat();
         if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
         reverseTimerRef.current = setTimeout(async () => {
           reverseTimerRef.current = null;
@@ -208,7 +225,7 @@ export function PickerMapView({
     const current = map.getCenter();
     const z = map.getZoom();
     if (!almostSame([current.lat, current.lng], coords) || Math.abs(z - 15) >= 0.5) {
-      map.setView(coords, 15, { animate: true });
+      map.easeTo({ center: [coords[1], coords[0]], zoom: 15, duration: 300 });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, ready]);
@@ -216,7 +233,7 @@ export function PickerMapView({
   useEffect(() => {
     if (!ready || !mapRef.current || !ref.current) return;
     const map = mapRef.current;
-    const fit = () => map.invalidateSize();
+    const fit = () => map.resize();
     fit();
     const observer = new ResizeObserver(() => fit());
     observer.observe(ref.current);
@@ -228,7 +245,7 @@ export function PickerMapView({
   return (
     <div
       ref={ref}
-      className={`${className ?? styles.pickerMap} ${theme === 'dark' ? styles.mapDark : ''}`}
+      className={`${className ?? styles.pickerMap} ${mapDarkClass(mapTheme, styles)}`}
     />
   );
 }

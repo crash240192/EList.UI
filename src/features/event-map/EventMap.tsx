@@ -1,12 +1,18 @@
-// features/event-map/EventMap.tsx — главная карта (Leaflet + OSM)
-// Балуны отключены — всё через React-компоненты.
-// При совпадении координат показываем список мероприятий на точке.
+// features/event-map/EventMap.tsx — главная карта (MapLibre + OpenFreeMap)
+// При совпадении координат — список мероприятий; рядом — кластеры GeoJSON.
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
-import L from 'leaflet';
-import 'leaflet.markercluster';
+import type { GeoJSON } from 'geojson';
 import type { IEventSearchShortItem } from '@/entities/event';
-import { createMap, createOsmTileLayer, haversineMeters } from '@/shared/lib/osmMap';
+import {
+  createMap,
+  applyMapTheme,
+  haversineMeters,
+  mapDarkClass,
+  type GeoJSONSource,
+  type MapLibreMap,
+  type MapTheme,
+} from '@/shared/lib/osmMap';
 import { placePointGroupModal, type PointGroupPlacement } from './pointGroupPlacement';
 import { useFiltersStore, useThemeStore } from '@/app/store';
 import {
@@ -20,7 +26,6 @@ import styles from './YandexMap.module.css';
 export interface MapSearchArea {
   lat: number;
   lng: number;
-  /** Радиус в метрах — по видимой области (центр → дальний угол bbox) */
   radiusM: number;
 }
 
@@ -31,10 +36,14 @@ interface EventMapProps {
   zoom?: number;
   onCenterChange?: (center: [number, number]) => void;
   onZoomChange?: (zoom: number) => void;
-  /** Видимая область карты → поиск (центр + радиус + зум для подписи города) */
   onSearchAreaChange?: (area: MapSearchArea) => void;
   searchAreaDebounceMs?: number;
 }
+
+const EVENTS_SOURCE = 'elist-events';
+const LAYER_CLUSTERS = 'elist-clusters';
+const LAYER_CLUSTER_COUNT = 'elist-cluster-count';
+const LAYER_UNCLUSTERED = 'elist-unclustered';
 
 function markerColors(item: IEventSearchShortItem): string[] {
   const c = item.colors?.filter(Boolean) ?? [];
@@ -44,7 +53,87 @@ function markerColors(item: IEventSearchShortItem): string[] {
 const coordKey = (lat: number, lng: number) =>
   `${lat.toFixed(5)},${lng.toFixed(5)}`;
 
-type MarkerWithGroup = L.Marker & { _elistGroup?: IEventSearchShortItem[] };
+async function ensureImage(map: MapLibreMap, id: string, url: string): Promise<void> {
+  if (!map.isStyleLoaded()) return;
+  if (map.hasImage(id)) return;
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`image load failed: ${id}`));
+    image.src = url;
+  });
+  if (!map.isStyleLoaded() || map.hasImage(id)) return;
+  map.addImage(id, img, { pixelRatio: Math.min(3, Math.round(window.devicePixelRatio || 1)) });
+}
+
+/** false = стиль ещё не готов, слои появятся на style.load. */
+function ensureEventLayers(map: MapLibreMap): boolean {
+  if (!map.isStyleLoaded()) return false;
+  if (map.getSource(EVENTS_SOURCE)) return true;
+
+  try {
+    map.addSource(EVENTS_SOURCE, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      cluster: true,
+      clusterMaxZoom: 16,
+      clusterRadius: 60,
+    });
+
+    map.addLayer({
+      id: LAYER_CLUSTERS,
+      type: 'circle',
+      source: EVENTS_SOURCE,
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': '#6366f1',
+        'circle-stroke-color': 'rgba(255,255,255,0.55)',
+        'circle-stroke-width': 2,
+        'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          16,
+          10, 20,
+          40, 24,
+        ],
+      },
+    });
+
+    map.addLayer({
+      id: LAYER_CLUSTER_COUNT,
+      type: 'symbol',
+      source: EVENTS_SOURCE,
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': ['get', 'point_count_abbreviated'],
+        'text-size': 12,
+        // OpenFreeMap liberty/dark: Noto Sans*
+        'text-font': ['Noto Sans Bold'],
+        'text-allow-overlap': true,
+      },
+      paint: {
+        'text-color': '#ffffff',
+      },
+    });
+
+    map.addLayer({
+      id: LAYER_UNCLUSTERED,
+      type: 'symbol',
+      source: EVENTS_SOURCE,
+      filter: ['!', ['has', 'point_count']],
+      layout: {
+        'icon-image': ['get', 'icon'],
+        'icon-size': 1,
+        'icon-allow-overlap': true,
+        'icon-anchor': 'center',
+      },
+    });
+    return true;
+  } catch {
+    // Style is not done loading / mid setStyle — ждём следующий style.load
+    return false;
+  }
+}
 
 export function EventMap({
   events,
@@ -57,13 +146,18 @@ export function EventMap({
   searchAreaDebounceMs = 400,
 }: EventMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const groupsRef = useRef(new Map<string, IEventSearchShortItem[]>());
   const onSearchAreaRef = useRef(onSearchAreaChange);
+  const showGroupRef = useRef<(group: IEventSearchShortItem[], x: number, y: number) => void>(() => {});
+  const appliedThemeRef = useRef<MapTheme | null>(null);
   useEffect(() => { onSearchAreaRef.current = onSearchAreaChange; }, [onSearchAreaChange]);
+
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [iconsReady, setIconsReady] = useState(false);
+  /** Инкремент на каждый успешный style.load — пересоздать слои/иконки после setStyle. */
+  const [styleEpoch, setStyleEpoch] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +179,7 @@ export function EventMap({
       const target: [number, number] = (detail?.lat && detail?.lng)
         ? [detail.lat, detail.lng]
         : centerRef.current;
-      mapRef.current.setView(target, 12, { animate: true });
+      mapRef.current.easeTo({ center: [target[1], target[0]], zoom: 12 });
     };
     window.addEventListener('elist:centerMap', handler);
     return () => window.removeEventListener('elist:centerMap', handler);
@@ -99,6 +193,7 @@ export function EventMap({
   }, [ctxMenu]);
 
   const { theme } = useThemeStore();
+  const mapTheme: MapTheme = theme === 'dark' ? 'dark' : 'light';
   const filterCategories = useFiltersStore(s => s.filters.categories);
   const filterTypes = useFiltersStore(s => s.filters.types);
   const markerFilter: MarkerTypeCategoryFilter = {
@@ -115,6 +210,7 @@ export function EventMap({
     }
     setGroupState({ events: group, x, y });
   }, [onMarkerClick]);
+  showGroupRef.current = showGroup;
 
   const handleSearchHere = (lat: number, lng: number, radius: number) => {
     setCtxMenu(null);
@@ -134,10 +230,9 @@ export function EventMap({
       const map = createMap(el, {
         center,
         zoom,
-        zoomControl: true,
-        attributionControl: true,
+        theme: mapTheme,
+        interactive: true,
       });
-      createOsmTileLayer().addTo(map);
       mapRef.current = map;
 
       const emitSearchArea = () => {
@@ -183,23 +278,76 @@ export function EventMap({
 
       map.on('moveend', onViewportChange);
       map.on('zoomend', onViewportChange);
-      requestAnimationFrame(() => {
-        map.invalidateSize();
+
+      const onStyleReady = () => {
+        if (destroyed) return;
+        ensureEventLayers(map);
+        setStyleEpoch(e => e + 1);
+        setReady(true);
         scheduleSearchArea();
+      };
+      // load — первый стиль; style.load — после setStyle (смена темы)
+      map.on('load', onStyleReady);
+      map.on('style.load', onStyleReady);
+      map.on('error', (e) => {
+        const msg = e.error?.message ?? 'Ошибка загрузки карты';
+        if (!destroyed) setError(msg);
       });
 
-      map.on('contextmenu', (e: L.LeafletMouseEvent) => {
-        if (!el) return;
-        e.originalEvent.preventDefault();
+      appliedThemeRef.current = mapTheme;
+
+      map.on('contextmenu', (e) => {
+        e.preventDefault();
         const rect = el.getBoundingClientRect();
         setCtxMenu({
           x: e.originalEvent.clientX - rect.left,
           y: e.originalEvent.clientY - rect.top,
-          lat: e.latlng.lat,
-          lng: e.latlng.lng,
+          lat: e.lngLat.lat,
+          lng: e.lngLat.lng,
         });
         setGroupState(null);
       });
+
+      map.on('click', LAYER_UNCLUSTERED, (e) => {
+        const f = e.features?.[0];
+        const gid = f?.properties?.groupId as string | undefined;
+        if (!gid) return;
+        const group = groupsRef.current.get(gid);
+        if (!group) return;
+        const rect = el.getBoundingClientRect();
+        showGroupRef.current(
+          group,
+          e.originalEvent.clientX - rect.left,
+          e.originalEvent.clientY - rect.top,
+        );
+      });
+
+      map.on('click', LAYER_CLUSTERS, async (e) => {
+        const f = e.features?.[0];
+        if (!f || f.properties?.cluster_id == null) return;
+        const source = map.getSource(EVENTS_SOURCE) as GeoJSONSource;
+        const clusterId = f.properties.cluster_id as number;
+        const leaves = await source.getClusterLeaves(clusterId, 200, 0);
+        const clusterEvents: IEventSearchShortItem[] = [];
+        for (const leaf of leaves) {
+          const gid = leaf.properties?.groupId as string | undefined;
+          if (!gid) continue;
+          const g = groupsRef.current.get(gid);
+          if (g) clusterEvents.push(...g);
+        }
+        if (clusterEvents.length === 0) return;
+        const rect = el.getBoundingClientRect();
+        showGroupRef.current(
+          clusterEvents,
+          e.originalEvent.clientX - rect.left,
+          e.originalEvent.clientY - rect.top,
+        );
+      });
+
+      map.on('mouseenter', LAYER_CLUSTERS, () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', LAYER_CLUSTERS, () => { map.getCanvas().style.cursor = ''; });
+      map.on('mouseenter', LAYER_UNCLUSTERED, () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', LAYER_UNCLUSTERED, () => { map.getCanvas().style.cursor = ''; });
 
       let longPressTimer: ReturnType<typeof setTimeout> | null = null;
       let longPressMoved = false;
@@ -211,23 +359,20 @@ export function EventMap({
         longPressMoved = false;
         longPressX = e.clientX;
         longPressY = e.clientY;
-
         longPressTimer = setTimeout(() => {
           if (longPressMoved || !el || !mapRef.current) return;
           const rect = el.getBoundingClientRect();
           const x = longPressX - rect.left;
           const y = longPressY - rect.top;
-          const coords = mapRef.current.containerPointToLatLng(L.point(x, y));
-          setCtxMenu({ x, y, lat: coords.lat, lng: coords.lng });
+          const ll = mapRef.current.unproject([x, y]);
+          setCtxMenu({ x, y, lat: ll.lat, lng: ll.lng });
           setGroupState(null);
           if (navigator.vibrate) navigator.vibrate(40);
         }, 600);
       };
-
       handlePointerUp = () => {
         if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
       };
-
       handlePointerMove = (e: PointerEvent) => {
         const dx = e.clientX - longPressX;
         const dy = e.clientY - longPressY;
@@ -236,30 +381,24 @@ export function EventMap({
           if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
         }
       };
-
       el.addEventListener('pointerdown', handlePointerDown);
       el.addEventListener('pointerup', handlePointerUp);
       el.addEventListener('pointermove', handlePointerMove);
       el.addEventListener('pointercancel', handlePointerUp);
-
-      if (!destroyed) setReady(true);
+      // ready — только после load/style.load (см. onStyleReady)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось инициализировать карту');
     }
 
     return () => {
       destroyed = true;
-      if (searchAreaTimer) {
-        clearTimeout(searchAreaTimer);
-        searchAreaTimer = null;
-      }
+      if (searchAreaTimer) clearTimeout(searchAreaTimer);
       if (el) {
         if (handlePointerDown) el.removeEventListener('pointerdown', handlePointerDown);
         if (handlePointerUp) el.removeEventListener('pointerup', handlePointerUp);
         if (handlePointerMove) el.removeEventListener('pointermove', handlePointerMove);
         if (handlePointerUp) el.removeEventListener('pointercancel', handlePointerUp);
       }
-      clusterRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -267,10 +406,22 @@ export function EventMap({
   }, []);
 
   useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    // Не вызывать setStyle на первом ready — стиль уже задан в createMap.
+    // Иначе гонка: addSource до конца загрузки → "Style is not done loading".
+    if (appliedThemeRef.current === mapTheme) return;
+    appliedThemeRef.current = mapTheme;
+    applyMapTheme(mapRef.current, mapTheme);
+  }, [mapTheme, ready]);
+
+  useEffect(() => {
     if (!ready || !mapRef.current || !containerRef.current) return;
     const map = mapRef.current;
     const el = containerRef.current;
-    const fit = () => map.invalidateSize();
+    const fit = () => {
+      if (map.isStyleLoaded()) map.resize();
+      else map.once('idle', () => map.resize());
+    };
     fit();
     const observer = new ResizeObserver(() => fit());
     observer.observe(el);
@@ -280,20 +431,17 @@ export function EventMap({
   useEffect(() => {
     if (!ready || !mapRef.current) return;
     const map = mapRef.current;
-    const current = map.getCenter();
+    if (!map.isStyleLoaded()) return;
+    const c = map.getCenter();
     const [lat, lng] = center;
-    if (Math.abs(current.lat - lat) < 0.0001 && Math.abs(current.lng - lng) < 0.0001) return;
-    map.setView(center, zoom, { animate: ready });
+    if (Math.abs(c.lat - lat) < 0.0001 && Math.abs(c.lng - lng) < 0.0001) return;
+    map.easeTo({ center: [lng, lat], zoom, duration: 400 });
   }, [center, zoom, ready]);
 
   useEffect(() => {
     if (!ready || !iconsReady || !mapRef.current) return;
     const map = mapRef.current;
-
-    if (clusterRef.current) {
-      map.removeLayer(clusterRef.current);
-      clusterRef.current = null;
-    }
+    if (!ensureEventLayers(map)) return;
 
     const groups = new Map<string, IEventSearchShortItem[]>();
     for (const ev of events) {
@@ -302,68 +450,44 @@ export function EventMap({
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(ev);
     }
+    groupsRef.current = groups;
 
-    const clusterer = L.markerClusterGroup({
-      showCoverageOnHover: false,
-      maxClusterRadius: 60,
-      spiderfyOnMaxZoom: true,
-      zoomToBoundsOnClick: false,
-      iconCreateFunction: (cluster) => {
-        const count = cluster.getChildCount();
-        const size = count < 10 ? 36 : count < 40 ? 42 : 48;
-        return L.divIcon({
-          html: `<div>${count}</div>`,
-          className: 'elist-map-cluster',
-          iconSize: L.point(size, size),
-          iconAnchor: L.point(size / 2, size / 2),
+    let cancelled = false;
+    void (async () => {
+      const features: GeoJSON.Feature[] = [];
+      for (const [key, group] of groups) {
+        if (cancelled) return;
+        const first = group[0];
+        const ringSource = group.length === 1
+          ? markerColors(first)
+          : [...new Set(group.flatMap(ev => markerColors(ev)))];
+        const iconId = `ev-${key.replace(/[^0-9a-z-]/gi, '_')}`;
+        const png = makeMarkerPng(ringSource, group.length, markerFilter);
+        try {
+          await ensureImage(map, iconId, png);
+        } catch {
+          continue;
+        }
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [first.longitude!, first.latitude!],
+          },
+          properties: {
+            groupId: key,
+            icon: iconId,
+          },
         });
-      },
-    });
-
-    for (const [, group] of groups) {
-      const first = group[0];
-      const ringSource = group.length === 1
-        ? markerColors(first)
-        : [...new Set(group.flatMap(ev => markerColors(ev)))];
-      const icon = L.icon({
-        iconUrl: makeMarkerPng(ringSource, group.length, markerFilter),
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-      });
-      const marker = L.marker([first.latitude!, first.longitude!], { icon }) as MarkerWithGroup;
-      marker._elistGroup = group;
-      marker.on('click', (e: L.LeafletMouseEvent) => {
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          showGroup(group, e.originalEvent.clientX - rect.left, e.originalEvent.clientY - rect.top);
-        } else {
-          showGroup(group, -1, -1);
-        }
-      });
-      clusterer.addLayer(marker);
-    }
-
-    clusterer.on('clusterclick', (e: L.LeafletEvent) => {
-      const cluster = (e as L.LeafletMouseEvent & { layer: L.MarkerCluster }).layer;
-      const childMarkers = cluster.getAllChildMarkers?.() as MarkerWithGroup[] | undefined;
-      const clusterEvents: IEventSearchShortItem[] = [];
-      childMarkers?.forEach((pm) => {
-        (pm._elistGroup ?? []).forEach((ev) => clusterEvents.push(ev));
-      });
-      if (clusterEvents.length > 0) {
-        const oe = (e as L.LeafletMouseEvent).originalEvent;
-        if (containerRef.current && oe) {
-          const rect = containerRef.current.getBoundingClientRect();
-          showGroup(clusterEvents, oe.clientX - rect.left, oe.clientY - rect.top);
-        } else {
-          showGroup(clusterEvents, -1, -1);
-        }
       }
-    });
 
-    map.addLayer(clusterer);
-    clusterRef.current = clusterer;
-  }, [events, showGroup, ready, iconsReady, filterCategories, filterTypes]);
+      if (cancelled || !map.isStyleLoaded()) return;
+      const source = map.getSource(EVENTS_SOURCE) as GeoJSONSource | undefined;
+      if (!source) return;
+      source.setData({ type: 'FeatureCollection', features });
+    })();
+    return () => { cancelled = true; };
+  }, [events, ready, iconsReady, filterCategories, filterTypes, styleEpoch, markerFilter]);
 
   if (error) return (
     <div className={styles.errorBox} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -375,7 +499,7 @@ export function EventMap({
     <div className={styles.eventsMapWrap}>
       <div
         ref={containerRef}
-        className={`${styles.eventsMap} ${theme === 'dark' ? styles.eventsMapDark : ''}`}
+        className={`${styles.eventsMap} ${mapDarkClass(mapTheme, styles)}`}
       />
 
       {ctxMenu && (
@@ -402,7 +526,6 @@ export function EventMap({
           }}>
             Искать поблизости
           </div>
-
           {[
             { label: '300 м', radius: 300 },
             { label: '500 м', radius: 500 },

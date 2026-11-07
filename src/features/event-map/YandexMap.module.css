@@ -171,7 +171,7 @@
   width: 100%;
   height: 100%;
   position: relative;
-  /* Оверлеи выше leaflet-pane / controls */
+  /* Оверлеи выше maplibre canvas/controls */
   isolation: isolate;
 }
 
@@ -181,38 +181,16 @@
   z-index: 0;
 }
 
-/* Кластеры MarkerCluster — accent вместо салатового дефолта */
-:global(.elist-map-cluster) {
-  background: color-mix(in srgb, var(--accent) 42%, transparent);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* OpenFreeMap dark — нативный стиль; лёгкая подстройка контролов под токены UI */
+.mapDarkNative :global(.maplibregl-ctrl-attrib),
+.eventsMapDark :global(.maplibregl-ctrl-attrib) {
+  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+  color: var(--text-muted);
 }
 
-:global(.elist-map-cluster > div) {
-  width: 78%;
-  height: 78%;
-  margin: 0;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font: 700 13px/1 Manrope, system-ui, sans-serif;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 45%, transparent);
-  border: 2px solid color-mix(in srgb, #fff 55%, var(--accent));
-}
-
-/*
- * Тёмная тема: инверсия только тайлов, стандартный контраст
- * (без brightness/contrast/saturate приглушения).
- * Маркеры/попапы/кластеры без фильтра — исходные цвета.
- */
-.eventsMapDark :global(.leaflet-tile-pane),
-.mapDark :global(.leaflet-tile-pane) {
-  filter: invert(1) hue-rotate(180deg);
+.mapDarkNative :global(.maplibregl-ctrl-group button),
+.eventsMapDark :global(.maplibregl-ctrl-group button) {
+  background: var(--surface) !important;
 }
 
 /* ---- Error ---- */

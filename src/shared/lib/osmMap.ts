@@ -1,43 +1,360 @@
-// shared/lib/osmMap.ts — Leaflet + тайлы OpenStreetMap
+// shared/lib/osmMap.ts — MapLibre GL + OpenFreeMap (данные OSM, без API-ключа)
 
-import L from 'leaflet';
-
-export const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-export const OSM_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>';
+import '@/shared/lib/maplibreWorker';
+import {
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  Popup,
+  type GeoJSONSource,
+  type LayerSpecification,
+  type MapOptions,
+  type StyleSpecification,
+} from 'maplibre-gl';
 
 export const DEFAULT_MAP_CENTER: [number, number] = [55.7558, 37.6173];
 
-/**
- * Leaflet 1.9+ по умолчанию рисует флаг Украины в prefix атрибуции.
- * Оставляем нейтральный текст; атрибуция OSM на тайловом слое сохраняется.
- */
-const LEAFLET_ATTRIBUTION_PREFIX =
-  '<a href="https://leafletjs.com" title="A JavaScript library for interactive maps">Leaflet</a>';
+export type MapTheme = 'light' | 'dark';
 
-export function createMap(el: HTMLElement, options?: L.MapOptions): L.Map {
-  const map = L.map(el, options);
-  map.attributionControl?.setPrefix(LEAFLET_ATTRIBUTION_PREFIX);
-  return map;
+/**
+ * Публичные стили OpenFreeMap (коммерческое OK, без ключа).
+ * style.json не в репо — грузится по URL (MapLibre Style Spec).
+ *
+ * light: liberty (с building-3d — оставляем, pitch=0).
+ * dark:  fiord → ELIST_DARK_MAP_PALETTE (запекаем в StyleSpecification).
+ */
+export const OPENFREEMAP_STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
+export const OPENFREEMAP_STYLE_DARK = 'https://tiles.openfreemap.org/styles/fiord';
+
+/** Палитра тёмной темы карты — токены UI (`index.css` / hero). */
+export const ELIST_DARK_MAP_PALETTE = {
+  background: '#16171e', // --bg
+  water: '#1a1040', // hero gradient start
+  residential: '#272932', // --surface-2
+  park: '#0d2818', // hero gradient end (леса / парки)
+  building: '#32343f', // --border
+  streetMaj: '#9F4BC6',
+  streetMin: '#5076AF',
+} as const;
+
+const mapThemeByInstance = new WeakMap<MapLibreMap, MapTheme>();
+
+/** Pending dark style — один fetch на вкладку. */
+let elistDarkStylePromise: Promise<StyleSpecification> | null = null;
+
+export function getMapStyleUrl(theme: MapTheme = 'light'): string {
+  return theme === 'dark' ? OPENFREEMAP_STYLE_DARK : OPENFREEMAP_STYLE_LIGHT;
 }
 
-export function createOsmTileLayer(): L.TileLayer {
-  return L.tileLayer(OSM_TILE_URL, {
-    attribution: OSM_ATTRIBUTION,
-    maxZoom: 19,
-    // DPR≥2 (мобилки): иначе 256px-тайл растягивается → мыло/пиксели.
-    // Leaflet берёт z+1 и рисует в половинном CSS-size; maxZoom станет 18
-    // (zoomOffset+1 → нативный OSM z19 на крайнем зуме, без запроса z20).
-    detectRetina: true,
+/** @deprecated use getMapStyleUrl / resolveMapStyle */
+export function getMapStyle(theme: MapTheme = 'light'): string {
+  return getMapStyleUrl(theme);
+}
+
+/** OFM dark — нативный стиль, CSS-invert не нужен. */
+export function mapDarkClass(
+  theme: MapTheme,
+  styles: Record<string, string>,
+): string {
+  if (theme !== 'dark') return '';
+  return styles.mapDarkNative ?? '';
+}
+
+function setLayerPaint(
+  style: StyleSpecification,
+  layerId: string,
+  props: Record<string, unknown>,
+): void {
+  const layer = style.layers?.find(l => l.id === layerId);
+  if (!layer || !('paint' in layer) || !layer.paint) return;
+  Object.assign(layer.paint, props);
+}
+
+function applyPaletteToStyle(style: StyleSpecification): void {
+  const p = ELIST_DARK_MAP_PALETTE;
+
+  setLayerPaint(style, 'background', { 'background-color': p.background });
+  setLayerPaint(style, 'water', { 'fill-color': p.water });
+  setLayerPaint(style, 'waterway', { 'line-color': p.water });
+  setLayerPaint(style, 'landuse_residential', { 'fill-color': p.residential });
+  // fiord: park opacity 0.3 / wood с alpha → серый «#8C8E9E» на холсте; делаем плотными
+  setLayerPaint(style, 'landcover_wood', { 'fill-color': p.park, 'fill-opacity': 1 });
+  setLayerPaint(style, 'park', { 'fill-color': p.park, 'fill-opacity': 0.92 });
+  setLayerPaint(style, 'park_outline', { 'line-color': p.park });
+  setLayerPaint(style, 'road_area_pier', { 'fill-color': p.background });
+  setLayerPaint(style, 'road_pier', { 'line-color': p.streetMin });
+
+  // fiord building fill-opacity=0.25 → дома почти сливаются с residential
+  setLayerPaint(style, 'building', {
+    'fill-color': p.building,
+    'fill-opacity': 0.92,
+  });
+
+  for (const id of [
+    'highway_major_inner',
+    'highway_major_subtle',
+    'highway_major_casing',
+    'highway_motorway_inner',
+    'highway_motorway_subtle',
+    'highway_motorway_casing',
+    'tunnel_motorway_casing',
+    'tunnel_motorway_inner',
+  ]) {
+    setLayerPaint(style, id, { 'line-color': p.streetMaj });
+  }
+
+  for (const id of [
+    'highway_minor',
+    'highway_path',
+    'aeroway-taxiway',
+    'aeroway-runway-casing',
+    'aeroway-runway',
+  ]) {
+    setLayerPaint(style, id, { 'line-color': p.streetMin });
+  }
+  setLayerPaint(style, 'aeroway-area', { 'fill-color': p.streetMin });
+
+  const landText = '#f0f1f7';
+  const landHalo = 'rgba(22, 23, 30, 0.85)';
+  for (const id of [
+    'highway_name_other',
+    'highway_ref',
+    'place_other',
+    'place_suburb',
+    'place_village',
+    'place_town',
+    'place_city',
+    'place_city_large',
+    'place_state',
+    'place_country_other',
+    'place_country_minor',
+    'place_country_major',
+    'place_continent',
+  ]) {
+    setLayerPaint(style, id, { 'text-color': landText, 'text-halo-color': landHalo });
+  }
+  setLayerPaint(style, 'water_name', {
+    'text-color': '#f0f1f7',
+    'text-halo-color': 'rgba(26, 16, 64, 0.75)',
   });
 }
 
-/** Ссылка на точку в OSM */
+/**
+ * 3D-здания в стиле (не через addLayer на лету).
+ * Плоский building не режем по maxzoom — иначе при сбое extrusion дома пропадают.
+ */
+function injectBuilding3d(style: StyleSpecification): void {
+  if (!style.layers) return;
+  if (style.layers.some(l => l.id === 'building-3d')) return;
+
+  const buildingIdx = style.layers.findIndex(l => l.id === 'building');
+  const layer: LayerSpecification = {
+    id: 'building-3d',
+    type: 'fill-extrusion',
+    source: 'openmaptiles',
+    'source-layer': 'building',
+    minzoom: 14,
+    filter: ['!', ['has', 'hide_3d']],
+    paint: {
+      'fill-extrusion-base': [
+        'coalesce',
+        ['to-number', ['get', 'render_min_height']],
+        0,
+      ],
+      'fill-extrusion-color': ELIST_DARK_MAP_PALETTE.building,
+      'fill-extrusion-height': [
+        'max',
+        ['coalesce', ['to-number', ['get', 'render_height']], 0],
+        3,
+      ],
+      'fill-extrusion-opacity': 0.85,
+    },
+  };
+
+  if (buildingIdx >= 0) style.layers.splice(buildingIdx + 1, 0, layer);
+  else style.layers.push(layer);
+}
+
+async function getElistDarkStyle(): Promise<StyleSpecification> {
+  if (!elistDarkStylePromise) {
+    elistDarkStylePromise = fetch(OPENFREEMAP_STYLE_DARK)
+      .then(r => {
+        if (!r.ok) throw new Error(`OFM fiord style HTTP ${r.status}`);
+        return r.json() as Promise<StyleSpecification>;
+      })
+      .then(style => {
+        applyPaletteToStyle(style);
+        injectBuilding3d(style);
+        return style;
+      })
+      .catch(err => {
+        elistDarkStylePromise = null;
+        throw err;
+      });
+  }
+  // clone: MapLibre может мутировать переданный объект
+  const base = await elistDarkStylePromise;
+  return structuredClone(base);
+}
+
+function pendingDarkStyle(): StyleSpecification {
+  return {
+    version: 8,
+    name: 'elist-dark-pending',
+    sources: {},
+    layers: [
+      {
+        id: 'background',
+        type: 'background',
+        paint: { 'background-color': ELIST_DARK_MAP_PALETTE.background },
+      },
+    ],
+  };
+}
+
+/**
+ * Liberty (light) — building-3d уже есть.
+ * Не трогаем zoom-range плоского building: обрезка maxzoom=14 + пустой
+ * extrusion давала «пропажу» домов при пан/зуме.
+ */
+function ensureBuilding3d(map: MapLibreMap): void {
+  if (!map.isStyleLoaded() || map.getLayer('building-3d')) return;
+  if (!map.getSource('openmaptiles')) return;
+
+  let color: string | unknown = '#aaa';
+  try {
+    if (map.getLayer('building')) {
+      color = map.getPaintProperty('building', 'fill-color') ?? color;
+    }
+  } catch {
+    /* нет слоя */
+  }
+
+  map.addLayer({
+    id: 'building-3d',
+    type: 'fill-extrusion',
+    source: 'openmaptiles',
+    'source-layer': 'building',
+    minzoom: 14,
+    filter: ['!', ['has', 'hide_3d']],
+    paint: {
+      'fill-extrusion-base': [
+        'coalesce',
+        ['to-number', ['get', 'render_min_height']],
+        0,
+      ],
+      'fill-extrusion-color': color as string,
+      'fill-extrusion-height': [
+        'max',
+        ['coalesce', ['to-number', ['get', 'render_height']], 0],
+        3,
+      ],
+      'fill-extrusion-opacity': 0.85,
+    },
+  });
+}
+
+/**
+ * Не даём уйти в сильный наклон (главный GPU-риск на мобилке).
+ * Тёмная палитра уже в StyleSpecification — тут только pitch + light 3d.
+ */
+export function flattenMapView(map: MapLibreMap): void {
+  if (!map.isMoving()) {
+    map.setPitch(0);
+    map.setBearing(0);
+  } else {
+    map.once('moveend', () => {
+      map.setPitch(0);
+      map.setBearing(0);
+    });
+  }
+  const theme = mapThemeByInstance.get(map) ?? 'light';
+  if (theme === 'light') ensureBuilding3d(map);
+}
+
+function applyStyleForTheme(map: MapLibreMap, theme: MapTheme): void {
+  mapThemeByInstance.set(map, theme);
+  if (theme === 'light') {
+    map.setStyle(OPENFREEMAP_STYLE_LIGHT);
+    return;
+  }
+  void getElistDarkStyle()
+    .then(style => {
+      if (mapThemeByInstance.get(map) !== 'dark') return;
+      map.setStyle(style);
+    })
+    .catch(() => {
+      // fallback: сырой fiord, без нашей палитры
+      if (mapThemeByInstance.get(map) === 'dark') {
+        map.setStyle(OPENFREEMAP_STYLE_DARK);
+      }
+    });
+}
+
+export interface CreateMapLibreOptions {
+  center?: [number, number];
+  zoom?: number;
+  theme?: MapTheme;
+  interactive?: boolean;
+  scrollZoom?: boolean;
+  attributionControl?: boolean;
+}
+
+export function createMap(
+  container: HTMLElement,
+  options: CreateMapLibreOptions = {},
+): MapLibreMap {
+  const {
+    center = DEFAULT_MAP_CENTER,
+    zoom = 12,
+    theme = 'light',
+    interactive = true,
+    scrollZoom = interactive,
+    attributionControl = true,
+  } = options;
+
+  const map = new MapLibreMap({
+    container,
+    // dark: короткий placeholder, затем запечённый fiord (без setPaintProperty на лету)
+    style: theme === 'dark' ? pendingDarkStyle() : OPENFREEMAP_STYLE_LIGHT,
+    center: [center[1], center[0]], // MapLibre: [lng, lat]
+    zoom,
+    interactive,
+    scrollZoom,
+    attributionControl: attributionControl ? undefined : false,
+    pitch: 0,
+    maxPitch: 0,
+    dragRotate: false,
+    touchPitch: false,
+    pitchWithRotate: false,
+  } satisfies MapOptions);
+
+  mapThemeByInstance.set(map, theme);
+
+  const onStyle = () => flattenMapView(map);
+  map.on('load', onStyle);
+  map.on('style.load', onStyle);
+
+  if (theme === 'dark') {
+    applyStyleForTheme(map, 'dark');
+  }
+
+  if (interactive) {
+    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+  }
+
+  return map;
+}
+
+/** Смена light/dark: setStyle (слои событий перевешиваются на style.load). */
+export function applyMapTheme(map: MapLibreMap, theme: MapTheme): void {
+  applyStyleForTheme(map, theme);
+}
+
 export function buildOsmPointUrl(lat: number, lng: number, zoom = 16): string {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=${zoom}/${lat}/${lng}`;
 }
 
-/** Расстояние между двумя точками (метры), формула гаверсинуса */
 export function haversineMeters(a: [number, number], b: [number, number]): number {
   const R = 6_371_000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -51,43 +368,40 @@ export function haversineMeters(a: [number, number], b: [number, number]): numbe
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export function createDotIcon(color: string, size = 14): L.DivIcon {
-  return L.divIcon({
-    className: 'elist-map-dot',
-    html: `<span style="
-      display:block;width:${size}px;height:${size}px;border-radius:50%;
-      background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);
-    "></span>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
+export function createDotMarkerElement(color: string, size = 14): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'elist-map-dot';
+  el.style.cssText = `
+    width:${size}px;height:${size}px;border-radius:50%;
+    background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);
+    cursor:grab;
+  `;
+  return el;
 }
 
-/** Компактный зум Leaflet справа сверху */
-export function addCompactZoomControl(map: L.Map): void {
-  L.control.zoom({ position: 'topright' }).addTo(map);
-}
-
-export function setPickerBehaviors(map: L.Map, panEnabled: boolean): void {
-  map.doubleClickZoom.disable();
-  map.boxZoom.disable();
-  map.keyboard.disable();
+export function setPickerBehaviors(map: MapLibreMap, panEnabled: boolean): void {
   if (panEnabled) {
-    map.dragging.enable();
-    map.scrollWheelZoom.enable();
-    map.touchZoom.enable();
+    map.dragPan.enable();
+    map.scrollZoom.enable();
+    map.touchZoomRotate.enable();
   } else {
-    map.dragging.disable();
-    map.scrollWheelZoom.disable();
-    map.touchZoom.disable();
+    map.dragPan.disable();
+    map.scrollZoom.disable();
+    map.touchZoomRotate.disable();
   }
-}
-
-export function disableMapPageScrollCapture(map: L.Map): void {
-  map.dragging.disable();
-  map.scrollWheelZoom.disable();
-  map.touchZoom.disable();
   map.doubleClickZoom.disable();
   map.boxZoom.disable();
   map.keyboard.disable();
 }
+
+export function disableMapPageScrollCapture(map: MapLibreMap): void {
+  map.dragPan.disable();
+  map.scrollZoom.disable();
+  map.touchZoomRotate.disable();
+  map.doubleClickZoom.disable();
+  map.boxZoom.disable();
+  map.keyboard.disable();
+}
+
+export { Marker, Popup, MapLibreMap };
+export type { GeoJSONSource, StyleSpecification };
